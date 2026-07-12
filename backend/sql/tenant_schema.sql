@@ -183,6 +183,7 @@ CREATE TABLE servicios_catalogo (
 ) ENGINE=InnoDB;
 
 -- ── Configuración empresa (facturación) ───────────────────────
+-- ── Configuración empresa (facturación) ───────────────────────
 CREATE TABLE empresa_config (
   id               INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre           VARCHAR(150)  NOT NULL DEFAULT 'VetClinic',
@@ -196,6 +197,7 @@ CREATE TABLE empresa_config (
   web              VARCHAR(100)  NULL,
   logo_url         VARCHAR(500)  NULL,
   moneda           VARCHAR(10)   NOT NULL DEFAULT 'PEN',
+  simbolo_moneda   VARCHAR(10)   NOT NULL DEFAULT 'S/.',
   igv_porcentaje   DECIMAL(5,2)  NOT NULL DEFAULT 18.00,
   serie_boleta     VARCHAR(10)   NOT NULL DEFAULT 'B001',
   serie_factura    VARCHAR(10)   NOT NULL DEFAULT 'F001',
