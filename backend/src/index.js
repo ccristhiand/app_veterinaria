@@ -46,14 +46,24 @@ const server = http.createServer(app);
 // ── CORS dinámico por tenant ──────────────────────────────────────
 const corsOptions = {
   origin(origin, callback) {
-    // Permitir cualquier subdominio del dominio base
-    const base = process.env.BASE_DOMAIN || 'vetclinic.com';
-    if (!origin || origin.includes('localhost') ||
-        origin.endsWith(`.${base}`) || origin === `https://${base}`) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS no permitido'));
+    // Sin origen (Postman, curl, mobile apps) → permitir
+    if (!origin) return callback(null, true);
+
+    // DESARROLLO LOCAL — localhost, .test, .local
+    if (origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.includes('.test') ||
+        origin.includes('.local')) {
+      return callback(null, true);
     }
+
+    // PRODUCCIÓN — cualquier subdominio del dominio base
+    const base = process.env.BASE_DOMAIN || 'vetclinic.com';
+    if (origin.endsWith(`.${base}`) || origin === `https://${base}`) {
+      return callback(null, true);
+    }
+
+    callback(new Error('CORS no permitido'));
   },
   credentials: true,
 };

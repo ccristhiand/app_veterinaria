@@ -372,3 +372,5 @@ curl https://api.tudominio.pe/health
 - **Socket.io** — citas, stock y notificaciones en tiempo real
 - **Suspensión** — cierre forzado de sesiones con motivo
 - **Multimoneda** — configurable por clínica (S/., $, €, etc.)
+
+sudo nano /etc/nginx/sites-available/vetclinic
