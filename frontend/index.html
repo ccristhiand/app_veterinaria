@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>VetClinic</title>
+  <script>
+    if (localStorage.getItem('vet_access') && localStorage.getItem('vet_user')) {
+      window.location.replace('dashboard.html');
+    } else {
+      window.location.replace('login.html');
+    }
+  </script>
+</head>
+<body></body>
+</html>

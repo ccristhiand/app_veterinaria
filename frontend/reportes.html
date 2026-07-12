@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Reportes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <!-- xlsx-js-style para Excel con colores y estilos -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <style>
+    .rep-tab { padding:.55rem 1rem;border:none;background:none;cursor:pointer;
+               font-family:inherit;font-size:.82rem;font-weight:600;color:var(--ink-faint);
+               border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s; }
+    .rep-tab.active { color:var(--green-600);border-bottom-color:var(--green-500); }
+    .kpi { background:#fff;border:1px solid var(--line);border-radius:1rem;
+           padding:1.1rem;box-shadow:var(--shadow-sm); }
+    .kpi-val { font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:700;line-height:1; }
+    .kpi-label { font-size:.65rem;color:var(--ink-faint);font-weight:700;
+                 text-transform:uppercase;letter-spacing:.08em;margin-top:.4rem; }
+    .rep-table { width:100%;border-collapse:collapse;font-size:.8rem; }
+    .rep-table th { background:#f6f8f6;padding:.6rem .85rem;text-align:left;
+                    font-size:.62rem;font-weight:700;letter-spacing:.1em;
+                    text-transform:uppercase;color:var(--ink-faint);
+                    border-bottom:1px solid var(--line); }
+    .rep-table td { padding:.7rem .85rem;border-bottom:1px solid #f2f5f2; }
+    .rep-table tr:last-child td { border-bottom:none; }
+    .bar-h { height:8px;background:#e8ede9;border-radius:999px;overflow:hidden;margin-top:.3rem; }
+    .bar-h-fill { height:100%;border-radius:999px;
+                  background:linear-gradient(90deg,#10b981,#059669);transition:width .5s; }
+    .badge-vencida  { background:#fff1f2;color:#be123c;border:1px solid #fecdd3;
+                      font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-proxima  { background:#fffbeb;color:#b45309;border:1px solid #fde68a;
+                      font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-ok       { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;
+                      font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    @media print {
+      .no-print { display:none !important; }
+      .page { padding:0 !important; }
+      .vcard { box-shadow:none !important; }
+    }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>📈 Reportes</h2><p>Análisis y estadísticas de la clínica</p></div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap" class="no-print">
+      <button onclick="descargarExcel()" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.4rem">
+        📊 Excel
+      </button>
+      <button onclick="descargarPDF()" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.4rem">
+        📄 PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtros de período -->
+  <div class="vcard vcard-pad no-print" style="margin-bottom:1.3rem;
+    display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+    <div><label class="vlabel">Desde</label>
+      <input type="date" id="r-desde" class="vinput" style="width:auto"/></div>
+    <div><label class="vlabel">Hasta</label>
+      <input type="date" id="r-hasta" class="vinput" style="width:auto"/></div>
+    <button onclick="cargarReporte()" class="vbtn vbtn-primary">🔍 Generar</button>
+    <button onclick="setPeriodo('hoy')"    class="vbtn vbtn-ghost">Hoy</button>
+    <button onclick="setPeriodo('semana')" class="vbtn vbtn-ghost">Esta semana</button>
+    <button onclick="setPeriodo('mes')"    class="vbtn vbtn-ghost">Este mes</button>
+    <button onclick="setPeriodo('anio')"   class="vbtn vbtn-ghost">Este año</button>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);
+    margin-bottom:1.3rem;flex-wrap:wrap" class="no-print">
+    <button class="rep-tab active" id="tab-financiero"   onclick="mostrarTab('financiero')">💰 Financiero</button>
+    <button class="rep-tab" id="tab-citas"        onclick="mostrarTab('citas')">📅 Citas</button>
+    <button class="rep-tab" id="tab-mascotas"     onclick="mostrarTab('mascotas')">🐾 Mascotas</button>
+    <button class="rep-tab" id="tab-vacunas"      onclick="mostrarTab('vacunas')">💉 Vacunas</button>
+    <button class="rep-tab" id="tab-inventario"   onclick="mostrarTab('inventario')">📦 Inventario</button>
+    <button class="rep-tab" id="tab-estetica"     onclick="mostrarTab('estetica')">✂️ Estética</button>
+    <button class="rep-tab" id="tab-veterinarios" onclick="mostrarTab('veterinarios')">🩺 Veterinarios</button>
+  </div>
+
+  <!-- Contenidos -->
+  <div id="contenido-financiero">
+    <div id="fin-loading" class="vempty"><div class="vspinner"></div><p>Generando reporte…</p></div>
+    <div id="fin-content" style="display:none"></div>
+  </div>
+  <div id="contenido-citas"        style="display:none"></div>
+  <div id="contenido-mascotas"     style="display:none"></div>
+  <div id="contenido-vacunas"      style="display:none"></div>
+  <div id="contenido-inventario"   style="display:none"></div>
+  <div id="contenido-estetica"     style="display:none"></div>
+  <div id="contenido-veterinarios" style="display:none"></div>
+
+</div>
+
+<script>
+// Estado global de datos cargados
+const datosReporte = {};
+let tabActiva = 'financiero';
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'reportes', title:'Reportes', subtitle:'Análisis y estadísticas' });
+  const hoy = new Date();
+  document.getElementById('r-desde').value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01`;
+  document.getElementById('r-hasta').value = fechaHoyInput();
+  cargarReporte();
+});
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function setPeriodo(p) {
+  const hoy  = new Date();
+  const fmt  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const desde = new Date(hoy);
+  if      (p==='hoy')    { /* mismo día */ }
+  else if (p==='semana') { desde.setDate(hoy.getDate()-6); }
+  else if (p==='mes')    { desde.setDate(1); }
+  else if (p==='anio')   { desde.setMonth(0); desde.setDate(1); }
+  document.getElementById('r-desde').value = fmt(desde);
+  document.getElementById('r-hasta').value = fmt(hoy);
+  cargarReporte();
+}
+
+function mostrarTab(tab) {
+  tabActiva = tab;
+  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios'].forEach(t => {
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t===tab);
+    const el = document.getElementById(`contenido-${t}`);
+    if (el) el.style.display = t===tab ? 'block' : 'none';
+  });
+  // Cargar si no está cargado aún
+  if (!datosReporte[tab]) cargarTab(tab);
+}
+
+async function cargarReporte() {
+  // Limpiar caché y recargar tab activa
+  Object.keys(datosReporte).forEach(k => delete datosReporte[k]);
+  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios'].forEach(t => {
+    const el = document.getElementById(`contenido-${t}`);
+    if (el) el.innerHTML = `<div class="vempty"><div class="vspinner"></div><p>Generando…</p></div>`;
+  });
+  cargarTab(tabActiva);
+}
+
+async function cargarTab(tab) {
+  const desde = document.getElementById('r-desde').value;
+  const hasta = document.getElementById('r-hasta').value;
+  const cont  = document.getElementById(`contenido-${tab}`);
+  cont.innerHTML = `<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>`;
+  cont.style.display = 'block';
+
+  try {
+    let endpoint = tab === 'veterinarios' ? 'veterinarios' : tab;
+    const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}`);
+    if (!res?.ok) { cont.innerHTML=`<div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div>`; return; }
+    const d = (await res.json()).data;
+    datosReporte[tab] = d;
+    renderTab(tab, d, cont);
+  } catch(e) {
+    cont.innerHTML = `<div class="vempty"><span class="icon">😿</span><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function renderTab(tab, d, cont) {
+  switch(tab) {
+    case 'financiero':   cont.innerHTML = renderFinanciero(d);   break;
+    case 'citas':        cont.innerHTML = renderCitas(d);        break;
+    case 'mascotas':     cont.innerHTML = renderMascotas(d);     break;
+    case 'vacunas':      cont.innerHTML = renderVacunas(d);      break;
+    case 'inventario':   cont.innerHTML = renderInventario(d);   break;
+    case 'estetica':     cont.innerHTML = renderEstetica(d);     break;
+    case 'veterinarios': cont.innerHTML = renderVeterinarios(d); break;
+  }
+}
+
+// ── FINANCIERO ────────────────────────────────────────────────────
+function renderFinanciero(d) {
+  const r = d.resumen;
+  const maxDia = Math.max(...(d.porDia||[]).map(x=>parseFloat(x.ingresos)||0), 1);
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi('S/. '+parseFloat(r.ingresos||0).toFixed(2), 'Ingresos', '#15803d')}
+      ${kpi('S/. '+parseFloat(r.por_cobrar||0).toFixed(2), 'Por cobrar', '#b45309')}
+      ${kpi(r.total_documentos||0, 'Documentos', '#1d4ed8')}
+      ${kpi('S/. '+parseFloat(r.total_igv||0).toFixed(2), 'IGV Total', '#6d28d9')}
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.pagados||0, 'Pagados', '#15803d')}
+      ${kpi(r.pendientes||0, 'Pendientes', '#b45309')}
+      ${kpi(r.anulados||0, 'Anulados', '#be123c')}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">📈 Ingresos por día</h3>
+        ${d.porDia?.length ? `
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            ${d.porDia.map(x=>{
+              const pct=Math.max(((parseFloat(x.ingresos)||0)/maxDia)*100,2).toFixed(0);
+              return `<div>
+                <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.2rem">
+                  <span style="color:var(--ink-soft)">${fDate(x.dia)}</span>
+                  <span style="font-weight:700;color:#15803d">S/. ${parseFloat(x.ingresos||0).toFixed(2)}</span>
+                </div>
+                <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%"></div></div>
+              </div>`;
+            }).join('')}
+          </div>` : '<p style="color:var(--ink-faint);font-size:.8rem">Sin datos en el período.</p>'}
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">💳 Métodos de pago</h3>
+        ${renderMetodosPago(d.porMetodo)}
+      </div>
+    </div>
+
+    <div class="vcard" style="margin-bottom:1.3rem">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">🏆 Top servicios facturados</h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rep-table">
+          <thead><tr><th>Servicio</th><th>Cantidad</th><th>Total</th><th style="min-width:150px">%</th></tr></thead>
+          <tbody>
+            ${d.topServicios?.length ? (() => {
+              const maxM = Math.max(...d.topServicios.map(x=>parseFloat(x.monto_total)||0),1);
+              return d.topServicios.map(s=>`<tr>
+                <td style="font-weight:600">${esc(s.descripcion)}</td>
+                <td>${s.cantidad}</td>
+                <td style="font-weight:700;color:#15803d">S/. ${parseFloat(s.monto_total).toFixed(2)}</td>
+                <td><div class="bar-h"><div class="bar-h-fill" style="width:${((parseFloat(s.monto_total)/maxM)*100).toFixed(0)}%"></div></div></td>
+              </tr>`).join('');
+            })() : '<tr><td colspan="4" style="text-align:center;color:var(--ink-faint);padding:1.5rem">Sin datos</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    ${d.pendientes?.length ? `
+    <div class="vcard">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">⏳ Pendientes de cobro</h3>
+        <span style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px">${d.pendientes.length} documentos</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rep-table">
+          <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Total</th></tr></thead>
+          <tbody>${d.pendientes.map(p=>`<tr>
+            <td style="font-family:monospace;font-weight:700">${esc(p.numero)}</td>
+            <td>${fDate(p.fecha)}</td>
+            <td>${esc(p.cliente)}</td>
+            <td><span style="font-size:.7rem;font-weight:700;padding:.15rem .45rem;border-radius:.35rem;background:${p.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${p.tipo==='factura'?'#1d4ed8':'#15803d'}">${p.tipo}</span></td>
+            <td style="font-weight:700;color:#b45309">S/. ${parseFloat(p.total).toFixed(2)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : ''}`;
+}
+
+function renderMetodosPago(data) {
+  if (!data?.length) return '<p style="color:var(--ink-faint);font-size:.8rem">Sin pagos en el período.</p>';
+  const icons = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transfer.', yape:'📱 Yape', plin:'📱 Plin' };
+  const total = data.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  return data.map(m=>{
+    const pct = total>0?((parseFloat(m.monto)/total)*100).toFixed(0):0;
+    return `<div style="margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.25rem">
+        <span style="font-weight:600">${icons[m.metodo_pago]||m.metodo_pago}</span>
+        <span style="font-weight:700;color:#15803d">S/. ${parseFloat(m.monto).toFixed(2)} <span style="color:var(--ink-faint);font-weight:400">(${pct}%)</span></span>
+      </div>
+      <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%"></div></div>
+      <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.1rem">${m.transacciones} transacciones</p>
+    </div>`;
+  }).join('');
+}
+
+// ── CITAS ─────────────────────────────────────────────────────────
+function renderCitas(d) {
+  const r = d.resumen;
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.total||0, 'Total citas', '#15803d')}
+      ${kpi(r.completadas||0, 'Completadas', '#059669')}
+      ${kpi(r.pendientes||0, 'Pendientes', '#b45309')}
+      ${kpi(r.confirmadas||0, 'Confirmadas', '#1d4ed8')}
+      ${kpi(r.en_curso||0, 'En curso', '#6d28d9')}
+      ${kpi(r.canceladas||0, 'Canceladas', '#be123c')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">📅 Citas por día</h3>
+        ${d.porDia?.length ? d.porDia.map(x=>{
+          const max = Math.max(...(d.porDia||[]).map(y=>y.total||0),1);
+          const pct = Math.max(((x.total||0)/max)*100,2).toFixed(0);
+          return `<div style="margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.2rem">
+              <span style="color:var(--ink-soft)">${fDate(x.dia)}</span>
+              <span style="font-weight:700">${x.total} <span style="color:#059669">(${x.completadas} comp.)</span></span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('') : '<p style="color:var(--ink-faint);font-size:.8rem">Sin citas en el período.</p>'}
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">🩺 Por veterinario</h3>
+        <table class="rep-table">
+          <thead><tr><th>Veterinario</th><th>Total</th><th>Completadas</th></tr></thead>
+          <tbody>${d.porVeterinario?.map(v=>`<tr>
+            <td style="font-weight:600">${esc(v.veterinario)}</td>
+            <td>${v.total}</td>
+            <td style="color:#059669;font-weight:600">${v.completadas}</td>
+          </tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--ink-faint)">Sin datos</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── MASCOTAS ──────────────────────────────────────────────────────
+function renderMascotas(d) {
+  const r = d.resumen;
+  const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.total||0, 'Total mascotas', '#15803d')}
+      ${kpi(r.perros||0, '🐕 Perros', '#b45309')}
+      ${kpi(r.gatos||0, '🐈 Gatos', '#6d28d9')}
+      ${kpi(r.aves||0, '🦜 Aves', '#0369a1')}
+      ${kpi(r.reptiles||0, '🦎 Reptiles', '#047857')}
+      ${kpi(r.otros||0, '🐾 Otros', '#78716c')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">🐾 Por especie</h3>
+        ${d.porEspecie?.map(e=>{
+          const max=Math.max(...(d.porEspecie||[]).map(x=>x.total||0),1);
+          const pct=((e.total/max)*100).toFixed(0);
+          return `<div style="margin-bottom:.6rem">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.2rem">
+              <span style="font-weight:600;text-transform:capitalize">${icons[e.especie]||'🐾'} ${esc(e.especie)}</span>
+              <span style="font-weight:700">${e.total}</span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('')||'<p style="color:var(--ink-faint);font-size:.8rem">Sin datos.</p>'}
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">📅 Nuevas por mes</h3>
+        ${d.nuevasPorMes?.map(m=>{
+          const max=Math.max(...(d.nuevasPorMes||[]).map(x=>x.total||0),1);
+          const pct=((m.total/max)*100).toFixed(0);
+          return `<div style="margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.2rem">
+              <span style="color:var(--ink-soft)">${m.mes}</span>
+              <span style="font-weight:700">${m.total}</span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('')||'<p style="color:var(--ink-faint);font-size:.8rem">Sin datos.</p>'}
+      </div>
+    </div>
+    <div class="vcard">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">🏆 Más atendidas en el período</h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rep-table">
+          <thead><tr><th>Mascota</th><th>Especie</th><th>Raza</th><th>Propietario</th><th>Consultas</th></tr></thead>
+          <tbody>${d.masAtendidas?.map(m=>`<tr>
+            <td style="font-weight:600">${badgeEspecie(m.especie)} ${esc(m.nombre)}</td>
+            <td style="text-transform:capitalize">${esc(m.especie)}</td>
+            <td style="color:var(--ink-soft)">${esc(m.raza||'—')}</td>
+            <td>${esc(m.propietario)}</td>
+            <td style="font-weight:700;color:var(--green-600)">${m.consultas}</td>
+          </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--ink-faint);padding:1.5rem">Sin datos</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── VACUNAS ───────────────────────────────────────────────────────
+function renderVacunas(d) {
+  const r = d.resumen;
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.total_aplicadas||0, 'Aplicadas en período', '#15803d')}
+      ${kpi(r.proximas_30dias||0, 'Próximas 30 días', '#b45309')}
+      ${kpi(r.vencidas||0, 'Vencidas', '#be123c')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">💉 Por tipo de vacuna</h3>
+        ${d.porNombre?.map(v=>{
+          const max=Math.max(...(d.porNombre||[]).map(x=>x.total||0),1);
+          const pct=((v.total/max)*100).toFixed(0);
+          return `<div style="margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.2rem">
+              <span style="font-weight:600">${esc(v.nombre)}</span>
+              <span style="font-weight:700">${v.total}</span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%;background:linear-gradient(90deg,#6d28d9,#7c3aed)"></div></div>
+          </div>`;
+        }).join('')||'<p style="color:var(--ink-faint);font-size:.8rem">Sin vacunas en el período.</p>'}
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">⚠️ Próximas a vencer (30 días)</h3>
+        ${d.proximasVencer?.length ? `
+          <div style="display:flex;flex-direction:column;gap:.5rem;max-height:300px;overflow-y:auto">
+            ${d.proximasVencer.map(v=>`<div style="padding:.65rem .85rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <p style="font-weight:700;font-size:.82rem">${esc(v.mascota)} <span style="color:var(--ink-faint)">(${esc(v.especie)})</span></p>
+                  <p style="font-size:.72rem;color:var(--ink-soft)">${esc(v.vacuna)}</p>
+                  <p style="font-size:.68rem;color:var(--ink-faint)">👤 ${esc(v.propietario)} · 📞 ${esc(v.telefono||'—')}</p>
+                </div>
+                <span class="badge-proxima">${fDate(v.proxima_dosis)}</span>
+              </div>
+            </div>`).join('')}
+          </div>` : '<p style="color:var(--ink-faint);font-size:.8rem">✅ Sin vacunas próximas a vencer.</p>'}
+      </div>
+    </div>
+    ${d.vencidas?.length ? `
+    <div class="vcard">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">❌ Vacunas vencidas</h3>
+        <span style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px">${d.vencidas.length}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rep-table">
+          <thead><tr><th>Mascota</th><th>Vacuna</th><th>Propietario</th><th>Teléfono</th><th>Venció</th></tr></thead>
+          <tbody>${d.vencidas.map(v=>`<tr>
+            <td style="font-weight:600">${esc(v.mascota)} <span style="font-size:.7rem;color:var(--ink-faint)">(${esc(v.especie)})</span></td>
+            <td>${esc(v.vacuna)}</td>
+            <td>${esc(v.propietario)}</td>
+            <td style="color:var(--ink-soft)">${esc(v.telefono||'—')}</td>
+            <td><span class="badge-vencida">${fDate(v.proxima_dosis)}</span></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : ''}`;
+}
+
+// ── INVENTARIO ────────────────────────────────────────────────────
+function renderInventario(d) {
+  const r = d.resumen;
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.total_items||0, 'Total ítems', '#15803d')}
+      ${kpi(r.stock_bajo||0, 'Stock bajo', '#b45309')}
+      ${kpi(r.por_vencer||0, 'Por vencer (30d)', '#1d4ed8')}
+      ${kpi(r.vencidos||0, 'Vencidos', '#be123c')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:700">⚠️ Stock bajo</h3>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="rep-table">
+            <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th><th>Estado</th></tr></thead>
+            <tbody>${d.stockBajo?.map(i=>{
+              const pct=Math.min(100,((i.cantidad/i.stock_minimo)*100)).toFixed(0);
+              return `<tr>
+                <td><p style="font-weight:600">${esc(i.nombre)}</p>
+                  <p style="font-size:.68rem;color:var(--ink-faint)">${esc(i.categoria)}</p></td>
+                <td style="font-weight:700;color:#b45309">${i.cantidad} ${esc(i.unidad)}</td>
+                <td style="color:var(--ink-soft)">${i.stock_minimo}</td>
+                <td><div style="width:60px;height:6px;background:#fee2e2;border-radius:999px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:#f59e0b;border-radius:999px"></div>
+                </div></td>
+              </tr>`;
+            }).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--ink-faint);padding:1.5rem">✅ Sin stock bajo</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="vcard">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:700">📅 Por vencer</h3>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="rep-table">
+            <thead><tr><th>Producto</th><th>Stock</th><th>Vence</th></tr></thead>
+            <tbody>${d.porVencer?.map(i=>`<tr>
+              <td><p style="font-weight:600">${esc(i.nombre)}</p>
+                <p style="font-size:.68rem;color:var(--ink-faint)">${esc(i.categoria)}</p></td>
+              <td>${i.cantidad} ${esc(i.unidad)}</td>
+              <td><span class="badge-proxima">${fDate(i.fecha_vencimiento)}</span></td>
+            </tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--ink-faint);padding:1.5rem">✅ Sin vencimientos próximos</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── ESTÉTICA ──────────────────────────────────────────────────────
+function renderEstetica(d) {
+  const r = d.resumen;
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.total||0, 'Total servicios', '#db2777')}
+      ${kpi('S/. '+parseFloat(r.ingresos||0).toFixed(2), 'Ingresos', '#15803d')}
+      ${kpi(r.basicos||0, 'Baños básicos', '#6d28d9')}
+      ${kpi(r.completos||0, 'Baños completos', '#1d4ed8')}
+      ${kpi(r.con_corte||0, 'Con corte', '#b45309')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">✂️ Por tipo de baño</h3>
+        ${d.porTipo?.map(t=>{
+          const max=Math.max(...(d.porTipo||[]).map(x=>parseFloat(x.ingresos)||0),1);
+          const pct=((parseFloat(t.ingresos||0)/max)*100).toFixed(0);
+          return `<div style="margin-bottom:.6rem">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.2rem">
+              <span style="font-weight:600;text-transform:capitalize">${esc(t.tipo_bano)}</span>
+              <span>${t.total} servicios · <span style="font-weight:700;color:#15803d">S/. ${parseFloat(t.ingresos||0).toFixed(2)}</span></span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%;background:linear-gradient(90deg,#db2777,#be185d)"></div></div>
+          </div>`;
+        }).join('')||'<p style="color:var(--ink-faint);font-size:.8rem">Sin servicios en el período.</p>'}
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">📅 Ingresos por día</h3>
+        ${d.porDia?.map(x=>{
+          const max=Math.max(...(d.porDia||[]).map(y=>parseFloat(y.ingresos)||0),1);
+          const pct=Math.max(((parseFloat(x.ingresos||0)/max)*100),2).toFixed(0);
+          return `<div style="margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.2rem">
+              <span style="color:var(--ink-soft)">${fDate(x.dia)}</span>
+              <span style="font-weight:700;color:#15803d">S/. ${parseFloat(x.ingresos||0).toFixed(2)} <span style="color:var(--ink-faint);font-weight:400">(${x.total})</span></span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${pct}%;background:linear-gradient(90deg,#db2777,#be185d)"></div></div>
+          </div>`;
+        }).join('')||'<p style="color:var(--ink-faint);font-size:.8rem">Sin datos.</p>'}
+      </div>
+    </div>`;
+}
+
+// ── VETERINARIOS ──────────────────────────────────────────────────
+function renderVeterinarios(d) {
+  return `
+    <div class="vcard">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">🩺 Rendimiento por veterinario</h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="rep-table">
+          <thead><tr>
+            <th>Veterinario</th><th>Citas</th><th>Completadas</th><th>Canceladas</th>
+            <th>Consultas</th><th>Vacunas</th><th>Efectividad</th>
+          </tr></thead>
+          <tbody>${d.veterinarios?.map(v=>{
+            const ef = v.citas_total>0 ? Math.round((v.citas_completadas/v.citas_total)*100) : 0;
+            return `<tr>
+              <td style="font-weight:700">${esc(v.nombre)}</td>
+              <td>${v.citas_total||0}</td>
+              <td style="color:#15803d;font-weight:600">${v.citas_completadas||0}</td>
+              <td style="color:#be123c">${v.citas_canceladas||0}</td>
+              <td>${v.consultas||0}</td>
+              <td style="color:#6d28d9">${v.vacunas||0}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                  <div class="bar-h" style="width:80px;flex-shrink:0">
+                    <div class="bar-h-fill" style="width:${ef}%;background:${ef>=80?'linear-gradient(90deg,#10b981,#059669)':ef>=50?'linear-gradient(90deg,#f59e0b,#d97706)':'linear-gradient(90deg,#f43f5e,#e11d48)'}"></div>
+                  </div>
+                  <span style="font-size:.78rem;font-weight:700;color:${ef>=80?'#15803d':ef>=50?'#b45309':'#be123c'}">${ef}%</span>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--ink-faint);padding:1.5rem">Sin veterinarios activos</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── KPI helper ────────────────────────────────────────────────────
+function kpi(val, label, color='#15803d') {
+  return `<div class="kpi">
+    <p class="kpi-val" style="color:${color}">${val}</p>
+    <p class="kpi-label">${label}</p>
+  </div>`;
+}
+
+// ── EXCEL con estilos (xlsx-js-style) ────────────────────────────
+function descargarExcel() {
+  const d     = datosReporte[tabActiva];
+  const desde = document.getElementById('r-desde').value;
+  const hasta = document.getElementById('r-hasta').value;
+  const titulos = {
+    financiero:'Financiero', citas:'Citas', mascotas:'Mascotas',
+    vacunas:'Vacunas', inventario:'Inventario', estetica:'Estética',
+    veterinarios:'Veterinarios'
+  };
+  const titulo = titulos[tabActiva] || tabActiva;
+  if (!d) { toast('Genera el reporte primero.','warning'); return; }
+
+  // Usar XLSXStyle (xlsx-js-style)
+  const XS = window.XLSXStyle || window.XLSX;
+
+  // ── Estilos ───────────────────────────────────────────────────
+  const VERDE_OSCURO = '166534';
+  const VERDE_CLARO  = 'ECFDF5';
+  const GRIS_FILA    = 'F6F8F6';
+  const BLANCO       = 'FFFFFF';
+  const NEGRO        = '1A2E28';
+
+  const sTitulo = {
+    font : { bold:true, sz:14, color:{ rgb:BLANCO } },
+    fill : { fgColor:{ rgb:VERDE_OSCURO } },
+    alignment: { horizontal:'left', vertical:'center' },
+    border: bordesTodos(BLANCO),
+  };
+  const sSubtitulo = {
+    font : { bold:true, sz:10, color:{ rgb:'4B5F57' } },
+    fill : { fgColor:{ rgb:VERDE_CLARO } },
+    alignment: { horizontal:'left' },
+  };
+  const sHeader = {
+    font : { bold:true, sz:10, color:{ rgb:BLANCO } },
+    fill : { fgColor:{ rgb:VERDE_OSCURO } },
+    alignment: { horizontal:'center', vertical:'center', wrapText:true },
+    border: bordesTodos('FFFFFF'),
+  };
+  const sHeaderLeft = { ...sHeader, alignment:{ horizontal:'left', vertical:'center' } };
+  const sFila = (par) => ({
+    font : { sz:10, color:{ rgb:NEGRO } },
+    fill : { fgColor:{ rgb: par ? GRIS_FILA : BLANCO } },
+    alignment: { horizontal:'left', vertical:'center' },
+    border: bordesTodos('E8EDE9'),
+  });
+  const sFilaNum = (par) => ({
+    ...sFila(par),
+    alignment: { horizontal:'right', vertical:'center' },
+  });
+  const sFilaVerde = (par) => ({
+    ...sFilaNum(par),
+    font: { sz:10, bold:true, color:{ rgb:VERDE_OSCURO } },
+  });
+  const sFilaRojo = (par) => ({
+    ...sFilaNum(par),
+    font: { sz:10, bold:true, color:{ rgb:'BE123C' } },
+  });
+  const sFilaAmbar = (par) => ({
+    ...sFilaNum(par),
+    font: { sz:10, bold:true, color:{ rgb:'B45309' } },
+  });
+  const sVacio = { font:{sz:6}, fill:{fgColor:{rgb:BLANCO}} };
+
+  function bordesTodos(color) {
+    const b = { style:'thin', color:{ rgb:color } };
+    return { top:b, bottom:b, left:b, right:b };
+  }
+
+  function c(v, s) { return { v, s, t: typeof v==='number'?'n':'s' }; }
+
+  // ── Builder de hoja ───────────────────────────────────────────
+  function buildSheet(secciones) {
+    // secciones: [{ titulo, headers, rows, colWidths }]
+    const aoa = []; // array of arrays de celdas con estilo
+
+    // Fila de título general
+    aoa.push([c(`VetClinic — Reporte ${titulo}`, sTitulo)]);
+    aoa.push([c(`Período: ${desde} al ${hasta}`, sSubtitulo)]);
+    aoa.push([c('', sVacio)]);
+
+    secciones.forEach(sec => {
+      // Título de sección
+      aoa.push([c(sec.titulo, { ...sSubtitulo, font:{bold:true,sz:10,color:{rgb:VERDE_OSCURO}}, fill:{fgColor:{rgb:VERDE_CLARO}} })]);
+      // Headers
+      aoa.push(sec.headers.map((h,i) => c(h, i===0 ? sHeaderLeft : sHeader)));
+      // Filas
+      sec.rows.forEach((row, ri) => {
+        const par = ri%2===0;
+        aoa.push(row.map((cell, ci) => {
+          const v = cell?.v !== undefined ? cell.v : cell;
+          const isNum = typeof v === 'number' || (typeof v === 'string' && /^[\d.,]+$/.test(v) && !v.includes('-'));
+          const style = cell?.s || (isNum && ci>0 ? sFilaNum(par) : sFila(par));
+          return c(v, style);
+        }));
+      });
+      aoa.push([c('', sVacio)]);
+    });
+
+    // Convertir a worksheet
+    const ws = XS.utils.aoa_to_sheet(aoa.map(row => row.map(cell => cell.v)));
+
+    // Aplicar estilos
+    const range = XS.utils.decode_range(ws['!ref'] || 'A1');
+    aoa.forEach((row, r) => {
+      row.forEach((cell, c_) => {
+        const addr = XS.utils.encode_cell({ r, c: c_ });
+        if (!ws[addr]) ws[addr] = {};
+        ws[addr].s = cell.s || sVacio;
+        if (typeof cell.v === 'number') ws[addr].t = 'n';
+      });
+    });
+
+    // Merge título y subtítulo en toda la fila
+    const maxCols = Math.max(...aoa.map(r=>r.length), 1) - 1;
+    ws['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:maxCols} },
+      { s:{r:1,c:0}, e:{r:1,c:maxCols} },
+    ];
+
+    // Alto de filas
+    ws['!rows'] = aoa.map((_,i) => i===0?{hpt:28}:i===1?{hpt:18}:{hpt:18});
+
+    // Ancho de columnas
+    const primeraSec = secciones[0];
+    if (primeraSec?.colWidths) {
+      ws['!cols'] = primeraSec.colWidths.map(w => ({ wch:w }));
+    } else {
+      ws['!cols'] = Array(maxCols+1).fill(null).map((_,i) => {
+        const maxLen = Math.max(...aoa.map(r => String(r[i]?.v||'').length), 8);
+        return { wch: Math.min(maxLen+4, 40) };
+      });
+    }
+
+    return ws;
+  }
+
+  const wb = XS.utils.book_new();
+
+  switch(tabActiva) {
+
+    case 'financiero': {
+      const r = d.resumen;
+      const totalMet = (d.porMetodo||[]).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN GENERAL',
+          headers: ['Concepto','Valor'],
+          colWidths: [35, 20],
+          rows: [
+            ['Total ingresos (pagados)', `S/. ${parseFloat(r.ingresos||0).toFixed(2)}`],
+            ['Por cobrar (pendientes)',  `S/. ${parseFloat(r.por_cobrar||0).toFixed(2)}`],
+            ['Total IGV recaudado',      `S/. ${parseFloat(r.total_igv||0).toFixed(2)}`],
+            ['Total boletas',            `S/. ${parseFloat(r.boletas||0).toFixed(2)}`],
+            ['Total facturas',           `S/. ${parseFloat(r.facturas||0).toFixed(2)}`],
+            ['Documentos emitidos',      r.total_documentos||0],
+            ['Pagados',                  r.pagados||0],
+            ['Pendientes',               r.pendientes||0],
+            ['Anulados',                 r.anulados||0],
+          ],
+        },
+        {
+          titulo: '📅 INGRESOS POR DÍA',
+          headers: ['Fecha','Ingresos (S/.)','Documentos'],
+          colWidths: [18, 20, 15],
+          rows: (d.porDia||[]).map(x=>[x.dia, `S/. ${parseFloat(x.ingresos||0).toFixed(2)}`, x.documentos]),
+        },
+        {
+          titulo: '💳 MÉTODOS DE PAGO',
+          headers: ['Método','Monto (S/.)','Transacciones','% del total'],
+          rows: (d.porMetodo||[]).map(m=>[
+            m.metodo_pago,
+            `S/. ${parseFloat(m.monto||0).toFixed(2)}`,
+            m.transacciones,
+            totalMet>0 ? ((parseFloat(m.monto)/totalMet)*100).toFixed(1)+'%' : '0%',
+          ]),
+        },
+        {
+          titulo: '🏆 TOP SERVICIOS FACTURADOS',
+          headers: ['#','Servicio','Cantidad','Monto Total (S/.)'],
+          rows: (d.topServicios||[]).map((s,i)=>[i+1, s.descripcion, s.cantidad, `S/. ${parseFloat(s.monto_total||0).toFixed(2)}`]),
+        },
+        {
+          titulo: '⏳ PENDIENTES DE COBRO',
+          headers: ['Número','Fecha','Cliente','Tipo','Total (S/.)'],
+          rows: (d.pendientes||[]).map(p=>[p.numero, p.fecha, p.cliente, p.tipo, `S/. ${parseFloat(p.total||0).toFixed(2)}`]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Financiero');
+      break;
+    }
+
+    case 'citas': {
+      const r = d.resumen;
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN DE CITAS',
+          headers: ['Estado','Cantidad'],
+          colWidths: [25, 15],
+          rows: [
+            ['Total citas', r.total||0],
+            ['Completadas', r.completadas||0],
+            ['Confirmadas', r.confirmadas||0],
+            ['En curso',    r.en_curso||0],
+            ['Pendientes',  r.pendientes||0],
+            ['Canceladas',  r.canceladas||0],
+          ],
+        },
+        {
+          titulo: '🩺 RENDIMIENTO POR VETERINARIO',
+          headers: ['Veterinario','Total','Completadas','Canceladas','Efectividad (%)'],
+          colWidths: [30, 12, 15, 15, 18],
+          rows: (d.porVeterinario||[]).map(v=>[
+            v.veterinario, v.total, v.completadas, v.citas_canceladas||0,
+            v.total>0 ? ((v.completadas/v.total)*100).toFixed(1)+'%' : '0%',
+          ]),
+        },
+        {
+          titulo: '📅 CITAS POR DÍA',
+          headers: ['Fecha','Total','Completadas'],
+          rows: (d.porDia||[]).map(x=>[x.dia, x.total, x.completadas]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Citas');
+      break;
+    }
+
+    case 'mascotas': {
+      const r = d.resumen;
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN DE MASCOTAS',
+          headers: ['Especie','Cantidad','% del total'],
+          colWidths: [20, 15, 15],
+          rows: [
+            ['Total mascotas', r.total||0, '100%'],
+            ['Perros',   r.perros||0,   r.total?((r.perros/r.total)*100).toFixed(1)+'%':'0%'],
+            ['Gatos',    r.gatos||0,    r.total?((r.gatos/r.total)*100).toFixed(1)+'%':'0%'],
+            ['Aves',     r.aves||0,     r.total?((r.aves/r.total)*100).toFixed(1)+'%':'0%'],
+            ['Reptiles', r.reptiles||0, r.total?((r.reptiles/r.total)*100).toFixed(1)+'%':'0%'],
+            ['Otros',    r.otros||0,    r.total?((r.otros/r.total)*100).toFixed(1)+'%':'0%'],
+          ],
+        },
+        {
+          titulo: '📅 NUEVAS MASCOTAS POR MES',
+          headers: ['Mes','Nuevas mascotas'],
+          rows: (d.nuevasPorMes||[]).map(m=>[m.mes, m.total]),
+        },
+        {
+          titulo: '🏆 MÁS ATENDIDAS EN EL PERÍODO',
+          headers: ['Mascota','Especie','Raza','Propietario','Consultas'],
+          colWidths: [20, 12, 18, 28, 12],
+          rows: (d.masAtendidas||[]).map(m=>[m.nombre, m.especie, m.raza||'—', m.propietario, m.consultas]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Mascotas');
+      break;
+    }
+
+    case 'vacunas': {
+      const r = d.resumen;
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN DE VACUNAS',
+          headers: ['Concepto','Cantidad'],
+          colWidths: [30, 15],
+          rows: [
+            ['Aplicadas en período',         r.total_aplicadas||0],
+            ['Próximas a vencer (30 días)',   r.proximas_30dias||0],
+            ['Vencidas',                      r.vencidas||0],
+          ],
+        },
+        {
+          titulo: '💉 POR TIPO DE VACUNA',
+          headers: ['Vacuna','Total aplicadas'],
+          rows: (d.porNombre||[]).map(v=>[v.nombre, v.total]),
+        },
+        {
+          titulo: '⚠️ PRÓXIMAS A VENCER (30 días)',
+          headers: ['Mascota','Especie','Vacuna','Propietario','Teléfono','Fecha próxima dosis'],
+          colWidths: [18, 12, 25, 25, 15, 22],
+          rows: (d.proximasVencer||[]).map(v=>[v.mascota, v.especie, v.vacuna, v.propietario, v.telefono||'—', v.proxima_dosis]),
+        },
+        {
+          titulo: '❌ VACUNAS VENCIDAS',
+          headers: ['Mascota','Especie','Vacuna','Propietario','Teléfono','Fecha vencimiento'],
+          colWidths: [18, 12, 25, 25, 15, 22],
+          rows: (d.vencidas||[]).map(v=>[v.mascota, v.especie, v.vacuna, v.propietario, v.telefono||'—', v.proxima_dosis]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Vacunas');
+      break;
+    }
+
+    case 'inventario': {
+      const r = d.resumen;
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN DE INVENTARIO',
+          headers: ['Concepto','Cantidad'],
+          colWidths: [30, 15],
+          rows: [
+            ['Total ítems',           r.total_items||0],
+            ['Stock bajo',            r.stock_bajo||0],
+            ['Por vencer (30 días)',   r.por_vencer||0],
+            ['Vencidos',              r.vencidos||0],
+          ],
+        },
+        {
+          titulo: '📦 POR CATEGORÍA',
+          headers: ['Categoría','Ítems','Unidades totales'],
+          rows: (d.porCategoria||[]).map(c=>[c.categoria, c.items, c.total_unidades]),
+        },
+        {
+          titulo: '⚠️ ÍTEMS CON STOCK BAJO',
+          headers: ['Producto','Categoría','Stock actual','Stock mínimo','Unidad','Proveedor','Déficit'],
+          colWidths: [25, 15, 14, 14, 10, 20, 10],
+          rows: (d.stockBajo||[]).map(i=>[
+            i.nombre, i.categoria, i.cantidad, i.stock_minimo,
+            i.unidad, i.proveedor||'—',
+            Math.max(0, i.stock_minimo - i.cantidad),
+          ]),
+        },
+        {
+          titulo: '📅 POR VENCER (30 días)',
+          headers: ['Producto','Categoría','Cantidad','Unidad','Fecha vencimiento','Proveedor'],
+          colWidths: [25, 15, 12, 10, 20, 20],
+          rows: (d.porVencer||[]).map(i=>[i.nombre, i.categoria, i.cantidad, i.unidad, i.fecha_vencimiento, i.proveedor||'—']),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Inventario');
+      break;
+    }
+
+    case 'estetica': {
+      const r = d.resumen;
+      const totalIng = parseFloat(r.ingresos||0)||1;
+      const ws = buildSheet([
+        {
+          titulo: '📊 RESUMEN DE ESTÉTICA',
+          headers: ['Concepto','Valor'],
+          colWidths: [28, 20],
+          rows: [
+            ['Total servicios',         r.total||0],
+            ['Ingresos totales',         `S/. ${parseFloat(r.ingresos||0).toFixed(2)}`],
+            ['Baños básicos',            r.basicos||0],
+            ['Baños completos',          r.completos||0],
+            ['Baños medicados',          r.medicados||0],
+            ['Con corte de pelo',        r.con_corte||0],
+          ],
+        },
+        {
+          titulo: '✂️ POR TIPO DE BAÑO',
+          headers: ['Tipo','Cantidad','Ingresos (S/.)','% del total'],
+          colWidths: [18, 12, 18, 15],
+          rows: (d.porTipo||[]).map(t=>[
+            t.tipo_bano, t.total,
+            `S/. ${parseFloat(t.ingresos||0).toFixed(2)}`,
+            ((parseFloat(t.ingresos||0)/totalIng)*100).toFixed(1)+'%',
+          ]),
+        },
+        {
+          titulo: '📅 INGRESOS POR DÍA',
+          headers: ['Fecha','Servicios','Ingresos (S/.)'],
+          rows: (d.porDia||[]).map(x=>[x.dia, x.total, `S/. ${parseFloat(x.ingresos||0).toFixed(2)}`]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Estética');
+      break;
+    }
+
+    case 'veterinarios': {
+      const ws = buildSheet([
+        {
+          titulo: '🩺 RENDIMIENTO POR VETERINARIO',
+          headers: ['Veterinario','Total citas','Completadas','Canceladas','Efectividad (%)','Consultas','Vacunas aplicadas'],
+          colWidths: [28, 14, 14, 14, 18, 12, 18],
+          rows: (d.veterinarios||[]).map(v=>[
+            v.nombre,
+            v.citas_total||0,
+            v.citas_completadas||0,
+            v.citas_canceladas||0,
+            v.citas_total>0 ? ((v.citas_completadas/v.citas_total)*100).toFixed(1)+'%' : '0%',
+            v.consultas||0,
+            v.vacunas||0,
+          ]),
+        },
+      ]);
+      XS.utils.book_append_sheet(wb, ws, 'Veterinarios');
+      break;
+    }
+  }
+
+  XS.writeFile(wb, `VetClinic_${titulo}_${desde}_${hasta}.xlsx`);
+  toast('✅ Excel descargado', 'success');
+}
+
+// ── PDF ───────────────────────────────────────────────────────────
+function descargarPDF() {
+  const desde  = document.getElementById('r-desde').value;
+  const hasta  = document.getElementById('r-hasta').value;
+  const titulo = { financiero:'Financiero', citas:'Citas', mascotas:'Mascotas',
+                   vacunas:'Vacunas', inventario:'Inventario', estetica:'Estética',
+                   veterinarios:'Veterinarios' }[tabActiva] || tabActiva;
+
+  const contenido = document.getElementById(`contenido-${tabActiva}`)?.innerHTML || '';
+  const ventana   = window.open('', '_blank');
+  ventana.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8"/>
+    <title>Reporte ${titulo}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <style>
+      * { margin:0;padding:0;box-sizing:border-box; }
+      body { font-family:'Inter',sans-serif;padding:2rem;color:#111;font-size:12px; }
+      h1 { font-size:1.4rem;font-weight:800;margin-bottom:.3rem;color:#166534; }
+      h3 { font-size:1rem;font-weight:700;margin-bottom:.75rem; }
+      .kpi { display:inline-block;border:1px solid #e5e7eb;border-radius:.75rem;
+             padding:.75rem 1rem;margin:.3rem; }
+      .kpi-val { font-size:1.5rem;font-weight:800; }
+      .kpi-label { font-size:.6rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em; }
+      .vcard { border:1px solid #e5e7eb;border-radius:.75rem;margin-bottom:1rem;overflow:hidden; }
+      .vcard-pad { padding:1rem; }
+      .rep-table { width:100%;border-collapse:collapse;font-size:.75rem; }
+      .rep-table th { background:#f9fafb;padding:.5rem .75rem;text-align:left;
+                      font-size:.6rem;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;
+                      border-bottom:1px solid #e5e7eb; }
+      .rep-table td { padding:.55rem .75rem;border-bottom:1px solid #f3f4f6; }
+      .bar-h { height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:.2rem; }
+      .bar-h-fill { height:100%;border-radius:999px;background:#10b981; }
+      .badge-vencida { background:#fff1f2;color:#be123c;border:1px solid #fecdd3;
+                       font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:999px; }
+      .badge-proxima { background:#fffbeb;color:#b45309;border:1px solid #fde68a;
+                       font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:999px; }
+      .no-print, button { display:none !important; }
+      @media print { button { display:none !important; } }
+    </style>
+  </head><body>
+    <div style="border-bottom:2px solid #166534;padding-bottom:1rem;margin-bottom:1.5rem">
+      <h1>VetClinic — Reporte ${titulo}</h1>
+      <p style="color:#6b7280;font-size:.8rem">Período: ${desde} al ${hasta}</p>
+    </div>
+    ${contenido}
+    <br/>
+    <div style="text-align:center">
+      <button onclick="window.print()"
+        style="display:inline-block!important;background:#166534;color:#fff;border:none;
+        padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">
+        🖨️ Imprimir / Guardar PDF
+      </button>
+    </div>
+  </body></html>`);
+  ventana.document.close();
+  setTimeout(() => ventana.print(), 1000);
+  toast('✅ PDF listo para imprimir', 'success');
+}
+</script>
+</body>
+</html>

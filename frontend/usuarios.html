@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Usuarios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div>
+      <h2>👥 Usuarios</h2>
+      <p>Gestión de accesos al sistema</p>
+    </div>
+    <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary" id="btn-nuevo">
+      ＋ Nuevo Usuario
+    </button>
+  </div>
+
+  <!-- Banner de límite -->
+  <div id="banner-limite" class="vcard vcard-pad" style="margin-bottom:1.3rem;
+    background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-color:#a7f3d0;display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
+          color:#fff;font-weight:800;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+          id="limite-icon">👥</div>
+        <div>
+          <p style="font-weight:700;font-size:.95rem" id="limite-texto">Cargando…</p>
+          <p style="font-size:.72rem;color:var(--ink-soft)" id="limite-sub">—</p>
+        </div>
+      </div>
+      <!-- Barra de progreso -->
+      <div style="flex:1;min-width:200px;max-width:300px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;font-size:.7rem;font-weight:600">
+          <span style="color:var(--ink-soft)" id="limite-usados">0 usados</span>
+          <span style="color:var(--green-600)" id="limite-max">de 0</span>
+        </div>
+        <div style="background:#d1fae5;border-radius:999px;height:8px;overflow:hidden">
+          <div id="limite-bar" style="height:100%;border-radius:999px;
+            background:linear-gradient(90deg,#10b981,#059669);transition:width .5s ease;width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+    <div>
+      <label class="vlabel">Rol</label>
+      <select id="f-rol" class="vinput" style="width:auto" onchange="cargar()">
+        <option value="">Todos los roles</option>
+        <option value="admin">👑 Admin</option>
+        <option value="veterinario">🩺 Veterinario</option>
+        <option value="recepcionista">💁 Recepcionista</option>
+      </select>
+    </div>
+    <div>
+      <label class="vlabel">Estado</label>
+      <select id="f-activo" class="vinput" style="width:auto" onchange="cargar()">
+        <option value="true">✅ Activos</option>
+        <option value="false">❌ Inactivos</option>
+        <option value="">Todos</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="vcard">
+    <div style="overflow-x:auto">
+      <table class="vtable">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th class="hidden sm:table-cell">Creado</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="6">
+            <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Modal Nuevo / Editar Usuario ══════════════════════════════ -->
+<div id="modal-usuario" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3 id="modal-titulo">👤 Nuevo Usuario</h3>
+      <button onclick="closeModal('modal-usuario')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="u-id"/>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2">
+          <label class="vlabel">Nombre completo *</label>
+          <input id="u-nombre" type="text" class="vinput" placeholder="Dr. Juan García"/>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="vlabel">Email *</label>
+          <input id="u-email" type="email" class="vinput" placeholder="juan@clinica.com"/>
+        </div>
+        <div>
+          <label class="vlabel">Rol *</label>
+          <select id="u-rol" class="vinput">
+            <option value="recepcionista">💁 Recepcionista</option>
+            <option value="veterinario">🩺 Veterinario</option>
+            <option value="admin">👑 Administrador</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel" id="pass-label">Password * (mín. 8 caracteres)</label>
+          <div style="position:relative">
+            <input id="u-password" type="password" class="vinput" placeholder="••••••••"/>
+            <button type="button" onclick="togglePassUser()" 
+              style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);
+              background:none;border:none;cursor:pointer;color:var(--ink-faint)">👁️</button>
+          </div>
+          <p id="pass-hint" style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">
+            Déjalo vacío para no cambiar el password
+          </p>
+        </div>
+      </div>
+
+      <!-- Info de roles -->
+      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.9rem;padding:.85rem 1rem">
+        <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);margin-bottom:.6rem;
+          text-transform:uppercase;letter-spacing:.1em">ℹ️ Permisos por rol</p>
+        <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.74rem;color:var(--ink-soft)">
+          <p>👑 <b>Admin</b> — Acceso total, incluyendo usuarios y configuración</p>
+          <p>🩺 <b>Veterinario</b> — Citas, historia clínica, vacunas. Sin facturación</p>
+          <p>💁 <b>Recepcionista</b> — Citas, propietarios, mascotas. Sin configuración</p>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-usuario')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarUsuario()" class="vbtn vbtn-primary" id="btn-guardar">
+        💾 Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let usuarioEditandoId = null;
+let limiteData = null;
+const userActual = JSON.parse(localStorage.getItem('vet_user') || '{}');
+
+// Solo admin puede acceder
+document.addEventListener('DOMContentLoaded', () => {
+  const user = initPage({
+    activePage: 'usuarios',
+    title     : 'Usuarios',
+    subtitle  : 'Gestión de accesos'
+  });
+
+  if (user?.rol !== 'admin') {
+    document.getElementById('main-content').innerHTML = `
+      <div class="vempty" style="margin-top:4rem">
+        <span class="icon">🔒</span>
+        <p style="font-size:1rem;font-weight:700">Acceso restringido</p>
+        <p style="font-size:.82rem;color:var(--ink-faint);margin-top:.3rem">
+          Solo los administradores pueden gestionar usuarios.
+        </p>
+      </div>`;
+    return;
+  }
+
+  cargarLimite();
+  cargar();
+});
+
+// ── Cargar límite ─────────────────────────────────────────────────
+async function cargarLimite() {
+  try {
+    const res = await api('/usuarios/limite');
+    if (!res?.ok) return;
+    limiteData = (await res.json()).data;
+
+    const pct = Math.min(100, Math.round((limiteData.total_activos / limiteData.max_usuarios) * 100));
+    const esCritico = pct >= 90;
+    const esLleno   = !limiteData.puede_crear;
+
+    document.getElementById('banner-limite').style.display = 'block';
+    document.getElementById('limite-texto').textContent =
+      esLleno ? '⚠️ Límite de usuarios alcanzado'
+      : esCritico ? '⚠️ Casi en el límite de usuarios'
+      : `Usuarios de la clínica`;
+    document.getElementById('limite-sub').textContent =
+      `${limiteData.disponible} lugar${limiteData.disponible !== 1 ? 'es' : ''} disponible${limiteData.disponible !== 1 ? 's' : ''}`;
+    document.getElementById('limite-usados').textContent = `${limiteData.total_activos} usados`;
+    document.getElementById('limite-max').textContent    = `de ${limiteData.max_usuarios}`;
+    document.getElementById('limite-bar').style.width    = `${pct}%`;
+    document.getElementById('limite-bar').style.background =
+      esLleno ? 'linear-gradient(90deg,#e11d48,#be123c)'
+      : esCritico ? 'linear-gradient(90deg,#f59e0b,#d97706)'
+      : 'linear-gradient(90deg,#10b981,#059669)';
+
+    // Deshabilitar botón si está lleno
+    if (esLleno) {
+      const btn = document.getElementById('btn-nuevo');
+      btn.disabled = true;
+      btn.textContent = '🔒 Límite alcanzado';
+      btn.style.opacity = '.5';
+      btn.style.cursor  = 'not-allowed';
+    }
+  } catch {}
+}
+
+// ── Cargar tabla ──────────────────────────────────────────────────
+async function cargar() {
+  const rol    = document.getElementById('f-rol').value;
+  const activo = document.getElementById('f-activo').value;
+  const tbody  = document.getElementById('tbody');
+
+  tbody.innerHTML = `<tr><td colspan="6">
+    <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+  </td></tr>`;
+
+  try {
+    let url = '/usuarios?';
+    if (rol)           url += `rol=${rol}&`;
+    if (activo !== '') url += `activo=${activo}`;
+
+    const res  = await api(url);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="6">
+        <div class="vempty"><span class="icon">👤</span><p>Sin usuarios</p></div>
+      </td></tr>`;
+      return;
+    }
+
+    const rolConfig = {
+      admin         : { label:'👑 Admin',          bg:'#fef3c7', color:'#b45309', border:'#fde68a' },
+      veterinario   : { label:'🩺 Veterinario',     bg:'#ecfdf5', color:'#047857', border:'#a7f3d0' },
+      recepcionista : { label:'💁 Recepcionista',   bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
+    };
+
+    tbody.innerHTML = rows.map(u => {
+      const rc = rolConfig[u.rol] || { label: u.rol, bg:'#f8faf8', color:'#4b5f57', border:'#e8ede9' };
+      const esSelf = u.id === userActual.id;
+      return `<tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+              background:linear-gradient(135deg,${u.activo?'#10b981,#059669':'#cbd5e1,#94a3b8'});
+              color:#fff;font-weight:700;font-size:.85rem;
+              display:flex;align-items:center;justify-content:center">
+              ${esc(u.nombre.charAt(0).toUpperCase())}
+            </div>
+            <div>
+              <p style="font-weight:700;font-size:.87rem">
+                ${esc(u.nombre)}
+                ${esSelf ? '<span style="font-size:.62rem;background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:999px;font-weight:700;margin-left:.3rem">Tú</span>' : ''}
+              </p>
+            </div>
+          </div>
+        </td>
+        <td style="font-size:.8rem;color:var(--ink-soft)">${esc(u.email)}</td>
+        <td>
+          <span style="font-size:.72rem;font-weight:700;padding:.25rem .65rem;border-radius:999px;
+            background:${rc.bg};color:${rc.color};border:1px solid ${rc.border}">
+            ${rc.label}
+          </span>
+        </td>
+        <td class="hidden sm:table-cell" style="font-size:.75rem;color:var(--ink-faint)">
+          ${fDate(u.created_at)}
+        </td>
+        <td>
+          ${u.activo
+            ? '<span style="background:#f0fdf4;color:#15803d;font-size:.7rem;font-weight:700;padding:.22rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ Activo</span>'
+            : '<span style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.22rem .6rem;border-radius:999px;border:1px solid #fecdd3">❌ Inactivo</span>'}
+        </td>
+        <td>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <button class="vlink" onclick="abrirModalEditar(${u.id})"
+              style="font-size:.75rem;color:var(--sky)">✏️ Editar</button>
+            ${!esSelf ? `
+            <span style="color:var(--line)">·</span>
+            <button class="vlink" onclick="toggleUsuario(${u.id},'${esc(u.nombre)}',${u.activo})"
+              style="font-size:.75rem;color:${u.activo?'#e11d48':'#15803d'}">
+              ${u.activo ? '🚫 Desactivar' : '✅ Activar'}
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="6">
+      <div class="vempty"><span class="icon">😿</span>
+        <p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p>
+      </div>
+    </td></tr>`;
+  }
+}
+
+// ── Nuevo usuario ─────────────────────────────────────────────────
+function abrirModalNuevo() {
+  if (limiteData && !limiteData.puede_crear) {
+    toast('Has alcanzado el límite de usuarios de tu plan. Contacta al administrador.', 'warning', 6000);
+    return;
+  }
+  usuarioEditandoId = null;
+  document.getElementById('modal-titulo').textContent    = '👤 Nuevo Usuario';
+  document.getElementById('btn-guardar').textContent     = '💾 Crear Usuario';
+  document.getElementById('u-id').value                  = '';
+  document.getElementById('u-nombre').value              = '';
+  document.getElementById('u-email').value               = '';
+  document.getElementById('u-password').value            = '';
+  document.getElementById('u-rol').value                 = 'recepcionista';
+  document.getElementById('pass-label').textContent      = 'Password * (mín. 8 caracteres)';
+  document.getElementById('pass-hint').style.display     = 'none';
+  openModal('modal-usuario');
+}
+
+// ── Editar usuario ────────────────────────────────────────────────
+async function abrirModalEditar(id) {
+  usuarioEditandoId = id;
+  document.getElementById('modal-titulo').textContent = '✏️ Editar Usuario';
+  document.getElementById('btn-guardar').textContent  = '💾 Guardar Cambios';
+  document.getElementById('u-id').value               = id;
+  document.getElementById('u-password').value         = '';
+  document.getElementById('pass-label').textContent   = 'Nuevo password (opcional)';
+  document.getElementById('pass-hint').style.display  = 'block';
+  openModal('modal-usuario');
+
+  try {
+    const res = await api(`/usuarios/${id}`);
+    if (!res?.ok) { toast('Error al cargar datos.','danger'); return; }
+    const u = (await res.json()).data;
+    document.getElementById('u-nombre').value = u.nombre || '';
+    document.getElementById('u-email').value  = u.email  || '';
+    document.getElementById('u-rol').value    = u.rol    || 'recepcionista';
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Guardar ───────────────────────────────────────────────────────
+async function guardarUsuario() {
+  const esEdicion = !!usuarioEditandoId;
+  const nombre    = document.getElementById('u-nombre').value.trim();
+  const email     = document.getElementById('u-email').value.trim();
+  const rol       = document.getElementById('u-rol').value;
+  const password  = document.getElementById('u-password').value;
+
+  if (!nombre) { toast('El nombre es obligatorio.','warning'); return; }
+  if (!email)  { toast('El email es obligatorio.','warning'); return; }
+  if (!esEdicion && !password) { toast('El password es obligatorio.','warning'); return; }
+  if (password && password.length < 8) { toast('El password debe tener al menos 8 caracteres.','warning'); return; }
+
+  const body = { nombre, email, rol };
+  if (password) body.password = password;
+
+  const url    = esEdicion ? `/usuarios/${usuarioEditandoId}` : '/usuarios';
+  const method = esEdicion ? 'PUT' : 'POST';
+
+  try {
+    const res  = await api(url, { method, body });
+    if (!res) return;
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (data.code === 'USER_LIMIT_REACHED') {
+        toast(`🔒 ${data.message}`, 'warning', 7000);
+      } else {
+        apiError(res.status, data.message);
+      }
+      return;
+    }
+
+    toast(esEdicion ? '✅ Usuario actualizado.' : '✅ Usuario creado correctamente.', 'success');
+    closeModal('modal-usuario');
+    await cargarLimite();
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Toggle activo/inactivo ────────────────────────────────────────
+async function toggleUsuario(id, nombre, activo) {
+  const accion = activo ? 'desactivar' : 'activar';
+  const ok = await vconfirm({
+    titulo     : `¿${activo ? 'Desactivar' : 'Activar'} usuario?`,
+    mensaje    : `El usuario <strong>${nombre}</strong> será ${accion}do y ${activo ? 'perderá' : 'recuperará'} el acceso al sistema.`,
+    labelOk    : activo ? '🚫 Desactivar' : '✅ Activar',
+    labelCancel: 'Cancelar',
+    tipo       : activo ? 'danger' : 'success',
+  });
+  if (!ok) return;
+
+  try {
+    const res  = await api(`/usuarios/${id}/toggle`, { method:'PATCH' });
+    if (!res) return;
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (data.code === 'USER_LIMIT_REACHED') {
+        toast(`🔒 ${data.message}`, 'warning', 7000);
+      } else {
+        apiError(res.status, data.message);
+      }
+      return;
+    }
+
+    toast(data.message, 'success');
+    await cargarLimite();
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function togglePassUser() {
+  const inp = document.getElementById('u-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+</script>
+</body>
+</html>

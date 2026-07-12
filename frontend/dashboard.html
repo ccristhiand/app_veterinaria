@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+
+<div id="main-content" class="page">
+
+  <!-- Saludo -->
+  <div class="page-head">
+    <div>
+      <h2 id="saludo">Buen día 👋</h2>
+      <p id="fecha-hoy"></p>
+    </div>
+    <a href="citas.html" class="vbtn vbtn-primary">📅 Nueva Cita</a>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="stat" style="--stat-accent:#10b981;--stat-bg:#ecfdf5">
+      <div class="stat-icon">📅</div>
+      <p class="stat-value" id="stat-citas" style="color:#059669">—</p>
+      <p class="stat-label">Citas hoy</p>
+    </div>
+    <div class="stat" style="--stat-accent:#0ea5e9;--stat-bg:#f0f9ff">
+      <div class="stat-icon">🐾</div>
+      <p class="stat-value" id="stat-pendientes" style="color:#0284c7">—</p>
+      <p class="stat-label">Pendientes hoy</p>
+    </div>
+    <div class="stat" style="--stat-accent:#8b5cf6;--stat-bg:#f5f3ff">
+      <div class="stat-icon">✅</div>
+      <p class="stat-value" id="stat-completadas" style="color:#7c3aed">—</p>
+      <p class="stat-label">Completadas hoy</p>
+    </div>
+    <div class="stat" style="--stat-accent:#f59e0b;--stat-bg:#fffbeb">
+      <div class="stat-icon">📦</div>
+      <p class="stat-value" id="stat-stock" style="color:#d97706">—</p>
+      <p class="stat-label">Stock bajo</p>
+    </div>
+  </div>
+
+  <!-- Grid principal -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+    <!-- Citas hoy -->
+    <div class="lg:col-span-2 vcard">
+      <div style="padding:1.2rem 1.4rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700">Agenda de Hoy</h3>
+          <p style="font-size:.72rem;color:var(--ink-faint);margin-top:2px">Se actualiza en tiempo real</p>
+        </div>
+        <span style="display:flex;align-items:center;gap:.4rem;font-size:.7rem;color:#059669;font-weight:700;background:#ecfdf5;padding:.35rem .75rem;border-radius:999px">
+          <span class="ws-dot-on"></span> EN VIVO
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead>
+            <tr>
+              <th>Hora</th><th>Paciente</th>
+              <th class="hidden sm:table-cell">Propietario</th>
+              <th class="hidden md:table-cell">Veterinario</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="citas-hoy">
+            <tr><td colspan="5"><div class="vempty"><div class="vspinner"></div><p>Cargando agenda…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Columna derecha -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+
+      <!-- Stock bajo -->
+      <div class="vcard">
+        <div style="padding:1.1rem 1.3rem;border-bottom:1px solid var(--line)">
+          <h3 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700">⚠️ Alertas de Stock</h3>
+        </div>
+        <div id="stock-list">
+          <div class="vempty" style="padding:1.5rem"><div class="vspinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Accesos rápidos -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;margin-bottom:1rem">Accesos Rápidos</h3>
+        <div class="grid grid-cols-2 gap-2.5">
+          <a href="citas.html"        class="qa-tile" style="background:#ecfdf5;color:#047857"><span class="icon">📅</span>Citas</a>
+          <a href="mascotas.html"     class="qa-tile" style="background:#f0f9ff;color:#0369a1"><span class="icon">🐾</span>Mascotas</a>
+          <a href="propietarios.html" class="qa-tile" style="background:#f5f3ff;color:#6d28d9"><span class="icon">👥</span>Propietarios</a>
+          <a href="historia.html"     class="qa-tile" style="background:#fff7ed;color:#c2410c"><span class="icon">📋</span>Historia</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  initPage({ activePage: 'dashboard', title: 'Dashboard', subtitle: 'Resumen general de la clínica' });
+
+  // Saludo dinámico
+  const h = new Date().getHours();
+  const user = JSON.parse(localStorage.getItem('vet_user')||'{}');
+  document.getElementById('saludo').textContent =
+    (h < 12 ? '☀️ Buenos días' : h < 19 ? '🌤️ Buenas tardes' : '🌙 Buenas noches') + `, ${user.nombre?.split(' ')[0]||''}`;
+  document.getElementById('fecha-hoy').textContent =
+    new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  async function load() {
+    const hoy = new Date().toISOString().split('T')[0];
+
+    try {
+      const res  = await api(`/citas?fecha=${hoy}&limit=50`);
+      if (!res) return;
+      const citas = (await res.json()).data || [];
+
+      document.getElementById('stat-citas').textContent       = citas.length;
+      document.getElementById('stat-pendientes').textContent  = citas.filter(c=>['pendiente','confirmada'].includes(c.estado)).length;
+      document.getElementById('stat-completadas').textContent = citas.filter(c=>c.estado==='completada').length;
+
+      renderCitas(citas);
+    } catch {
+      document.getElementById('citas-hoy').innerHTML =
+        `<tr><td colspan="5"><div class="vempty"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="load()">Reintentar</button></p></div></td></tr>`;
+    }
+
+    try {
+      const res  = await api('/inventario');
+      if (!res) return;
+      const items = ((await res.json()).data || []).filter(i => i.bajo_stock);
+      document.getElementById('stat-stock').textContent = items.length;
+      document.getElementById('stock-list').innerHTML = items.length
+        ? items.slice(0,5).map(i => `
+          <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f2f5f2;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <p style="font-size:.82rem;font-weight:600">${esc(i.nombre)}</p>
+              <p style="font-size:.7rem;color:var(--ink-faint)">${i.cantidad} ${esc(i.unidad)} · mínimo ${i.stock_minimo}</p>
+            </div>
+            <span style="width:9px;height:9px;background:#f59e0b;border-radius:50%;box-shadow:0 0 8px rgba(245,158,11,.6)"></span>
+          </div>`).join('')
+        : `<div class="vempty" style="padding:1.6rem"><span class="icon">✅</span><p>Stock en orden</p></div>`;
+    } catch {}
+  }
+
+  load();
+
+  function renderCitas(citas) {
+    const tbody = document.getElementById('citas-hoy');
+    tbody.innerHTML = citas.length ? citas.map(c => rowHTML(c)).join('')
+      : `<tr><td colspan="5"><div class="vempty"><span class="icon">🌿</span><p>Sin citas para hoy. ¡Día tranquilo!</p></div></td></tr>`;
+  }
+
+  function rowHTML(c) {
+    return `<tr>
+      <td><span style="font-weight:700;color:var(--green-600)">${fTime(c.fecha_hora)}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <span style="font-size:1.25rem">${badgeEspecie(c.especie)}</span>
+          <span style="font-weight:600">${esc(c.mascota_nombre)}</span>
+        </div>
+      </td>
+      <td class="hidden sm:table-cell" style="color:var(--ink-soft)">${esc(c.propietario_nombre||'—')}</td>
+      <td class="hidden md:table-cell" style="color:var(--ink-soft)">${esc(c.veterinario_nombre||'—')}</td>
+      <td>${badgeEstado(c.estado)}</td>
+    </tr>`;
+  }
+
+  // Tiempo real
+  getSocket().on('cita:nueva', msg => {
+    const tbody = document.getElementById('citas-hoy');
+    const empty = tbody.querySelector('.vempty');
+    if (empty) tbody.innerHTML = '';
+    const tr = document.createElement('tr');
+    tr.className = 'row-new';
+    tr.innerHTML = rowHTML(msg.payload).replace(/^<tr>/,'').replace(/<\/tr>$/,'');
+    tbody.prepend(tr);
+    setTimeout(() => tr.classList.remove('row-new'), 3500);
+    const el = document.getElementById('stat-citas');
+    el.textContent = (parseInt(el.textContent)||0) + 1;
+  });
+</script>
+</body>
+</html>

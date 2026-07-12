@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Mascotas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div>
+      <h2>Mascotas</h2>
+      <p>Busca por nombre de mascota o DNI del propietario</p>
+    </div>
+    <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary">＋ Nueva Mascota</button>
+  </div>
+
+  <!-- Búsqueda -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end">
+    <div class="search-wrap" style="flex:1;min-width:200px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input id="search" type="text"
+        placeholder="Nombre de mascota, raza, microchip…"
+        class="vinput" onkeydown="if(event.key==='Enter')buscar()"/>
+    </div>
+    <button onclick="buscar()" class="vbtn vbtn-primary">Buscar</button>
+    <button onclick="limpiar()" class="vbtn vbtn-ghost">Ver todas</button>
+  </div>
+
+  <!-- Grid -->
+  <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div class="vempty" style="grid-column:1/-1">
+      <div class="vspinner"></div><p>Cargando mascotas…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Nueva / Editar Mascota ══════════════════════════════ -->
+<div id="modal-mascota" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:620px">
+    <div class="vmodal-head">
+      <h3 id="modal-masc-titulo">🐾 Nueva Mascota</h3>
+      <button onclick="closeModal('modal-mascota')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="masc-id"/>
+
+      <!-- Buscar propietario (solo en nuevo) -->
+      <div id="bloque-prop-buscar">
+        <div style="background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1rem">
+          <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft);
+            text-transform:uppercase;letter-spacing:.1em;margin-bottom:.7rem">
+            ① Propietario
+          </p>
+          <div style="display:flex;gap:.6rem;margin-bottom:.6rem">
+            <div class="search-wrap" style="flex:1">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <input id="m-prop-search" type="text"
+                placeholder="DNI, nombre o teléfono del propietario…"
+                class="vinput" onkeydown="if(event.key==='Enter')buscarPropMascota()"/>
+            </div>
+            <button onclick="buscarPropMascota()" class="vbtn vbtn-primary">Buscar</button>
+          </div>
+          <div id="m-prop-resultados"
+            style="display:flex;flex-direction:column;gap:.4rem;max-height:160px;overflow-y:auto">
+          </div>
+          <!-- Propietario seleccionado -->
+          <div id="m-prop-sel" style="display:none;background:#ecfdf5;border:1px solid #a7f3d0;
+            border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.7rem">
+            <div style="width:32px;height:32px;border-radius:50%;
+              background:linear-gradient(135deg,#10b981,#059669);color:#fff;
+              font-weight:700;font-size:.78rem;display:flex;align-items:center;
+              justify-content:center;flex-shrink:0" id="m-prop-avatar">?</div>
+            <div style="flex:1">
+              <p style="font-weight:700;font-size:.85rem" id="m-prop-nombre-sel">—</p>
+              <p style="font-size:.7rem;color:var(--ink-soft)" id="m-prop-info-sel">—</p>
+            </div>
+            <button onclick="limpiarPropMascota()"
+              style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Propietario en modo edición (solo lectura) -->
+      <div id="bloque-prop-readonly" style="display:none;background:#f0fdf4;
+        border:1px solid #a7f3d0;border-radius:.9rem;padding:.75rem 1rem;
+        display:none;align-items:center;gap:.75rem">
+        <span style="font-size:1.3rem">👤</span>
+        <div>
+          <p style="font-size:.65rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Propietario</p>
+          <p style="font-weight:700;font-size:.88rem" id="m-prop-readonly-nombre">—</p>
+        </div>
+      </div>
+
+      <!-- Datos de la mascota -->
+      <p id="label-datos-mascota" style="font-size:.72rem;font-weight:700;
+        color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em">
+        ② Datos de la mascota
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Nombre *</label>
+          <input id="m-nombre" type="text" class="vinput" placeholder="Max, Luna, Coco…"/>
+        </div>
+        <div>
+          <label class="vlabel">Especie *</label>
+          <select id="m-especie" class="vinput">
+            <option value="">Seleccionar…</option>
+            <option value="perro">🐕 Perro</option>
+            <option value="gato">🐈 Gato</option>
+            <option value="ave">🦜 Ave</option>
+            <option value="reptil">🦎 Reptil</option>
+            <option value="roedor">🐹 Roedor</option>
+            <option value="otro">🐾 Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Raza</label>
+          <input id="m-raza" type="text" class="vinput" placeholder="Labrador, Persa…"/>
+        </div>
+        <div>
+          <label class="vlabel">Sexo</label>
+          <select id="m-sexo" class="vinput">
+            <option value="desconocido">Desconocido</option>
+            <option value="macho">Macho</option>
+            <option value="hembra">Hembra</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Fecha de nacimiento</label>
+          <input id="m-fnac" type="date" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Peso (kg)</label>
+          <input id="m-peso" type="number" step="0.1" min="0" class="vinput" placeholder="3.5"/>
+        </div>
+        <div>
+          <label class="vlabel">Color</label>
+          <input id="m-color" type="text" class="vinput" placeholder="Negro, Blanco…"/>
+        </div>
+        <div>
+          <label class="vlabel">Microchip</label>
+          <input id="m-chip" type="text" class="vinput" placeholder="Número de microchip"/>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel">🌿 Alergias conocidas</label>
+        <textarea id="m-alergias" rows="2" class="vinput"
+          placeholder="Penicilina, Polen…"></textarea>
+      </div>
+      <div>
+        <label class="vlabel" style="color:#be123c">⚠️ Alertas médicas</label>
+        <textarea id="m-alertas" rows="2" class="vinput" style="border-color:#fecdd3"
+          placeholder="Condiciones críticas que el veterinario debe conocer…"></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-mascota')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarMascota()" class="vbtn vbtn-primary" id="btn-guardar-masc">
+        💾 Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Detalle Mascota ══════════════════════════════════════ -->
+<div id="modal-det" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:600px">
+    <div class="vmodal-head">
+      <h3 id="det-titulo">Detalle</h3>
+      <button onclick="closeModal('modal-det')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="det-body"></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-det')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button id="det-carnet-btn" class="vbtn vbtn-ghost">📱 Carnet Digital</button>
+      <button id="det-historia-btn" class="vbtn vbtn-ghost">📋 Ver Historia</button>
+      <button id="det-editar-btn"   class="vbtn vbtn-primary">✏️ Editar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let propMascotaSel = null;
+let mascEditandoId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'mascotas', title:'Mascotas', subtitle:'Registro de pacientes' });
+  cargar();
+});
+
+function buscar() { cargar(document.getElementById('search').value.trim()); }
+function limpiar() { document.getElementById('search').value=''; cargar(); }
+
+function edad(fnac) {
+  if (!fnac) return null;
+  const diff  = Date.now() - new Date(fnac).getTime();
+  const years = Math.floor(diff / 31557600000);
+  if (years >= 1) return `${years} año${years>1?'s':''}`;
+  const months = Math.floor(diff / 2629800000);
+  return months > 0 ? `${months} mes${months!==1?'es':''}` : 'Cachorro';
+}
+
+// ── Cargar grid ───────────────────────────────────────────────────
+async function cargar(search='') {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+    <div class="vspinner"></div><p>Cargando…</p></div>`;
+  try {
+    const res  = await api(`/mascotas?search=${encodeURIComponent(search)}&limit=60`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+
+    if (!rows.length) {
+      grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+        <span class="icon">🔍</span><p>Sin mascotas encontradas</p></div>`;
+      return;
+    }
+
+    grid.innerHTML = rows.map(m => `
+      <div class="pet-card" onclick="verDetalle(${m.id})">
+        ${m.alertas_medicas ? `<span class="pet-alert">⚠️ Alerta</span>` : ''}
+        <div class="pet-avatar">${badgeEspecie(m.especie)}</div>
+        <h3 class="pet-name">${esc(m.nombre)}</h3>
+        <p class="pet-meta">
+          ${esc(m.raza||m.especie)} · ${esc(m.sexo)}
+          ${edad(m.fecha_nacimiento) ? ' · '+edad(m.fecha_nacimiento) : ''}
+        </p>
+        <div class="pet-details">
+          <span>👤 ${esc(m.propietario_nombre||'—')}</span>
+          ${m.peso_kg ? `<span>⚖️ ${m.peso_kg} kg</span>` : ''}
+        </div>
+        <!-- Botón editar directo en la card -->
+        <button onclick="event.stopPropagation();abrirModalEditar(${m.id})"
+          style="margin-top:.6rem;width:100%;background:none;border:1px solid var(--line);
+          border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;
+          color:var(--sky);cursor:pointer;font-family:inherit;transition:all .15s"
+          onmouseover="this.style.borderColor='var(--sky)';this.style.background='#f0f9ff'"
+          onmouseout="this.style.borderColor='var(--line)';this.style.background='none'">
+          ✏️ Editar
+        </button>
+      </div>`).join('');
+  } catch {
+    grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+      <span class="icon">😿</span>
+      <p>Error al cargar.
+        <button class="vlink" onclick="cargar()">Reintentar</button>
+      </p></div>`;
+  }
+}
+
+// ── Nuevo ─────────────────────────────────────────────────────────
+function abrirModalNuevo() {
+  mascEditandoId = null; propMascotaSel = null;
+  document.getElementById('modal-masc-titulo').textContent = '🐾 Nueva Mascota';
+  document.getElementById('btn-guardar-masc').textContent  = '💾 Guardar';
+  document.getElementById('masc-id').value = '';
+  document.getElementById('bloque-prop-buscar').style.display   = 'block';
+  document.getElementById('bloque-prop-readonly').style.display = 'none';
+  document.getElementById('label-datos-mascota').textContent    = '② Datos de la mascota';
+  limpiarFormMascota();
+  limpiarPropMascota();
+  openModal('modal-mascota');
+}
+
+// ── Editar ────────────────────────────────────────────────────────
+async function abrirModalEditar(id) {
+  mascEditandoId = id;
+  document.getElementById('modal-masc-titulo').textContent = '✏️ Editar Mascota';
+  document.getElementById('btn-guardar-masc').textContent  = '💾 Guardar Cambios';
+  document.getElementById('masc-id').value = id;
+  // En edición ocultamos el buscador de propietario
+  document.getElementById('bloque-prop-buscar').style.display   = 'none';
+  document.getElementById('bloque-prop-readonly').style.display = 'flex';
+  document.getElementById('label-datos-mascota').textContent    = 'Datos de la mascota';
+  limpiarFormMascota();
+  openModal('modal-mascota');
+
+  try {
+    const res = await api(`/mascotas/${id}`);
+    if (!res || !res.ok) { toast('Error al cargar datos.','danger'); return; }
+    const m   = (await res.json()).data;
+
+    document.getElementById('m-prop-readonly-nombre').textContent =
+      `${m.propietario_nombre||'—'}`;
+
+    document.getElementById('m-nombre').value   = m.nombre             || '';
+    document.getElementById('m-especie').value  = m.especie            || '';
+    document.getElementById('m-raza').value     = m.raza               || '';
+    document.getElementById('m-sexo').value     = m.sexo               || 'desconocido';
+    document.getElementById('m-fnac').value     = m.fecha_nacimiento?.split('T')[0] || '';
+    document.getElementById('m-peso').value     = m.peso_kg            || '';
+    document.getElementById('m-color').value    = m.color              || '';
+    document.getElementById('m-chip').value     = m.microchip          || '';
+    document.getElementById('m-alergias').value = m.alergias           || '';
+    document.getElementById('m-alertas').value  = m.alertas_medicas    || '';
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Buscar propietario (solo en nuevo) ────────────────────────────
+async function buscarPropMascota() {
+  const q    = document.getElementById('m-prop-search').value.trim();
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  const cont = document.getElementById('m-prop-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
+
+  try {
+    const res  = await api(`/propietarios?search=${encodeURIComponent(q)}&limit=8`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    cont.innerHTML = rows.length ? rows.map(p => `
+      <button onclick="selPropMascota(${p.id},'${esc(p.nombre)}','${esc(p.apellido)}','${esc(p.dni||'')}','${esc(p.telefono)}')"
+        style="display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;background:#fff;
+        border:1px solid var(--line);border-radius:.8rem;cursor:pointer;text-align:left;
+        font-family:inherit;width:100%;transition:all .15s"
+        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+        <div style="width:32px;height:32px;border-radius:50%;
+          background:linear-gradient(135deg,#ede9fe,#ddd6fe);
+          color:#6d28d9;font-weight:700;font-size:.75rem;flex-shrink:0;
+          display:flex;align-items:center;justify-content:center">
+          ${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}
+        </div>
+        <div style="flex:1">
+          <p style="font-weight:700;font-size:.83rem">${esc(p.nombre)} ${esc(p.apellido)}</p>
+          <p style="font-size:.68rem;color:var(--ink-faint)">
+            ${p.dni?'🪪 '+esc(p.dni)+' · ':''}📞 ${esc(p.telefono)}
+          </p>
+        </div>
+      </button>`).join('')
+    : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem;text-align:center">No encontrado</div>';
+  } catch {
+    cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>';
+  }
+}
+
+function selPropMascota(id, nombre, apellido, dni, telefono) {
+  propMascotaSel = { id };
+  document.getElementById('m-prop-resultados').innerHTML = '';
+  document.getElementById('m-prop-search').value         = '';
+  document.getElementById('m-prop-sel').style.display    = 'flex';
+  document.getElementById('m-prop-avatar').textContent    = nombre.charAt(0)+apellido.charAt(0);
+  document.getElementById('m-prop-nombre-sel').textContent= `${nombre} ${apellido}`;
+  document.getElementById('m-prop-info-sel').textContent  =
+    `${dni?'🪪 '+dni+' · ':''}📞 ${telefono}`;
+}
+
+function limpiarPropMascota() {
+  propMascotaSel = null;
+  document.getElementById('m-prop-sel').style.display        = 'none';
+  document.getElementById('m-prop-resultados').innerHTML     = '';
+  document.getElementById('m-prop-search').value             = '';
+}
+
+// ── Guardar ───────────────────────────────────────────────────────
+async function guardarMascota() {
+  const esEdicion = !!mascEditandoId;
+
+  if (!esEdicion && !propMascotaSel) {
+    toast('Selecciona un propietario primero.','warning'); return;
+  }
+
+  const nombre  = document.getElementById('m-nombre').value.trim();
+  const especie = document.getElementById('m-especie').value;
+
+  if (!nombre || !especie) {
+    toast('Nombre y especie son obligatorios.','warning'); return;
+  }
+
+  const body = {
+    nombre,
+    especie,
+    raza            : document.getElementById('m-raza').value.trim()     || null,
+    sexo            : document.getElementById('m-sexo').value,
+    fecha_nacimiento: document.getElementById('m-fnac').value             || null,
+    peso_kg         : parseFloat(document.getElementById('m-peso').value) || null,
+    color           : document.getElementById('m-color').value.trim()    || null,
+    microchip       : document.getElementById('m-chip').value.trim()     || null,
+    alergias        : document.getElementById('m-alergias').value.trim() || null,
+    alertas_medicas : document.getElementById('m-alertas').value.trim()  || null,
+  };
+
+  if (!esEdicion) body.propietario_id = propMascotaSel.id;
+
+  const url    = esEdicion ? `/mascotas/${mascEditandoId}` : '/mascotas';
+  const method = esEdicion ? 'PUT' : 'POST';
+
+  try {
+    const res  = await api(url, { method, body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+
+    toast(esEdicion ? '✅ Mascota actualizada' : '🐾 Mascota registrada','success');
+    closeModal('modal-mascota');
+    limpiarFormMascota();
+    limpiarPropMascota();
+    cargar(document.getElementById('search').value.trim());
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function limpiarFormMascota() {
+  ['m-nombre','m-raza','m-fnac','m-peso','m-color','m-chip','m-alergias','m-alertas']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('m-especie').value = '';
+  document.getElementById('m-sexo').value    = 'desconocido';
+}
+
+// ── Ver detalle mascota ───────────────────────────────────────────
+async function verDetalle(id) {
+  document.getElementById('det-titulo').textContent  = 'Cargando…';
+  document.getElementById('det-body').innerHTML      =
+    '<div class="vempty"><div class="vspinner"></div></div>';
+
+  document.getElementById('det-historia-btn').onclick = () => {
+    sessionStorage.setItem('historia_mascota_id', id);
+    window.location.href = 'historia.html';
+  };
+  document.getElementById('det-editar-btn').onclick = () => {
+    closeModal('modal-det');
+    abrirModalEditar(id);
+  };
+  document.getElementById('det-carnet-btn').onclick = () => abrirCarnet(id);
+
+  openModal('modal-det');
+
+  try {
+    const res = await api(`/mascotas/${id}`);
+    if (!res) return;
+    const d   = (await res.json()).data;
+
+    document.getElementById('det-titulo').textContent =
+      `${badgeEspecie(d.especie)} ${d.nombre}`;
+
+    document.getElementById('det-body').innerHTML = `
+      <!-- Propietario -->
+      <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);
+        border:1px solid #ddd6fe;border-radius:1rem;padding:.85rem 1.1rem;
+        margin-bottom:1.2rem;display:flex;align-items:center;gap:.85rem">
+        <div style="width:40px;height:40px;border-radius:50%;
+          background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;
+          font-weight:700;font-size:.9rem;display:flex;align-items:center;
+          justify-content:center;flex-shrink:0">
+          ${esc((d.propietario_nombre||'?').charAt(0))}
+        </div>
+        <div>
+          <p style="font-size:.62rem;color:#6d28d9;font-weight:700;
+            text-transform:uppercase;letter-spacing:.1em">Propietario</p>
+          <p style="font-weight:700;font-size:.9rem">${esc(d.propietario_nombre||'—')}</p>
+          <p style="font-size:.72rem;color:var(--ink-soft)">📞 ${esc(d.telefono||'—')}</p>
+        </div>
+      </div>
+
+      <!-- Datos -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" style="margin-bottom:1.2rem">
+        ${ib('Especie', d.especie)} ${ib('Raza', d.raza)} ${ib('Sexo', d.sexo)}
+        ${d.peso_kg ? ib('Peso', d.peso_kg+' kg') : ''}
+        ${d.fecha_nacimiento ? ib('Nacimiento', fDate(d.fecha_nacimiento)) : ''}
+        ${d.color ? ib('Color', d.color) : ''}
+      </div>
+
+      ${d.microchip ? `
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.9rem;
+          padding:.7rem 1rem;margin-bottom:.7rem;font-size:.8rem">
+          <b style="color:#0369a1">💾 Microchip:</b>
+          <span style="font-family:monospace">${esc(d.microchip)}</span>
+        </div>` : ''}
+      ${d.alergias ? `
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.9rem;
+          padding:.7rem 1rem;margin-bottom:.7rem;font-size:.8rem">
+          <b style="color:#b45309">🌿 Alergias:</b> ${esc(d.alergias)}
+        </div>` : ''}
+      ${d.alertas_medicas ? `
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.9rem;
+          padding:.7rem 1rem;margin-bottom:.7rem;font-size:.8rem">
+          <b style="color:#be123c">⚠️ Alerta médica:</b> ${esc(d.alertas_medicas)}
+        </div>` : ''}
+
+      <!-- Vacunas -->
+      <h4 style="font-family:'Playfair Display',serif;font-weight:700;
+        margin:1.2rem 0 .8rem">💉 Vacunas (${d.vacunas?.length||0})</h4>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        ${d.vacunas?.length ? d.vacunas.slice(0,6).map(v=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;
+            padding:.75rem 1rem;background:#f8faf8;border-radius:.9rem;
+            border:1px solid var(--line);font-size:.8rem">
+            <div>
+              <p style="font-weight:600">${esc(v.nombre)}</p>
+              <p style="font-size:.7rem;color:var(--ink-faint)">
+                Aplicada: ${fDate(v.fecha_aplicacion)}
+              </p>
+            </div>
+            ${v.proxima_dosis ? `
+              <span style="font-size:.7rem;color:#0369a1;font-weight:700;
+                background:#f0f9ff;padding:.25rem .6rem;border-radius:999px">
+                Próx: ${fDate(v.proxima_dosis)}
+              </span>` : ''}
+          </div>`).join('')
+        : '<p style="font-size:.8rem;color:var(--ink-faint)">Sin vacunas registradas.</p>'}
+      </div>`;
+  } catch {
+    document.getElementById('det-body').innerHTML =
+      '<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>';
+  }
+}
+
+function ib(label, val) {
+  if (!val) return '';
+  return `<div style="background:#f8faf8;border-radius:.9rem;padding:.7rem .9rem;
+    border:1px solid var(--line)">
+    <p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;
+      letter-spacing:.1em;font-weight:700">${label}</p>
+    <p style="font-size:.82rem;font-weight:600;margin-top:.2rem;text-transform:capitalize">
+      ${esc(val||'—')}
+    </p>
+  </div>`;
+}
+
+// ── Carnet Digital ────────────────────────────────────────────────
+async function abrirCarnet(mascotaId) {
+  openModal('modal-carnet');
+  document.getElementById('carnet-body').innerHTML =
+    '<div class="vempty"><div class="vspinner"></div><p>Generando carnet…</p></div>';
+
+  try {
+    const res = await api(`/carnet/mascota/${mascotaId}`);
+    if (!res?.ok) { toast('Error al obtener carnet.','danger'); return; }
+    const carnet = (await res.json()).data;
+
+    const url = `${window.location.origin}/carnet-publico.html?t=${carnet.token}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=166534&qzone=2`;
+
+    document.getElementById('carnet-body').innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1.25rem">
+
+        <!-- QR -->
+        <div style="background:#f0fdf4;border:2px solid #a7f3d0;border-radius:1.25rem;
+          padding:1.25rem;text-align:center">
+          <img src="${qrUrl}" alt="QR Carnet" width="180" height="180"
+            style="border-radius:.5rem;display:block;margin:0 auto"/>
+          <p style="font-size:.72rem;color:#15803d;font-weight:700;margin-top:.6rem">
+            📱 Escanear para ver el carnet
+          </p>
+        </div>
+
+        <!-- Estado -->
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="width:10px;height:10px;border-radius:50%;background:${carnet.activo?'#10b981':'#e11d48'}"></span>
+          <span style="font-size:.8rem;font-weight:600;color:${carnet.activo?'#15803d':'#be123c'}">
+            ${carnet.activo ? 'Carnet activo' : 'Carnet desactivado'}
+          </span>
+          <span style="font-size:.72rem;color:var(--ink-faint)">· ${carnet.vistas} vista${carnet.vistas!==1?'s':''}</span>
+        </div>
+
+        <!-- URL -->
+        <div style="width:100%;background:#f8faf8;border:1px solid var(--line);
+          border-radius:.85rem;padding:.85rem 1rem">
+          <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;
+            text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Enlace público</p>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <p id="carnet-url" style="font-size:.75rem;color:#1d4ed8;word-break:break-all;
+              flex:1;font-family:'Courier New',monospace">${url}</p>
+            <button onclick="copiarLink('${url}')"
+              style="background:none;border:1.5px solid var(--line);border-radius:.65rem;
+              padding:.35rem .75rem;font-size:.72rem;cursor:pointer;font-weight:600;
+              color:var(--ink-soft);white-space:nowrap;flex-shrink:0">
+              📋 Copiar
+            </button>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <div style="display:flex;gap:.6rem;width:100%;flex-wrap:wrap">
+          <a href="${url}" target="_blank" class="vbtn vbtn-primary"
+            style="flex:1;text-align:center;text-decoration:none">
+            👁️ Ver carnet
+          </a>
+          <button onclick="regenerarToken(${mascotaId})" class="vbtn vbtn-ghost" style="flex:1">
+            🔄 Regenerar QR
+          </button>
+        </div>
+
+        <p style="font-size:.7rem;color:var(--ink-faint);text-align:center">
+          Comparte este QR o enlace con el propietario para que vea el historial de su mascota sin necesidad de login.
+        </p>
+      </div>`;
+
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function copiarLink(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    toast('✅ Enlace copiado al portapapeles', 'success');
+  }).catch(() => {
+    const inp = document.createElement('input');
+    inp.value = url; document.body.appendChild(inp);
+    inp.select(); document.execCommand('copy');
+    inp.remove();
+    toast('✅ Enlace copiado', 'success');
+  });
+}
+
+async function regenerarToken(mascotaId) {
+  const ok = await vconfirm({
+    titulo     : '¿Regenerar QR?',
+    mensaje    : 'El enlace anterior dejará de funcionar y se generará uno nuevo.',
+    labelOk    : '🔄 Regenerar',
+    labelCancel: 'Cancelar',
+    tipo       : 'warning',
+  });
+  if (!ok) return;
+  try {
+    const res = await api(`/carnet/mascota/${mascotaId}/regenerar`, { method:'POST' });
+    if (!res?.ok) { toast('Error al regenerar.','danger'); return; }
+    toast('✅ QR regenerado.', 'success');
+    abrirCarnet(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+</script>
+
+<!-- Modal Carnet Digital -->
+<div id="modal-carnet" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3>📱 Carnet Digital</h3>
+      <button onclick="closeModal('modal-carnet')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="carnet-body">
+      <div class="vempty"><div class="vspinner"></div></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-carnet')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+</html>

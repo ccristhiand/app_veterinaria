@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Configuración</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div>
+      <h2>⚙️ Configuración de Empresa</h2>
+      <p>Datos que aparecerán en todas las boletas y facturas</p>
+    </div>
+    <button onclick="guardar()" class="vbtn vbtn-primary">💾 Guardar Cambios</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start" id="layout-grid">
+
+    <!-- Formulario -->
+    <div style="display:flex;flex-direction:column;gap:1.3rem">
+
+      <!-- Datos principales -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;margin-bottom:1.1rem">
+          🏥 Datos de la Clínica
+        </h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div style="grid-column:span 2">
+            <label class="vlabel">Nombre comercial *</label>
+            <input id="c-nombre" type="text" class="vinput" placeholder="VetClinic"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div style="grid-column:span 2">
+            <label class="vlabel">Razón social</label>
+            <input id="c-razon" type="text" class="vinput" placeholder="VetClinic S.A.C."
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">RUC</label>
+            <input id="c-ruc" type="text" class="vinput" placeholder="20XXXXXXXXX"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Teléfono</label>
+            <input id="c-telefono" type="text" class="vinput" placeholder="01-234-5678"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div style="grid-column:span 2">
+            <label class="vlabel">Dirección</label>
+            <input id="c-direccion" type="text" class="vinput" placeholder="Av. Principal 123"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Distrito</label>
+            <input id="c-distrito" type="text" class="vinput" placeholder="Miraflores"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Ciudad</label>
+            <input id="c-ciudad" type="text" class="vinput" placeholder="Lima"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Email</label>
+            <input id="c-email" type="email" class="vinput" placeholder="info@vetclinic.pe"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Sitio web</label>
+            <input id="c-web" type="text" class="vinput" placeholder="www.vetclinic.pe"
+              oninput="actualizarPreview()"/>
+          </div>
+          <div style="grid-column:span 2">
+            <label class="vlabel">URL del logo</label>
+            <input id="c-logo" type="text" class="vinput"
+              placeholder="https://tu-servidor.com/logo.png"
+              oninput="actualizarPreview()"/>
+            <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.3rem">
+              Sube tu logo a Imgur, Cloudinary o cualquier hosting de imágenes y pega la URL aquí.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuración de documentos -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;margin-bottom:1.1rem">
+          🧾 Configuración de Documentos
+        </h3>
+
+        <!-- Moneda -->
+        <div style="margin-bottom:1rem">
+          <label class="vlabel">💱 Moneda</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+            <div>
+              <label class="vlabel" style="font-size:.7rem">Moneda</label>
+              <select id="c-moneda" class="vinput" onchange="onMonedaChange()">
+                <option value="PEN">🇵🇪 Sol Peruano (PEN)</option>
+                <option value="USD">🇺🇸 Dólar (USD)</option>
+                <option value="COP">🇨🇴 Peso Colombiano (COP)</option>
+                <option value="MXN">🇲🇽 Peso Mexicano (MXN)</option>
+                <option value="ARS">🇦🇷 Peso Argentino (ARS)</option>
+                <option value="CLP">🇨🇱 Peso Chileno (CLP)</option>
+                <option value="BOB">🇧🇴 Boliviano (BOB)</option>
+                <option value="PYG">🇵🇾 Guaraní (PYG)</option>
+                <option value="UYU">🇺🇾 Peso Uruguayo (UYU)</option>
+                <option value="VES">🇻🇪 Bolívar (VES)</option>
+                <option value="BRL">🇧🇷 Real Brasileño (BRL)</option>
+                <option value="EUR">🇪🇺 Euro (EUR)</option>
+                <option value="OTRO">🌍 Otra</option>
+              </select>
+            </div>
+            <div>
+              <label class="vlabel" style="font-size:.7rem">Símbolo</label>
+              <input id="c-simbolo" type="text" class="vinput" placeholder="S/."
+                style="font-weight:700;font-size:1rem" oninput="actualizarPreview()"/>
+            </div>
+            <div>
+              <label class="vlabel" style="font-size:.7rem">Código personalizado</label>
+              <input id="c-moneda-custom" type="text" class="vinput" placeholder="PEN"
+                maxlength="5" oninput="actualizarPreview()"/>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+          <div>
+            <label class="vlabel">% IGV / Impuesto</label>
+            <input id="c-igv" type="number" step="0.01" min="0" max="99" class="vinput"
+              placeholder="18" oninput="actualizarPreview()"/>
+          </div>
+          <div>
+            <label class="vlabel">Serie Boleta</label>
+            <input id="c-serie-b" type="text" class="vinput" placeholder="B001"/>
+          </div>
+          <div>
+            <label class="vlabel">Serie Factura</label>
+            <input id="c-serie-f" type="text" class="vinput" placeholder="F001"/>
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <label class="vlabel">Pie de documento</label>
+          <textarea id="c-pie" rows="2" class="vinput"
+            placeholder="Gracias por su preferencia. No se aceptan devoluciones después de 24 horas."
+            oninput="actualizarPreview()"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Preview del documento -->
+    <div style="position:sticky;top:1rem">
+      <div class="vcard" style="padding:0;overflow:hidden">
+        <div style="padding:.75rem 1rem;background:var(--green-50);border-bottom:1px solid var(--line);
+          display:flex;align-items:center;gap:.5rem">
+          <span style="font-size:.75rem;font-weight:700;color:var(--green-600)">
+            👁️ PREVIEW DEL DOCUMENTO
+          </span>
+        </div>
+        <!-- Mini boleta preview -->
+        <div id="preview-doc" style="padding:1.2rem;font-size:.72rem;font-family:'Inter',sans-serif;
+          line-height:1.6;background:#fafaf8;min-height:380px">
+          <!-- Se genera con JS -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+initPage({ activePage:'configuracion', title:'Configuración', subtitle:'Datos de la empresa' });
+
+// Cargar config actual
+(async () => {
+  try {
+    const res = await api('/empresa');
+    if (!res||!res.ok) return;
+    const d = (await res.json()).data;
+    if (!d) return;
+    document.getElementById('c-nombre').value   = d.nombre        || '';
+    document.getElementById('c-razon').value    = d.razon_social  || '';
+    document.getElementById('c-ruc').value      = d.ruc           || '';
+    document.getElementById('c-telefono').value = d.telefono      || '';
+    document.getElementById('c-direccion').value= d.direccion     || '';
+    document.getElementById('c-distrito').value = d.distrito      || '';
+    document.getElementById('c-ciudad').value   = d.ciudad        || '';
+    document.getElementById('c-email').value    = d.email         || '';
+    document.getElementById('c-web').value      = d.web           || '';
+    document.getElementById('c-logo').value     = d.logo_url      || '';
+    document.getElementById('c-igv').value      = d.igv_porcentaje|| 18;
+    document.getElementById('c-serie-b').value  = d.serie_boleta  || 'B001';
+    document.getElementById('c-serie-f').value  = d.serie_factura || 'F001';
+    document.getElementById('c-pie').value      = d.pie_documento || '';
+    // Moneda
+    const moneda = d.moneda || 'PEN';
+    const selectMoneda = document.getElementById('c-moneda');
+    const opcionExiste = [...selectMoneda.options].some(o => o.value === moneda);
+    selectMoneda.value = opcionExiste ? moneda : 'OTRO';
+    document.getElementById('c-simbolo').value       = d.simbolo_moneda || 'S/.';
+    document.getElementById('c-moneda-custom').value = moneda;
+    actualizarPreview();
+  } catch {}
+})();
+
+function onMonedaChange() {
+  const simbolos = {
+    PEN:'S/.', USD:'$', COP:'$', MXN:'$', ARS:'$',
+    CLP:'$', BOB:'Bs.', PYG:'₲', UYU:'$U', VES:'Bs.S',
+    BRL:'R$', EUR:'€',
+  };
+  const sel = document.getElementById('c-moneda').value;
+  if (sel !== 'OTRO') {
+    document.getElementById('c-simbolo').value       = simbolos[sel] || sel;
+    document.getElementById('c-moneda-custom').value = sel;
+  }
+  actualizarPreview();
+}
+
+function actualizarPreview() {
+  const nombre   = document.getElementById('c-nombre').value   || 'VetClinic';
+  const razon    = document.getElementById('c-razon').value    || '';
+  const ruc      = document.getElementById('c-ruc').value      || '';
+  const tel      = document.getElementById('c-telefono').value || '';
+  const dir      = document.getElementById('c-direccion').value|| '';
+  const dist     = document.getElementById('c-distrito').value || '';
+  const ciudad   = document.getElementById('c-ciudad').value   || 'Lima';
+  const email    = document.getElementById('c-email').value    || '';
+  const web      = document.getElementById('c-web').value      || '';
+  const logo     = document.getElementById('c-logo').value     || '';
+  const igv      = parseFloat(document.getElementById('c-igv').value) || 18;
+  const pie      = document.getElementById('c-pie').value      || '';
+  const sim      = document.getElementById('c-simbolo').value  || 'S/.';
+
+  const hoy = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+
+  document.getElementById('preview-doc').innerHTML = `
+    <!-- Header empresa -->
+    <div style="border-bottom:2px solid #166534;padding-bottom:.75rem;margin-bottom:.75rem;
+      display:flex;align-items:center;gap:.75rem">
+      ${logo ? `<img src="${esc(logo)}" style="height:48px;object-fit:contain;border-radius:.4rem" onerror="this.style.display='none'"/>` : `<div style="width:48px;height:48px;background:linear-gradient(135deg,#166534,#15803d);border-radius:.6rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1rem">V</div>`}
+      <div>
+        <p style="font-weight:800;font-size:.92rem;color:#166534">${esc(nombre)}</p>
+        ${razon ? `<p style="color:#4b5f57;font-size:.65rem">${esc(razon)}</p>` : ''}
+        ${ruc   ? `<p style="color:#4b5f57;font-size:.65rem">RUC: ${esc(ruc)}</p>` : ''}
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="background:linear-gradient(135deg,#166534,#15803d);color:#fff;
+          padding:.4rem .8rem;border-radius:.5rem;font-weight:800;font-size:.8rem">
+          BOLETA
+        </div>
+        <p style="font-size:.62rem;color:#4b5f57;margin-top:.25rem">B001-00001</p>
+      </div>
+    </div>
+
+    <!-- Info empresa -->
+    <div style="font-size:.65rem;color:#4b5f57;margin-bottom:.75rem;
+      display:flex;flex-direction:column;gap:.1rem">
+      ${dir    ? `<span>📍 ${esc(dir)}${dist?', '+esc(dist):''}, ${esc(ciudad)}</span>` : ''}
+      ${tel    ? `<span>📞 ${esc(tel)}</span>` : ''}
+      ${email  ? `<span>✉️ ${esc(email)}</span>` : ''}
+      ${web    ? `<span>🌐 ${esc(web)}</span>` : ''}
+    </div>
+
+    <!-- Info cliente -->
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.5rem;
+      padding:.5rem .7rem;margin-bottom:.75rem;font-size:.65rem">
+      <p style="font-weight:700;color:#166534;margin-bottom:.2rem">CLIENTE</p>
+      <p>Juan García · DNI: 45678912</p>
+      <p style="color:#4b5f57">📞 987 654 321</p>
+    </div>
+
+    <!-- Items -->
+    <table style="width:100%;border-collapse:collapse;font-size:.65rem;margin-bottom:.75rem">
+      <thead>
+        <tr style="background:#166534;color:#fff">
+          <th style="padding:.3rem .5rem;text-align:left;border-radius:.3rem 0 0 0">Descripción</th>
+          <th style="padding:.3rem .4rem;text-align:center">Cant.</th>
+          <th style="padding:.3rem .4rem;text-align:right">P.Unit</th>
+          <th style="padding:.3rem .5rem;text-align:right;border-radius:0 .3rem 0 0">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #e5e7eb">
+          <td style="padding:.35rem .5rem">Consulta médica general</td>
+          <td style="padding:.35rem .4rem;text-align:center">1</td>
+          <td style="padding:.35rem .4rem;text-align:right">${sim} 60.00</td>
+          <td style="padding:.35rem .5rem;text-align:right">${sim} 60.00</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e5e7eb">
+          <td style="padding:.35rem .5rem">Vacuna séxtuple</td>
+          <td style="padding:.35rem .4rem;text-align:center">1</td>
+          <td style="padding:.35rem .4rem;text-align:right">${sim} 45.00</td>
+          <td style="padding:.35rem .5rem;text-align:right">${sim} 45.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Totales -->
+    <div style="display:flex;flex-direction:column;gap:.2rem;align-items:flex-end;
+      font-size:.68rem;margin-bottom:.75rem">
+      <div style="display:flex;gap:2rem">
+        <span style="color:#4b5f57">Subtotal:</span>
+        <span style="font-weight:600">${sim} 105.00</span>
+      </div>
+      <div style="display:flex;gap:2rem">
+        <span style="color:#4b5f57">IGV (${igv}%):</span>
+        <span style="font-weight:600">${sim} ${(105*igv/100).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;gap:2rem;background:#166534;color:#fff;
+        padding:.3rem .6rem;border-radius:.4rem;font-weight:800;font-size:.75rem">
+        <span>TOTAL:</span>
+        <span>${sim} ${(105*(1+igv/100)).toFixed(2)}</span>
+      </div>
+    </div>
+
+    <!-- Pie -->
+    <div style="border-top:1px solid #e5e7eb;padding-top:.5rem;text-align:center;
+      font-size:.6rem;color:#9ca3af">
+      ${pie ? esc(pie) : 'Gracias por su preferencia.'}
+      <br/>${hoy} · ${esc(nombre)}
+    </div>`;
+}
+
+async function guardar() {
+  const monedaSelect = document.getElementById('c-moneda').value;
+  const monedaCodigo = monedaSelect === 'OTRO'
+    ? document.getElementById('c-moneda-custom').value.trim().toUpperCase() || 'PEN'
+    : monedaSelect;
+
+  const body = {
+    nombre        : document.getElementById('c-nombre').value.trim(),
+    razon_social  : document.getElementById('c-razon').value.trim(),
+    ruc           : document.getElementById('c-ruc').value.trim(),
+    telefono      : document.getElementById('c-telefono').value.trim(),
+    direccion     : document.getElementById('c-direccion').value.trim(),
+    distrito      : document.getElementById('c-distrito').value.trim(),
+    ciudad        : document.getElementById('c-ciudad').value.trim(),
+    email         : document.getElementById('c-email').value.trim(),
+    web           : document.getElementById('c-web').value.trim(),
+    logo_url      : document.getElementById('c-logo').value.trim(),
+    moneda        : monedaCodigo,
+    simbolo_moneda: document.getElementById('c-simbolo').value.trim() || 'S/.',
+    igv_porcentaje: parseFloat(document.getElementById('c-igv').value)||18,
+    serie_boleta  : document.getElementById('c-serie-b').value.trim()||'B001',
+    serie_factura : document.getElementById('c-serie-f').value.trim()||'F001',
+    pie_documento : document.getElementById('c-pie').value.trim(),
+  };
+
+  if (!body.nombre) { toast('El nombre es obligatorio.','warning'); return; }
+
+  try {
+    const res  = await api('/empresa', { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+    toast('✅ Configuración guardada correctamente','success');
+  } catch { toast('Error de conexión.','danger'); }
+}
+</script>
+</body>
+</html>

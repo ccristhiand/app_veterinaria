@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Propietarios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div>
+      <h2>Propietarios</h2>
+      <p>Busca por DNI, nombre o teléfono</p>
+    </div>
+    <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary">＋ Nuevo Propietario</button>
+  </div>
+
+  <!-- Búsqueda -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end">
+    <div class="search-wrap" style="flex:1;min-width:220px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input id="search" type="text"
+        placeholder="DNI, nombre, apellido o teléfono…"
+        class="vinput" onkeydown="if(event.key==='Enter')buscar()"/>
+    </div>
+    <button onclick="buscar()" class="vbtn vbtn-primary">Buscar</button>
+    <button onclick="limpiar()" class="vbtn vbtn-ghost">Ver todos</button>
+  </div>
+
+  <!-- Tabla -->
+  <div class="vcard">
+    <div style="overflow-x:auto">
+      <table class="vtable">
+        <thead>
+          <tr>
+            <th>Propietario</th>
+            <th>DNI</th>
+            <th class="hidden sm:table-cell">Teléfono</th>
+            <th class="hidden md:table-cell">Email</th>
+            <th class="hidden md:table-cell">RUC</th>
+            <th>Mascotas</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7">
+            <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Nuevo / Editar Propietario ══════════════════════════ -->
+<div id="modal-prop" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:600px">
+    <div class="vmodal-head">
+      <h3 id="modal-prop-titulo">👤 Nuevo Propietario</h3>
+      <button onclick="closeModal('modal-prop')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="prop-id"/>
+
+      <!-- Datos personales -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Nombre *</label>
+          <input id="p-nombre" type="text" class="vinput" placeholder="Juan"/>
+        </div>
+        <div>
+          <label class="vlabel">Apellido *</label>
+          <input id="p-apellido" type="text" class="vinput" placeholder="García"/>
+        </div>
+        <div>
+          <label class="vlabel">DNI</label>
+          <input id="p-dni" type="text" maxlength="8" class="vinput" placeholder="45678912"/>
+        </div>
+        <div>
+          <label class="vlabel">Teléfono</label>
+          <input id="p-telefono" type="text" class="vinput" placeholder="987 654 321"/>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="vlabel">Email</label>
+          <input id="p-email" type="email" class="vinput" placeholder="juan@email.com"/>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="vlabel">Dirección</label>
+          <input id="p-direccion" type="text" class="vinput" placeholder="Av. Principal 123, Lima"/>
+        </div>
+      </div>
+
+      <!-- Datos empresa (para facturación) -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem">
+          <span style="font-size:1rem">🏢</span>
+          <div>
+            <p style="font-weight:700;font-size:.85rem">Datos empresa (opcional)</p>
+            <p style="font-size:.68rem;color:var(--ink-faint)">
+              Rellena si este propietario suele pedir facturas con RUC
+            </p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="vlabel">RUC</label>
+            <input id="p-ruc" type="text" maxlength="11" class="vinput"
+              placeholder="20XXXXXXXXX" oninput="this.value=this.value.replace(/\D/g,'')"/>
+          </div>
+          <div>
+            <label class="vlabel">Razón social</label>
+            <input id="p-razon" type="text" class="vinput" placeholder="Empresa S.A.C."/>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="vlabel">Dirección fiscal</label>
+            <input id="p-dir-fiscal" type="text" class="vinput"
+              placeholder="Av. Empresarial 456, Lima"/>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-prop')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarProp()" class="vbtn vbtn-primary" id="btn-guardar-prop">
+        💾 Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Detalle Propietario ═════════════════════════════════ -->
+<div id="modal-det" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:560px">
+    <div class="vmodal-head">
+      <h3 id="det-titulo">Detalle</h3>
+      <button onclick="closeModal('modal-det')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="det-body"></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-det')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button id="det-editar-btn" class="vbtn vbtn-primary">✏️ Editar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let propEditandoId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'propietarios', title:'Propietarios', subtitle:'Registro de clientes' });
+  cargar();
+});
+
+function buscar() { cargar(document.getElementById('search').value.trim()); }
+function limpiar() { document.getElementById('search').value=''; cargar(); }
+
+// ── Cargar tabla ──────────────────────────────────────────────────
+async function cargar(search='') {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = `<tr><td colspan="7">
+    <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+  </td></tr>`;
+
+  try {
+    const res  = await api(`/propietarios?search=${encodeURIComponent(search)}&limit=60`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7">
+        <div class="vempty"><span class="icon">🔍</span>
+        <p>Sin propietarios encontrados</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(p => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:.7rem">
+            <div style="width:36px;height:36px;border-radius:50%;
+              background:linear-gradient(135deg,#ede9fe,#ddd6fe);
+              color:#6d28d9;font-weight:700;font-size:.82rem;flex-shrink:0;
+              display:flex;align-items:center;justify-content:center">
+              ${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}
+            </div>
+            <div>
+              <p style="font-weight:700;font-size:.87rem">
+                ${esc(p.nombre)} ${esc(p.apellido)}
+              </p>
+              ${p.direccion
+                ? `<p style="font-size:.68rem;color:var(--ink-faint)">📍 ${esc(p.direccion)}</p>`
+                : ''}
+            </div>
+          </div>
+        </td>
+        <td style="font-family:monospace;font-size:.8rem">${esc(p.dni||'—')}</td>
+        <td class="hidden sm:table-cell" style="font-size:.82rem">${esc(p.telefono||'—')}</td>
+        <td class="hidden md:table-cell" style="font-size:.78rem;color:var(--ink-soft)">
+          ${esc(p.email||'—')}
+        </td>
+        <td class="hidden md:table-cell">
+          ${p.ruc
+            ? `<span style="font-family:monospace;font-size:.72rem;background:#eff6ff;
+                color:#1d4ed8;padding:.2rem .5rem;border-radius:.4rem;font-weight:600">
+                ${esc(p.ruc)}</span>`
+            : '<span style="color:var(--ink-faint);font-size:.75rem">—</span>'}
+        </td>
+        <td>
+          <span style="background:var(--green-50);color:var(--green-600);font-size:.75rem;
+            font-weight:700;padding:.25rem .65rem;border-radius:999px;
+            border:1px solid var(--green-100)">
+            🐾 ${p.total_mascotas||0}
+          </span>
+        </td>
+        <td>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="vlink" onclick="verDetalle(${p.id})"
+              style="font-size:.75rem;color:var(--green-600);font-weight:600">
+              Ver
+            </button>
+            <span style="color:var(--line)">·</span>
+            <button class="vlink" onclick="abrirModalEditar(${p.id})"
+              style="font-size:.75rem;color:var(--sky)">
+              ✏️ Editar
+            </button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="vempty"><span class="icon">😿</span>
+        <p>Error al cargar.
+          <button class="vlink" onclick="cargar()">Reintentar</button>
+        </p>
+      </div></td></tr>`;
+  }
+}
+
+// ── Nuevo propietario ─────────────────────────────────────────────
+function abrirModalNuevo() {
+  propEditandoId = null;
+  document.getElementById('modal-prop-titulo').textContent = '👤 Nuevo Propietario';
+  document.getElementById('btn-guardar-prop').textContent  = '💾 Guardar';
+  document.getElementById('prop-id').value = '';
+  limpiarForm();
+  openModal('modal-prop');
+}
+
+// ── Editar propietario ────────────────────────────────────────────
+async function abrirModalEditar(id) {
+  propEditandoId = id;
+  document.getElementById('modal-prop-titulo').textContent = '✏️ Editar Propietario';
+  document.getElementById('btn-guardar-prop').textContent  = '💾 Guardar Cambios';
+  document.getElementById('prop-id').value = id;
+  openModal('modal-prop');
+
+  try {
+    const res = await api(`/propietarios/${id}`);
+    if (!res || !res.ok) { toast('Error al cargar datos.','danger'); return; }
+    const p   = (await res.json()).data;
+
+    document.getElementById('p-nombre').value    = p.nombre        || '';
+    document.getElementById('p-apellido').value  = p.apellido      || '';
+    document.getElementById('p-dni').value       = p.dni           || '';
+    document.getElementById('p-telefono').value  = p.telefono      || '';
+    document.getElementById('p-email').value     = p.email         || '';
+    document.getElementById('p-direccion').value = p.direccion     || '';
+    document.getElementById('p-ruc').value       = p.ruc           || '';
+    document.getElementById('p-razon').value     = p.razon_social  || '';
+    document.getElementById('p-dir-fiscal').value= p.direccion_fiscal || '';
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Guardar (crear o actualizar) ──────────────────────────────────
+async function guardarProp() {
+  const nombre   = document.getElementById('p-nombre').value.trim();
+  const apellido = document.getElementById('p-apellido').value.trim();
+  const ruc      = document.getElementById('p-ruc').value.trim();
+
+  if (!nombre || !apellido) {
+    toast('Nombre y apellido son obligatorios.','warning'); return;
+  }
+  if (ruc && !/^\d{11}$/.test(ruc)) {
+    toast('El RUC debe tener exactamente 11 dígitos.','warning'); return;
+  }
+
+  const body = {
+    nombre,
+    apellido,
+    dni            : document.getElementById('p-dni').value.trim()        || null,
+    telefono       : document.getElementById('p-telefono').value.trim()   || null,
+    email          : document.getElementById('p-email').value.trim()      || null,
+    direccion      : document.getElementById('p-direccion').value.trim()  || null,
+    ruc            : ruc || null,
+    razon_social   : document.getElementById('p-razon').value.trim()      || null,
+    direccion_fiscal: document.getElementById('p-dir-fiscal').value.trim()|| null,
+  };
+
+  const esEdicion = !!propEditandoId;
+  const url       = esEdicion ? `/propietarios/${propEditandoId}` : '/propietarios';
+  const method    = esEdicion ? 'PUT' : 'POST';
+
+  try {
+    const res  = await api(url, { method, body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+
+    toast(esEdicion ? '✅ Propietario actualizado' : '✅ Propietario registrado','success');
+    closeModal('modal-prop');
+    limpiarForm();
+    cargar(document.getElementById('search').value.trim());
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function limpiarForm() {
+  ['p-nombre','p-apellido','p-dni','p-telefono','p-email',
+   'p-direccion','p-ruc','p-razon','p-dir-fiscal']
+    .forEach(id => document.getElementById(id).value = '');
+}
+
+// ── Ver detalle ───────────────────────────────────────────────────
+async function verDetalle(id) {
+  document.getElementById('det-titulo').textContent = 'Cargando…';
+  document.getElementById('det-body').innerHTML =
+    '<div class="vempty"><div class="vspinner"></div></div>';
+
+  document.getElementById('det-editar-btn').onclick = () => {
+    closeModal('modal-det');
+    abrirModalEditar(id);
+  };
+
+  openModal('modal-det');
+
+  try {
+    const res = await api(`/propietarios/${id}`);
+    if (!res) return;
+    const p   = (await res.json()).data;
+
+    document.getElementById('det-titulo').textContent =
+      `${esc(p.nombre)} ${esc(p.apellido)}`;
+
+    document.getElementById('det-body').innerHTML = `
+      <!-- Avatar y datos principales -->
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.3rem">
+        <div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;
+          background:linear-gradient(135deg,#8b5cf6,#6d28d9);
+          color:#fff;font-weight:800;font-size:1.1rem;
+          display:flex;align-items:center;justify-content:center">
+          ${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}
+        </div>
+        <div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700">
+            ${esc(p.nombre)} ${esc(p.apellido)}
+          </h3>
+          <p style="font-size:.75rem;color:var(--ink-soft);margin-top:.15rem">
+            Registrado desde ${fDate(p.created_at||new Date())}
+          </p>
+        </div>
+      </div>
+
+      <!-- Info de contacto -->
+      <div class="grid grid-cols-2 gap-3" style="margin-bottom:1.2rem">
+        ${ib('🪪 DNI', p.dni)}
+        ${ib('📞 Teléfono', p.telefono)}
+        ${p.email    ? ib('✉️ Email', p.email)       : ''}
+        ${p.direccion? ib('📍 Dirección', p.direccion): ''}
+      </div>
+
+      <!-- Datos empresa si tiene RUC -->
+      ${p.ruc ? `
+        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);
+          border:1px solid #93c5fd;border-radius:1rem;padding:1rem;margin-bottom:1.2rem">
+          <p style="font-size:.65rem;color:#1d4ed8;font-weight:700;text-transform:uppercase;
+            letter-spacing:.1em;margin-bottom:.75rem">🏢 Datos para facturación</p>
+          <div class="grid grid-cols-2 gap-3">
+            ${ib('RUC', p.ruc)}
+            ${ib('Razón social', p.razon_social)}
+            ${p.direccion_fiscal ? `
+              <div style="grid-column:span 2;background:#fff;border-radius:.9rem;
+                padding:.7rem .9rem;border:1px solid #bae6fd">
+                <p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;
+                  letter-spacing:.1em;font-weight:700">Dirección fiscal</p>
+                <p style="font-size:.82rem;font-weight:600;margin-top:.2rem">
+                  ${esc(p.direccion_fiscal)}
+                </p>
+              </div>` : ''}
+          </div>
+        </div>` : ''}
+
+      <!-- Mascotas -->
+      <h4 style="font-family:'Playfair Display',serif;font-weight:700;
+        margin-bottom:.8rem;font-size:.95rem">
+        🐾 Mascotas (${p.mascotas?.length||0})
+      </h4>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        ${p.mascotas?.length ? p.mascotas.map(m => `
+          <div style="display:flex;align-items:center;gap:.85rem;padding:.75rem 1rem;
+            background:#f8faf8;border-radius:.9rem;border:1px solid var(--line)">
+            <span style="font-size:1.4rem">${badgeEspecie(m.especie)}</span>
+            <div style="flex:1">
+              <p style="font-weight:700;font-size:.85rem">${esc(m.nombre)}</p>
+              <p style="font-size:.7rem;color:var(--ink-faint)">
+                ${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}
+              </p>
+            </div>
+            ${m.alertas_medicas ? `
+              <span style="font-size:.62rem;background:#fff1f2;color:#be123c;
+                padding:.2rem .5rem;border-radius:999px;font-weight:700;
+                border:1px solid #fecdd3">⚠️ Alerta</span>` : ''}
+          </div>`).join('')
+        : '<p style="font-size:.8rem;color:var(--ink-faint)">Sin mascotas registradas.</p>'}
+      </div>`;
+  } catch {
+    document.getElementById('det-body').innerHTML =
+      '<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>';
+  }
+}
+
+function ib(label, val) {
+  if (!val) return '';
+  return `<div style="background:#f8faf8;border-radius:.9rem;padding:.7rem .9rem;
+    border:1px solid var(--line)">
+    <p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;
+      letter-spacing:.1em;font-weight:700">${label}</p>
+    <p style="font-size:.82rem;font-weight:600;margin-top:.2rem">${esc(val||'—')}</p>
+  </div>`;
+}
+</script>
+</body>
+</html>

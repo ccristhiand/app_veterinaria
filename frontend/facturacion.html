@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Facturación</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    .tab-btn { padding:.55rem 1.1rem;border:none;background:none;cursor:pointer;font-family:inherit;
+               font-size:.84rem;font-weight:600;color:var(--ink-faint);
+               border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s; }
+    .tab-btn.active { color:var(--green-600);border-bottom-color:var(--green-500);font-weight:700; }
+    .metodo-btn { display:flex;align-items:center;gap:.5rem;padding:.55rem .9rem;
+                  border:2px solid var(--line);border-radius:.8rem;cursor:pointer;
+                  font-family:inherit;font-size:.8rem;font-weight:600;background:#fff;
+                  transition:all .15s;color:var(--ink); }
+    .metodo-btn.activo { border-color:var(--green-500);background:var(--green-50);color:var(--green-700); }
+    .metodo-btn.pendiente { border-color:#fde68a;background:#fffbeb;color:#b45309; }
+    /* Autocomplete items */
+    .ac-factura-list { position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+      background:#fff;border:1.5px solid var(--green-500);border-radius:.85rem;
+      box-shadow:0 8px 24px rgba(13,59,46,.12);max-height:200px;overflow-y:auto;
+      list-style:none;padding:.35rem; }
+    .ac-factura-list li { display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
+      border-radius:.6rem;cursor:pointer;transition:background .12s;font-size:.8rem; }
+    .ac-factura-list li:hover { background:var(--green-50); }
+    .ac-cat-pill { font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;white-space:nowrap; }
+    .pago-fila { display:grid;grid-template-columns:1fr 120px 32px;gap:.5rem;align-items:center; }
+    #pdf-preview table { width:100%;border-collapse:collapse; }
+    #pdf-preview th { background:#166534;color:#fff;padding:.4rem .6rem;text-align:left;font-size:.72rem; }
+    #pdf-preview td { padding:.38rem .6rem;border-bottom:1px solid #f0f0f0;font-size:.72rem; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>🧾 Facturación</h2><p>Boletas, facturas y dashboard de caja</p></div>
+    <button onclick="abrirNuevaFactura()" class="vbtn vbtn-primary">＋ Nueva Boleta / Factura</button>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
+    <button class="tab-btn active" id="tab-dashboard" onclick="mostrarTab('dashboard')">📊 Dashboard</button>
+    <button class="tab-btn" id="tab-lista" onclick="mostrarTab('lista')">📋 Documentos</button>
+    <button class="tab-btn" id="tab-anulados" onclick="mostrarTab('anulados')">🚫 Anulados</button>
+  </div>
+
+  <!-- ── TAB DASHBOARD ── -->
+  <div id="contenido-dashboard">
+    <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+      <div><label class="vlabel">Desde</label><input type="date" id="d-desde" class="vinput" style="width:auto"/></div>
+      <div><label class="vlabel">Hasta</label><input type="date" id="d-hasta" class="vinput" style="width:auto"/></div>
+      <button onclick="cargarResumen()" class="vbtn vbtn-primary">Actualizar</button>
+      <button onclick="setPeriodo('hoy')" class="vbtn vbtn-ghost">Hoy</button>
+      <button onclick="setPeriodo('semana')" class="vbtn vbtn-ghost">Esta semana</button>
+      <button onclick="setPeriodo('mes')" class="vbtn vbtn-ghost">Este mes</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        <p style="font-size:.68rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Ingresos del período</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#15803d;margin-top:.3rem" id="stat-ingresos">S/. 0.00</p>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.15rem" id="stat-pagados">0 documentos pagados</p>
+      </div>
+      <div class="vcard vcard-pad">
+        <p style="font-size:.68rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Por cobrar</p>
+        <p style="font-size:1.6rem;font-weight:800;color:#b45309;margin-top:.3rem" id="stat-pendiente">S/. 0.00</p>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.15rem" id="stat-pendientes-n">0 pendientes</p>
+      </div>
+      <div class="vcard vcard-pad">
+        <p style="font-size:.68rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Total documentos</p>
+        <p style="font-size:1.6rem;font-weight:800;margin-top:.3rem" id="stat-total-docs">0</p>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.15rem" id="stat-anulados">0 anulados</p>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem">
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">📈 Ingresos últimos 7 días</h3>
+        <div id="grafico-7dias" style="display:flex;align-items:flex-end;gap:.5rem;height:140px;padding-top:.5rem"></div>
+        <div id="grafico-labels" style="display:flex;gap:.5rem;margin-top:.4rem"></div>
+      </div>
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">💳 Por método de pago</h3>
+        <div id="metodos-lista" style="display:flex;flex-direction:column;gap:.6rem"></div>
+      </div>
+    </div>
+
+    <div class="vcard vcard-pad" style="margin-top:1.3rem">
+      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">🏆 Servicios más facturados</h3>
+      <div id="top-servicios" style="display:flex;flex-direction:column;gap:.5rem"></div>
+    </div>
+  </div>
+
+  <!-- ── TAB LISTA ── -->
+  <div id="contenido-lista" style="display:none">
+    <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+      <div><label class="vlabel">Fecha</label><input type="date" id="f-fecha" class="vinput" style="width:auto"/></div>
+      <div>
+        <label class="vlabel">Estado</label>
+        <select id="f-estado" class="vinput" style="width:auto">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pagado">Pagado</option>
+          <option value="anulado">Anulado</option>
+        </select>
+      </div>
+      <div>
+        <label class="vlabel">Tipo</label>
+        <select id="f-tipo" class="vinput" style="width:auto">
+          <option value="">Todos</option>
+          <option value="boleta">Boleta</option>
+          <option value="factura">Factura</option>
+        </select>
+      </div>
+      <button onclick="cargarFacturas()" class="vbtn vbtn-primary">Filtrar</button>
+      <button onclick="limpiarFiltros()" class="vbtn vbtn-ghost">Limpiar</button>
+    </div>
+    <div class="vcard">
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead>
+            <tr>
+              <th>Número</th><th>Fecha</th><th>Cliente</th>
+              <th class="hidden sm:table-cell">Mascota</th>
+              <th>Total</th><th>Estado</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-facturas">
+            <tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB ANULADOS ── -->
+  <div id="contenido-anulados" style="display:none">
+    <div class="vcard">
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead>
+            <tr>
+              <th>Número</th><th>Fecha</th><th>Cliente</th>
+              <th>Total</th><th>Motivo de anulación</th><th>Anulado por</th><th>Fecha anulación</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-anulados">
+            <tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ══ Modal Anular Factura ══════════════════════════════════════════ -->
+<div id="modal-anular" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:460px">
+    <div class="vmodal-head">
+      <h3>🚫 Anular documento</h3>
+      <button onclick="closeModal('modal-anular')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:1rem">
+        <p style="font-weight:700;font-size:.88rem;color:#be123c" id="anular-numero">—</p>
+        <p style="font-size:.78rem;color:#be123c;margin-top:.2rem" id="anular-info">—</p>
+      </div>
+      <input type="hidden" id="anular-id"/>
+      <div>
+        <label class="vlabel">Motivo de anulación *</label>
+        <textarea id="anular-obs" rows="3" class="vinput"
+          placeholder="Describe el motivo de anulación…"></textarea>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">
+        ⚠️ Esta acción <strong>no se puede revertir</strong>. El documento quedará anulado permanentemente.
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-anular')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="confirmarAnulacion()" class="vbtn"
+        style="background:#e11d48;color:#fff;font-weight:700">🚫 Confirmar anulación</button>
+    </div>
+  </div>
+</div>
+<div id="modal-factura" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:700px">
+    <div class="vmodal-head">
+      <h3>🧾 Nueva Boleta / Factura</h3>
+      <button onclick="closeModal('modal-factura')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+
+      <!-- Tipo y fecha -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Tipo de documento</label>
+          <select id="nf-tipo" class="vinput" onchange="onTipoChange()">
+            <option value="boleta">🧾 Boleta</option>
+            <option value="factura">📄 Factura</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Fecha *</label>
+          <input id="nf-fecha" type="date" class="vinput"/>
+        </div>
+      </div>
+
+      <!-- Bloque datos empresa (solo para FACTURA) -->
+      <div id="bloque-empresa" style="display:none;
+        background:linear-gradient(135deg,#eff6ff,#dbeafe);
+        border:1.5px solid #93c5fd;border-radius:1rem;padding:1.1rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">
+          <span style="font-size:1.2rem">🏢</span>
+          <div>
+            <p style="font-weight:700;font-size:.88rem;color:#1d4ed8">Datos de la empresa cliente</p>
+            <p style="font-size:.7rem;color:#3b82f6">Requerido para emitir facturas con RUC</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="sm:col-span-2">
+            <label class="vlabel">RUC *</label>
+            <div style="display:flex;gap:.5rem">
+              <input id="nf-ruc" type="text" maxlength="11" class="vinput"
+                placeholder="20XXXXXXXXX — 11 dígitos"
+                oninput="validarRUC(this)"/>
+              <span id="nf-ruc-ok" style="display:none;align-items:center;font-size:1.2rem;flex-shrink:0">✅</span>
+              <span id="nf-ruc-err" style="display:none;align-items:center;font-size:1.2rem;flex-shrink:0">❌</span>
+            </div>
+            <p id="nf-ruc-hint" style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">
+              Ingresa el RUC de 11 dígitos de la empresa
+            </p>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="vlabel">Razón social *</label>
+            <input id="nf-razon" type="text" class="vinput"
+              placeholder="Ej: EMPRESA EJEMPLO S.A.C."/>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="vlabel">Dirección fiscal</label>
+            <input id="nf-dir-fiscal" type="text" class="vinput"
+              placeholder="Av. Principal 123, Lima"/>
+          </div>
+        </div>
+        <p style="font-size:.68rem;color:#3b82f6;margin-top:.75rem;font-style:italic">
+          💡 Si el propietario ya tiene RUC guardado, se autocompleta automáticamente.
+          Puedes guardarlo en su ficha desde <a href="propietarios.html" style="color:#1d4ed8;font-weight:700">Propietarios</a>.
+        </p>
+      </div>
+
+      <!-- Buscar propietario -->
+      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1rem">
+        <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.7rem">
+          👤 Propietario / Cliente
+        </p>
+        <div style="display:flex;gap:.6rem;margin-bottom:.6rem">
+          <div class="search-wrap" style="flex:1">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input id="nf-prop-q" type="text" placeholder="DNI, nombre o teléfono…"
+              class="vinput" onkeydown="if(event.key==='Enter')buscarPropFac()"/>
+          </div>
+          <button onclick="buscarPropFac()" class="vbtn vbtn-primary">Buscar</button>
+        </div>
+        <div id="nf-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:150px;overflow-y:auto"></div>
+        <div id="nf-prop-sel" style="display:none;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.75rem;margin-top:.5rem">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="nf-prop-avatar">?</div>
+          <div style="flex:1">
+            <p style="font-weight:700;font-size:.88rem" id="nf-prop-nombre">—</p>
+            <p style="font-size:.7rem;color:var(--ink-soft)" id="nf-prop-info">—</p>
+          </div>
+          <button onclick="limpiarPropFac()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+        </div>
+      </div>
+
+      <!-- Mascota -->
+      <div id="nf-mascotas-wrap" style="display:none">
+        <label class="vlabel">Mascota (opcional)</label>
+        <select id="nf-mascota" class="vinput">
+          <option value="">Sin mascota específica</option>
+        </select>
+      </div>
+
+      <!-- IGV -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600">
+          <input type="checkbox" id="nf-igv" checked style="accent-color:var(--green-600);width:16px;height:16px"/>
+          IGV incluido en el precio (<span id="nf-igv-pct">18</span>%)
+        </label>
+        <p style="font-size:.72rem;color:var(--ink-soft)" id="nf-igv-hint">
+          ✅ Los precios ya incluyen IGV — se extrae automáticamente
+        </p>
+      </div>
+
+      <!-- Ítems -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <label style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif">📝 Ítems del documento</label>
+          <button onclick="addItem()" class="vbtn vbtn-primary" style="font-size:.78rem;padding:.4rem .9rem">＋ Agregar ítem</button>
+        </div>
+        <!-- Header de columnas -->
+        <div style="display:grid;grid-template-columns:1fr 70px 110px 90px 36px;gap:.5rem;padding:0 .2rem;margin-bottom:.3rem">
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em">Descripción</p>
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:center">Cant.</p>
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:right">Precio unit.</p>
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:right">Total</p>
+          <p></p>
+        </div>
+        <div id="nf-items" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      </div>
+
+      <!-- Totales -->
+      <div id="nf-totales" style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1.1rem">
+        <div style="display:flex;justify-content:flex-end;flex-direction:column;gap:.3rem;align-items:flex-end">
+          <div style="display:flex;gap:3rem;font-size:.82rem">
+            <span style="color:var(--ink-soft)">Subtotal (sin IGV):</span>
+            <span style="font-weight:600;min-width:80px;text-align:right" id="tot-sub">S/. 0.00</span>
+          </div>
+          <div style="display:flex;gap:3rem;font-size:.82rem">
+            <span style="color:var(--ink-soft)" id="tot-igv-label">IGV (18%):</span>
+            <span style="font-weight:600;min-width:80px;text-align:right" id="tot-igv">S/. 0.00</span>
+          </div>
+          <div style="display:flex;gap:3rem;font-size:.96rem;font-weight:800;color:#15803d;padding-top:.3rem;border-top:1px solid #a7f3d0;margin-top:.2rem">
+            <span>TOTAL:</span>
+            <span style="min-width:80px;text-align:right" id="tot-total">S/. 0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Métodos de pago mixtos -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <label style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif">💳 Métodos de pago</label>
+          <button onclick="addPagoFila()" class="vlink" style="color:var(--green-600);font-size:.8rem">＋ Dividir pago</button>
+        </div>
+        <div id="nf-pagos" style="display:flex;flex-direction:column;gap:.5rem"></div>
+        <div style="margin-top:.6rem;display:flex;align-items:center;justify-content:space-between;font-size:.78rem;color:var(--ink-soft)">
+          <span>Pendiente de asignar:</span>
+          <span id="pago-restante" style="font-weight:700;color:#b45309">S/. 0.00</span>
+        </div>
+      </div>
+
+      <!-- Notas -->
+      <div>
+        <label class="vlabel">Notas internas</label>
+        <textarea id="nf-notas" rows="2" class="vinput" placeholder="Observaciones internas…"></textarea>
+      </div>
+
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-factura')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="emitirFactura()" class="vbtn vbtn-primary">🧾 Emitir Documento</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Ver / PDF ════════════════════════════════════════════ -->
+<div id="modal-ver-fac" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:640px">
+    <div class="vmodal-head">
+      <h3 id="ver-fac-titulo">🧾 Documento</h3>
+      <button onclick="closeModal('modal-ver-fac')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem" id="ver-fac-acciones"></div>
+      <div id="pdf-preview" style="border:1px solid var(--line);border-radius:.9rem;padding:1.4rem;background:#fff"></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-ver-fac')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="descargarImagen()" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.4rem">
+        🖼️ Guardar imagen
+      </button>
+      <button onclick="compartirWhatsApp()" class="vbtn"
+        style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;
+        border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;
+        font-weight:600;cursor:pointer;font-family:inherit;
+        display:inline-flex;align-items:center;gap:.5rem">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>
+        Enviar por WhatsApp
+      </button>
+      <button onclick="descargarPDF()" class="vbtn vbtn-primary">⬇️ Descargar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Pagar — Pagos Mixtos ════════════════════════════════ -->
+<div id="modal-pagar" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:460px">
+    <div class="vmodal-head">
+      <h3>💳 Registrar Pago</h3>
+      <button onclick="closeModal('modal-pagar')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="pagar-id"/>
+
+      <!-- Info factura -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;
+        padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <p style="font-size:.68rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total a cobrar</p>
+          <p style="font-size:1.4rem;font-weight:800;color:#15803d" id="pagar-total">S/. 0.00</p>
+        </div>
+        <div style="text-align:right">
+          <p style="font-size:.68rem;color:var(--ink-faint)">Pendiente</p>
+          <p style="font-size:1rem;font-weight:700;color:#b45309" id="pagar-restante-label">S/. 0.00</p>
+        </div>
+      </div>
+
+      <!-- Filas de pago -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <label style="font-size:.82rem;font-weight:700">Métodos de pago</label>
+          <button onclick="addPagarFila()" class="vlink" style="font-size:.78rem;color:var(--green-600)">
+            ＋ Agregar método
+          </button>
+        </div>
+        <!-- Headers -->
+        <div style="display:grid;grid-template-columns:1fr 110px 28px;gap:.5rem;padding:0 .1rem;margin-bottom:.3rem">
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em">Método</p>
+          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:right">Monto</p>
+          <p></p>
+        </div>
+        <div id="pagar-filas" style="display:flex;flex-direction:column;gap:.45rem"></div>
+      </div>
+
+      <!-- Referencia / notas -->
+      <div>
+        <label class="vlabel">Referencia (opcional)</label>
+        <input id="pagar-referencia" type="text" class="vinput"
+          placeholder="Nro. operación, voucher, código Yape…"/>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-pagar')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="confirmarPago()" class="vbtn vbtn-primary">✅ Confirmar Pago</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────
+let empresa     = {};
+const getSim = () => empresa.simbolo_moneda || window._sim || 'S/.';
+let propFacSel  = null;
+let itemN       = 0;
+let pagoN       = 0;
+let facActualId = null;
+let facActualData = null;
+let _catalogoCache = null; // servicios + inventario
+
+// ── Init ──────────────────────────────────────────────────────────
+initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y documentos' });
+
+(async () => {
+  try {
+    const res = await api('/empresa');
+    if (res?.ok) {
+      empresa = (await res.json()).data || {};
+      document.getElementById('nf-igv-pct').textContent = empresa.igv_porcentaje || 18;
+      document.getElementById('tot-igv-label').textContent = `IGV (${empresa.igv_porcentaje||18}%):`;
+      // Aplicar símbolo de moneda globalmente
+      const sim = empresa.simbolo_moneda || 'S/.';
+      window._sim = sim; // guardar globalmente
+      document.querySelectorAll('[data-sim]').forEach(el => el.textContent = sim + ' 0.00');
+    }
+  } catch {}
+
+  document.getElementById('nf-fecha').value = fechaHoyInput();
+  document.getElementById('f-fecha').value  = fechaHoyInput();
+  document.getElementById('d-desde').value  = fechaHoyInput();
+  document.getElementById('d-hasta').value  = fechaHoyInput();
+
+  // Evento IGV
+  document.getElementById('nf-igv').addEventListener('change', () => {
+    const inc = document.getElementById('nf-igv').checked;
+    document.getElementById('nf-igv-hint').textContent = inc
+      ? '✅ Los precios ya incluyen IGV — se extrae automáticamente'
+      : '➕ Se sumará el IGV encima del precio ingresado';
+    calcularTotales();
+  });
+
+  cargarResumen();
+})();
+
+// ── Catálogo combinado: servicios + inventario ────────────────────
+async function getCatalogo() {
+  if (_catalogoCache) return _catalogoCache;
+  try {
+    const [rs, ri] = await Promise.all([
+      api('/servicios'),
+      api('/inventario'),
+    ]);
+    const servicios  = rs?.ok  ? ((await rs.json()).data  || []).map(s=>({ ...s, _tipo:'servicio' }))  : [];
+    const inventario = ri?.ok  ? ((await ri.json()).data  || []).map(i=>({ ...i, _tipo:'inventario' })) : [];
+    _catalogoCache = [...servicios, ...inventario];
+    return _catalogoCache;
+  } catch { return []; }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────
+function mostrarTab(tab) {
+  ['dashboard','lista','anulados'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`contenido-${t}`).style.display = t===tab?'block':'none';
+  });
+  if (tab==='lista')     cargarFacturas();
+  if (tab==='anulados')  cargarAnulados();
+}
+
+// ── Cargar anulados ───────────────────────────────────────────────
+async function cargarAnulados() {
+  const tbody = document.getElementById('tbody-anulados');
+  tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>`;
+  try {
+    const res  = await api('/facturas?estado=anulado&limit=100');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">✅</span><p>Sin documentos anulados</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(f => `<tr>
+      <td style="font-family:monospace;font-weight:700;color:#be123c">${esc(f.numero)}</td>
+      <td style="font-size:.8rem">${fDate(f.fecha)}</td>
+      <td>
+        <p style="font-weight:600;font-size:.85rem">${esc(f.propietario_nombre||f.cliente_nombre||'—')}</p>
+        ${(f.dni||f.cliente_dni)?`<p style="font-size:.7rem;color:var(--ink-faint)">DNI: ${esc(f.dni||f.cliente_dni)}</p>`:''}
+      </td>
+      <td style="font-weight:700;color:#374151">S/. ${parseFloat(f.total).toFixed(2)}</td>
+      <td style="font-size:.78rem;color:#be123c;max-width:200px">
+        ${esc(f.observaciones || '—')}
+      </td>
+      <td style="font-size:.78rem">${esc(f.anulado_por||'—')}</td>
+      <td style="font-size:.75rem;color:var(--ink-faint)">${f.updated_at?new Date(f.updated_at).toLocaleDateString('es-PE'):'—'}</td>
+    </tr>`).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`;
+  }
+}
+
+// ── Abrir modal anulación ─────────────────────────────────────────
+function abrirAnular(id, numero, cliente, total) {
+  document.getElementById('anular-id').value        = id;
+  document.getElementById('anular-numero').textContent = `🧾 ${numero}`;
+  document.getElementById('anular-info').textContent   = `${cliente} · S/. ${parseFloat(total).toFixed(2)}`;
+  document.getElementById('anular-obs').value           = '';
+  openModal('modal-anular');
+}
+
+// ── Confirmar anulación ───────────────────────────────────────────
+async function confirmarAnulacion() {
+  const id  = document.getElementById('anular-id').value;
+  const obs = document.getElementById('anular-obs').value.trim();
+  if (!obs) { toast('El motivo de anulación es obligatorio.','warning'); return; }
+
+  try {
+    const res  = await api(`/facturas/${id}/anular`, {
+      method: 'PATCH',
+      body  : { observaciones: obs },
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error al anular.','danger'); return; }
+    toast('🚫 Documento anulado correctamente.', 'success', 5000);
+    closeModal('modal-anular');
+    cargarFacturas();
+    cargarResumen();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function setPeriodo(p) {
+  const hoy = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const desde = new Date(hoy);
+  if (p==='semana') desde.setDate(hoy.getDate()-6);
+  else if (p==='mes') desde.setDate(1);
+  document.getElementById('d-desde').value = fmt(desde);
+  document.getElementById('d-hasta').value = fmt(hoy);
+  cargarResumen();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────
+async function cargarResumen() {
+  const desde = document.getElementById('d-desde').value;
+  const hasta = document.getElementById('d-hasta').value;
+  try {
+    const res = await api(`/facturas/resumen?desde=${desde}&hasta=${hasta}`);
+    if (!res||!res.ok) return;
+    const d   = (await res.json()).data;
+    document.getElementById('stat-ingresos').textContent    = `${getSim()} ${parseFloat(d.totales.ingresos||0).toFixed(2)}`;
+    document.getElementById('stat-pendiente').textContent   = `${getSim()} ${parseFloat(d.totales.pendiente||0).toFixed(2)}`;
+    document.getElementById('stat-total-docs').textContent  = d.totales.total_docs || 0;
+    document.getElementById('stat-pagados').textContent     = `${d.totales.docs_pagados||0} doc. pagados`;
+    document.getElementById('stat-pendientes-n').textContent= `${d.totales.docs_pendientes||0} pendientes`;
+    document.getElementById('stat-anulados').textContent    = `${d.totales.docs_anulados||0} anulados`;
+    renderGrafico(d.por7dias);
+    renderMetodos(d.porMetodo);
+    renderTopServicios(d.topServicios);
+  } catch(e) { console.error(e); }
+}
+
+function renderGrafico(data) {
+  const dias = document.getElementById('grafico-7dias');
+  const labs = document.getElementById('grafico-labels');
+  if (!data.length) { dias.innerHTML='<p style="font-size:.75rem;color:var(--ink-faint);margin:auto">Sin datos</p>'; labs.innerHTML=''; return; }
+  const max = Math.max(...data.map(d=>parseFloat(d.monto)||0),1);
+  const hoy = new Date();
+  const diasArr = Array.from({length:7},(_,i)=>{
+    const d=new Date(hoy); d.setDate(hoy.getDate()-6+i);
+    const key=d.toISOString().split('T')[0];
+    const found=data.find(x=>x.dia.split('T')[0]===key);
+    return { key, monto:parseFloat(found?.monto||0), label:d.toLocaleDateString('es-PE',{weekday:'short'}) };
+  });
+  dias.innerHTML=diasArr.map(d=>{
+    const pct=Math.max((d.monto/max)*100,4);
+    const esHoy=d.key===hoy.toISOString().split('T')[0];
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.25rem" title="S/. ${d.monto.toFixed(2)}">
+      ${d.monto>0?`<span style="font-size:.58rem;color:var(--green-600);font-weight:700">S/.${d.monto.toFixed(0)}</span>`:''}
+      <div style="width:100%;background:${esHoy?'linear-gradient(135deg,#15803d,#16a34a)':'#bbf7d0'};border-radius:.4rem .4rem 0 0;height:${pct}%"></div>
+    </div>`;
+  }).join('');
+  labs.innerHTML=diasArr.map(d=>`<div style="flex:1;text-align:center;font-size:.6rem;color:var(--ink-faint)">${d.label}</div>`).join('');
+}
+
+function renderMetodos(data) {
+  const cont=document.getElementById('metodos-lista');
+  if (!data.length) { cont.innerHTML='<p style="font-size:.78rem;color:var(--ink-faint)">Sin pagos en el período</p>'; return; }
+  const total=data.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const icons={ efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transferencia', yape:'📱 Yape', plin:'📱 Plin' };
+  cont.innerHTML=data.map(m=>{
+    const pct=total>0?((parseFloat(m.monto)/total)*100).toFixed(0):0;
+    return `<div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+        <span style="font-size:.78rem;font-weight:600">${icons[m.metodo_pago]||m.metodo_pago||'—'}</span>
+        <span style="font-size:.78rem;font-weight:700;color:#15803d">S/. ${parseFloat(m.monto).toFixed(2)}</span>
+      </div>
+      <div style="background:#f0f0f0;border-radius:999px;height:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(135deg,#15803d,#16a34a);border-radius:999px"></div>
+      </div>
+      <p style="font-size:.62rem;color:var(--ink-faint);margin-top:.1rem">${m.cantidad} transacciones · ${pct}%</p>
+    </div>`;
+  }).join('');
+}
+
+function renderTopServicios(data) {
+  const cont=document.getElementById('top-servicios');
+  if (!data?.length) { cont.innerHTML='<p style="font-size:.78rem;color:var(--ink-faint)">Sin datos</p>'; return; }
+  const max=Math.max(...data.map(d=>parseFloat(d.monto_total||0)),1);
+  cont.innerHTML=data.map((s,i)=>{
+    const pct=((parseFloat(s.monto_total)/max)*100).toFixed(0);
+    return `<div style="display:flex;align-items:center;gap:.85rem">
+      <span style="font-size:.72rem;font-weight:800;color:var(--ink-faint);width:18px;text-align:right">${i+1}</span>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:.2rem">
+          <span style="font-size:.78rem;font-weight:600">${esc(s.descripcion)}</span>
+          <span style="font-size:.78rem;font-weight:700;color:#15803d">S/. ${parseFloat(s.monto_total).toFixed(2)}</span>
+        </div>
+        <div style="background:#f0f0f0;border-radius:999px;height:5px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(135deg,#15803d,#16a34a);border-radius:999px"></div>
+        </div>
+        <p style="font-size:.6rem;color:var(--ink-faint);margin-top:.1rem">${s.cantidad_total} unidades</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Lista facturas ────────────────────────────────────────────────
+function limpiarFiltros() {
+  document.getElementById('f-fecha').value  = fechaHoyInput();
+  document.getElementById('f-estado').value = '';
+  document.getElementById('f-tipo').value   = '';
+  cargarFacturas();
+}
+
+async function cargarFacturas() {
+  const fecha  = document.getElementById('f-fecha').value;
+  const estado = document.getElementById('f-estado').value;
+  const tipo   = document.getElementById('f-tipo').value;
+  let url = '/facturas?limit=50';
+  if (fecha)  url += `&fecha=${fecha}`;
+  if (estado) url += `&estado=${estado}`;
+  if (tipo)   url += `&tipo=${tipo}`;
+
+  const tbody = document.getElementById('tbody-facturas');
+  tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>`;
+
+  try {
+    const res  = await api(url);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">🧾</span><p>Sin documentos</p></div></td></tr>`;
+      return;
+    }
+
+    const estadoBadge = {
+      pendiente: '<span style="background:#fffbeb;color:#b45309;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fde68a">⏳ Pendiente</span>',
+      pagado   : '<span style="background:#f0fdf4;color:#15803d;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ Pagado</span>',
+      anulado  : '<span style="background:#fff1f2;color:#be123c;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">❌ Anulado</span>',
+    };
+    const metodoBadge = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transfer.', yape:'📱 Yape', plin:'📱 Plin' };
+
+    tbody.innerHTML = rows.map(f => `<tr>
+      <td style="font-family:monospace;font-size:.75rem;font-weight:700">
+        <span style="font-size:.65rem;background:${f.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${f.tipo==='factura'?'#1d4ed8':'#15803d'};padding:.1rem .4rem;border-radius:.3rem;font-weight:700;margin-right:.3rem">${f.tipo==='factura'?'F':'B'}</span>
+        ${esc(f.numero)}
+      </td>
+      <td style="font-size:.8rem">${fDate(f.fecha)}</td>
+      <td>
+        <p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p>
+        <p style="font-size:.68rem;color:var(--ink-faint)">${f.dni?'DNI: '+esc(f.dni):''}</p>
+      </td>
+      <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
+      <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
+      <td>
+        ${estadoBadge[f.estado]||f.estado}
+        ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
+      </td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
+          <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
+          ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
+          ${f.estado!=='anulado'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)})" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
+  } catch { tbody.innerHTML=`<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
+}
+
+// ══ NUEVA FACTURA ════════════════════════════════════════════════
+
+function abrirNuevaFactura() {
+  propFacSel=null; itemN=0; pagoN=0; _catalogoCache=null;
+  document.getElementById('nf-items').innerHTML='';
+  document.getElementById('nf-pagos').innerHTML='';
+  document.getElementById('nf-prop-sel').style.display='none';
+  document.getElementById('nf-prop-resultados').innerHTML='';
+  document.getElementById('nf-prop-q').value='';
+  document.getElementById('nf-mascotas-wrap').style.display='none';
+  document.getElementById('nf-fecha').value=fechaHoyInput();
+  document.getElementById('nf-notas').value='';
+  document.getElementById('nf-igv').checked=true;
+  document.getElementById('nf-igv-hint').textContent='✅ Los precios ya incluyen IGV — se extrae automáticamente';
+  // Reset tipo y bloque empresa
+  document.getElementById('nf-tipo').value='boleta';
+  document.getElementById('bloque-empresa').style.display='none';
+  document.getElementById('nf-ruc').value='';
+  document.getElementById('nf-razon').value='';
+  document.getElementById('nf-dir-fiscal').value='';
+  document.getElementById('nf-ruc-ok').style.display='none';
+  document.getElementById('nf-ruc-err').style.display='none';
+  calcularTotales();
+  openModal('modal-factura');
+  addItem();
+  addPagoFila();
+}
+
+// ── Tipo documento ────────────────────────────────────────────────
+function onTipoChange() {
+  const tipo = document.getElementById('nf-tipo').value;
+  const bloque = document.getElementById('bloque-empresa');
+  bloque.style.display = tipo === 'factura' ? 'block' : 'none';
+  // Si ya hay propietario seleccionado, autocompletar
+  if (tipo === 'factura' && propFacSel) autocompletarEmpresa();
+}
+
+function validarRUC(input) {
+  const val = input.value.replace(/\D/g,'');
+  input.value = val;
+  const ok  = document.getElementById('nf-ruc-ok');
+  const err = document.getElementById('nf-ruc-err');
+  const hint = document.getElementById('nf-ruc-hint');
+  if (val.length === 0) {
+    ok.style.display='none'; err.style.display='none';
+    hint.textContent='Ingresa el RUC de 11 dígitos de la empresa';
+    hint.style.color='var(--ink-faint)';
+  } else if (val.length === 11) {
+    ok.style.display='flex'; err.style.display='none';
+    hint.textContent='RUC válido ✓';
+    hint.style.color='#15803d';
+  } else {
+    ok.style.display='none'; err.style.display='flex';
+    hint.textContent=`Faltan ${11-val.length} dígitos`;
+    hint.style.color='#be123c';
+  }
+}
+
+function autocompletarEmpresa() {
+  if (!propFacSel?._data) return;
+  const d = propFacSel._data;
+  if (d.ruc)              document.getElementById('nf-ruc').value        = d.ruc;
+  if (d.razon_social)     document.getElementById('nf-razon').value      = d.razon_social;
+  if (d.direccion_fiscal) document.getElementById('nf-dir-fiscal').value = d.direccion_fiscal;
+  if (d.ruc) validarRUC(document.getElementById('nf-ruc'));
+}
+
+// ── Buscar propietario ────────────────────────────────────────────
+async function buscarPropFac() {
+  const q=document.getElementById('nf-prop-q').value.trim();
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  const cont=document.getElementById('nf-prop-resultados');
+  cont.innerHTML='<div style="font-size:.78rem;color:var(--ink-faint);padding:.3rem">Buscando…</div>';
+  try {
+    const res=await api(`/propietarios?search=${encodeURIComponent(q)}&limit=6`);
+    if (!res) return;
+    const rows=(await res.json()).data||[];
+    cont.innerHTML=rows.length?rows.map(p=>`
+      <button onclick="selPropFac(${p.id},'${esc(p.nombre)}','${esc(p.apellido)}','${esc(p.dni||'')}','${esc(p.telefono)}')"
+        style="display:flex;align-items:center;gap:.7rem;padding:.6rem .85rem;background:#fff;border:1px solid var(--line);border-radius:.8rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
+        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}</div>
+        <div style="flex:1"><p style="font-weight:700;font-size:.83rem">${esc(p.nombre)} ${esc(p.apellido)}</p><p style="font-size:.68rem;color:var(--ink-faint)">${p.dni?'🪪 '+esc(p.dni)+' · ':''}📞 ${esc(p.telefono)}</p></div>
+      </button>`).join('')
+    :'<div style="font-size:.78rem;color:var(--ink-faint);text-align:center;padding:.5rem">Sin resultados</div>';
+  } catch { cont.innerHTML='<div style="font-size:.78rem;color:#e11d48;padding:.3rem">Error</div>'; }
+}
+
+async function selPropFac(id, nombre, apellido, dni, telefono) {
+  propFacSel = { id };
+  document.getElementById('nf-prop-resultados').innerHTML='';
+  document.getElementById('nf-prop-q').value='';
+  document.getElementById('nf-prop-sel').style.display='flex';
+  document.getElementById('nf-prop-avatar').textContent=nombre.charAt(0)+apellido.charAt(0);
+  document.getElementById('nf-prop-nombre').textContent=`${nombre} ${apellido}`;
+  document.getElementById('nf-prop-info').textContent=`${dni?'🪪 '+dni+' · ':''}📞 ${telefono}`;
+  try {
+    const res=await api(`/propietarios/${id}`);
+    if (!res) return;
+    const data=(await res.json()).data;
+
+    // Guardar datos completos del propietario para usar después
+    propFacSel._data = data;
+
+    // Cargar mascotas
+    const masc = data.mascotas || [];
+    const sel=document.getElementById('nf-mascota');
+    sel.innerHTML='<option value="">Sin mascota específica</option>'+
+      masc.map(m=>`<option value="${m.id}">${badgeEspecie(m.especie)} ${esc(m.nombre)}</option>`).join('');
+    document.getElementById('nf-mascotas-wrap').style.display=masc.length?'block':'none';
+
+    // Si tipo=factura, autocompletar datos empresa
+    if (document.getElementById('nf-tipo').value === 'factura') {
+      autocompletarEmpresa();
+    }
+  } catch {}
+}
+
+function limpiarPropFac() {
+  propFacSel=null;
+  document.getElementById('nf-prop-sel').style.display='none';
+  document.getElementById('nf-mascotas-wrap').style.display='none';
+  document.getElementById('nf-prop-resultados').innerHTML='';
+  // Limpiar campos empresa
+  document.getElementById('nf-ruc').value        = '';
+  document.getElementById('nf-razon').value      = '';
+  document.getElementById('nf-dir-fiscal').value = '';
+  document.getElementById('nf-ruc-ok').style.display  = 'none';
+  document.getElementById('nf-ruc-err').style.display = 'none';
+}
+
+// ── Agregar ítem con autocompletado ───────────────────────────────
+function addItem(desc='', cant=1, pu=0) {
+  const id=itemN++;
+  const div=document.createElement('div');
+  div.id=`item-${id}`;
+  div.style.cssText='display:grid;grid-template-columns:1fr 70px 110px 90px 36px;gap:.5rem;align-items:center;position:relative';
+  div.innerHTML=`
+    <div style="position:relative">
+      <input type="text" placeholder="Busca servicio o escribe…" class="vinput" data-f="desc"
+        style="font-size:.8rem;width:100%" value="${esc(desc)}"
+        oninput="calcularTotales();buscarItemAC(this,${id})"/>
+      <ul id="ac-${id}" class="ac-factura-list" style="display:none"></ul>
+    </div>
+    <input type="number" placeholder="1" min="0.5" step="0.5"
+      class="vinput" data-f="cant" style="font-size:.8rem;text-align:center" value="${cant}"
+      oninput="calcularTotales()"/>
+    <input type="number" placeholder="0.00" min="0" step="0.50"
+      class="vinput" data-f="pu" style="font-size:.8rem;text-align:right" value="${pu||''}"
+      oninput="calcularTotales()"/>
+    <div data-f="total" style="font-size:.82rem;font-weight:700;color:#15803d;
+      text-align:right;padding:.5rem .3rem;min-width:80px">S/. 0.00</div>
+    <button onclick="document.getElementById('item-${id}').remove();calcularTotales()"
+      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.2rem">✕</button>
+    <input type="hidden" data-f="inv-id" value=""/>
+    <input type="hidden" data-f="inv-stock" value=""/>
+    <input type="hidden" data-f="inv-unidad" value=""/>
+    </div>
+    <div data-f="stock-badge" style="grid-column:1/3;margin-top:-.25rem"></div>`;
+  document.getElementById('nf-items').appendChild(div);
+  div.querySelector('[data-f="pu"]').addEventListener('blur', calcularTotales);
+}
+
+async function buscarItemAC(input, id) {
+  const q   = input.value.trim().toLowerCase();
+  const ul  = document.getElementById(`ac-${id}`);
+  if (q.length < 1) { ul.style.display='none'; return; }
+
+  const catalogo = await getCatalogo();
+  const matches  = catalogo.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 8);
+
+  if (!matches.length) { ul.style.display='none'; return; }
+
+  const catColors = {
+    consulta    : '#f0fdf4;color:#15803d',
+    vacunacion  : '#f5f3ff;color:#6d28d9',
+    estetica    : '#fdf2f8;color:#db2777',
+    cirugia     : '#fff1f2;color:#be123c',
+    laboratorio : '#eff6ff;color:#1d4ed8',
+    medicamento : '#f0f9ff;color:#0369a1',
+    otro        : '#f8faf8;color:#4b5f57',
+  };
+
+  ul.innerHTML = matches.map(item => {
+    const cat    = item.categoria || item._tipo;
+    const precio = item.precio || item.precio_unitario || 0;
+    const colores = catColors[cat] || '#f8faf8;color:#4b5f57';
+    const stock  = item._tipo==='inventario' ? parseFloat(item.cantidad||0) : null;
+    const stockLabel = stock !== null ? ` · 📦 ${stock} ${item.unidad||''}` : '';
+    const stockColor = stock !== null && stock <= 0 ? 'color:#e11d48' : stock !== null && stock <= (item.stock_minimo||0) ? 'color:#f59e0b' : '';
+    const invId  = item._tipo==='inventario' ? item.id : '';
+    return `<li onmousedown="selItemAC(event,${id},'${esc(item.nombre)}',${parseFloat(precio)},'${invId}',${stock !== null ? stock : 'null'},'${esc(item.unidad||'')}')">
+      <span class="ac-cat-pill" style="background:${colores}">${cat}</span>
+      <span style="flex:1;font-weight:600">${esc(item.nombre)}</span>
+      <span style="font-size:.7rem;color:var(--ink-faint)">S/. ${parseFloat(precio).toFixed(2)}<span style="${stockColor}">${stockLabel}</span></span>
+    </li>`;
+  }).join('');
+  ul.style.display='block';
+}
+
+function selItemAC(e, id, nombre, precio, invId='', stockDisp=null, unidad='') {
+  e.preventDefault();
+  const div = document.getElementById(`item-${id}`);
+  div.querySelector('[data-f="desc"]').value = nombre;
+  div.querySelector('[data-f="pu"]').value   = precio;
+
+  // Guardar referencia al ítem de inventario y stock disponible
+  const hiddenInv = div.querySelector('[data-f="inv-id"]');
+  if (hiddenInv) hiddenInv.value = invId;
+
+  const hiddenStock = div.querySelector('[data-f="inv-stock"]');
+  if (hiddenStock) hiddenStock.value = stockDisp !== null ? stockDisp : '';
+
+  const hiddenUnidad = div.querySelector('[data-f="inv-unidad"]');
+  if (hiddenUnidad) hiddenUnidad.value = unidad;
+
+  // Mostrar badge de stock disponible si es producto de inventario
+  const stockBadge = div.querySelector('[data-f="stock-badge"]');
+  if (stockBadge) {
+    if (invId && stockDisp !== null) {
+      const color = stockDisp <= 0 ? '#e11d48' : stockDisp <= 5 ? '#f59e0b' : '#15803d';
+      const bg    = stockDisp <= 0 ? '#fff1f2' : stockDisp <= 5 ? '#fffbeb' : '#f0fdf4';
+      stockBadge.innerHTML = `<span style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;
+        border-radius:.4rem;background:${bg};color:${color};border:1px solid ${color}30">
+        📦 Stock: ${stockDisp} ${unidad}
+      </span>`;
+    } else {
+      stockBadge.innerHTML = '';
+    }
+  }
+
+  document.getElementById(`ac-${id}`).style.display='none';
+  calcularTotales();
+}
+
+// Cerrar dropdown al hacer click fuera
+document.addEventListener('click', e => {
+  document.querySelectorAll('.ac-factura-list').forEach(ul => {
+    if (!ul.contains(e.target) && !ul.previousElementSibling?.contains(e.target)) {
+      ul.style.display='none';
+    }
+  });
+});
+
+// ── Calcular totales con lógica IGV ───────────────────────────────
+function calcularTotales() {
+  const igvIncluido = document.getElementById('nf-igv').checked;
+  const igvPct      = parseFloat(empresa.igv_porcentaje || 18) / 100;
+  let totalConIGV   = 0;
+
+  document.querySelectorAll('#nf-items > div').forEach(div => {
+    const cant      = parseFloat(div.querySelector('[data-f="cant"]')?.value) || 0;
+    const pu        = parseFloat(div.querySelector('[data-f="pu"]')?.value)   || 0;
+    const itemTotal = parseFloat((cant * pu).toFixed(2));
+    totalConIGV    += itemTotal;
+    // Actualizar columna total del ítem
+    const totalEl = div.querySelector('[data-f="total"]');
+    if (totalEl) totalEl.textContent = `${getSim()} ${itemTotal.toFixed(2)}`;
+  });
+
+  totalConIGV = parseFloat(totalConIGV.toFixed(2));
+
+  let subtotal, igv, total;
+
+  if (igvIncluido) {
+    // El precio YA incluye IGV → extraer
+    subtotal = parseFloat((totalConIGV / (1 + igvPct)).toFixed(2));
+    igv      = parseFloat((totalConIGV - subtotal).toFixed(2));
+    total    = totalConIGV;
+  } else {
+    // El precio NO incluye IGV → sumar encima
+    subtotal = totalConIGV;
+    igv      = parseFloat((subtotal * igvPct).toFixed(2));
+    total    = parseFloat((subtotal + igv).toFixed(2));
+  }
+
+  document.getElementById('tot-sub').textContent       = `${getSim()} ${subtotal.toFixed(2)}`;
+  document.getElementById('tot-igv').textContent       = `${getSim()} ${igv.toFixed(2)}`;
+  document.getElementById('tot-total').textContent     = `${getSim()} ${total.toFixed(2)}`;
+  document.getElementById('tot-igv-label').textContent = `IGV (${empresa.igv_porcentaje||18}%):`;
+
+  actualizarPagoRestante(total);
+}
+
+// ── Métodos de pago mixtos ────────────────────────────────────────
+const metodosOpciones = [
+  { value:'efectivo',     label:'💵 Efectivo'     },
+  { value:'tarjeta',      label:'💳 Tarjeta'       },
+  { value:'transferencia',label:'🏦 Transferencia' },
+  { value:'yape',         label:'📱 Yape'          },
+  { value:'plin',         label:'📱 Plin'          },
+];
+
+function addPagoFila(metodo='', monto='') {
+  const id  = pagoN++;
+  const div = document.createElement('div');
+  div.id    = `pago-${id}`;
+  div.className = 'pago-fila';
+  div.innerHTML = `
+    <select class="vinput" data-f="metodo" style="font-size:.82rem" onchange="actualizarPagoRestante()">
+      <option value="">⏳ Pendiente de pago</option>
+      ${metodosOpciones.map(m=>`<option value="${m.value}" ${m.value===metodo?'selected':''}>${m.label}</option>`).join('')}
+    </select>
+    <input type="number" class="vinput" data-f="monto" placeholder="S/. 0.00" min="0" step="0.50"
+      value="${monto}" style="font-size:.82rem;text-align:right" oninput="actualizarPagoRestante()"/>
+    ${pagoN>1?`<button onclick="document.getElementById('pago-${id}').remove();actualizarPagoRestante()"
+      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem">✕</button>`
+    :`<span></span>`}`;
+  document.getElementById('nf-pagos').appendChild(div);
+}
+
+function actualizarPagoRestante(totalOverride) {
+  let total;
+  if (totalOverride !== undefined && totalOverride !== null) {
+    total = parseFloat(totalOverride) || 0;
+  } else {
+    const txt = document.getElementById('tot-total')?.textContent || 'S/. 0.00';
+    total = parseFloat(txt.replace(getSim()+' ', '')) || 0;
+  }
+  let asignado = 0;
+  document.querySelectorAll('#nf-pagos > div').forEach(div => {
+    const m = parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
+    asignado += m;
+  });
+  const restante = parseFloat((total - asignado).toFixed(2));
+  const el = document.getElementById('pago-restante');
+  el.textContent = `${getSim()} ${restante.toFixed(2)}`;
+  el.style.color = Math.abs(restante) < 0.01 ? '#15803d' : restante < 0 ? '#be123c' : '#b45309';
+}
+
+// ── Emitir factura ────────────────────────────────────────────────
+async function emitirFactura() {
+  if (!propFacSel) { toast('Selecciona un propietario.','warning'); return; }
+
+  const tipo = document.getElementById('nf-tipo').value;
+
+  // Validar datos empresa si es factura
+  let cliente_ruc = null, cliente_razon_social = null, cliente_direccion_fiscal = null;
+  if (tipo === 'factura') {
+    cliente_ruc              = document.getElementById('nf-ruc').value.trim();
+    cliente_razon_social     = document.getElementById('nf-razon').value.trim();
+    cliente_direccion_fiscal = document.getElementById('nf-dir-fiscal').value.trim();
+    if (!cliente_ruc || !/^\d{11}$/.test(cliente_ruc)) {
+      toast('Para factura se requiere RUC válido de 11 dígitos.', 'warning'); return;
+    }
+    if (!cliente_razon_social) {
+      toast('Para factura se requiere la razón social.', 'warning'); return;
+    }
+  }
+
+  const items=[]; let ok=true;
+  const erroresStock = [];
+
+  document.querySelectorAll('#nf-items > div[id^="item-"]').forEach(div=>{
+    const desc    = div.querySelector('[data-f="desc"]')?.value.trim();
+    const cant    = parseFloat(div.querySelector('[data-f="cant"]')?.value)||1;
+    const pu      = parseFloat(div.querySelector('[data-f="pu"]')?.value)||0;
+    const invId   = div.querySelector('[data-f="inv-id"]')?.value || null;
+    const invStock= div.querySelector('[data-f="inv-stock"]')?.value;
+    const invUnidad= div.querySelector('[data-f="inv-unidad"]')?.value || '';
+
+    if (!desc) { ok=false; return; }
+
+    // Validar stock solo si es producto de inventario
+    if (invId && invStock !== '' && invStock !== undefined) {
+      const stockDisp = parseFloat(invStock);
+      if (cant > stockDisp) {
+        erroresStock.push(`"${desc}": solicitado ${cant} ${invUnidad}, disponible ${stockDisp} ${invUnidad}`);
+        ok = false;
+      }
+    }
+
+    items.push({
+      descripcion  : desc,
+      cantidad     : cant,
+      precio_unit  : pu,
+      inventario_id: invId ? parseInt(invId) : null,
+    });
+  });
+
+  if (erroresStock.length) {
+    toast(`⚠️ Stock insuficiente:\n${erroresStock.join('\n')}`, 'warning', 8000);
+    return;
+  }
+  if (!ok)          { toast('Completa la descripción de todos los ítems.','warning'); return; }
+  if (!items.length){ toast('Agrega al menos un ítem.','warning'); return; }
+
+  // Recolectar pagos
+  const pagos=[];
+  document.querySelectorAll('#nf-pagos > div').forEach(div=>{
+    const metodo=div.querySelector('[data-f="metodo"]')?.value;
+    const monto =parseFloat(div.querySelector('[data-f="monto"]')?.value)||0;
+    if (metodo && monto>0) pagos.push({ metodo_pago:metodo, monto });
+  });
+
+  // Si hay al menos un pago registrado, el primer método va como principal
+  const metodo_pago_principal = pagos.length>0 ? pagos[0].metodo_pago : null;
+
+  const body={
+    tipo,
+    propietario_id: propFacSel.id,
+    mascota_id    : parseInt(document.getElementById('nf-mascota')?.value)||null,
+    fecha         : document.getElementById('nf-fecha').value,
+    items,
+    igv_incluido  : document.getElementById('nf-igv').checked,
+    aplicar_igv   : true,
+    metodo_pago   : metodo_pago_principal,
+    pagos,
+    notas         : document.getElementById('nf-notas').value.trim()||null,
+    // Datos empresa para factura
+    cliente_ruc,
+    cliente_razon_social,
+    cliente_direccion_fiscal,
+  };
+
+  try {
+    const res=await api('/facturas',{method:'POST',body});
+    if (!res) return;
+    const data=await res.json();
+    if (!res.ok) { toast(data.message||'Error al emitir.','danger'); return; }
+    toast(`✅ ${body.tipo==='factura'?'Factura':'Boleta'} ${data.data.numero} emitida`,'success',5000);
+    closeModal('modal-factura');
+    await verFactura(data.data.id);
+    cargarResumen();
+    if (document.getElementById('contenido-lista').style.display!=='none') cargarFacturas();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Ver factura + PDF ─────────────────────────────────────────────
+async function verFactura(id) {
+  facActualId=id; facActualData=null;
+  document.getElementById('ver-fac-titulo').textContent='🧾 Cargando…';
+  document.getElementById('pdf-preview').innerHTML='<div class="vempty"><div class="vspinner"></div></div>';
+  document.getElementById('ver-fac-acciones').innerHTML='';
+  openModal('modal-ver-fac');
+  try {
+    const res=await api(`/facturas/${id}`);
+    if (!res||!res.ok) { toast('Error al cargar.','danger'); return; }
+    const f=(await res.json()).data;
+    facActualData=f;
+    document.getElementById('ver-fac-titulo').textContent=`🧾 ${f.numero}`;
+    if (f.estado==='pendiente') {
+      document.getElementById('ver-fac-acciones').innerHTML=
+        `<button onclick="closeModal('modal-ver-fac');abrirPagar(${f.id},${parseFloat(f.total)})" class="vbtn vbtn-primary" style="font-size:.78rem">💳 Registrar Pago</button>`;
+    }
+    renderPDF(f, empresa);
+  } catch { toast('Error.','danger'); }
+}
+
+function renderPDF(f, emp) {
+  const igvPct  = parseFloat(emp.igv_porcentaje||18);
+  const tipoLbl = f.tipo==='factura'?'FACTURA ELECTRÓNICA':'BOLETA DE VENTA';
+  const metodos = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transferencia', yape:'📱 Yape', plin:'📱 Plin' };
+
+  document.getElementById('pdf-preview').innerHTML=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:3px solid #166534;padding-bottom:1rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        ${emp.logo_url?`<img src="${esc(emp.logo_url)}" style="height:56px;object-fit:contain;border-radius:.4rem" onerror="this.style.display='none'"/>`
+        :`<div style="width:56px;height:56px;background:linear-gradient(135deg,#166534,#15803d);border-radius:.8rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.3rem">V</div>`}
+        <div>
+          <p style="font-weight:800;font-size:1rem;color:#166534">${esc(emp.nombre||'VetClinic')}</p>
+          ${emp.razon_social?`<p style="font-size:.72rem;color:#4b5f57">${esc(emp.razon_social)}</p>`:''}
+          ${emp.ruc?`<p style="font-size:.72rem;color:#4b5f57">RUC: ${esc(emp.ruc)}</p>`:''}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="background:linear-gradient(135deg,${f.tipo==='factura'?'#1d4ed8,#2563eb':'#166534,#15803d'});color:#fff;padding:.5rem 1rem;border-radius:.6rem;font-weight:800;font-size:.85rem">${tipoLbl}</div>
+        <p style="font-size:.8rem;font-weight:700;font-family:monospace;margin-top:.35rem">${esc(f.numero)}</p>
+        <p style="font-size:.7rem;color:#4b5f57;margin-top:.1rem">Fecha: ${fDate(f.fecha)}</p>
+        <span style="font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;display:inline-block;margin-top:.2rem;${f.estado==='pagado'?'background:#f0fdf4;color:#15803d;':f.estado==='anulado'?'background:#fff1f2;color:#be123c;':'background:#fffbeb;color:#b45309;'}">${f.estado.toUpperCase()}</span>
+      </div>
+    </div>
+
+    <div style="font-size:.7rem;color:#4b5f57;margin-bottom:.8rem;display:flex;flex-direction:column;gap:.1rem">
+      ${emp.direccion?`<span>📍 ${esc(emp.direccion)}${emp.distrito?', '+esc(emp.distrito):''}${emp.ciudad?', '+esc(emp.ciudad):''}</span>`:''}
+      ${emp.telefono?`<span>📞 ${esc(emp.telefono)}</span>`:''}
+      ${emp.email?`<span>✉️ ${esc(emp.email)}</span>`:''}
+      ${emp.web?`<span>🌐 ${esc(emp.web)}</span>`:''}
+    </div>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.7rem;
+      padding:.75rem 1rem;margin-bottom:1rem;font-size:.75rem">
+      ${f.tipo === 'factura' ? `
+        <!-- Bloque empresa para FACTURA -->
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;align-items:start">
+          <span style="font-size:.6rem;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;grid-column:span 2;margin-bottom:.2rem">🏢 Empresa cliente</span>
+          <span style="color:#4b5f57;font-weight:600">RUC:</span>
+          <span style="font-weight:700;font-family:monospace">${esc(f.cliente_ruc||'—')}</span>
+          <span style="color:#4b5f57;font-weight:600">Razón social:</span>
+          <span style="font-weight:700">${esc(f.cliente_razon_social||'—')}</span>
+          ${f.cliente_direccion_fiscal?`
+          <span style="color:#4b5f57;font-weight:600">Dir. fiscal:</span>
+          <span>${esc(f.cliente_direccion_fiscal)}</span>`:''}
+          ${f.telefono?`<span style="color:#4b5f57">Teléfono:</span><span>${esc(f.telefono)}</span>`:''}
+        </div>` : `
+        <!-- Bloque persona natural para BOLETA -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+          <div>
+            <p style="font-size:.6rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Cliente</p>
+            <p style="font-weight:700">${esc(f.propietario_nombre)}</p>
+            ${f.dni?`<p style="color:#4b5f57">DNI: ${esc(f.dni)}</p>`:''}
+          </div>
+          <div>
+            ${f.telefono?`<p style="color:#4b5f57;margin-top:.3rem">📞 ${esc(f.telefono)}</p>`:''}
+            ${f.mascota_nombre?`<p style="color:#4b5f57;margin-top:.1rem">${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}</p>`:''}
+          </div>
+        </div>`}
+    </div>
+
+    <table style="margin-bottom:1rem">
+      <thead><tr>
+        <th style="border-radius:.4rem 0 0 0;min-width:240px">Descripción</th>
+        <th style="text-align:center;width:60px">Cant.</th>
+        <th style="text-align:right;width:90px">P. Unit.</th>
+        <th style="text-align:right;width:90px;border-radius:0 .4rem 0 0">Subtotal</th>
+      </tr></thead>
+      <tbody>
+        ${(f.items||[]).map(it=>`
+          <tr>
+            <td>${esc(it.descripcion)}</td>
+            <td style="text-align:center">${it.cantidad}</td>
+            <td style="text-align:right">S/. ${parseFloat(it.precio_unit).toFixed(2)}</td>
+            <td style="text-align:right;font-weight:600">S/. ${parseFloat(it.subtotal).toFixed(2)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <div style="display:flex;flex-direction:column;gap:.3rem;min-width:220px">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem">
+          <span style="color:#4b5f57">Subtotal:</span>
+          <span style="font-weight:600">S/. ${parseFloat(f.subtotal).toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.78rem">
+          <span style="color:#4b5f57">IGV (${igvPct}%):</span>
+          <span style="font-weight:600">S/. ${parseFloat(f.igv).toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;background:#166534;color:#fff;padding:.5rem .85rem;border-radius:.5rem;font-weight:800;font-size:.92rem;margin-top:.2rem">
+          <span>TOTAL:</span><span>S/. ${parseFloat(f.total).toFixed(2)}</span>
+        </div>
+        ${f.metodo_pago?`<p style="text-align:right;font-size:.7rem;color:#15803d;font-weight:600;margin-top:.2rem">${metodos[f.metodo_pago]||f.metodo_pago}</p>`:''}
+      </div>
+    </div>
+
+    <!-- Detalle de pagos mixtos -->
+    ${f.pagos?.length > 1 ? `
+    <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.7rem;padding:.75rem 1rem;margin-bottom:1rem;font-size:.72rem">
+      <p style="font-weight:700;color:#4b5f57;margin-bottom:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em">Detalle de pagos</p>
+      ${f.pagos.map(p=>`
+        <div style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid #f0f0f0">
+          <span>${metodos[p.metodo_pago]||p.metodo_pago}${p.referencia?' · Ref: '+p.referencia:''}</span>
+          <span style="font-weight:700">S/. ${parseFloat(p.monto).toFixed(2)}</span>
+        </div>`).join('')}
+    </div>` : f.pagos?.length===1 ? `
+    <p style="font-size:.7rem;color:#15803d;font-weight:600;text-align:right;margin-bottom:.75rem">
+      ${metodos[f.pagos[0].metodo_pago]||f.pagos[0].metodo_pago}
+      ${f.pagos[0].referencia?' · Ref: '+f.pagos[0].referencia:''}
+    </p>` : ''}
+
+    <div style="border-top:1px solid #e5e7eb;padding-top:.75rem;text-align:center;font-size:.68rem;color:#9ca3af;line-height:1.6">
+      ${emp.pie_documento?`<p>${esc(emp.pie_documento)}</p>`:''}
+      <p>${esc(emp.nombre||'VetClinic')} · Gracias por su preferencia · ${fDate(f.fecha)}</p>
+      <p style="font-family:monospace;letter-spacing:.05em">${esc(f.numero)}</p>
+    </div>`;
+}
+
+// ── Capturar comprobante como imagen ─────────────────────────────
+async function capturarImagen() {
+  const el = document.getElementById('pdf-preview');
+  if (!el) return null;
+
+  // Forzar fondo blanco para la captura
+  const bgOriginal = el.style.background;
+  el.style.background = '#ffffff';
+
+  try {
+    const canvas = await html2canvas(el, {
+      scale      : 2,          // alta resolución
+      useCORS    : true,
+      allowTaint : true,
+      backgroundColor: '#ffffff',
+      logging    : false,
+    });
+    el.style.background = bgOriginal;
+    return canvas;
+  } catch (e) {
+    el.style.background = bgOriginal;
+    console.error('Error capturando imagen:', e);
+    return null;
+  }
+}
+
+async function descargarImagen() {
+  if (!facActualData) return;
+
+  const btn = document.querySelector('[onclick="descargarImagen()"]');
+  const textoOriginal = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+
+  toast('Generando imagen…', 'info', 2000);
+
+  const canvas = await capturarImagen();
+  if (!canvas) {
+    toast('Error al generar la imagen.', 'danger');
+    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+    return;
+  }
+
+  const link      = document.createElement('a');
+  link.download   = `${facActualData.numero}.png`;
+  link.href       = canvas.toDataURL('image/png');
+  link.click();
+
+  if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+  toast('✅ Imagen descargada', 'success');
+}
+
+async function compartirWhatsApp() {
+  if (!facActualData) return;
+
+  const btn = document.querySelector('[onclick="compartirWhatsApp()"]');
+  const textoOriginal = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+
+  toast('Preparando imagen para WhatsApp…', 'info', 3000);
+
+  const canvas = await capturarImagen();
+  if (!canvas) {
+    toast('Error al generar la imagen.', 'danger');
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+    return;
+  }
+
+  // Convertir canvas a Blob
+  canvas.toBlob(async (blob) => {
+    const f    = facActualData;
+    const tel  = f.telefono?.replace(/\D/g, '') || '';
+    const telPE = tel ? (tel.startsWith('51') ? tel : `51${tel}`) : '';
+
+    // Intentar usar Web Share API (móvil / Chrome)
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], `${f.numero}.png`, { type: 'image/png' });
+      const shareData = {
+        title : `Comprobante ${f.numero}`,
+        text  : `Hola, te adjunto tu comprobante de pago ${f.numero} de VetClinic.`,
+        files : [file],
+      };
+
+      if (navigator.canShare(shareData)) {
+        try {
+          await navigator.share(shareData);
+          toast('✅ Imagen compartida', 'success');
+          if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+          return;
+        } catch (e) {
+          if (e.name !== 'AbortError') console.error(e);
+        }
+      }
+    }
+
+    // Fallback: descargar imagen + abrir WhatsApp con mensaje
+    // (el usuario la adjunta manualmente)
+    const link    = document.createElement('a');
+    link.download = `${f.numero}.png`;
+    link.href     = canvas.toDataURL('image/png');
+    link.click();
+
+    // Mensaje para WhatsApp
+    const msg = encodeURIComponent(
+      `Hola 👋, te compartimos tu comprobante de pago:\n\n` +
+      `📄 *${f.tipo === 'factura' ? 'Factura' : 'Boleta'}*: ${f.numero}\n` +
+      `📅 Fecha: ${fDate(f.fecha)}\n` +
+      `💰 Total: S/. ${parseFloat(f.total).toFixed(2)}\n` +
+      `✅ Estado: ${f.estado.toUpperCase()}\n\n` +
+      `La imagen del comprobante ha sido descargada. Por favor adjúntala a este chat.`
+    );
+
+    const waUrl = telPE
+      ? `https://wa.me/${telPE}?text=${msg}`
+      : `https://wa.me/?text=${msg}`;
+
+    setTimeout(() => window.open(waUrl, '_blank'), 800);
+
+    toast('✅ Imagen descargada · Abriendo WhatsApp…', 'success', 5000);
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+
+  }, 'image/png', 0.95);
+}
+
+function descargarPDF() {
+  if (!facActualData) return;
+  const contenido=document.getElementById('pdf-preview').innerHTML;
+  const ventana=window.open('','_blank');
+  ventana.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8"/>
+    <title>${facActualData.numero}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;padding:2rem;max-width:700px;margin:0 auto;color:#111}table{width:100%;border-collapse:collapse}th{background:#166534;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.75rem}td{padding:.4rem .7rem;border-bottom:1px solid #f0f0f0;font-size:.75rem}@media print{button{display:none}}</style>
+  </head><body>
+    ${contenido}
+    <br/><div style="text-align:center"><button onclick="window.print()" style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
+  </body></html>`);
+  ventana.document.close();
+  setTimeout(()=>ventana.print(),800);
+}
+
+// ── Cobrar — pagos mixtos ─────────────────────────────────────────
+let pagarFilaN = 0;
+let pagarTotalActual = 0;
+
+function abrirPagar(id, total) {
+  pagarFilaN = 0;
+  pagarTotalActual = parseFloat(total) || 0;
+  document.getElementById('pagar-id').value          = id;
+  document.getElementById('pagar-total').textContent = `${getSim()} ${pagarTotalActual.toFixed(2)}`;
+  document.getElementById('pagar-filas').innerHTML   = '';
+  document.getElementById('pagar-referencia').value  = '';
+  addPagarFila();
+  // Pre-rellenar primera fila con el total completo
+  const primerMonto = document.querySelector('#pagar-filas [data-f="monto"]');
+  if (primerMonto) primerMonto.value = pagarTotalActual.toFixed(2);
+  actualizarPagarRestante();
+  openModal('modal-pagar');
+}
+
+function addPagarFila(metodo='', monto='') {
+  const id  = pagarFilaN++;
+  const div = document.createElement('div');
+  div.id    = `pagar-fila-${id}`;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 110px 28px;gap:.5rem;align-items:center';
+  div.innerHTML = `
+    <select class="vinput" data-f="metodo" style="font-size:.82rem" onchange="actualizarPagarRestante()">
+      <option value="">Seleccionar…</option>
+      <option value="efectivo"      ${metodo==='efectivo'?'selected':''}>💵 Efectivo</option>
+      <option value="tarjeta"       ${metodo==='tarjeta'?'selected':''}>💳 Tarjeta</option>
+      <option value="transferencia" ${metodo==='transferencia'?'selected':''}>🏦 Transferencia</option>
+      <option value="yape"          ${metodo==='yape'?'selected':''}>📱 Yape</option>
+      <option value="plin"          ${metodo==='plin'?'selected':''}>📱 Plin</option>
+    </select>
+    <input type="number" class="vinput" data-f="monto" placeholder="0.00" min="0" step="0.50"
+      value="${monto}" style="font-size:.82rem;text-align:right"
+      oninput="actualizarPagarRestante()"/>
+    ${pagarFilaN > 1
+      ? `<button onclick="document.getElementById('pagar-fila-${id}').remove();actualizarPagarRestante()"
+           style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.1rem">✕</button>`
+      : '<span></span>'}`;
+  document.getElementById('pagar-filas').appendChild(div);
+}
+
+function actualizarPagarRestante() {
+  let asignado = 0;
+  document.querySelectorAll('#pagar-filas > div').forEach(div => {
+    asignado += parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
+  });
+  const restante = parseFloat((pagarTotalActual - asignado).toFixed(2));
+  const el = document.getElementById('pagar-restante-label');
+  el.textContent = `${getSim()} ${Math.max(restante,0).toFixed(2)}`;
+  el.style.color = Math.abs(restante) < 0.01 ? '#15803d' : '#b45309';
+}
+
+async function confirmarPago() {
+  const id         = document.getElementById('pagar-id').value;
+  const referencia = document.getElementById('pagar-referencia').value.trim();
+
+  const pagos = [];
+  let totalPagado = 0;
+  let valido = true;
+
+  document.querySelectorAll('#pagar-filas > div').forEach(div => {
+    const metodo = div.querySelector('[data-f="metodo"]')?.value;
+    const monto  = parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
+    if (!metodo) { valido = false; return; }
+    if (monto <= 0) { valido = false; return; }
+    pagos.push({ metodo_pago: metodo, monto, referencia: referencia || null });
+    totalPagado += monto;
+  });
+
+  if (!valido || !pagos.length) {
+    toast('Selecciona el método y monto de cada pago.', 'warning'); return;
+  }
+
+  const diferencia = Math.abs(totalPagado - pagarTotalActual);
+  if (diferencia > 0.10) {
+    toast(`El total pagado (S/. ${totalPagado.toFixed(2)}) no coincide con el total de la factura (S/. ${pagarTotalActual.toFixed(2)}).`, 'warning');
+    return;
+  }
+
+  try {
+    const res = await api(`/facturas/${id}/pagar`, { method: 'PATCH', body: { pagos } });
+    if (!res) return;
+    const d = await res.json();
+    if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
+    toast('✅ Pago registrado correctamente', 'success');
+    closeModal('modal-pagar');
+    cargarResumen();
+    if (document.getElementById('contenido-lista').style.display !== 'none') cargarFacturas();
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+</script>
+</body>
+</html>

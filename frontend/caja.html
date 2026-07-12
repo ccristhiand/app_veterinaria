@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Cierre de Caja</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    .metodo-card { background:#fff;border:1.5px solid var(--line);border-radius:1rem;padding:.8rem 1rem;transition:all .2s; }
+    .metodo-card.efectivo { border-color:#bbf7d0;background:#f0fdf4; }
+    .metodo-card.digital  { border-color:#bfdbfe;background:#eff6ff; }
+    .tab-btn { padding:.5rem 1rem;border:none;background:none;cursor:pointer;
+               font-family:inherit;font-size:.84rem;font-weight:600;
+               color:var(--ink-faint);border-bottom:3px solid transparent;transition:all .15s; }
+    .tab-btn.active { color:var(--green-600);border-bottom-color:var(--green-500); }
+    .dif-positiva { color:#15803d;background:#f0fdf4;border:1.5px solid #bbf7d0; }
+    .dif-negativa { color:#be123c;background:#fff1f2;border:1.5px solid #fecdd3; }
+    .dif-cero     { color:#1d4ed8;background:#eff6ff;border:1.5px solid #bfdbfe; }
+    .gasto-fila   { display:grid;grid-template-columns:1fr 130px 130px 32px;gap:.4rem;align-items:center; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>🏦 Cierre de Caja</h2><p>Control de ingresos y conteo de efectivo</p></div>
+    <button onclick="imprimirComprobante()" class="vbtn vbtn-ghost">🖨️ Imprimir</button>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
+    <button class="tab-btn active" id="tab-nuevo"     onclick="mostrarTab('nuevo')">📋 Nuevo Cierre</button>
+    <button class="tab-btn"        id="tab-historial" onclick="mostrarTab('historial')">📅 Historial</button>
+  </div>
+
+  <!-- TAB NUEVO CIERRE -->
+  <div id="contenido-nuevo">
+
+    <!-- Selector fecha/turno -->
+    <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+      <div>
+        <label class="vlabel">Fecha</label>
+        <input type="date" id="c-fecha" class="vinput" style="width:auto" onchange="cargarResumen()"/>
+      </div>
+      <div>
+        <label class="vlabel">Turno</label>
+        <select id="c-turno" class="vinput" style="width:auto" onchange="cargarResumen()">
+          <option value="dia_completo">☀️ Día completo</option>
+          <option value="mañana">🌅 Mañana</option>
+          <option value="tarde">🌆 Tarde</option>
+        </select>
+      </div>
+      <button onclick="cargarResumen()" class="vbtn vbtn-primary">🔄 Actualizar</button>
+      <div id="estado-cierre" style="display:none;padding:.5rem 1rem;border-radius:.8rem;
+        font-size:.8rem;font-weight:700"></div>
+    </div>
+
+    <!-- Grid principal -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem">
+
+      <!-- IZQUIERDA: Ingresos del sistema -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">
+          💰 Ingresos del día (Sistema)
+        </h3>
+
+        <!-- Efectivo -->
+        <div class="metodo-card efectivo" style="margin-bottom:.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:.6rem">
+              <span style="font-size:1.3rem">💵</span>
+              <div>
+                <p style="font-weight:700;font-size:.88rem">Efectivo</p>
+                <p style="font-size:.65rem;color:#059669;font-weight:600">📦 Se cuenta físicamente</p>
+              </div>
+            </div>
+            <p style="font-size:1.15rem;font-weight:800;color:#15803d" id="sis-efectivo">S/. 0.00</p>
+          </div>
+        </div>
+
+        <!-- Digitales -->
+        <p style="font-size:.62rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;
+          letter-spacing:.1em;margin-bottom:.5rem">Solo referencia (ya en el banco)</p>
+        <div style="display:flex;flex-direction:column;gap:.35rem">
+          <div class="metodo-card digital" style="padding:.55rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.82rem;font-weight:600">💳 Tarjeta</span>
+              <span style="font-weight:700;color:#1d4ed8" id="sis-tarjeta">S/. 0.00</span>
+            </div>
+          </div>
+          <div class="metodo-card digital" style="padding:.55rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.82rem;font-weight:600">📱 Yape</span>
+              <span style="font-weight:700;color:#1d4ed8" id="sis-yape">S/. 0.00</span>
+            </div>
+          </div>
+          <div class="metodo-card digital" style="padding:.55rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.82rem;font-weight:600">📱 Plin</span>
+              <span style="font-weight:700;color:#1d4ed8" id="sis-plin">S/. 0.00</span>
+            </div>
+          </div>
+          <div class="metodo-card digital" style="padding:.55rem .9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.82rem;font-weight:600">🏦 Transferencia</span>
+              <span style="font-weight:700;color:#1d4ed8" id="sis-transferencia">S/. 0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div style="margin-top:.85rem;padding-top:.85rem;border-top:2px solid var(--line);
+          display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700">Total del día</span>
+          <span style="font-size:1.15rem;font-weight:800;color:#15803d" id="sis-total">S/. 0.00</span>
+        </div>
+
+        <!-- Pendientes -->
+        <div id="pendientes-aviso" style="display:none;margin-top:.75rem;padding:.6rem .85rem;
+          background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;font-size:.75rem;color:#b45309">
+          ⚠️ <b id="pendientes-n">0</b> facturas pendientes · S/. <b id="pendientes-m">0.00</b>
+        </div>
+      </div>
+
+      <!-- DERECHA: Conteo de caja -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">
+          🔢 Conteo de Caja
+        </h3>
+
+        <div style="display:flex;flex-direction:column;gap:.85rem">
+
+          <!-- Monto inicial -->
+          <div>
+            <label class="vlabel">💵 Monto inicial de caja (S/.)</label>
+            <input id="c-monto-inicial" type="number" min="0" step="0.50"
+              class="vinput" placeholder="0.00" value="0" oninput="calcularDiferencia()"/>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">
+              Billetes/monedas al inicio del turno (caja chica)
+            </p>
+          </div>
+
+          <!-- Gastos -->
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+              <label class="vlabel" style="margin:0">💸 Gastos en efectivo</label>
+              <button onclick="addGasto()" class="vlink" style="font-size:.75rem;color:var(--green-600)">
+                ＋ Agregar
+              </button>
+            </div>
+            <div class="gasto-fila" style="padding:0 .1rem;margin-bottom:.25rem">
+              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">Descripción</p>
+              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Monto</p>
+              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">Categoría</p>
+              <p></p>
+            </div>
+            <div id="gastos-lista" style="display:flex;flex-direction:column;gap:.35rem"></div>
+            <div style="display:flex;justify-content:space-between;font-size:.78rem;
+              margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line)">
+              <span style="color:var(--ink-soft)">Total gastos:</span>
+              <span style="font-weight:700;color:#be123c" id="total-gastos">S/. 0.00</span>
+            </div>
+          </div>
+
+          <!-- Conteo físico -->
+          <div style="background:#f0fdf4;border:1.5px solid #a7f3d0;border-radius:1rem;padding:1rem">
+            <label class="vlabel" style="color:#15803d;font-weight:700">
+              💵 Efectivo contado físicamente (S/.) *
+            </label>
+            <input id="c-conteo" type="number" min="0" step="0.50"
+              class="vinput" placeholder="0.00" oninput="calcularDiferencia()"
+              style="font-size:1.1rem;font-weight:700;border-color:#a7f3d0"/>
+          </div>
+
+          <!-- Diferencia -->
+          <div id="c-diferencia-box" style="display:none;border-radius:1rem;padding:1rem;text-align:center">
+            <p style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">
+              Diferencia (conteo − esperado)
+            </p>
+            <p style="font-size:1.6rem;font-weight:800" id="c-diferencia-val">S/. 0.00</p>
+            <p style="font-size:.75rem;margin-top:.25rem" id="c-diferencia-label">—</p>
+            <div style="margin-top:.75rem;padding:.65rem;background:rgba(255,255,255,.65);
+              border-radius:.65rem;font-size:.75rem;text-align:left;display:flex;flex-direction:column;gap:.2rem">
+              <div style="display:flex;justify-content:space-between">
+                <span>Monto inicial:</span><span style="font-weight:700" id="det-inicial">S/. 0.00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span>+ Efectivo sistema:</span><span style="font-weight:700" id="det-sistema">S/. 0.00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span>− Gastos:</span><span style="font-weight:700;color:#be123c" id="det-gastos">S/. 0.00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(0,0,0,.1);
+                padding-top:.35rem;margin-top:.1rem">
+                <span style="font-weight:700">= Esperado en caja:</span>
+                <span style="font-weight:800" id="det-esperado">S/. 0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Observaciones -->
+          <div>
+            <label class="vlabel">Observaciones</label>
+            <textarea id="c-obs" rows="2" class="vinput"
+              placeholder="Notas del cierre…"></textarea>
+          </div>
+        </div>
+
+        <!-- Botones -->
+        <div style="display:flex;gap:.6rem;margin-top:1rem">
+          <button onclick="guardarCierre(false)" class="vbtn vbtn-ghost" style="flex:1">
+            💾 Guardar borrador
+          </button>
+          <button onclick="guardarCierre(true)" class="vbtn vbtn-primary" style="flex:1" id="btn-cerrar">
+            🔒 Cerrar caja
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB HISTORIAL -->
+  <div id="contenido-historial" style="display:none">
+    <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+      <div><label class="vlabel">Desde</label>
+        <input type="date" id="h-desde" class="vinput" style="width:auto"/></div>
+      <div><label class="vlabel">Hasta</label>
+        <input type="date" id="h-hasta" class="vinput" style="width:auto"/></div>
+      <button onclick="cargarHistorial()" class="vbtn vbtn-primary">Filtrar</button>
+    </div>
+    <div class="vcard">
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Turno</th><th>Efectivo sistema</th>
+              <th>Conteo físico</th><th>Diferencia</th>
+              <th>Gastos</th><th>Realizado por</th><th>Estado</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-historial">
+            <tr><td colspan="9"><div class="vempty"><div class="vspinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal detalle -->
+<div id="modal-cierre" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3 id="modal-cierre-titulo">Detalle del cierre</h3>
+      <button onclick="closeModal('modal-cierre')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="modal-cierre-body"></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-cierre')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="imprimirDetalle()" class="vbtn vbtn-primary">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let gastoN = 0;
+let resumenActual = null;
+let cierreDetalleActual = null;
+
+let _empresaCaja = {};
+const getSim = () => _empresaCaja.simbolo_moneda || 'S/.';
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'caja', title:'Cierre de Caja', subtitle:'Control de efectivo' });
+  // Cargar config de empresa para símbolo moneda
+  api('/empresa').then(res => {
+    if (res?.ok) res.json().then(d => {
+      _empresaCaja = d.data || {};
+      // Actualizar labels con símbolo correcto
+      const sim = getSim();
+      document.querySelectorAll('[data-caja-sim]').forEach(el => {
+        el.textContent = el.textContent.replace('S/.', sim);
+      });
+    });
+  });
+  document.getElementById('c-fecha').value = fechaHoyInput();
+  const hoy = new Date();
+  document.getElementById('h-hasta').value = fechaHoyInput();
+  const ini = new Date(hoy); ini.setDate(1);
+  document.getElementById('h-desde').value =
+    `${ini.getFullYear()}-${String(ini.getMonth()+1).padStart(2,'0')}-01`;
+  cargarResumen();
+});
+
+function mostrarTab(tab) {
+  ['nuevo','historial'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`contenido-${t}`).style.display = t===tab?'block':'none';
+  });
+  if (tab==='historial') cargarHistorial();
+}
+
+async function cargarResumen() {
+  const fecha = document.getElementById('c-fecha').value;
+  const turno = document.getElementById('c-turno').value;
+  try {
+    const res = await api(`/caja/resumen-dia?fecha=${fecha}&turno=${turno}`);
+    if (!res?.ok) return;
+    const d = (await res.json()).data;
+    resumenActual = d;
+    const t = d.totales;
+    document.getElementById('sis-efectivo').textContent      = `${getSim()} ${parseFloat(t.efectivo||0).toFixed(2)}`;
+    document.getElementById('sis-tarjeta').textContent       = `${getSim()} ${parseFloat(t.tarjeta||0).toFixed(2)}`;
+    document.getElementById('sis-yape').textContent          = `${getSim()} ${parseFloat(t.yape||0).toFixed(2)}`;
+    document.getElementById('sis-plin').textContent          = `${getSim()} ${parseFloat(t.plin||0).toFixed(2)}`;
+    document.getElementById('sis-transferencia').textContent = `${getSim()} ${parseFloat(t.transferencia||0).toFixed(2)}`;
+    document.getElementById('sis-total').textContent         = `${getSim()} ${parseFloat(t.total||0).toFixed(2)}`;
+
+    const p = d.pendientes;
+    if (parseFloat(p.monto||0) > 0) {
+      document.getElementById('pendientes-aviso').style.display = 'block';
+      document.getElementById('pendientes-n').textContent = p.total;
+      document.getElementById('pendientes-m').textContent = parseFloat(p.monto).toFixed(2);
+    } else {
+      document.getElementById('pendientes-aviso').style.display = 'none';
+    }
+
+    const ec = d.cierre_existente;
+    const estadoEl = document.getElementById('estado-cierre');
+    if (ec) {
+      estadoEl.style.display = 'block';
+      if (ec.estado === 'cerrado') {
+        estadoEl.style.cssText = 'display:block;padding:.5rem 1rem;border-radius:.8rem;font-size:.8rem;font-weight:700;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0';
+        estadoEl.textContent = '✅ Caja cerrada';
+        document.getElementById('btn-cerrar').disabled = true;
+        document.getElementById('btn-cerrar').textContent = '✅ Ya cerrada';
+      } else {
+        estadoEl.style.cssText = 'display:block;padding:.5rem 1rem;border-radius:.8rem;font-size:.8rem;font-weight:700;background:#fffbeb;color:#b45309;border:1px solid #fde68a';
+        estadoEl.textContent = '📝 Borrador guardado';
+        document.getElementById('btn-cerrar').disabled = false;
+        document.getElementById('btn-cerrar').textContent = '🔒 Cerrar caja';
+      }
+      document.getElementById('c-monto-inicial').value = ec.monto_inicial || 0;
+      document.getElementById('c-conteo').value        = ec.conteo_fisico || '';
+      document.getElementById('c-obs').value           = ec.observaciones || '';
+      document.getElementById('gastos-lista').innerHTML = '';
+      gastoN = 0;
+      for (const g of d.gastos||[]) addGasto(g.descripcion, g.monto, g.categoria);
+    } else {
+      estadoEl.style.display = 'none';
+      document.getElementById('btn-cerrar').disabled = false;
+      document.getElementById('btn-cerrar').textContent = '🔒 Cerrar caja';
+    }
+    calcularDiferencia();
+  } catch(e) { console.error(e); }
+}
+
+function addGasto(desc='', monto='', cat='otro') {
+  const id = gastoN++;
+  const div = document.createElement('div');
+  div.id = `gasto-${id}`;
+  div.className = 'gasto-fila';
+  div.innerHTML = `
+    <input type="text" class="vinput" data-f="desc" placeholder="Descripción…"
+      value="${esc(String(desc))}" style="font-size:.8rem" oninput="calcularDiferencia()"/>
+    <input type="number" class="vinput" data-f="monto" placeholder="0.00"
+      min="0" step="0.50" value="${monto}"
+      style="font-size:.8rem;text-align:right" oninput="calcularDiferencia()"/>
+    <select class="vinput" data-f="cat" style="font-size:.78rem">
+      <option value="compra"         ${cat==='compra'?'selected':''}>Compra</option>
+      <option value="servicio"       ${cat==='servicio'?'selected':''}>Servicio</option>
+      <option value="pago_proveedor" ${cat==='pago_proveedor'?'selected':''}>Proveedor</option>
+      <option value="otro"           ${cat==='otro'?'selected':''}>Otro</option>
+    </select>
+    <button onclick="document.getElementById('gasto-${id}').remove();calcularDiferencia()"
+      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:0">✕</button>`;
+  document.getElementById('gastos-lista').appendChild(div);
+}
+
+function calcularDiferencia() {
+  const conteo    = parseFloat(document.getElementById('c-conteo').value) || 0;
+  const inicial   = parseFloat(document.getElementById('c-monto-inicial').value) || 0;
+  const sEfectivo = parseFloat(resumenActual?.totales?.efectivo || 0);
+
+  let totalGastos = 0;
+  document.querySelectorAll('#gastos-lista > div').forEach(div => {
+    totalGastos += parseFloat(div.querySelector('[data-f="monto"]')?.value || 0);
+  });
+  document.getElementById('total-gastos').textContent = `${getSim()} ${totalGastos.toFixed(2)}`;
+
+  const esperado   = parseFloat((inicial + sEfectivo - totalGastos).toFixed(2));
+  const diferencia = parseFloat((conteo - esperado).toFixed(2));
+
+  const box   = document.getElementById('c-diferencia-box');
+  const valEl = document.getElementById('c-diferencia-val');
+  const lblEl = document.getElementById('c-diferencia-label');
+  box.style.display = 'block';
+
+  box.className = '';
+  if (Math.abs(diferencia) < 0.01) {
+    box.className = 'dif-cero';
+    box.style.borderRadius = '1rem'; box.style.padding = '1rem'; box.style.textAlign = 'center';
+    valEl.textContent = 'S/. 0.00';
+    lblEl.textContent = '✅ Cuadre perfecto';
+  } else if (diferencia > 0) {
+    box.className = 'dif-positiva';
+    box.style.borderRadius = '1rem'; box.style.padding = '1rem'; box.style.textAlign = 'center';
+    valEl.textContent = `+S/. ${diferencia.toFixed(2)}`;
+    lblEl.textContent = '⬆️ Sobrante en caja';
+  } else {
+    box.className = 'dif-negativa';
+    box.style.borderRadius = '1rem'; box.style.padding = '1rem'; box.style.textAlign = 'center';
+    valEl.textContent = `-S/. ${Math.abs(diferencia).toFixed(2)}`;
+    lblEl.textContent = '⬇️ Faltante en caja';
+  }
+
+  document.getElementById('det-inicial').textContent  = `${getSim()} ${inicial.toFixed(2)}`;
+  document.getElementById('det-sistema').textContent  = `${getSim()} ${sEfectivo.toFixed(2)}`;
+  document.getElementById('det-gastos').textContent   = `${getSim()} ${totalGastos.toFixed(2)}`;
+  document.getElementById('det-esperado').textContent = `${getSim()} ${esperado.toFixed(2)}`;
+}
+
+async function guardarCierre(cerrar) {
+  const conteo = document.getElementById('c-conteo').value;
+  if (!conteo) { toast('Ingresa el conteo físico de efectivo.','warning'); return; }
+  if (cerrar) {
+    const ok = await vconfirm({
+      titulo     : '¿Cerrar caja definitivamente?',
+      mensaje    : 'Esta acción no se puede revertir. El cierre quedará registrado de forma permanente.',
+      labelOk    : '🔒 Sí, cerrar caja',
+      labelCancel: 'Cancelar',
+      tipo       : 'warning',
+    });
+    if (!ok) return;
+  }
+
+  const gastos = [];
+  document.querySelectorAll('#gastos-lista > div').forEach(div => {
+    const desc  = div.querySelector('[data-f="desc"]')?.value.trim();
+    const monto = parseFloat(div.querySelector('[data-f="monto"]')?.value || 0);
+    const cat   = div.querySelector('[data-f="cat"]')?.value;
+    if (desc && monto > 0) gastos.push({ descripcion:desc, monto, categoria:cat });
+  });
+
+  const body = {
+    fecha         : document.getElementById('c-fecha').value,
+    turno         : document.getElementById('c-turno').value,
+    monto_inicial : parseFloat(document.getElementById('c-monto-inicial').value) || 0,
+    conteo_fisico : parseFloat(conteo),
+    observaciones : document.getElementById('c-obs').value.trim() || null,
+    gastos, cerrar,
+  };
+
+  try {
+    const res  = await api('/caja/cierres', { method:'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast(data.message, 'success', 5000);
+    cargarResumen();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+async function cargarHistorial() {
+  const desde = document.getElementById('h-desde').value;
+  const hasta = document.getElementById('h-hasta').value;
+  const tbody = document.getElementById('tbody-historial');
+  tbody.innerHTML = `<tr><td colspan="9"><div class="vempty"><div class="vspinner"></div></div></td></tr>`;
+  try {
+    const res  = await api(`/caja/cierres?desde=${desde}&hasta=${hasta}`);
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="vempty"><span class="icon">📭</span><p>Sin cierres en el período</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(c => {
+      const dif = parseFloat(c.diferencia||0);
+      const difColor = Math.abs(dif)<0.01 ? '#1d4ed8' : dif>0 ? '#15803d' : '#be123c';
+      const difTxt   = Math.abs(dif)<0.01 ? '✅ Cuadre'
+        : dif>0 ? `+S/. ${dif.toFixed(2)}` : `-S/. ${Math.abs(dif).toFixed(2)}`;
+      return `<tr>
+        <td style="font-weight:600">${fDate(c.fecha)}</td>
+        <td style="font-size:.78rem;text-transform:capitalize">${c.turno.replace('_',' ')}</td>
+        <td style="font-weight:600;color:#15803d">S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</td>
+        <td style="font-weight:600">S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</td>
+        <td style="font-weight:700;color:${difColor}">${difTxt}</td>
+        <td style="color:#be123c">S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</td>
+        <td style="font-size:.78rem">${esc(c.realizado_por)}</td>
+        <td>${c.estado==='cerrado'
+          ? '<span style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">✅ Cerrado</span>'
+          : '<span style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">📝 Borrador</span>'}</td>
+        <td><button class="vlink" onclick="verDetalle(${c.id})" style="font-size:.74rem">Ver</button></td>
+      </tr>`;
+    }).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`;
+  }
+}
+
+async function verDetalle(id) {
+  openModal('modal-cierre');
+  document.getElementById('modal-cierre-body').innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  try {
+    const res = await api(`/caja/cierres/${id}`);
+    if (!res?.ok) return;
+    const c = (await res.json()).data;
+    cierreDetalleActual = c;
+    document.getElementById('modal-cierre-titulo').textContent =
+      `Cierre ${fDate(c.fecha)} — ${c.turno.replace('_',' ')}`;
+    const dif = parseFloat(c.diferencia||0);
+    const difClass = Math.abs(dif)<0.01?'dif-cero':dif>0?'dif-positiva':'dif-negativa';
+    const difLabel = Math.abs(dif)<0.01?'✅ Cuadre perfecto':dif>0?'⬆️ Sobrante':'⬇️ Faltante';
+    document.getElementById('modal-cierre-body').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:.9rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;font-size:.82rem">
+          <div style="background:#f8faf8;border-radius:.75rem;padding:.7rem .9rem">
+            <p style="font-size:.6rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Realizado por</p>
+            <p style="font-weight:600;margin-top:.2rem">${esc(c.realizado_por)}</p>
+          </div>
+          <div style="background:#f8faf8;border-radius:.75rem;padding:.7rem .9rem">
+            <p style="font-size:.6rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Estado</p>
+            <p style="font-weight:600;margin-top:.2rem">${c.estado==='cerrado'?'✅ Cerrado':'📝 Borrador'}</p>
+          </div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:.9rem 1rem">
+          <p style="font-size:.62rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Ingresos del sistema</p>
+          ${[['💵 Efectivo',c.sistema_efectivo,true],['💳 Tarjeta',c.sistema_tarjeta,false],
+             ['📱 Yape',c.sistema_yape,false],['📱 Plin',c.sistema_plin,false],
+             ['🏦 Transferencia',c.sistema_transferencia,false]].map(([l,v,b])=>`
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid #d1fae5">
+              <span ${b?'style="font-weight:700"':''}>${l}</span>
+              <span ${b?'style="font-weight:700;color:#15803d"':''}>S/. ${parseFloat(v||0).toFixed(2)}</span>
+            </div>`).join('')}
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.88rem;padding-top:.5rem;color:#15803d">
+            <span>Total</span><span>S/. ${parseFloat(c.sistema_total||0).toFixed(2)}</span>
+          </div>
+        </div>
+        ${c.gastos?.length?`
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.9rem;padding:.9rem 1rem">
+          <p style="font-size:.62rem;color:#be123c;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Gastos del día</p>
+          ${c.gastos.map(g=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid #fecdd3">
+            <span>${esc(g.descripcion)} <span style="font-size:.65rem;color:var(--ink-faint)">(${g.categoria})</span></span>
+            <span style="font-weight:600;color:#be123c">-S/. ${parseFloat(g.monto).toFixed(2)}</span>
+          </div>`).join('')}
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.85rem;padding-top:.5rem;color:#be123c">
+            <span>Total gastos</span><span>S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span>
+          </div>
+        </div>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+          <div style="background:#f8faf8;border-radius:.9rem;padding:.9rem;text-align:center">
+            <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Monto inicial</p>
+            <p style="font-size:1.1rem;font-weight:800;color:#1d4ed8;margin-top:.3rem">S/. ${parseFloat(c.monto_inicial||0).toFixed(2)}</p>
+          </div>
+          <div style="background:#f8faf8;border-radius:.9rem;padding:.9rem;text-align:center">
+            <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Conteo físico</p>
+            <p style="font-size:1.1rem;font-weight:800;margin-top:.3rem">S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</p>
+          </div>
+        </div>
+        <div class="${difClass}" style="border-radius:.9rem;padding:1rem;text-align:center">
+          <p style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em">${difLabel}</p>
+          <p style="font-size:1.4rem;font-weight:800;margin-top:.3rem">S/. ${Math.abs(dif).toFixed(2)}</p>
+        </div>
+        ${c.observaciones?`<div style="background:#f8faf8;border-radius:.75rem;padding:.75rem 1rem;font-size:.8rem">
+          <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;margin-bottom:.3rem">OBSERVACIONES</p>
+          <p>${esc(c.observaciones)}</p></div>`:''}
+      </div>`;
+  } catch { toast('Error al cargar.','danger'); }
+}
+
+function imprimirDetalle() {
+  if (cierreDetalleActual) imprimirCierre(cierreDetalleActual);
+}
+
+function imprimirComprobante() {
+  if (!resumenActual) { toast('Primero carga el resumen del día.','warning'); return; }
+  const t = resumenActual.totales;
+  const conteo  = parseFloat(document.getElementById('c-conteo').value) || 0;
+  const inicial = parseFloat(document.getElementById('c-monto-inicial').value) || 0;
+  let totalGastos = 0;
+  const gastosArr = [];
+  document.querySelectorAll('#gastos-lista > div').forEach(div => {
+    const desc  = div.querySelector('[data-f="desc"]')?.value.trim();
+    const monto = parseFloat(div.querySelector('[data-f="monto"]')?.value||0);
+    if (desc && monto>0) { gastosArr.push({descripcion:desc,monto}); totalGastos+=monto; }
+  });
+  imprimirCierre({
+    fecha: document.getElementById('c-fecha').value,
+    turno: document.getElementById('c-turno').value,
+    sistema_efectivo: t.efectivo, sistema_tarjeta: t.tarjeta,
+    sistema_yape: t.yape, sistema_plin: t.plin,
+    sistema_transferencia: t.transferencia, sistema_total: t.total,
+    monto_inicial: inicial, conteo_fisico: conteo,
+    diferencia: conteo - (inicial + parseFloat(t.efectivo||0) - totalGastos),
+    total_gastos: totalGastos, gastos: gastosArr,
+    observaciones: document.getElementById('c-obs').value,
+    estado: 'borrador',
+  });
+}
+
+function imprimirCierre(c) {
+  const dif = parseFloat(c.diferencia||0);
+  const difLabel = Math.abs(dif)<0.01 ? 'CUADRE PERFECTO ✅'
+    : dif>0 ? `SOBRANTE: S/. +${dif.toFixed(2)}`
+    : `FALTANTE: S/. -${Math.abs(dif).toFixed(2)}`;
+  const esperado = parseFloat(c.monto_inicial||0)+parseFloat(c.sistema_efectivo||0)-parseFloat(c.total_gastos||0);
+  const v = window.open('','_blank');
+  v.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Cierre ${fDate(c.fecha)}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'Courier New',monospace;padding:1.5rem;max-width:380px;margin:0 auto;font-size:12px}
+      .tit{text-align:center;font-size:16px;font-weight:bold;margin-bottom:.4rem}
+      .sub{text-align:center;font-size:11px;color:#555;border-bottom:2px dashed #333;padding-bottom:.75rem;margin-bottom:.75rem}
+      .row{display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px dotted #ddd}
+      .row.b{font-weight:bold}.row.v{color:#166534}.row.r{color:#be123c}.row.a{color:#1d4ed8}
+      .sec{margin-top:.65rem;padding-top:.5rem;border-top:1px dashed #333}
+      .sec-t{font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem}
+      .dif{text-align:center;border:2px solid #333;padding:.6rem;margin-top:.75rem;border-radius:4px}
+      .dif p{font-size:14px;font-weight:bold}
+      @media print{button{display:none!important}}
+    </style></head><body>
+    <div class="tit">🏦 CIERRE DE CAJA</div>
+    <div class="sub">
+      <p>VetClinic</p>
+      <p>Fecha: ${fDate(c.fecha)} · ${(c.turno||'').replace('_',' ').toUpperCase()}</p>
+      <p>Estado: ${c.estado==='cerrado'?'✅ CERRADO':'📝 BORRADOR'}</p>
+    </div>
+    <div class="sec-t">INGRESOS DEL SISTEMA</div>
+    <div class="row v b"><span>💵 Efectivo</span><span>S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</span></div>
+    <div class="row"><span>💳 Tarjeta</span><span>S/. ${parseFloat(c.sistema_tarjeta||0).toFixed(2)}</span></div>
+    <div class="row"><span>📱 Yape</span><span>S/. ${parseFloat(c.sistema_yape||0).toFixed(2)}</span></div>
+    <div class="row"><span>📱 Plin</span><span>S/. ${parseFloat(c.sistema_plin||0).toFixed(2)}</span></div>
+    <div class="row"><span>🏦 Transferencia</span><span>S/. ${parseFloat(c.sistema_transferencia||0).toFixed(2)}</span></div>
+    <div class="row b v"><span>TOTAL DÍA</span><span>S/. ${parseFloat(c.sistema_total||0).toFixed(2)}</span></div>
+    ${c.gastos?.length?`
+    <div class="sec">
+      <div class="sec-t">GASTOS DEL DÍA</div>
+      ${c.gastos.map(g=>`<div class="row r"><span>${esc(g.descripcion)}</span><span>-S/. ${parseFloat(g.monto).toFixed(2)}</span></div>`).join('')}
+      <div class="row b r"><span>TOTAL GASTOS</span><span>-S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span></div>
+    </div>`:''}
+    <div class="sec">
+      <div class="sec-t">CONTEO DE CAJA</div>
+      <div class="row"><span>Monto inicial</span><span>S/. ${parseFloat(c.monto_inicial||0).toFixed(2)}</span></div>
+      <div class="row"><span>+ Efectivo sistema</span><span>S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</span></div>
+      <div class="row r"><span>− Gastos</span><span>S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span></div>
+      <div class="row b"><span>= Esperado en caja</span><span>S/. ${esperado.toFixed(2)}</span></div>
+      <div class="row b a"><span>Conteo físico</span><span>S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</span></div>
+    </div>
+    <div class="dif"><p>${difLabel}</p></div>
+    ${c.observaciones?`<div class="sec"><div class="sec-t">OBSERVACIONES</div><p style="font-size:11px">${esc(c.observaciones)}</p></div>`:''}
+    <div style="text-align:center;margin-top:1rem;font-size:10px;color:#999;border-top:1px dashed #333;padding-top:.5rem">
+      Generado: ${new Date().toLocaleString('es-PE')}
+    </div><br/>
+    <div style="text-align:center">
+      <button onclick="window.print()"
+        style="background:#166534;color:#fff;border:none;padding:.5rem 1.5rem;
+        border-radius:.4rem;font-weight:700;cursor:pointer;font-size:12px">
+        🖨️ Imprimir
+      </button>
+    </div>
+  </body></html>`);
+  v.document.close();
+  setTimeout(()=>v.print(), 700);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Servicios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>🛎️ Catálogo de Servicios</h2><p>Gestiona los servicios y precios de la clínica</p></div>
+    <button onclick="abrirNuevo()" class="vbtn vbtn-primary" id="btn-nuevo">＋ Nuevo Servicio</button>
+  </div>
+
+  <!-- Stats por categoría -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem" id="stats-cats"></div>
+
+  <!-- Filtros -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+    <div class="search-wrap" style="flex:1;min-width:200px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input id="f-search" type="text" placeholder="Buscar servicio…"
+        class="vinput" oninput="filtrar()"/>
+    </div>
+    <div>
+      <label class="vlabel">Categoría</label>
+      <select id="f-cat" class="vinput" style="width:auto" onchange="filtrar()">
+        <option value="">Todas</option>
+        <option value="consulta">🩺 Consulta</option>
+        <option value="vacunacion">💉 Vacunación</option>
+        <option value="estetica">✂️ Estética</option>
+        <option value="cirugia">🔬 Cirugía</option>
+        <option value="laboratorio">🧪 Laboratorio</option>
+        <option value="medicamento">💊 Medicamento</option>
+        <option value="otro">📎 Otro</option>
+      </select>
+    </div>
+    <div>
+      <label class="vlabel">Estado</label>
+      <select id="f-estado" class="vinput" style="width:auto" onchange="cargar()">
+        <option value="activos">✅ Activos</option>
+        <option value="todos">Todos</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Grid de servicios -->
+  <div id="grid-servicios" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div class="vempty" style="grid-column:1/-1">
+      <div class="vspinner"></div><p>Cargando servicios…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Servicio ════════════════════════════════════════════ -->
+<div id="modal-svc" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:500px">
+    <div class="vmodal-head">
+      <h3 id="svc-titulo">🛎️ Nuevo Servicio</h3>
+      <button onclick="closeModal('modal-svc')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="svc-id"/>
+      <div>
+        <label class="vlabel">Nombre del servicio *</label>
+        <input id="svc-nombre" type="text" class="vinput" placeholder="Consulta general, Baño básico…"/>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Categoría *</label>
+          <select id="svc-cat" class="vinput">
+            <option value="consulta">🩺 Consulta</option>
+            <option value="vacunacion">💉 Vacunación</option>
+            <option value="estetica">✂️ Estética</option>
+            <option value="cirugia">🔬 Cirugía</option>
+            <option value="laboratorio">🧪 Laboratorio</option>
+            <option value="medicamento">💊 Medicamento</option>
+            <option value="otro">📎 Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Precio (S/.) *</label>
+          <input id="svc-precio" type="number" min="0" step="0.50" class="vinput" placeholder="0.00"/>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel">Descripción (opcional)</label>
+        <textarea id="svc-desc" rows="2" class="vinput"
+          placeholder="Descripción breve del servicio…"></textarea>
+      </div>
+      <div id="svc-activo-wrap" style="display:none">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600">
+          <input type="checkbox" id="svc-activo" checked style="accent-color:var(--green-600);width:16px;height:16px"/>
+          Servicio activo (visible en facturación)
+        </label>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-svc')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarServicio()" class="vbtn vbtn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let todosLosServicios = [];
+let esAdmin = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const user = initPage({ activePage:'servicios', title:'Servicios', subtitle:'Catálogo de precios' });
+  esAdmin = user?.rol === 'admin';
+
+  // Recepcionista solo puede ver — ocultar botón crear
+  if (!esAdmin) {
+    document.getElementById('btn-nuevo').style.display = 'none';
+  }
+
+  cargar();
+});
+
+const catConfig = {
+  consulta    : { icon:'🩺', label:'Consulta',     color:'#15803d', bg:'#f0fdf4', border:'#bbf7d0' },
+  vacunacion  : { icon:'💉', label:'Vacunación',   color:'#6d28d9', bg:'#f5f3ff', border:'#ddd6fe' },
+  estetica    : { icon:'✂️', label:'Estética',     color:'#db2777', bg:'#fdf2f8', border:'#fbcfe8' },
+  cirugia     : { icon:'🔬', label:'Cirugía',      color:'#be123c', bg:'#fff1f2', border:'#fecdd3' },
+  laboratorio : { icon:'🧪', label:'Laboratorio',  color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+  medicamento : { icon:'💊', label:'Medicamento',  color:'#0369a1', bg:'#f0f9ff', border:'#bae6fd' },
+  otro        : { icon:'📎', label:'Otro',         color:'#4b5f57', bg:'#f8faf8', border:'#e8ede9' },
+};
+
+async function cargar() {
+  const todos = document.getElementById('f-estado').value === 'todos';
+  const grid  = document.getElementById('grid-servicios');
+  grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+    <div class="vspinner"></div><p>Cargando…</p></div>`;
+
+  try {
+    const res = await api(`/servicios${todos ? '?todos=1' : ''}`);
+    if (!res) return;
+    todosLosServicios = (await res.json()).data || [];
+    renderStats();
+    filtrar();
+  } catch {
+    grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+      <span class="icon">😿</span>
+      <p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p>
+    </div>`;
+  }
+}
+
+function renderStats() {
+  const counts = {};
+  todosLosServicios.filter(s=>s.activo).forEach(s => {
+    counts[s.categoria] = (counts[s.categoria]||0) + 1;
+  });
+  const cats = Object.keys(catConfig);
+  document.getElementById('stats-cats').innerHTML = cats.slice(0,4).map(c => {
+    const cfg = catConfig[c];
+    return `<div class="vcard vcard-pad" style="text-align:center">
+      <p style="font-size:1.5rem">${cfg.icon}</p>
+      <p style="font-size:1.4rem;font-weight:800;color:${cfg.color};margin:.2rem 0">${counts[c]||0}</p>
+      <p style="font-size:.68rem;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.08em">${cfg.label}</p>
+    </div>`;
+  }).join('');
+}
+
+function filtrar() {
+  const search = document.getElementById('f-search').value.toLowerCase();
+  const cat    = document.getElementById('f-cat').value;
+  const grid   = document.getElementById('grid-servicios');
+
+  let items = todosLosServicios;
+  if (cat)    items = items.filter(s => s.categoria === cat);
+  if (search) items = items.filter(s =>
+    s.nombre.toLowerCase().includes(search) ||
+    (s.descripcion||'').toLowerCase().includes(search)
+  );
+
+  if (!items.length) {
+    grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
+      <span class="icon">🔍</span><p>Sin servicios con esos filtros</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(s => {
+    const cfg = catConfig[s.categoria] || catConfig.otro;
+    return `<div class="vcard" style="padding:1.2rem;position:relative;transition:all .2s;
+      ${!s.activo ? 'opacity:.55;' : ''}">
+      ${!s.activo ? `<span style="position:absolute;top:.75rem;right:.75rem;
+        font-size:.6rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;
+        background:#fff1f2;color:#be123c;border:1px solid #fecdd3">Inactivo</span>` : ''}
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem">
+        <div style="width:42px;height:42px;border-radius:.75rem;flex-shrink:0;
+          background:${cfg.bg};border:1.5px solid ${cfg.border};
+          display:flex;align-items:center;justify-content:center;font-size:1.3rem">
+          ${cfg.icon}
+        </div>
+        <div style="flex:1;min-width:0">
+          <p style="font-weight:700;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${esc(s.nombre)}
+          </p>
+          <span style="font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;
+            background:${cfg.bg};color:${cfg.color};border:1px solid ${cfg.border}">
+            ${cfg.label}
+          </span>
+        </div>
+      </div>
+      ${s.descripcion ? `<p style="font-size:.74rem;color:var(--ink-soft);margin-bottom:.75rem;
+        line-height:1.5;min-height:36px">${esc(s.descripcion)}</p>` :
+        `<div style="min-height:36px;margin-bottom:.75rem"></div>`}
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding-top:.75rem;border-top:1px solid var(--line)">
+        <p style="font-size:1.15rem;font-weight:800;color:${cfg.color}">
+          S/. ${parseFloat(s.precio).toFixed(2)}
+        </p>
+        ${esAdmin ? `<div style="display:flex;gap:.4rem">
+          <button class="vlink" onclick="abrirEditar(${s.id})"
+            style="font-size:.74rem;color:var(--sky)">✏️ Editar</button>
+          <span style="color:var(--line)">·</span>
+          <button class="vlink" onclick="toggleServicio(${s.id},'${esc(s.nombre)}',${s.activo})"
+            style="font-size:.74rem;color:${s.activo?'#e11d48':'#15803d'}">
+            ${s.activo ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function abrirNuevo() {
+  document.getElementById('svc-titulo').textContent = '🛎️ Nuevo Servicio';
+  document.getElementById('svc-id').value     = '';
+  document.getElementById('svc-nombre').value = '';
+  document.getElementById('svc-cat').value    = 'consulta';
+  document.getElementById('svc-precio').value = '';
+  document.getElementById('svc-desc').value   = '';
+  document.getElementById('svc-activo-wrap').style.display = 'none';
+  openModal('modal-svc');
+}
+
+async function abrirEditar(id) {
+  document.getElementById('svc-titulo').textContent = '✏️ Editar Servicio';
+  document.getElementById('svc-id').value = id;
+  document.getElementById('svc-activo-wrap').style.display = 'block';
+  openModal('modal-svc');
+
+  const svc = todosLosServicios.find(s => s.id === id);
+  if (svc) {
+    document.getElementById('svc-nombre').value   = svc.nombre      || '';
+    document.getElementById('svc-cat').value      = svc.categoria   || 'consulta';
+    document.getElementById('svc-precio').value   = svc.precio      || '';
+    document.getElementById('svc-desc').value     = svc.descripcion || '';
+    document.getElementById('svc-activo').checked = !!svc.activo;
+  }
+}
+
+async function guardarServicio() {
+  const id     = document.getElementById('svc-id').value;
+  const nombre = document.getElementById('svc-nombre').value.trim();
+  const precio = parseFloat(document.getElementById('svc-precio').value);
+
+  if (!nombre)    { toast('El nombre es obligatorio.','warning'); return; }
+  if (isNaN(precio) || precio < 0) { toast('Ingresa un precio válido.','warning'); return; }
+
+  const body = {
+    nombre,
+    categoria  : document.getElementById('svc-cat').value,
+    precio,
+    descripcion: document.getElementById('svc-desc').value.trim() || null,
+    activo     : id ? document.getElementById('svc-activo').checked : true,
+  };
+
+  const url    = id ? `/servicios/${id}` : '/servicios';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const res  = await api(url, { method, body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast(id ? '✅ Servicio actualizado.' : '✅ Servicio creado.', 'success');
+    closeModal('modal-svc');
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+async function toggleServicio(id, nombre, activo) {
+  const ok = await vconfirm({
+    titulo     : `¿${activo ? 'Desactivar' : 'Activar'} servicio?`,
+    mensaje    : `El servicio <strong>${nombre}</strong> ${activo ? 'dejará de aparecer en facturación' : 'volverá a estar disponible en facturación'}.`,
+    labelOk    : activo ? 'Desactivar' : 'Activar',
+    labelCancel: 'Cancelar',
+    tipo       : activo ? 'warning' : 'success',
+  });
+  if (!ok) return;
+  try {
+    const res  = await api(`/servicios/${id}`, {
+      method: 'PUT',
+      body  : { activo: !activo, nombre, categoria: '', precio: 0 }
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast(`✅ Servicio ${activo?'desactivado':'activado'}.`, 'success');
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+</script>
+</body>
+</html>

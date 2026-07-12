@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Inventario</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- SheetJS para template Excel y carga masiva -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>📦 Inventario</h2><p>Medicamentos, vacunas e insumos con alertas en tiempo real</p></div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button onclick="descargarTemplate()" class="vbtn vbtn-ghost">📥 Template Excel</button>
+      <button onclick="document.getElementById('input-excel').click()" class="vbtn vbtn-ghost">📤 Carga masiva</button>
+      <input type="file" id="input-excel" accept=".xlsx,.xls" style="display:none" onchange="procesarExcel(this)"/>
+      <button onclick="abrirNuevo()" class="vbtn vbtn-primary">＋ Nuevo Ítem</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem" id="stats-inv"></div>
+
+  <!-- Filtros -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+    <div>
+      <label class="vlabel">Categoría</label>
+      <select id="f-cat" class="vinput" style="width:auto" onchange="cargar()">
+        <option value="">Todas</option>
+        <option value="medicamento">💊 Medicamento</option>
+        <option value="vacuna">💉 Vacuna</option>
+        <option value="insumo">📦 Insumo</option>
+        <option value="otro">📎 Otro</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;padding-top:1.4rem">
+      <input type="checkbox" id="f-bajo" onchange="cargar()"
+        style="accent-color:var(--green-600);width:16px;height:16px"/>
+      <label for="f-bajo" style="font-size:.84rem;font-weight:600;cursor:pointer">Solo stock bajo</label>
+    </div>
+    <div class="search-wrap" style="flex:1;min-width:200px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input id="f-search" type="text" class="vinput" placeholder="Buscar producto…" oninput="filtrar()"/>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="vcard">
+    <div style="overflow-x:auto">
+      <table class="vtable">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Stock actual</th>
+            <th>Mínimo</th>
+            <th>Precio unit.</th>
+            <th>Proveedor</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-inv">
+          <tr><td colspan="8"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Modal Nuevo / Editar Ítem ════════════════════════════════ -->
+<div id="modal-item" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:540px">
+    <div class="vmodal-head">
+      <h3 id="item-titulo">📦 Nuevo Ítem</h3>
+      <button onclick="closeModal('modal-item')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <input type="hidden" id="i-id"/>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2">
+          <label class="vlabel">Nombre *</label>
+          <input id="i-nombre" type="text" class="vinput" placeholder="Amoxicilina 250mg…"/>
+        </div>
+        <div>
+          <label class="vlabel">Categoría</label>
+          <select id="i-cat" class="vinput">
+            <option value="medicamento">💊 Medicamento</option>
+            <option value="vacuna">💉 Vacuna</option>
+            <option value="insumo">📦 Insumo</option>
+            <option value="otro">📎 Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Unidad</label>
+          <input id="i-unidad" type="text" class="vinput" placeholder="caja, dosis, unidad…"/>
+        </div>
+        <div>
+          <label class="vlabel">Cantidad</label>
+          <input id="i-cant" type="number" min="0" step="0.5" value="0" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Stock mínimo</label>
+          <input id="i-min" type="number" min="0" step="0.5" value="5" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Precio unitario (S/.)</label>
+          <input id="i-precio" type="number" step="0.01" min="0" class="vinput" placeholder="0.00"/>
+        </div>
+        <div>
+          <label class="vlabel">Proveedor</label>
+          <input id="i-proveedor" type="text" class="vinput" placeholder="Nombre del proveedor…"/>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="vlabel">Fecha de vencimiento</label>
+          <input id="i-venc" type="date" class="vinput" style="width:auto"/>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-item')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarItem()" class="vbtn vbtn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Actualizar Stock ════════════════════════════════════ -->
+<div id="modal-stock" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:420px">
+    <div class="vmodal-head">
+      <h3 id="stock-titulo">🔄 Actualizar Stock</h3>
+      <button onclick="closeModal('modal-stock')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="stock-id"/>
+
+      <!-- Info producto -->
+      <div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.85rem;padding:.85rem 1rem">
+        <p style="font-weight:700;font-size:.9rem" id="stock-nombre">—</p>
+        <div style="display:flex;gap:2rem;margin-top:.5rem;font-size:.8rem">
+          <span>Stock actual: <strong id="stock-actual">—</strong></span>
+          <span>Mínimo: <strong id="stock-minimo-txt">—</strong></span>
+        </div>
+      </div>
+
+      <!-- Tipo de operación -->
+      <div>
+        <label class="vlabel">Tipo de movimiento</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
+          <label style="display:flex;align-items:center;gap:.4rem;padding:.65rem .75rem;
+            border-radius:.75rem;border:1.5px solid var(--line);cursor:pointer;font-size:.82rem;font-weight:600"
+            id="lbl-establecer">
+            <input type="radio" name="stock-tipo" value="establecer" checked
+              onchange="actualizarLabelStock()"
+              style="accent-color:var(--green-600)"/> Establecer
+          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;padding:.65rem .75rem;
+            border-radius:.75rem;border:1.5px solid var(--line);cursor:pointer;font-size:.82rem;font-weight:600"
+            id="lbl-agregar">
+            <input type="radio" name="stock-tipo" value="agregar"
+              onchange="actualizarLabelStock()"
+              style="accent-color:var(--green-600)"/> ＋ Agregar
+          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;padding:.65rem .75rem;
+            border-radius:.75rem;border:1.5px solid var(--line);cursor:pointer;font-size:.82rem;font-weight:600"
+            id="lbl-restar">
+            <input type="radio" name="stock-tipo" value="restar"
+              onchange="actualizarLabelStock()"
+              style="accent-color:var(--green-600)"/> − Restar
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="vlabel" id="stock-cant-label">Nueva cantidad total</label>
+        <input id="stock-cant" type="number" min="0" step="0.5" class="vinput"
+          style="font-size:1.1rem;font-weight:700" placeholder="0"/>
+        <p style="font-size:.72rem;color:var(--ink-faint);margin-top:.3rem" id="stock-preview">
+          El stock quedará en: —
+        </p>
+      </div>
+
+      <p style="font-size:.75rem;color:var(--ink-soft)">
+        Si el stock resultante queda por debajo del mínimo, se emitirá una alerta en tiempo real a todos los usuarios conectados.
+      </p>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-stock')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="actualizarStock()" class="vbtn vbtn-primary">✅ Actualizar stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Carga Masiva ════════════════════════════════════════ -->
+<div id="modal-masiva" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:560px">
+    <div class="vmodal-head">
+      <h3>📤 Resultado de carga masiva</h3>
+      <button onclick="closeModal('modal-masiva')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="masiva-body"></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-masiva')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="confirmarCargaMasiva()" class="vbtn vbtn-primary" id="btn-confirmar-masiva">
+        ✅ Confirmar e importar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let itemsActuales  = [];
+let stockItemActual = null;
+let itemsMasiva    = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'inventario', title:'Inventario', subtitle:'Control de stock' });
+  cargar();
+
+  const socket = getSocket();
+
+  // Actualizar en tiempo real cuando cambia el stock por facturación
+  socket.on('inventario:actualizado', (data) => {
+    const idx = itemsActuales.findIndex(i => i.id === data.id);
+    if (idx > -1) {
+      itemsActuales[idx].cantidad = data.cantidad;
+      renderStats(itemsActuales);
+      filtrar();
+      toast(`📦 ${data.nombre}: stock → ${parseFloat(data.cantidad).toFixed(2)} ${data.unidad||''}`, 'info', 4000);
+    } else {
+      cargar();
+    }
+  });
+
+  socket.on('notif:stock_minimo', () => cargar());
+});
+
+// ── Cargar inventario ─────────────────────────────────────────────
+async function cargar() {
+  const cat   = document.getElementById('f-cat').value;
+  const bajo  = document.getElementById('f-bajo').checked;
+  const tbody = document.getElementById('tbody-inv');
+
+  let url = '/inventario?';
+  if (cat)  url += `categoria=${cat}&`;
+  if (bajo) url += `bajo=1`;
+
+  tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><div class="vspinner"></div></div></td></tr>`;
+
+  try {
+    const res = await api(url);
+    if (!res?.ok) return;
+    itemsActuales = (await res.json()).data || [];
+    renderStats(itemsActuales);
+    filtrar();
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><span class="icon">😿</span>
+      <p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p></div></td></tr>`;
+  }
+}
+
+function renderStats(items) {
+  const total  = items.length;
+  const bajo   = items.filter(i => parseFloat(i.cantidad) <= parseFloat(i.stock_minimo)).length;
+  const meds   = items.filter(i => i.categoria === 'medicamento').length;
+  const vacs   = items.filter(i => i.categoria === 'vacuna').length;
+
+  document.getElementById('stats-inv').innerHTML = `
+    ${stat('📦', total,  'TOTAL ÍTEMS',   '#15803d', '#f0fdf4', '#bbf7d0')}
+    ${stat('⚠️', bajo,   'STOCK BAJO',    '#b45309', '#fffbeb', '#fde68a')}
+    ${stat('💊', meds,   'MEDICAMENTOS',  '#1d4ed8', '#eff6ff', '#bfdbfe')}
+    ${stat('💉', vacs,   'VACUNAS',       '#6d28d9', '#f5f3ff', '#ddd6fe')}`;
+}
+
+function stat(icon, val, label, color, bg, border) {
+  return `<div class="vcard vcard-pad" style="border-top:3px solid ${color}">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:.75rem;background:${bg};border:1px solid ${border};
+        display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${icon}</div>
+      <div>
+        <p style="font-size:1.5rem;font-weight:800;color:${color};line-height:1">${val}</p>
+        <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;
+          letter-spacing:.1em;margin-top:.2rem">${label}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Filtrar por búsqueda ──────────────────────────────────────────
+function filtrar() {
+  const q     = document.getElementById('f-search').value.toLowerCase();
+  const tbody = document.getElementById('tbody-inv');
+  let items   = itemsActuales;
+  if (q) items = items.filter(i => i.nombre.toLowerCase().includes(q) || (i.proveedor||'').toLowerCase().includes(q));
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><span class="icon">🔍</span><p>Sin resultados</p></div></td></tr>`;
+    return;
+  }
+
+  const catConfig = {
+    medicamento : { icon:'💊', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+    vacuna      : { icon:'💉', color:'#6d28d9', bg:'#f5f3ff', border:'#ddd6fe' },
+    insumo      : { icon:'📦', color:'#b45309', bg:'#fffbeb', border:'#fde68a' },
+    otro        : { icon:'📎', color:'#4b5f57', bg:'#f8faf8', border:'#e8ede9' },
+  };
+
+  tbody.innerHTML = items.map(i => {
+    const cant    = parseFloat(i.cantidad || 0);
+    const minimo  = parseFloat(i.stock_minimo || 0);
+    // ✅ Lógica correcta: bajo stock SOLO si cantidad < mínimo
+    const esBajo  = cant < minimo;
+    const pct     = minimo > 0 ? Math.min(100, Math.round((cant / minimo) * 100)) : 100;
+    const barColor= esBajo ? '#e11d48' : pct < 150 ? '#f59e0b' : '#10b981';
+    const cc      = catConfig[i.categoria] || catConfig.otro;
+
+    return `<tr>
+      <td>
+        <p style="font-weight:700;font-size:.9rem">${esc(i.nombre)}</p>
+        ${i.fecha_vencimiento ? `<p style="font-size:.68rem;color:${new Date(i.fecha_vencimiento)<new Date()?'#e11d48':'var(--ink-faint)'}">
+          Vence: ${fDate(i.fecha_vencimiento)}</p>` : ''}
+      </td>
+      <td>
+        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;
+          background:${cc.bg};color:${cc.color};border:1px solid ${cc.border}">
+          ${cc.icon} ${esc(i.categoria)}
+        </span>
+      </td>
+      <td>
+        <p style="font-weight:800;font-size:1rem;color:${esBajo?'#e11d48':'inherit'}">
+          ${cant.toFixed(2)} <span style="font-size:.68rem;font-weight:400;color:var(--ink-faint)">${esc(i.unidad||'')}</span>
+        </p>
+        <div style="background:#e8ede9;border-radius:999px;height:5px;width:80px;margin-top:.3rem;overflow:hidden">
+          <div style="height:100%;border-radius:999px;background:${barColor};width:${pct}%;transition:width .5s"></div>
+        </div>
+      </td>
+      <td style="color:var(--ink-soft);font-size:.85rem">${minimo.toFixed(2)} ${esc(i.unidad||'')}</td>
+      <td style="font-size:.85rem">${i.precio_unitario ? `S/. ${parseFloat(i.precio_unitario).toFixed(2)}` : '—'}</td>
+      <td style="font-size:.82rem;color:var(--ink-soft)">${esc(i.proveedor||'—')}</td>
+      <td>
+        ${esBajo
+          ? '<span style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">⚠️ Bajo stock</span>'
+          : '<span style="background:#f0fdf4;color:#15803d;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ OK</span>'}
+      </td>
+      <td>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="vlink" onclick="abrirEditar(${i.id})"
+            style="font-size:.74rem;color:var(--sky)">✏️ Editar</button>
+          <span style="color:var(--line)">·</span>
+          <button class="vlink" onclick="abrirStock(${i.id},'${esc(i.nombre)}',${cant},${minimo},'${esc(i.unidad||'')}')"
+            style="font-size:.74rem;color:var(--green-600)">🔄 Stock</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Nuevo ítem ────────────────────────────────────────────────────
+function abrirNuevo() {
+  document.getElementById('item-titulo').textContent = '📦 Nuevo Ítem';
+  document.getElementById('i-id').value       = '';
+  document.getElementById('i-nombre').value   = '';
+  document.getElementById('i-cat').value      = 'medicamento';
+  document.getElementById('i-unidad').value   = '';
+  document.getElementById('i-cant').value     = '0';
+  document.getElementById('i-min').value      = '5';
+  document.getElementById('i-precio').value   = '';
+  document.getElementById('i-proveedor').value= '';
+  document.getElementById('i-venc').value     = '';
+  openModal('modal-item');
+}
+
+// ── Editar ítem ───────────────────────────────────────────────────
+async function abrirEditar(id) {
+  document.getElementById('item-titulo').textContent = '✏️ Editar Ítem';
+  document.getElementById('i-id').value = id;
+  openModal('modal-item');
+
+  const item = itemsActuales.find(i => i.id === id);
+  if (item) {
+    document.getElementById('i-nombre').value    = item.nombre || '';
+    document.getElementById('i-cat').value       = item.categoria || 'medicamento';
+    document.getElementById('i-unidad').value    = item.unidad || '';
+    document.getElementById('i-cant').value      = item.cantidad || 0;
+    document.getElementById('i-min').value       = item.stock_minimo || 5;
+    document.getElementById('i-precio').value    = item.precio_unitario || '';
+    document.getElementById('i-proveedor').value = item.proveedor || '';
+    document.getElementById('i-venc').value      = item.fecha_vencimiento?.split('T')[0] || '';
+  }
+}
+
+// ── Guardar ítem (crear o editar) ─────────────────────────────────
+async function guardarItem() {
+  const id     = document.getElementById('i-id').value;
+  const nombre = document.getElementById('i-nombre').value.trim();
+  if (!nombre) { toast('El nombre es obligatorio.','warning'); return; }
+
+  const body = {
+    nombre,
+    categoria       : document.getElementById('i-cat').value,
+    cantidad        : parseFloat(document.getElementById('i-cant').value) || 0,
+    unidad          : document.getElementById('i-unidad').value.trim() || 'unidad',
+    stock_minimo    : parseFloat(document.getElementById('i-min').value) || 5,
+    precio_unitario : parseFloat(document.getElementById('i-precio').value) || null,
+    proveedor       : document.getElementById('i-proveedor').value.trim() || null,
+    fecha_vencimiento: document.getElementById('i-venc').value || null,
+  };
+
+  const url    = id ? `/inventario/${id}` : '/inventario';
+  const method = id ? 'PUT' : 'POST';
+
+  try {
+    const res  = await api(url, { method, body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast(id ? '✅ Ítem actualizado.' : '✅ Ítem creado.', 'success');
+    closeModal('modal-item');
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Actualizar stock ──────────────────────────────────────────────
+function abrirStock(id, nombre, cantidad, minimo, unidad) {
+  stockItemActual = { id, cantidad, minimo, unidad };
+  document.getElementById('stock-id').value         = id;
+  document.getElementById('stock-titulo').textContent= `🔄 ${nombre}`;
+  document.getElementById('stock-nombre').textContent= nombre;
+  document.getElementById('stock-actual').textContent= `${cantidad} ${unidad}`;
+  document.getElementById('stock-minimo-txt').textContent = `${minimo} ${unidad}`;
+  document.getElementById('stock-cant').value        = '';
+  document.getElementById('stock-preview').textContent = 'El stock quedará en: —';
+  // Reset radio
+  document.querySelector('input[name="stock-tipo"][value="establecer"]').checked = true;
+  actualizarLabelStock();
+  openModal('modal-stock');
+}
+
+function actualizarLabelStock() {
+  const tipo = document.querySelector('input[name="stock-tipo"]:checked')?.value || 'establecer';
+  const labels = {
+    establecer : 'Nueva cantidad total',
+    agregar    : 'Cantidad a agregar',
+    restar     : 'Cantidad a restar',
+  };
+  document.getElementById('stock-cant-label').textContent = labels[tipo];
+  calcularPreviewStock();
+}
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'stock-cant') calcularPreviewStock();
+});
+
+function calcularPreviewStock() {
+  if (!stockItemActual) return;
+  const tipo  = document.querySelector('input[name="stock-tipo"]:checked')?.value || 'establecer';
+  const valor = parseFloat(document.getElementById('stock-cant').value) || 0;
+  const actual = stockItemActual.cantidad;
+  const minimo = stockItemActual.minimo;
+  const unidad = stockItemActual.unidad;
+
+  let resultado;
+  if (tipo === 'establecer') resultado = valor;
+  else if (tipo === 'agregar') resultado = actual + valor;
+  else resultado = Math.max(0, actual - valor);
+
+  const esBajo = resultado < minimo;
+  document.getElementById('stock-preview').innerHTML =
+    `El stock quedará en: <strong style="color:${esBajo?'#e11d48':'#15803d'}">${resultado.toFixed(2)} ${unidad}</strong>
+    ${esBajo ? ' ⚠️ <span style="color:#e11d48;font-size:.7rem">Bajo el mínimo</span>' : ''}`;
+}
+
+async function actualizarStock() {
+  const id    = document.getElementById('stock-id').value;
+  const tipo  = document.querySelector('input[name="stock-tipo"]:checked')?.value || 'establecer';
+  const valor = parseFloat(document.getElementById('stock-cant').value);
+
+  if (isNaN(valor) || valor < 0) { toast('Ingresa una cantidad válida.','warning'); return; }
+
+  const actual = stockItemActual?.cantidad || 0;
+  let cantidad;
+  if (tipo === 'establecer') cantidad = valor;
+  else if (tipo === 'agregar') cantidad = actual + valor;
+  else cantidad = Math.max(0, actual - valor);
+
+  try {
+    const res  = await api(`/inventario/${id}`, { method:'PATCH', body:{ cantidad } });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Stock actualizado.', 'success');
+    closeModal('modal-stock');
+    cargar();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Template Excel descargable ────────────────────────────────────
+function descargarTemplate() {
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ['nombre','categoria','cantidad','unidad','stock_minimo','precio_unitario','proveedor','fecha_vencimiento'],
+    ['Amoxicilina 250mg','medicamento',100,'caja',20,15.50,'FarmaVet','2027-06-01'],
+    ['Vacuna Antirrábica','vacuna',50,'dosis',10,35.00,'BioVet','2026-12-01'],
+    ['Jeringas 5ml','insumo',200,'unidad',50,0.80,'MedSupply',''],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Estilo encabezados
+  ws['!cols'] = [
+    {wch:25},{wch:15},{wch:12},{wch:12},{wch:15},{wch:18},{wch:20},{wch:20}
+  ];
+
+  // Congelar primera fila
+  ws['!freeze'] = { xSplit:0, ySplit:1 };
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+
+  // Hoja de instrucciones
+  const instrWs = XLSX.utils.aoa_to_sheet([
+    ['📦 INSTRUCCIONES DE CARGA MASIVA — VetClinic'],
+    [''],
+    ['COLUMNAS REQUERIDAS:'],
+    ['nombre','Nombre del producto (obligatorio)'],
+    ['categoria','medicamento | vacuna | insumo | otro'],
+    ['cantidad','Cantidad inicial en stock (número)'],
+    ['unidad','caja, dosis, unidad, frasco, etc.'],
+    ['stock_minimo','Cantidad mínima antes de alerta'],
+    ['precio_unitario','Precio en S/. (opcional)'],
+    ['proveedor','Nombre del proveedor (opcional)'],
+    ['fecha_vencimiento','Formato: YYYY-MM-DD (opcional)'],
+    [''],
+    ['⚠️ No elimines la fila de encabezados'],
+    ['⚠️ La primera fila con los nombres de columna es obligatoria'],
+    ['✅ Puedes agregar hasta 500 productos por carga'],
+  ]);
+  instrWs['!cols'] = [{wch:25},{wch:50}];
+  XLSX.utils.book_append_sheet(wb, instrWs, 'Instrucciones');
+
+  XLSX.writeFile(wb, 'VetClinic_Template_Inventario.xlsx');
+  toast('📥 Template descargado', 'success');
+}
+
+// ── Procesar Excel cargado ────────────────────────────────────────
+function procesarExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type:'binary' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+
+      if (!rows.length) { toast('El archivo está vacío.','warning'); return; }
+
+      // Validar y limpiar
+      const validos = [], errores = [];
+      const catValidas = ['medicamento','vacuna','insumo','otro'];
+
+      rows.forEach((row, idx) => {
+        const n = String(row.nombre||'').trim();
+        if (!n) { errores.push(`Fila ${idx+2}: nombre vacío`); return; }
+
+        const cat = String(row.categoria||'otro').toLowerCase().trim();
+        if (!catValidas.includes(cat)) {
+          errores.push(`Fila ${idx+2}: categoría "${cat}" inválida`);
+        }
+
+        validos.push({
+          nombre           : n,
+          categoria        : catValidas.includes(cat) ? cat : 'otro',
+          cantidad         : parseFloat(row.cantidad) || 0,
+          unidad           : String(row.unidad||'unidad').trim(),
+          stock_minimo     : parseFloat(row.stock_minimo) || 5,
+          precio_unitario  : parseFloat(row.precio_unitario) || null,
+          proveedor        : String(row.proveedor||'').trim() || null,
+          fecha_vencimiento: String(row.fecha_vencimiento||'').trim() || null,
+        });
+      });
+
+      itemsMasiva = validos;
+      mostrarPreviewMasiva(validos, errores);
+    } catch(e) {
+      toast('Error al leer el archivo. Usa el template descargado.','danger');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function mostrarPreviewMasiva(validos, errores) {
+  const body = document.getElementById('masiva-body');
+  body.innerHTML = `
+    <div style="display:flex;gap:1rem;margin-bottom:1rem">
+      <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem;text-align:center">
+        <p style="font-size:1.3rem;font-weight:800;color:#15803d">${validos.length}</p>
+        <p style="font-size:.72rem;color:#15803d;font-weight:700">Productos válidos</p>
+      </div>
+      ${errores.length ? `
+      <div style="flex:1;background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.85rem;text-align:center">
+        <p style="font-size:1.3rem;font-weight:800;color:#be123c">${errores.length}</p>
+        <p style="font-size:.72rem;color:#be123c;font-weight:700">Con errores (omitidos)</p>
+      </div>` : ''}
+    </div>
+    ${errores.length ? `
+    <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem;padding:.75rem;margin-bottom:1rem;font-size:.75rem;color:#be123c">
+      ${errores.slice(0,5).map(e=>`<p>⚠️ ${e}</p>`).join('')}
+      ${errores.length>5?`<p>...y ${errores.length-5} más</p>`:''}
+    </div>` : ''}
+    <div style="max-height:280px;overflow-y:auto">
+      <table class="vtable">
+        <thead><tr><th>Nombre</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Precio</th></tr></thead>
+        <tbody>
+          ${validos.slice(0,50).map(v=>`<tr>
+            <td style="font-weight:600;font-size:.8rem">${esc(v.nombre)}</td>
+            <td style="font-size:.75rem">${v.categoria}</td>
+            <td style="font-size:.8rem">${v.cantidad}</td>
+            <td style="font-size:.75rem">${esc(v.unidad)}</td>
+            <td style="font-size:.8rem">${v.precio_unitario?`S/. ${v.precio_unitario.toFixed(2)}`:'—'}</td>
+          </tr>`).join('')}
+          ${validos.length>50?`<tr><td colspan="5" style="text-align:center;color:var(--ink-faint);font-size:.75rem">...y ${validos.length-50} más</td></tr>`:''}
+        </tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('btn-confirmar-masiva').style.display = validos.length ? 'inline-flex' : 'none';
+  openModal('modal-masiva');
+}
+
+async function confirmarCargaMasiva() {
+  if (!itemsMasiva.length) return;
+
+  const btn = document.getElementById('btn-confirmar-masiva');
+  btn.disabled = true;
+  btn.textContent = 'Importando…';
+
+  let exitosos = 0, fallidos = 0;
+
+  for (const item of itemsMasiva) {
+    try {
+      const res = await api('/inventario', { method:'POST', body:item });
+      if (res?.ok) exitosos++;
+      else fallidos++;
+    } catch { fallidos++; }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Confirmar e importar';
+
+  toast(`✅ ${exitosos} productos importados${fallidos?` · ${fallidos} fallidos`:''}`, 'success', 6000);
+  closeModal('modal-masiva');
+  itemsMasiva = [];
+  cargar();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+2026-07-04 20:05:42 [error]: Error: Cannot find module '../controllers/auth.controller'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js:6:20)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:06:21 [error]: Error: Cannot find module '../controllers/auth.controller'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js:6:20)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:09:06 [error]: Error: Cannot find module '../controllers/auth.controller'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js:6:20)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:09:10 [error]: Error: Cannot find module '../controllers/auth.controller'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\routes\auth.routes.js:6:20)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:10:52 [error]: Error: Cannot find module './routes/notificaciones.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:24:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:13:11 [error]: Error: Cannot find module './routes/notificaciones.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:24:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-04 20:13:57 [error]: Error: Cannot find module './routes/notificaciones.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:24:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-05 16:24:07 [error]: TypeError: Router.use() requires a middleware function but got a Object
+    at router.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:469:13)
+    at app.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:227:21)
+    at Array.forEach (<anonymous>)
+    at app.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:224:7)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:83:5)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+2026-07-05 16:24:13 [error]: TypeError: Router.use() requires a middleware function but got a Object
+    at router.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:469:13)
+    at app.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:227:21)
+    at Array.forEach (<anonymous>)
+    at app.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:224:7)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:83:5)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+2026-07-05 16:25:41 [error]: TypeError: Router.use() requires a middleware function but got a Object
+    at router.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:469:13)
+    at app.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:227:21)
+    at Array.forEach (<anonymous>)
+    at app.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:224:7)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:87:5)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+2026-07-06 00:21:19 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:22:59 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:24:11 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:24:25 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:25:04 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:26:00 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:26:06 [error]: node:internal/modules/cjs/loader:1503
+  throw err;
+  ^
+
+Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\[eval]
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-06 00:28:05 [error]: Error: Cannot find module './config/logger'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\sockets\index.js:13:28)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-08 21:14:23 [error]: Error: Cannot find module './routes/consentimientos.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:37:30)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-08 21:14:54 [error]: Error: Cannot find module './routes/consentimientos.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:37:30)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-08 21:18:08 [error]: Error: Cannot find module './routes/consentimientos.routes'
+Require stack:
+- E:\PRACTICANDO\app_veterinaria\backend\src\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1500:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1116:12)
+    at Module._load (node:internal/modules/cjs/loader:1285:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:37:30)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-10 21:32:07 [error]: TypeError: Router.use() requires a middleware function but got a Object
+    at router.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:469:13)
+    at app.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:227:21)
+    at Array.forEach (<anonymous>)
+    at app.use (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\application.js:224:7)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:123:5)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+2026-07-11 16:50:23 [error]: E:\PRACTICANDO\app_veterinaria\backend\src\routes\facturas.routes.js:421
+    const io = req.app.get('io');
+          ^
+
+SyntaxError: Identifier 'io' has already been declared
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:31:27)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-11 16:51:00 [error]: E:\PRACTICANDO\app_veterinaria\backend\src\routes\facturas.routes.js:421
+    const io = req.app.get('io');
+          ^
+
+SyntaxError: Identifier 'io' has already been declared
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:31:27)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-11 16:51:43 [error]: E:\PRACTICANDO\app_veterinaria\backend\src\routes\facturas.routes.js:421
+    const io = req.app.get('io');
+          ^
+
+SyntaxError: Identifier 'io' has already been declared
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:31:27)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+2026-07-11 19:31:11 [error]: E:\PRACTICANDO\app_veterinaria\backend\src\middlewares\tenant.middleware.js:25
+    const subdominio = host.toLowerCase();
+          ^
+
+SyntaxError: Identifier 'subdominio' has already been declared
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:16:31)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)

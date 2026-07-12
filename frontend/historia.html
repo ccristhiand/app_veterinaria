@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Historia Clínica</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    /* ── Autocompletado inventario ──────────────────────────────── */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1.5px solid var(--line);
+      border-radius: .85rem;
+      box-shadow: 0 8px 32px rgba(13,59,46,.12);
+      z-index: 1000;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: .35rem;
+      /* Asegurar que no se salga en móvil */
+      max-width: calc(100vw - 2rem);
+    
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: #fff; border: 1.5px solid var(--green-500);
+      border-radius: .85rem; box-shadow: 0 8px 24px rgba(13,59,46,.12);
+      max-height: 220px; overflow-y: auto; list-style: none; padding: .35rem;
+      animation: fadeIn .15s ease;
+    }
+    .autocomplete-list li {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .55rem .75rem; border-radius: .6rem;
+      cursor: pointer; transition: background .12s; font-size: .8rem;
+    }
+    .autocomplete-list li:hover { background: var(--green-50); }
+    .autocomplete-list li .ac-nombre { font-weight: 600; color: var(--ink); flex: 1; }
+    .autocomplete-list li .ac-stock  { font-size: .68rem; color: var(--ink-faint); white-space: nowrap; }
+    .autocomplete-list li .ac-cat    {
+      font-size: .62rem; font-weight: 700; padding: .15rem .45rem;
+      border-radius: 999px; white-space: nowrap;
+    }
+    .ac-cat-medicamento { background:#f0f9ff; color:#0369a1; }
+    .ac-cat-vacuna      { background:#f5f3ff; color:#6d28d9; }
+    .ac-cat-insumo      { background:#f8faf8; color:#4b5f57; }
+    .ac-cat-otro        { background:#faf9f6; color:#78716c; }
+    .autocomplete-list .ac-empty {
+      padding: .6rem .75rem; color: var(--ink-faint);
+      font-size: .78rem; text-align: center; cursor: default;
+    }
+    .autocomplete-list li .ac-hint {
+      font-size: .62rem; color: var(--green-600);
+      font-style: italic; white-space: nowrap;
+    }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+  <div class="page-head">
+    <div>
+      <h2>Historia Clínica</h2>
+      <p id="page-head-sub">Expedientes médicos de los pacientes</p>
+    </div>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button onclick="openModal('modal-buscar')" class="vbtn vbtn-ghost">🔍 Buscar Paciente</button>
+      <button id="btn-nueva-consulta" onclick="openModal('modal-consulta')" class="vbtn vbtn-primary" style="display:none">➕ Nueva Consulta</button>
+      <button id="btn-nueva-vacuna" onclick="abrirModalVacuna()" class="vbtn" style="display:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;align-items:center;gap:.5rem">💉 Registrar Vacuna</button>
+      <button id="btn-nueva-estetica" onclick="abrirModalEstetica()" class="vbtn" style="display:none;background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;align-items:center;gap:.5rem">✂️ Registrar Baño</button>
+    </div>
+  </div>
+
+  <div id="banner-cita" style="display:none;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1.5px solid #6ee7b7;border-radius:1.1rem;padding:1rem 1.4rem;margin-bottom:1.3rem;align-items:center;gap:1rem;flex-wrap:wrap">
+    <span style="font-size:1.8rem">🩺</span>
+    <div style="flex:1;min-width:180px">
+      <p style="font-size:.72rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.1em">Atendiendo cita</p>
+      <p style="font-weight:700;font-size:.92rem;margin-top:.15rem" id="banner-motivo">—</p>
+      <p style="font-size:.75rem;color:var(--ink-soft);margin-top:.1rem">Al guardar, la cita quedará marcada como <strong style="color:#047857">completada</strong> automáticamente.</p>
+    </div>
+    <span style="background:#d1fae5;color:#047857;font-size:.7rem;font-weight:700;padding:.4rem .9rem;border-radius:999px;border:1px solid #6ee7b7;white-space:nowrap">✓ Cita vinculada</span>
+  </div>
+
+  <div id="vacio" class="vcard" style="padding:4.5rem 2rem;text-align:center">
+    <div style="width:90px;height:90px;margin:0 auto 1.4rem;border-radius:50%;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.6rem">📋</div>
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:700;margin-bottom:.5rem">Expediente Médico</h3>
+    <p style="font-size:.85rem;color:var(--ink-faint);margin-bottom:1.6rem">Busca un paciente por el <strong>DNI o nombre del propietario</strong>,<br/>o ve al panel de <a href="citas.html" style="color:var(--green-600);font-weight:600">Citas</a> y usa el botón <strong>🩺 Atender</strong>.</p>
+    <button onclick="openModal('modal-buscar')" class="vbtn vbtn-primary" style="margin:0 auto">🔍 Buscar Paciente</button>
+  </div>
+
+  <div id="panel" style="display:none;flex-direction:column;gap:1.3rem">
+    <div class="vcard vcard-pad" style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:center">
+      <div style="width:70px;height:70px;border-radius:1.4rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.3rem;flex-shrink:0" id="h-icon">🐾</div>
+      <div style="flex:1;min-width:180px">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700" id="h-nombre">—</h3>
+        <p style="font-size:.8rem;color:var(--ink-soft);margin-top:.15rem" id="h-info">—</p>
+        <span style="font-size:.72rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;border:1px solid #ddd6fe;font-weight:600;margin-top:.4rem;display:inline-block" id="h-propietario"></span>
+        <div id="h-alerta" style="display:none;margin-top:.6rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-size:.72rem;font-weight:600;padding:.4rem .85rem;border-radius:.7rem"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-end">
+        <button onclick="openModal('modal-consulta')" class="vbtn vbtn-primary">➕ Nueva Consulta</button>
+        <button onclick="abrirModalVacuna()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.5rem 1rem;border-radius:.75rem;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">💉 Registrar Vacuna</button>
+        <button onclick="abrirModalEstetica()" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;padding:.5rem 1rem;border-radius:.75rem;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">✂️ Registrar Baño</button>
+        <p style="font-size:.68rem;color:var(--ink-faint)" id="h-total-consultas"></p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:.5rem;border-bottom:2px solid var(--line)">
+      <button id="tab-consultas" onclick="mostrarTab('consultas')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:700;color:var(--green-600);border-bottom:3px solid var(--green-500);margin-bottom:-2px;transition:all .15s">📋 Consultas</button>
+      <button id="tab-vacunas" onclick="mostrarTab('vacunas')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:var(--ink-faint);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s">💉 Vacunas</button>
+      <button id="tab-estetica" onclick="mostrarTab('estetica')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:var(--ink-faint);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s">✂️ Estética</button>
+    </div>
+
+    <div id="contenido-consultas">
+      <div id="consultas"><div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div></div>
+    </div>
+    <div id="contenido-vacunas" style="display:none">
+      <div id="vacunas-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div></div>
+    </div>
+    <div id="contenido-estetica" style="display:none">
+      <div id="estetica-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Buscar -->
+<div id="modal-buscar" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head"><h3>🔍 Buscar Paciente</h3><button onclick="closeModal('modal-buscar')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body">
+      <label class="vlabel">Buscar propietario por DNI, nombre o teléfono</label>
+      <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
+        <div class="search-wrap" style="flex:1">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="b-prop" type="text" placeholder="Ej: 45678912 · Juan García · 987654321" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
+        </div>
+        <button onclick="buscarPropH()" class="vbtn vbtn-primary">Buscar</button>
+      </div>
+      <div id="b-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:200px;overflow-y:auto;margin-bottom:.75rem"></div>
+      <div id="b-mascotas-section" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <label class="vlabel" style="margin-bottom:0">Mascotas de <strong id="b-prop-nombre-sel">—</strong></label>
+          <button onclick="resetBusqueda()" class="vlink" style="font-size:.72rem">← Cambiar propietario</button>
+        </div>
+        <div id="b-mascotas-lista" style="display:flex;flex-direction:column;gap:.4rem;max-height:240px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="vmodal-foot"><button onclick="closeModal('modal-buscar')" class="vbtn vbtn-ghost">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Modal Nueva Consulta -->
+<div id="modal-consulta" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:660px">
+    <div class="vmodal-head"><h3 id="modal-consulta-titulo">📋 Nueva Consulta</h3><button onclick="closeModal('modal-consulta')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+      <div id="modal-cita-banner" style="display:none;background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.9rem;padding:.75rem 1rem;font-size:.78rem;align-items:center;gap:.6rem">
+        <span>🩺</span><div><span style="font-weight:700;color:#047857">Atendiendo cita #<span id="modal-cita-id-label"></span></span><span style="color:var(--ink-soft)"> — Al guardar, la cita se marcará como completada</span></div>
+      </div>
+      <div><label class="vlabel">Motivo de consulta *</label><input id="co-motivo" type="text" class="vinput" placeholder="Control anual, vómitos, herida, vacunación…"/></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="vlabel">⚖️ Peso en consulta (kg)</label><input id="co-peso" type="number" step="0.1" class="vinput" placeholder="3.5"/></div>
+        <div><label class="vlabel">🌡️ Temperatura (°C)</label><input id="co-temp" type="number" step="0.1" class="vinput" placeholder="38.5"/></div>
+      </div>
+      <div><label class="vlabel">Anamnesis</label><textarea id="co-anamnesis" rows="2" class="vinput" placeholder="¿Qué reporta el propietario?"></textarea></div>
+      <div><label class="vlabel">Exploración física</label><textarea id="co-exploracion" rows="2" class="vinput" placeholder="Hallazgos del examen físico…"></textarea></div>
+      <div><label class="vlabel">Diagnóstico</label><textarea id="co-diagnostico" rows="2" class="vinput" placeholder="Diagnóstico definitivo o presuntivo…"></textarea></div>
+      <div><label class="vlabel">Tratamiento</label><textarea id="co-tratamiento" rows="2" class="vinput" placeholder="Plan de tratamiento indicado…"></textarea></div>
+      <div><label class="vlabel">Observaciones</label><textarea id="co-obs" rows="2" class="vinput" placeholder="Notas adicionales…"></textarea></div>
+      <!-- Recetas -->
+      <div style="border-top:1px solid var(--line);padding-top:1.1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+          <label style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif">💊 Recetas médicas</label>
+          <button onclick="addReceta()" class="vlink" style="color:var(--green-600)">＋ Agregar medicamento</button>
+        </div>
+        <div id="recetas" style="display:flex;flex-direction:column;gap:.8rem"></div>
+      </div>
+      <!-- Vacuna rápida -->
+      <div style="border-top:1px solid var(--line);padding-top:1.1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+          <label style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif">💉 Vacuna aplicada en esta consulta</label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;color:var(--ink-soft)">
+            <input type="checkbox" id="toggle-vacuna-rapida" onchange="toggleVacunaRapida()" style="accent-color:#8b5cf6;width:16px;height:16px"/>
+            Registrar vacuna
+          </label>
+        </div>
+        <div id="vacuna-rapida-form" style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:1rem;padding:1rem;flex-direction:column;gap:.8rem">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label class="vlabel">Nombre de la vacuna *</label><input id="vr-nombre" type="text" class="vinput" placeholder="Séxtuple, Antirrábica, Triple felina…"/></div>
+            <div><label class="vlabel">Fabricante</label><input id="vr-fabricante" type="text" class="vinput" placeholder="Zoetis, Merial, Boehringer…"/></div>
+            <div><label class="vlabel">N° de Lote</label><input id="vr-lote" type="text" class="vinput" placeholder="LOT-2026-XXXX"/></div>
+            <div><label class="vlabel">Fecha de aplicación *</label><input id="vr-fecha" type="date" class="vinput"/></div>
+            <div><label class="vlabel">Próxima dosis</label><input id="vr-proxima" type="date" class="vinput"/></div>
+            <div><label class="vlabel">Notas</label><input id="vr-notas" type="text" class="vinput" placeholder="Observaciones…"/></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-consulta')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarConsulta()" class="vbtn vbtn-primary" id="btn-guardar-consulta">💾 Guardar Consulta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Registrar Vacuna independiente -->
+<div id="modal-vacuna" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head"><h3>💉 Registrar Vacuna</h3><button onclick="closeModal('modal-vacuna')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.9rem;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem">
+        <span style="font-size:1.6rem" id="vac-mascota-icon">🐾</span>
+        <div><p style="font-weight:700;font-size:.9rem" id="vac-mascota-nombre">—</p><p style="font-size:.72rem;color:var(--ink-soft)" id="vac-mascota-info">—</p></div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2"><label class="vlabel">Nombre de la vacuna *</label><input id="v-nombre" type="text" class="vinput" placeholder="Séxtuple canina, Antirrábica, Triple felina…"/></div>
+        <div><label class="vlabel">Fabricante</label><input id="v-fabricante" type="text" class="vinput" placeholder="Zoetis, Merial, Boehringer…"/></div>
+        <div><label class="vlabel">N° de Lote</label><input id="v-lote" type="text" class="vinput" placeholder="LOT-2026-XXXX"/></div>
+        <div><label class="vlabel">Fecha de aplicación *</label><input id="v-fecha" type="date" class="vinput"/></div>
+        <div><label class="vlabel">Próxima dosis</label><input id="v-proxima" type="date" class="vinput"/></div>
+      </div>
+      <div><label class="vlabel">Notas</label><textarea id="v-notas" rows="2" class="vinput" placeholder="Sitio de aplicación, reacciones, observaciones…"></textarea></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-vacuna')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarVacuna()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit">💉 Guardar Vacuna</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Registrar Baño / Estética ════════════════════════════ -->
+<div id="modal-estetica" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:540px">
+    <div class="vmodal-head">
+      <h3>✂️ Registrar Servicio de Estética</h3>
+      <button onclick="closeModal('modal-estetica')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+
+      <!-- Info mascota -->
+      <div style="background:#fdf2f8;border:1px solid #fbcfe8;border-radius:.9rem;
+        padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem">
+        <span style="font-size:1.6rem" id="est-mascota-icon">🐾</span>
+        <div>
+          <p style="font-weight:700;font-size:.9rem" id="est-mascota-nombre">—</p>
+          <p style="font-size:.72rem;color:var(--ink-soft)" id="est-mascota-info">—</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Fecha *</label>
+          <input id="est-fecha" type="date" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Tipo de baño *</label>
+          <select id="est-tipo" class="vinput">
+            <option value="basico">🛁 Básico</option>
+            <option value="completo">✨ Completo</option>
+            <option value="medicado">💊 Medicado</option>
+            <option value="deslanado">✂️ Deslanado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Servicios incluidos -->
+      <div>
+        <label class="vlabel">Servicios incluidos</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.3rem">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;
+            background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;
+            border-radius:.75rem;font-size:.82rem;font-weight:500;transition:all .15s"
+            onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+            <input type="checkbox" id="est-corte" style="accent-color:#db2777;width:15px;height:15px"/>
+            ✂️ Corte de pelo
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;
+            background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;
+            border-radius:.75rem;font-size:.82rem;font-weight:500;transition:all .15s"
+            onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+            <input type="checkbox" id="est-unas" style="accent-color:#db2777;width:15px;height:15px"/>
+            💅 Corte de uñas
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;
+            background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;
+            border-radius:.75rem;font-size:.82rem;font-weight:500;transition:all .15s"
+            onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+            <input type="checkbox" id="est-dental" style="accent-color:#db2777;width:15px;height:15px"/>
+            🦷 Limpieza dental
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="vlabel">Productos utilizados</label>
+        <input id="est-productos" type="text" class="vinput"
+          placeholder="Shampoo medicado, acondicionador, loción antipulgas…"/>
+      </div>
+
+      <div>
+        <label class="vlabel">Precio (S/.)</label>
+        <input id="est-precio" type="number" step="0.50" min="0" class="vinput"
+          placeholder="0.00"/>
+      </div>
+
+      <div>
+        <label class="vlabel">Observaciones</label>
+        <textarea id="est-observaciones" rows="2" class="vinput"
+          placeholder="Estado del pelaje, condición de la piel, comportamiento, recomendaciones…"></textarea>
+      </div>
+
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-estetica')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarEstetica()"
+        style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;
+        border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;
+        font-weight:600;cursor:pointer;font-family:inherit">
+        ✂️ Guardar Servicio
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Editar Consulta ══════════════════════════════════════ -->
+<div id="modal-editar-consulta" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:660px">
+    <div class="vmodal-head">
+      <h3>✏️ Editar Consulta</h3>
+      <button onclick="closeModal('modal-editar-consulta')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+      <input type="hidden" id="ec-id"/>
+      <div><label class="vlabel">Motivo *</label>
+        <input id="ec-motivo" type="text" class="vinput" placeholder="Motivo de la consulta…"/></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="vlabel">⚖️ Peso (kg)</label>
+          <input id="ec-peso" type="number" step="0.1" class="vinput" placeholder="3.5"/></div>
+        <div><label class="vlabel">🌡️ Temperatura (°C)</label>
+          <input id="ec-temp" type="number" step="0.1" class="vinput" placeholder="38.5"/></div>
+      </div>
+      <div><label class="vlabel">Anamnesis</label>
+        <textarea id="ec-anamnesis" rows="2" class="vinput"></textarea></div>
+      <div><label class="vlabel">Exploración física</label>
+        <textarea id="ec-exploracion" rows="2" class="vinput"></textarea></div>
+      <div><label class="vlabel">Diagnóstico</label>
+        <textarea id="ec-diagnostico" rows="2" class="vinput"></textarea></div>
+      <div><label class="vlabel">Tratamiento</label>
+        <textarea id="ec-tratamiento" rows="2" class="vinput"></textarea></div>
+      <div><label class="vlabel">Observaciones</label>
+        <textarea id="ec-obs" rows="2" class="vinput"></textarea></div>
+      <!-- Recetas -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
+          <label style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif">💊 Recetas</label>
+          <button onclick="addRecetaEdit()" class="vlink" style="color:var(--green-600)">＋ Agregar</button>
+        </div>
+        <div id="ec-recetas" style="display:flex;flex-direction:column;gap:.7rem"></div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-editar-consulta')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarEditConsulta()" class="vbtn vbtn-primary">💾 Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Editar Vacuna ════════════════════════════════════════ -->
+<div id="modal-editar-vacuna" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3>✏️ Editar Vacuna</h3>
+      <button onclick="closeModal('modal-editar-vacuna')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="ev-id"/>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2"><label class="vlabel">Nombre de la vacuna *</label>
+          <input id="ev-nombre" type="text" class="vinput" placeholder="Séxtuple, Antirrábica…"/></div>
+        <div><label class="vlabel">Fabricante</label>
+          <input id="ev-fabricante" type="text" class="vinput" placeholder="Zoetis, Merial…"/></div>
+        <div><label class="vlabel">N° de Lote</label>
+          <input id="ev-lote" type="text" class="vinput" placeholder="LOT-2026-XXXX"/></div>
+        <div><label class="vlabel">Fecha de aplicación *</label>
+          <input id="ev-fecha" type="date" class="vinput"/></div>
+        <div><label class="vlabel">Próxima dosis</label>
+          <input id="ev-proxima" type="date" class="vinput"/></div>
+      </div>
+      <div><label class="vlabel">Notas</label>
+        <textarea id="ev-notas" rows="2" class="vinput" placeholder="Observaciones…"></textarea></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-editar-vacuna')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarEditVacuna()" class="vbtn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit">💾 Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Editar Estética ═════════════════════════════════════ -->
+<div id="modal-editar-estetica" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:540px">
+    <div class="vmodal-head">
+      <h3>✏️ Editar Servicio de Estética</h3>
+      <button onclick="closeModal('modal-editar-estetica')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+      <input type="hidden" id="ee-id"/>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="vlabel">Fecha *</label>
+          <input id="ee-fecha" type="date" class="vinput"/></div>
+        <div><label class="vlabel">Tipo de baño *</label>
+          <select id="ee-tipo" class="vinput">
+            <option value="basico">🛁 Básico</option>
+            <option value="completo">✨ Completo</option>
+            <option value="medicado">💊 Medicado</option>
+            <option value="deslanado">✂️ Deslanado</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel">Servicios incluidos</label>
+        <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.3rem">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;border-radius:.75rem;font-size:.82rem;font-weight:500">
+            <input type="checkbox" id="ee-corte" style="accent-color:#db2777;width:15px;height:15px"/>✂️ Corte</label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;border-radius:.75rem;font-size:.82rem;font-weight:500">
+            <input type="checkbox" id="ee-unas" style="accent-color:#db2777;width:15px;height:15px"/>💅 Uñas</label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;background:#fdf2f8;border:1px solid #fbcfe8;padding:.5rem .9rem;border-radius:.75rem;font-size:.82rem;font-weight:500">
+            <input type="checkbox" id="ee-dental" style="accent-color:#db2777;width:15px;height:15px"/>🦷 Dental</label>
+        </div>
+      </div>
+      <div><label class="vlabel">Productos utilizados</label>
+        <input id="ee-productos" type="text" class="vinput" placeholder="Shampoo, acondicionador…"/></div>
+      <div><label class="vlabel">Precio (S/.)</label>
+        <input id="ee-precio" type="number" step="0.50" min="0" class="vinput" placeholder="0.00"/></div>
+      <div><label class="vlabel">Observaciones</label>
+        <textarea id="ee-obs" rows="2" class="vinput" placeholder="Estado del pelaje, comportamiento…"></textarea></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-editar-estetica')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarEditEstetica()" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit">💾 Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver Consulta -->
+<div id="modal-ver" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:640px">
+    <div class="vmodal-head"><h3 id="ver-titulo">📋 Detalle de Consulta</h3><button onclick="closeModal('modal-ver')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body" id="ver-body"></div>
+    <div class="vmodal-foot"><button onclick="closeModal('modal-ver')" class="vbtn vbtn-ghost">Cerrar</button></div>
+  </div>
+</div>
+
+<script>
+let mascotaId  = null;
+let citaId     = null;
+let motivoCita = null;
+let recetaN    = 0;
+
+const ssMascotaId = sessionStorage.getItem('historia_mascota_id');
+const ssCitaId    = sessionStorage.getItem('historia_cita_id');
+const ssMotivo    = sessionStorage.getItem('historia_motivo');
+sessionStorage.removeItem('historia_mascota_id');
+sessionStorage.removeItem('historia_cita_id');
+sessionStorage.removeItem('historia_motivo');
+
+initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
+
+if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
+if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
+
+function mostrarTab(tab) {
+  const tabs = ['consultas','vacunas','estetica'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('tab-'+t);
+    if (!btn) return;
+    const isActive = t === tab;
+    // color activo: consultas=verde, vacunas=violeta, estetica=rosa
+    const activeColor = { consultas:'#059669', vacunas:'#6d28d9', estetica:'#db2777' };
+    const activeBorder = { consultas:'#10b981', vacunas:'#8b5cf6', estetica:'#ec4899' };
+    btn.style.color            = isActive ? activeColor[t]  : 'var(--ink-faint)';
+    btn.style.borderBottomColor = isActive ? activeBorder[t] : 'transparent';
+    btn.style.fontWeight       = isActive ? '700' : '600';
+  });
+  document.getElementById('contenido-consultas').style.display = tab==='consultas' ? 'block' : 'none';
+  document.getElementById('contenido-vacunas').style.display   = tab==='vacunas'   ? 'block' : 'none';
+  document.getElementById('contenido-estetica').style.display  = tab==='estetica'  ? 'block' : 'none';
+  if (tab==='vacunas'  && mascotaId) cargarVacunas(mascotaId);
+  if (tab==='estetica' && mascotaId) cargarEstetica(mascotaId);
+}
+
+function mostrarBannerCita() {
+  document.getElementById('banner-cita').style.display         = 'flex';
+  document.getElementById('banner-motivo').textContent         = '📋 '+motivoCita;
+  document.getElementById('page-head-sub').textContent         = 'Atendiendo cita #'+citaId;
+  document.getElementById('modal-consulta-titulo').textContent = '🩺 Registrar Atención — Cita #'+citaId;
+  document.getElementById('modal-cita-banner').style.display   = 'flex';
+  document.getElementById('modal-cita-id-label').textContent   = citaId;
+  document.getElementById('btn-guardar-consulta').textContent  = '✅ Guardar y Completar Cita';
+}
+
+function toggleVacunaRapida() {
+  const checked = document.getElementById('toggle-vacuna-rapida').checked;
+  document.getElementById('vacuna-rapida-form').style.display = checked ? 'flex' : 'none';
+
+  if (checked) {
+    document.getElementById('vr-fecha').value = fechaHoyInput();
+
+    // Adjuntar autocompletado solo la primera vez
+    if (!_acVacunaRapidaInit) {
+      _acVacunaRapidaInit = true;
+      const inputVR = document.getElementById('vr-nombre');
+      attachAutocomplete(inputVR, ['vacuna'], (item) => {
+        const fabInput = document.getElementById('vr-fabricante');
+        if (fabInput && !fabInput.value && item.proveedor) {
+          fabInput.value = item.proveedor;
+        }
+      });
+    }
+  }
+}
+
+// Flag para evitar adjuntar el autocomplete más de una vez
+let _acVacunaModalInit    = false;
+let _acVacunaRapidaInit   = false;
+
+function abrirModalVacuna() {
+  document.getElementById('v-fecha').value = fechaHoyInput();
+  openModal('modal-vacuna');
+
+  // Adjuntar autocompletado solo la primera vez que se abre el modal
+  if (!_acVacunaModalInit) {
+    _acVacunaModalInit = true;
+    const inputNombre = document.getElementById('v-nombre');
+    attachAutocomplete(inputNombre, ['vacuna'], (item) => {
+      // Al seleccionar vacuna, rellenar fabricante si existe en inventario y está vacío
+      const fabInput = document.getElementById('v-fabricante');
+      if (fabInput && !fabInput.value && item.proveedor) {
+        fabInput.value = item.proveedor;
+      }
+    });
+  }
+}
+
+async function buscarPropH() {
+  const q = document.getElementById('b-prop').value.trim();
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  const cont = document.getElementById('b-prop-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
+  document.getElementById('b-mascotas-section').style.display = 'none';
+  try {
+    const res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=8');
+    if (!res) return;
+    const rows = (await res.json()).data||[];
+    cont.innerHTML = rows.length ? rows.map(p=>`
+      <button onclick="selPropH(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
+        style="display:flex;align-items:center;gap:.75rem;padding:.75rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
+        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.8rem;flex-shrink:0;display:flex;align-items:center;justify-content:center">${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-weight:700;font-size:.87rem">${esc(p.nombre)} ${esc(p.apellido)}</p>
+          <p style="font-size:.7rem;color:var(--ink-faint)">${p.dni?'🪪 '+esc(p.dni)+' · ':''}📞 ${esc(p.telefono)}</p>
+        </div>
+        <span style="background:#ecfdf5;color:#047857;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;flex-shrink:0">🐾 ${p.total_mascotas}</span>
+      </button>`).join('')
+    : '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:.75rem">No se encontraron propietarios</div>';
+  } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>'; }
+}
+
+async function selPropH(propId, propNombre) {
+  document.getElementById('b-prop-resultados').innerHTML = '';
+  document.getElementById('b-prop').value = '';
+  document.getElementById('b-mascotas-section').style.display = 'block';
+  document.getElementById('b-prop-nombre-sel').textContent    = propNombre;
+  document.getElementById('b-mascotas-lista').innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Cargando mascotas…</div>';
+  try {
+    const res      = await api('/propietarios/'+propId);
+    if (!res) return;
+    const mascotas = (await res.json()).data?.mascotas||[];
+    document.getElementById('b-mascotas-lista').innerHTML = mascotas.length
+      ? mascotas.map(m=>`
+          <button onclick="selMascotaH(${m.id})"
+            style="display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
+            onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+            onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+            <span style="font-size:1.6rem">${badgeEspecie(m.especie)}</span>
+            <div style="flex:1"><p style="font-weight:700;font-size:.88rem">${esc(m.nombre)}</p><p style="font-size:.7rem;color:var(--ink-faint)">${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}</p></div>
+            ${m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3;white-space:nowrap">⚠️ Alerta</span>':''}
+          </button>`).join('')
+      : '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:1rem">Sin mascotas. <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar</a></div>';
+  } catch { document.getElementById('b-mascotas-lista').innerHTML='<div style="font-size:.78rem;color:#e11d48">Error</div>'; }
+}
+
+function selMascotaH(id) { closeModal('modal-buscar'); resetBusqueda(); cargarHistoria(id); }
+function resetBusqueda() {
+  document.getElementById('b-mascotas-section').style.display='none';
+  document.getElementById('b-prop-resultados').innerHTML='';
+  document.getElementById('b-prop').value='';
+}
+
+async function cargarHistoria(id) {
+  mascotaId = id;
+  document.getElementById('vacio').style.display              = 'none';
+  document.getElementById('panel').style.display              = 'flex';
+  document.getElementById('panel').style.flexDirection        = 'column';
+  document.getElementById('panel').style.gap                  = '1.3rem';
+  document.getElementById('btn-nueva-consulta').style.display  = 'inline-flex';
+  document.getElementById('btn-nueva-vacuna').style.display    = 'inline-flex';
+  document.getElementById('btn-nueva-estetica').style.display  = 'inline-flex';
+  document.getElementById('consultas').innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div>';
+  try {
+    const rm = await api('/mascotas/'+id);
+    if (!rm||!rm.ok) { toast('Mascota no encontrada.','danger'); return; }
+    const m = (await rm.json()).data;
+    document.getElementById('h-icon').textContent    = badgeEspecie(m.especie);
+    document.getElementById('h-nombre').textContent  = m.nombre;
+    document.getElementById('h-info').textContent    = m.especie+' · '+(m.raza||'Sin raza')+' · '+m.sexo+(m.peso_kg?' · '+m.peso_kg+' kg':'');
+    const propEl = document.getElementById('h-propietario');
+    if (propEl&&m.propietario_nombre) propEl.textContent='👤 '+m.propietario_nombre;
+    if (m.alertas_medicas) { const al=document.getElementById('h-alerta'); al.style.display='block'; al.innerHTML='⚠️ '+esc(m.alertas_medicas); }
+    // Precargar info en modal de vacuna
+    document.getElementById('vac-mascota-icon').textContent   = badgeEspecie(m.especie);
+    document.getElementById('vac-mascota-nombre').textContent = m.nombre;
+    document.getElementById('vac-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
+    document.getElementById('v-fecha').value = fechaHoyInput();
+
+    // Precargar info en modal de estética
+    document.getElementById('est-mascota-icon').textContent   = badgeEspecie(m.especie);
+    document.getElementById('est-mascota-nombre').textContent = m.nombre;
+    document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
+    document.getElementById('est-fecha').value = fechaHoyInput();
+    if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
+    const rh = await api('/historia/mascota/'+id);
+    if (!rh) return;
+    const consultas = (await rh.json()).data||[];
+    document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
+    renderTimeline(consultas);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('consultas').innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar el historial.</p></div>';
+  }
+}
+
+async function cargarVacunas(id) {
+  const cont = document.getElementById('vacunas-lista');
+  cont.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div>';
+  try {
+    const res  = await api('/vacunas/mascota/'+id);
+    if (!res) return;
+    const rows = (await res.json()).data||[];
+    if (!rows.length) {
+      cont.innerHTML=`<div class="vcard" style="padding:2.5rem;text-align:center"><span style="font-size:2.5rem;display:block;margin-bottom:.8rem">💉</span><p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin vacunas registradas para esta mascota.</p><button onclick="abrirModalVacuna()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">💉 Registrar Primera Vacuna</button></div>`;
+      return;
+    }
+    cont.innerHTML='<div style="display:flex;flex-direction:column;gap:.7rem">'+rows.map(v=>{
+      const hoy=new Date();
+      const proxima=v.proxima_dosis?new Date(v.proxima_dosis):null;
+      const dias=proxima?Math.ceil((proxima-hoy)/(1000*60*60*24)):null;
+      const vencida=dias!==null&&dias<0;
+      const proxima30=dias!==null&&dias<=30&&dias>=0;
+      return `<div class="vcard vcard-pad" style="${vencida?'border-color:#fecdd3;background:#fff1f2':proxima30?'border-color:#fde68a;background:#fffbeb':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+              <span style="font-size:1.2rem">💉</span>
+              <h4 style="font-weight:700;font-size:.95rem">${esc(v.nombre)}</h4>
+              ${vencida?'<span style="background:#fff1f2;color:#be123c;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fecdd3">🔴 VENCIDA</span>':''}
+              ${proxima30&&!vencida?'<span style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fde68a">⚠️ Próxima</span>':''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+              <span>📅 Aplicada: <strong>${fDate(v.fecha_aplicacion)}</strong></span>
+              ${v.fabricante?'<span>🏭 '+esc(v.fabricante)+'</span>':''}
+              ${v.lote?'<span>🔖 Lote: '+esc(v.lote)+'</span>':''}
+              <span>🩺 Dr(a). ${esc(v.veterinario_nombre||'—')}</span>
+            </div>
+            ${v.notas?'<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.35rem">📝 '+esc(v.notas)+'</p>':''}
+          </div>
+          ${v.proxima_dosis?`<div style="text-align:right;flex-shrink:0">
+            <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Próxima dosis</p>
+            <p style="font-weight:700;font-size:.88rem;margin-top:.2rem;color:${vencida?'#be123c':proxima30?'#b45309':'var(--ink)'}">${fDate(v.proxima_dosis)}</p>
+            ${dias!==null?'<p style="font-size:.7rem;color:'+(vencida?'#be123c':proxima30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>':''}
+          </div>`:''}
+        </div>
+        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+          <button onclick="abrirEditarVacuna(${v.id})"
+            style="font-size:.72rem;color:var(--sky);background:none;border:none;
+            cursor:pointer;font-family:inherit;font-weight:600">
+            ✏️ Editar vacuna
+          </button>
+        </div>
+      </div>`;
+    }).join('')+'</div>';
+  } catch { cont.innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar vacunas.</p></div>'; }
+}
+
+async function guardarVacuna() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+  const nombre=document.getElementById('v-nombre').value.trim();
+  const fecha=document.getElementById('v-fecha').value;
+  if (!nombre) { toast('El nombre de la vacuna es obligatorio.','warning'); return; }
+  if (!fecha)  { toast('La fecha de aplicación es obligatoria.','warning'); return; }
+  const body = { mascota_id:mascotaId, nombre, fabricante:document.getElementById('v-fabricante').value.trim()||null, lote:document.getElementById('v-lote').value.trim()||null, fecha_aplicacion:fecha, proxima_dosis:document.getElementById('v-proxima').value||null, notas:document.getElementById('v-notas').value.trim()||null };
+  try {
+    const res=await api('/vacunas',{method:'POST',body});
+    if (!res) return;
+    const data=await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+    toast('💉 Vacuna registrada correctamente','success');
+    closeModal('modal-vacuna');
+    ['v-nombre','v-fabricante','v-lote','v-proxima','v-notas'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('v-fecha').value=fechaHoyInput();
+    mostrarTab('vacunas');
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function renderTimeline(consultas) {
+  const cont=document.getElementById('consultas');
+  if (!consultas.length) {
+    cont.className='';
+    cont.innerHTML='<div class="vcard" style="padding:3rem 2rem;text-align:center"><span style="font-size:2.5rem;display:block;margin-bottom:.8rem">🌱</span><p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin consultas registradas.</p><button onclick="openModal(\'modal-consulta\')" class="vbtn vbtn-primary" style="margin:0 auto">➕ Primera Consulta</button></div>';
+    return;
+  }
+  cont.className='timeline';
+  cont.innerHTML=consultas.map(c=>`
+    <div class="timeline-item">
+      <div class="vcard vcard-pad" style="cursor:pointer;transition:all .22s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow=''" onclick="verConsulta(${c.id})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;gap:.6rem;align-items:center;font-size:.7rem;color:var(--ink-faint);margin-bottom:.4rem;flex-wrap:wrap">
+              <span>${fDateTime(c.fecha)}</span><span>·</span>
+              <span style="color:var(--green-600);font-weight:700">Dr(a). ${esc(c.veterinario_nombre||'')}</span>
+              ${c.cita_id?'<span style="background:#ecfdf5;color:#047857;font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;border:1px solid #a7f3d0">Cita #'+c.cita_id+'</span>':''}
+            </div>
+            <h4 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700">${esc(c.motivo)}</h4>
+            ${c.diagnostico?'<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.4rem;line-height:1.5"><strong>Dx:</strong> '+esc(c.diagnostico.substring(0,140))+(c.diagnostico.length>140?'…':'')+'</p>':''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.35rem;align-items:flex-end;flex-shrink:0">
+            ${c.peso_kg?'<span style="font-size:.68rem;background:#f0f9ff;color:#0369a1;padding:.25rem .6rem;border-radius:999px;font-weight:700">⚖️ '+c.peso_kg+' kg</span>':''}
+            ${c.temperatura_c?'<span style="font-size:.68rem;background:#fffbeb;color:#b45309;padding:.25rem .6rem;border-radius:999px;font-weight:700">🌡️ '+c.temperatura_c+'°C</span>':''}
+          </div>
+        </div>
+        <div style="margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <p style="font-size:.68rem;color:var(--ink-faint)">👆 Click para ver detalle</p>
+            <button onclick="event.stopPropagation();abrirEditarConsulta(${c.id})"
+              style="font-size:.68rem;color:var(--sky);background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Editar consulta">✏️ Editar</button>
+          </div>
+          ${c.tratamiento?'<span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;font-weight:600">💊 Con tratamiento</span>':''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function verConsulta(id) {
+  document.getElementById('ver-titulo').textContent='📋 Cargando…';
+  document.getElementById('ver-body').innerHTML='<div class="vempty"><div class="vspinner"></div></div>';
+  openModal('modal-ver');
+  try {
+    const res=await api('/historia/'+id); if (!res) return;
+    const c=(await res.json()).data;
+    document.getElementById('ver-titulo').textContent='📋 '+c.motivo;
+    document.getElementById('ver-body').innerHTML=`
+      <div class="grid grid-cols-2 gap-3" style="margin-bottom:1.2rem">
+        ${ib('📆 Fecha',fDateTime(c.fecha))}${ib('🩺 Veterinario',c.veterinario_nombre)}
+        ${c.peso_kg?ib('⚖️ Peso',c.peso_kg+' kg'):''}
+        ${c.temperatura_c?ib('🌡️ Temperatura',c.temperatura_c+' °C'):''}
+        ${c.cita_id?'<div style="background:#ecfdf5;border-radius:.9rem;padding:.7rem .9rem;border:1px solid #a7f3d0;grid-column:span 2"><p style="font-size:.6rem;color:#059669;text-transform:uppercase;letter-spacing:.1em;font-weight:700">🔗 Vinculada a</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">Cita #'+c.cita_id+'</p></div>':''}
+      </div>
+      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Observaciones',c.observaciones)}
+      ${c.recetas?.length?`<div style="margin-top:1.2rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:1.1rem;padding:1.15rem"><h4 style="font-family:'Playfair Display',serif;font-weight:700;color:#0c4a6e;margin-bottom:.85rem;font-size:.92rem">💊 Recetas (${c.recetas.length})</h4><div style="display:flex;flex-direction:column;gap:.55rem">${c.recetas.map(r=>`<div style="background:#fff;border-radius:.85rem;padding:.85rem 1rem;font-size:.8rem"><p style="font-weight:700">${esc(r.medicamento)}</p><p style="color:var(--ink-soft);margin-top:.2rem">${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias?' · '+r.duracion_dias+' días':''}</p>${r.instrucciones?'<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">📝 '+esc(r.instrucciones)+'</p>':''}</div>`).join('')}</div></div>`:''}`;
+  } catch { document.getElementById('ver-body').innerHTML='<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; }
+}
+
+async function guardarConsulta() {
+  if (!mascotaId) { toast('Selecciona una mascota primero.','warning'); return; }
+  const motivo=document.getElementById('co-motivo').value.trim();
+  if (!motivo) { toast('El motivo es obligatorio.','warning'); return; }
+  const recetas=[];
+  for (const div of document.querySelectorAll('#recetas > div')) {
+    const g=f=>div.querySelector('[data-f="'+f+'"]')?.value?.trim()||'';
+    const med=g('medicamento'),dosis=g('dosis'),frec=g('frecuencia');
+    if (!med||!dosis||!frec) { toast('Completa todos los campos de la receta o elimínala.','warning'); return; }
+    recetas.push({medicamento:med,dosis,frecuencia:frec,duracion_dias:parseInt(g('duracion_dias'))||null,instrucciones:g('instrucciones')});
+  }
+  const hayVacuna=document.getElementById('toggle-vacuna-rapida').checked;
+  let vacunaData=null;
+  if (hayVacuna) {
+    const vrN=document.getElementById('vr-nombre').value.trim();
+    const vrF=document.getElementById('vr-fecha').value;
+    if (!vrN||!vrF) { toast('Completa nombre y fecha de la vacuna.','warning'); return; }
+    vacunaData={mascota_id:mascotaId,nombre:vrN,fabricante:document.getElementById('vr-fabricante').value.trim()||null,lote:document.getElementById('vr-lote').value.trim()||null,fecha_aplicacion:vrF,proxima_dosis:document.getElementById('vr-proxima').value||null,notas:document.getElementById('vr-notas').value.trim()||null};
+  }
+  const body={mascota_id:mascotaId,cita_id:citaId||null,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
+  const btn=document.getElementById('btn-guardar-consulta');
+  btn.disabled=true; btn.textContent='Guardando…';
+  try {
+    const res=await api('/historia',{method:'POST',body});
+    if (!res) { btn.disabled=false; resetBtn(); return; }
+    const data=await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); btn.disabled=false; resetBtn(); return; }
+    if (vacunaData) {
+      const resV=await api('/vacunas',{method:'POST',body:vacunaData});
+      toast(resV?.ok?'✅ Consulta y vacuna guardadas correctamente':'✅ Consulta guardada · ⚠️ Error al guardar la vacuna',resV?.ok?'success':'warning',5000);
+    } else {
+      toast(citaId?'✅ Consulta guardada · Cita #'+citaId+' completada':'✅ Consulta registrada correctamente','success',5000);
+    }
+    closeModal('modal-consulta'); limpiarForm();
+    if (citaId) {
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      document.getElementById('modal-cita-banner').style.display='none';
+      document.getElementById('modal-consulta-titulo').textContent='📋 Nueva Consulta';
+      document.getElementById('btn-guardar-consulta').textContent='💾 Guardar Consulta';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
+    cargarHistoria(mascotaId);
+    if (vacunaData) setTimeout(()=>mostrarTab('vacunas'),600);
+  } catch { toast('Error de conexión.','danger'); }
+  finally { btn.disabled=false; resetBtn(); }
+}
+
+function resetBtn() { document.getElementById('btn-guardar-consulta').textContent=citaId?'✅ Guardar y Completar Cita':'💾 Guardar Consulta'; }
+
+// ══ ESTÉTICA ═════════════════════════════════════════════════════
+
+function abrirModalEstetica() {
+  document.getElementById('est-fecha').value = fechaHoyInput();
+  openModal('modal-estetica');
+}
+
+async function cargarEstetica(id) {
+  const cont = document.getElementById('estetica-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div>';
+  try {
+    const res  = await api('/estetica/mascota/'+id);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+
+    if (!rows.length) {
+      cont.innerHTML = `
+        <div class="vcard" style="padding:2.5rem;text-align:center">
+          <span style="font-size:2.5rem;display:block;margin-bottom:.8rem">✂️</span>
+          <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">
+            Sin servicios de estética registrados.
+          </p>
+          <button onclick="abrirModalEstetica()"
+            style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;
+            border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;
+            font-weight:600;cursor:pointer;font-family:inherit">
+            ✂️ Registrar Primer Baño
+          </button>
+        </div>`;
+      return;
+    }
+
+    const tipoLabel = { basico:'🛁 Básico', completo:'✨ Completo', medicado:'💊 Medicado', deslanado:'✂️ Deslanado' };
+
+    cont.innerHTML = '<div style="display:flex;flex-direction:column;gap:.7rem">'
+      + rows.map(s => `
+        <div class="vcard vcard-pad">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <!-- Encabezado -->
+              <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem;flex-wrap:wrap">
+                <span style="font-size:1.3rem">✂️</span>
+                <h4 style="font-weight:700;font-size:.95rem">${tipoLabel[s.tipo_bano]||s.tipo_bano}</h4>
+                <!-- Badges de servicios -->
+                ${s.incluye_corte  ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">✂️ Corte</span>' : ''}
+                ${s.incluye_unas   ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">💅 Uñas</span>' : ''}
+                ${s.incluye_dental ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">🦷 Dental</span>' : ''}
+              </div>
+              <!-- Detalles -->
+              <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+                <span>📅 <strong>${fDate(s.fecha)}</strong></span>
+                <span>✂️ ${esc(s.atendido_por_nombre||'—')}</span>
+                ${s.productos ? '<span>🧴 '+esc(s.productos)+'</span>' : ''}
+                ${s.cita_id   ? '<span style="background:#ecfdf5;color:#047857;padding:.1rem .45rem;border-radius:999px;border:1px solid #a7f3d0;font-weight:700">Cita #'+s.cita_id+'</span>' : ''}
+              </div>
+              ${s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.4rem;line-height:1.5">📝 '+esc(s.observaciones)+'</p>' : ''}
+            </div>
+            <!-- Precio -->
+            ${s.precio ? `
+              <div style="text-align:right;flex-shrink:0">
+                <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Precio</p>
+                <p style="font-weight:800;font-size:1.1rem;color:#db2777;margin-top:.15rem">
+                  S/. ${parseFloat(s.precio).toFixed(2)}
+                </p>
+              </div>` : ''}
+          </div>
+          <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+            <button onclick="abrirEditarEstetica(${s.id})"
+              style="font-size:.72rem;color:var(--sky);background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600">
+              ✏️ Editar servicio
+            </button>
+          </div>
+        </div>`).join('')
+      + '</div>';
+  } catch {
+    cont.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error al cargar estética.</p></div>';
+  }
+}
+
+async function guardarEstetica() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+
+  const fecha    = document.getElementById('est-fecha').value;
+  const tipo     = document.getElementById('est-tipo').value;
+
+  if (!fecha) { toast('La fecha es obligatoria.','warning'); return; }
+  if (!tipo)  { toast('Selecciona el tipo de baño.','warning'); return; }
+
+  const body = {
+    mascota_id     : mascotaId,
+    fecha,
+    tipo_bano      : tipo,
+    incluye_corte  : document.getElementById('est-corte').checked,
+    incluye_unas   : document.getElementById('est-unas').checked,
+    incluye_dental : document.getElementById('est-dental').checked,
+    productos      : document.getElementById('est-productos').value.trim() || null,
+    precio         : parseFloat(document.getElementById('est-precio').value) || null,
+    observaciones  : document.getElementById('est-observaciones').value.trim() || null,
+  };
+
+  try {
+    const res  = await api('/estetica', { method:'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+
+    toast('✂️ Servicio de estética registrado','success');
+    closeModal('modal-estetica');
+    limpiarFormEstetica();
+    mostrarTab('estetica'); // ir al tab para ver el registro
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function limpiarFormEstetica() {
+  document.getElementById('est-fecha').value         = fechaHoyInput();
+  document.getElementById('est-tipo').value          = 'basico';
+  document.getElementById('est-corte').checked       = false;
+  document.getElementById('est-unas').checked        = false;
+  document.getElementById('est-dental').checked      = false;
+  document.getElementById('est-productos').value     = '';
+  document.getElementById('est-precio').value        = '';
+  document.getElementById('est-observaciones').value = '';
+}
+
+function limpiarForm() {
+  ['co-motivo','co-peso','co-temp','co-anamnesis','co-exploracion','co-diagnostico','co-tratamiento','co-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('recetas').innerHTML='';
+  document.getElementById('toggle-vacuna-rapida').checked=false;
+  document.getElementById('vacuna-rapida-form').style.display='none';
+  ['vr-nombre','vr-fabricante','vr-lote','vr-proxima','vr-notas'].forEach(id=>document.getElementById(id).value='');
+  recetaN=0;
+}
+
+function addReceta() {
+  const id  = recetaN++;
+  const div = document.createElement('div');
+  div.id = 'rec-' + id;
+  div.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:.9rem;display:flex;flex-direction:column;gap:.6rem';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft)">💊 Medicamento ${id+1}</p>
+      <button onclick="document.getElementById('rec-${id}').remove()" class="vlink" style="color:#e11d48">Eliminar</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <!-- Campo medicamento con autocompletado -->
+      <div class="autocomplete-wrap" style="position:relative">
+        <input type="text" placeholder="💊 Busca o escribe medicamento…"
+          class="vinput" data-f="medicamento" style="font-size:.78rem;width:100%"/>
+      </div>
+      <input type="text" placeholder="Dosis *" class="vinput" data-f="dosis" style="font-size:.78rem"/>
+      <input type="text" placeholder="Frecuencia *" class="vinput" data-f="frecuencia" style="font-size:.78rem"/>
+      <input type="number" placeholder="Días" class="vinput" data-f="duracion_dias" style="font-size:.78rem"/>
+    </div>
+    <input type="text" placeholder="Instrucciones adicionales…" class="vinput" data-f="instrucciones" style="font-size:.78rem"/>`;
+
+  document.getElementById('recetas').appendChild(div);
+
+  // Adjuntar autocompletado al campo medicamento
+  const inputMed = div.querySelector('[data-f="medicamento"]');
+  attachAutocomplete(inputMed, ['medicamento', 'insumo', 'otro'], (item) => {
+    // Al seleccionar, pre-rellenar dosis si el campo está vacío
+    const dosisInput = div.querySelector('[data-f="dosis"]');
+    if (dosisInput && !dosisInput.value) {
+      dosisInput.focus();
+    }
+  });
+}
+
+// ══ EDICIÓN CONSULTA ════════════════════════════════════════════
+let ecRecetaN = 0;
+
+async function abrirEditarConsulta(id) {
+  document.getElementById('ec-id').value = id;
+  document.getElementById('ec-recetas').innerHTML = '';
+  ecRecetaN = 0;
+  openModal('modal-editar-consulta');
+  try {
+    const res = await api(`/historia/${id}`);
+    if (!res||!res.ok) { toast('Error al cargar consulta.','danger'); return; }
+    const c   = (await res.json()).data;
+    document.getElementById('ec-motivo').value     = c.motivo      || '';
+    document.getElementById('ec-peso').value       = c.peso_kg     || '';
+    document.getElementById('ec-temp').value       = c.temperatura_c || '';
+    document.getElementById('ec-anamnesis').value  = c.anamnesis   || '';
+    document.getElementById('ec-exploracion').value = c.exploracion || '';
+    document.getElementById('ec-diagnostico').value = c.diagnostico || '';
+    document.getElementById('ec-tratamiento').value = c.tratamiento || '';
+    document.getElementById('ec-obs').value        = c.observaciones || '';
+    // Cargar recetas existentes
+    (c.recetas||[]).forEach(r => addRecetaEdit(r));
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function addRecetaEdit(data={}) {
+  const id  = ecRecetaN++;
+  const div = document.createElement('div');
+  div.id = `ecr-${id}`;
+  div.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:.9rem;display:flex;flex-direction:column;gap:.6rem';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft)">💊 Medicamento ${id+1}</p>
+      <button onclick="document.getElementById('ecr-${id}').remove()" class="vlink" style="color:#e11d48">Eliminar</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <input type="text" placeholder="Medicamento *" class="vinput" data-f="medicamento" style="font-size:.78rem" value="${esc(data.medicamento||'')}"/>
+      <input type="text" placeholder="Dosis *" class="vinput" data-f="dosis" style="font-size:.78rem" value="${esc(data.dosis||'')}"/>
+      <input type="text" placeholder="Frecuencia *" class="vinput" data-f="frecuencia" style="font-size:.78rem" value="${esc(data.frecuencia||'')}"/>
+      <input type="number" placeholder="Días" class="vinput" data-f="duracion_dias" style="font-size:.78rem" value="${data.duracion_dias||''}"/>
+    </div>
+    <input type="text" placeholder="Instrucciones…" class="vinput" data-f="instrucciones" style="font-size:.78rem" value="${esc(data.instrucciones||'')}"/>`;
+  document.getElementById('ec-recetas').appendChild(div);
+  // Adjuntar autocomplete al campo medicamento
+  const inputMed = div.querySelector('[data-f="medicamento"]');
+  if (typeof attachAutocomplete === 'function') {
+    attachAutocomplete(inputMed, ['medicamento','insumo','otro'], ()=>{});
+  }
+}
+
+async function guardarEditConsulta() {
+  const id     = document.getElementById('ec-id').value;
+  const motivo = document.getElementById('ec-motivo').value.trim();
+  if (!motivo) { toast('El motivo es obligatorio.','warning'); return; }
+
+  const recetas = [];
+  for (const div of document.querySelectorAll('#ec-recetas > div')) {
+    const g = f => div.querySelector(`[data-f="${f}"]`)?.value?.trim()||'';
+    const med=g('medicamento'),dosis=g('dosis'),frec=g('frecuencia');
+    if (!med||!dosis||!frec) { toast('Completa todos los campos de la receta.','warning'); return; }
+    recetas.push({ medicamento:med, dosis, frecuencia:frec, duracion_dias:parseInt(g('duracion_dias'))||null, instrucciones:g('instrucciones') });
+  }
+
+  const body = {
+    motivo,
+    peso_kg      : parseFloat(document.getElementById('ec-peso').value)||null,
+    temperatura_c: parseFloat(document.getElementById('ec-temp').value)||null,
+    anamnesis    : document.getElementById('ec-anamnesis').value.trim(),
+    exploracion  : document.getElementById('ec-exploracion').value.trim(),
+    diagnostico  : document.getElementById('ec-diagnostico').value.trim(),
+    tratamiento  : document.getElementById('ec-tratamiento').value.trim(),
+    observaciones: document.getElementById('ec-obs').value.trim(),
+    recetas,
+  };
+
+  try {
+    const res = await api(`/historia/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Consulta actualizada','success');
+    closeModal('modal-editar-consulta');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══ EDICIÓN VACUNA ═══════════════════════════════════════════════
+
+async function abrirEditarVacuna(id) {
+  document.getElementById('ev-id').value = id;
+  openModal('modal-editar-vacuna');
+  try {
+    const res  = await api(`/vacunas/mascota/${mascotaId}`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    const v    = rows.find(x => x.id === id);
+    if (!v) { toast('Vacuna no encontrada.','danger'); return; }
+    document.getElementById('ev-nombre').value    = v.nombre            || '';
+    document.getElementById('ev-fabricante').value = v.fabricante       || '';
+    document.getElementById('ev-lote').value       = v.lote             || '';
+    document.getElementById('ev-fecha').value      = v.fecha_aplicacion?.split('T')[0] || '';
+    document.getElementById('ev-proxima').value    = v.proxima_dosis?.split('T')[0]    || '';
+    document.getElementById('ev-notas').value      = v.notas            || '';
+  } catch { toast('Error al cargar vacuna.','danger'); }
+}
+
+async function guardarEditVacuna() {
+  const id     = document.getElementById('ev-id').value;
+  const nombre = document.getElementById('ev-nombre').value.trim();
+  const fecha  = document.getElementById('ev-fecha').value;
+  if (!nombre) { toast('El nombre es obligatorio.','warning'); return; }
+  if (!fecha)  { toast('La fecha es obligatoria.','warning'); return; }
+
+  const body = {
+    nombre,
+    fabricante    : document.getElementById('ev-fabricante').value.trim()||null,
+    lote          : document.getElementById('ev-lote').value.trim()||null,
+    fecha_aplicacion: fecha,
+    proxima_dosis : document.getElementById('ev-proxima').value||null,
+    notas         : document.getElementById('ev-notas').value.trim()||null,
+  };
+
+  try {
+    const res = await api(`/vacunas/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Vacuna actualizada','success');
+    closeModal('modal-editar-vacuna');
+    cargarVacunas(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══ EDICIÓN ESTÉTICA ═════════════════════════════════════════════
+
+async function abrirEditarEstetica(id) {
+  document.getElementById('ee-id').value = id;
+  openModal('modal-editar-estetica');
+  try {
+    const res  = await api(`/estetica/mascota/${mascotaId}`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    const s    = rows.find(x => x.id === id);
+    if (!s) { toast('Registro no encontrado.','danger'); return; }
+    document.getElementById('ee-fecha').value      = s.fecha?.split('T')[0] || '';
+    document.getElementById('ee-tipo').value       = s.tipo_bano            || 'basico';
+    document.getElementById('ee-corte').checked   = !!s.incluye_corte;
+    document.getElementById('ee-unas').checked    = !!s.incluye_unas;
+    document.getElementById('ee-dental').checked  = !!s.incluye_dental;
+    document.getElementById('ee-productos').value  = s.productos            || '';
+    document.getElementById('ee-precio').value     = s.precio               || '';
+    document.getElementById('ee-obs').value        = s.observaciones        || '';
+  } catch { toast('Error al cargar registro.','danger'); }
+}
+
+async function guardarEditEstetica() {
+  const id   = document.getElementById('ee-id').value;
+  const fecha = document.getElementById('ee-fecha').value;
+  const tipo  = document.getElementById('ee-tipo').value;
+  if (!fecha) { toast('La fecha es obligatoria.','warning'); return; }
+  if (!tipo)  { toast('El tipo de baño es obligatorio.','warning'); return; }
+
+  const body = {
+    fecha,
+    tipo_bano      : tipo,
+    incluye_corte  : document.getElementById('ee-corte').checked,
+    incluye_unas   : document.getElementById('ee-unas').checked,
+    incluye_dental : document.getElementById('ee-dental').checked,
+    productos      : document.getElementById('ee-productos').value.trim()||null,
+    precio         : parseFloat(document.getElementById('ee-precio').value)||null,
+    observaciones  : document.getElementById('ee-obs').value.trim()||null,
+  };
+
+  try {
+    const res = await api(`/estetica/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Servicio de estética actualizado','success');
+    closeModal('modal-editar-estetica');
+    cargarEstetica(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function ib(label,val) { return '<div style="background:#f8faf8;border-radius:.9rem;padding:.7rem .9rem;border:1px solid var(--line)"><p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">'+label+'</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">'+esc(val||'—')+'</p></div>'; }
+function sec(label,val,color,bold) { if (!val) return ''; return '<div style="margin-bottom:.95rem"><p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:.35rem">'+label+'</p><p style="font-size:.85rem;line-height:1.65;'+(color?'color:'+color+';':'')+(bold?'font-weight:600;':'')+'">'+esc(val)+'</p></div>'; }
+
+// ══ AUTOCOMPLETADO INVENTARIO ════════════════════════════════════
+
+// Cache del inventario para no hacer fetch en cada keystroke
+let _inventarioCache = null;
+
+async function getInventario() {
+  if (_inventarioCache) return _inventarioCache;
+  try {
+    const res = await api('/inventario');
+    if (!res || !res.ok) return [];
+    _inventarioCache = (await res.json()).data || [];
+    return _inventarioCache;
+  } catch { return []; }
+}
+
+/**
+ * Adjunta autocompletado a un input.
+ * @param {HTMLInputElement} input   - El campo de texto
+ * @param {string[]}         cats    - Categorías a filtrar: ['medicamento'], ['vacuna'], etc.
+ * @param {Function}         onSelect - Callback(item) cuando el usuario elige una sugerencia
+ */
+function attachAutocomplete(input, cats, onSelect) {
+  // Contenedor relativo
+  input.parentElement.classList.add('autocomplete-wrap');
+
+  let list = null;
+  let _touchOutside = null;
+
+  function cerrar() {
+    list?.remove();
+    list = null;
+    // Remover listener de touch al cerrar
+    if (_touchOutside) {
+      document.removeEventListener('touchstart', _touchOutside);
+      _touchOutside = null;
+    }
+  }
+
+  input.addEventListener('input', async () => {
+    const q = input.value.trim().toLowerCase();
+    cerrar();
+    if (q.length < 1) return;
+
+    const items = await getInventario();
+    const filtrados = items.filter(i =>
+      (!cats.length || cats.includes(i.categoria)) &&
+      i.nombre.toLowerCase().includes(q)
+    ).slice(0, 8);
+
+    list = document.createElement('ul');
+    list.className = 'autocomplete-list';
+
+    if (!filtrados.length) {
+      const li = document.createElement('li');
+      li.className = 'ac-empty';
+      li.textContent = 'Sin coincidencias en inventario — puedes escribir manualmente';
+      list.appendChild(li);
+    } else {
+      filtrados.forEach(item => {
+        const li   = document.createElement('li');
+        const bajo = item.cantidad <= item.stock_minimo;
+        li.innerHTML = `
+          <span class="ac-cat ac-cat-${item.categoria}">${catIcon(item.categoria)} ${esc(item.categoria)}</span>
+          <span class="ac-nombre">${esc(item.nombre)}</span>
+          <span class="ac-stock" style="${bajo ? 'color:#b45309' : ''}">
+            ${bajo ? '⚠️' : '📦'} ${item.cantidad} ${esc(item.unidad)}
+          </span>
+          <span class="ac-hint">← seleccionar</span>`;
+        li.addEventListener('mousedown', e => {
+          e.preventDefault();
+          input.value = item.nombre;
+          cerrar();
+          if (onSelect) onSelect(item);
+        });
+        // Soporte táctil para móvil
+        li.addEventListener('touchstart', e => {
+          e.preventDefault();
+          input.value = item.nombre;
+          cerrar();
+          if (onSelect) onSelect(item);
+        }, { passive: false });
+        list.appendChild(li);
+      });
+    }
+
+    input.parentElement.appendChild(list);
+
+    // Agregar listener touch solo cuando el dropdown está abierto
+    if ('ontouchstart' in window) {
+      _touchOutside = (e) => {
+        if (list && !list.contains(e.target) && e.target !== input) {
+          cerrar();
+        }
+      };
+      document.addEventListener('touchstart', _touchOutside, { passive: true });
+    }
+  });
+
+  // Cerrar al perder foco (con delay para permitir click en la lista)
+  input.addEventListener('blur', () => setTimeout(cerrar, 200));
+  // Cerrar con Escape
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+}
+
+function catIcon(cat) {
+  return { medicamento:'💊', vacuna:'💉', insumo:'🧰', otro:'📎' }[cat] || '📦';
+}
+</script>
+</body>
+</html>

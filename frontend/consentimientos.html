@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Consentimientos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>📄 Consentimientos Informados</h2><p>Respaldo legal para procedimientos veterinarios</p></div>
+    <button onclick="mostrarTab('generar')" class="vbtn vbtn-primary">＋ Generar documento</button>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
+    <button class="rep-tab active" id="tab-generar"    onclick="mostrarTab('generar')">📝 Generar</button>
+    <button class="rep-tab" id="tab-historial"  onclick="mostrarTab('historial')">📋 Historial</button>
+    <button class="rep-tab" id="tab-plantillas" onclick="mostrarTab('plantillas')">🗂️ Plantillas</button>
+  </div>
+
+  <!-- GENERAR -->
+  <div id="contenido-generar">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem">
+      <!-- Formulario -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:1rem">
+          Datos del documento
+        </h3>
+        <div style="display:flex;flex-direction:column;gap:.9rem">
+          <div>
+            <label class="vlabel">Plantilla *</label>
+            <select id="g-plantilla" class="vinput" onchange="previewPlantilla()">
+              <option value="">— Selecciona plantilla —</option>
+            </select>
+          </div>
+          <div>
+            <label class="vlabel">Buscar mascota *</label>
+            <div class="search-wrap">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <input id="g-mascota-search" type="text" class="vinput"
+                placeholder="Nombre de la mascota o propietario…" oninput="buscarMascota()"/>
+            </div>
+            <div id="g-mascota-results" style="display:none;position:absolute;z-index:50;
+              background:#fff;border:1.5px solid var(--line);border-radius:.85rem;
+              box-shadow:0 8px 24px rgba(0,0,0,.1);max-height:250px;overflow-y:auto;
+              min-width:320px;margin-top:.25rem"></div>
+          </div>
+          <!-- Mascota seleccionada -->
+          <div id="g-mascota-sel" style="display:none;padding:.85rem 1rem;
+            background:#f0fdf4;border:1.5px solid #a7f3d0;border-radius:.9rem">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <p style="font-weight:700" id="sel-mascota-nombre">—</p>
+                <p style="font-size:.78rem;color:var(--ink-soft)" id="sel-mascota-info">—</p>
+                <p style="font-size:.78rem;color:#15803d;font-weight:600;margin-top:.25rem" id="sel-propietario">—</p>
+              </div>
+              <button onclick="limpiarMascota()" class="vlink" style="font-size:.75rem;color:#be123c">✕ Cambiar</button>
+            </div>
+          </div>
+          <div>
+            <label class="vlabel">Veterinario</label>
+            <select id="g-vet" class="vinput">
+              <option value="">— Selecciona veterinario —</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:.6rem;margin-top:1.2rem">
+          <button onclick="generarDocumento()" class="vbtn vbtn-primary" style="flex:1">
+            📄 Generar documento
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="vcard" style="overflow:hidden">
+        <div style="padding:.75rem 1.1rem;border-bottom:1px solid var(--line);
+          display:flex;align-items:center;gap:.5rem;background:#f6f8f6">
+          <span style="font-size:.72rem;font-weight:700;color:var(--ink-faint);
+            text-transform:uppercase;letter-spacing:.1em">👁️ Preview de plantilla</span>
+        </div>
+        <div id="preview-plantilla" style="padding:1.25rem;font-size:.75rem;
+          max-height:500px;overflow-y:auto;color:#374151;line-height:1.7">
+          <div style="text-align:center;color:var(--ink-faint);padding:3rem">
+            <p style="font-size:2rem">📄</p>
+            <p>Selecciona una plantilla para ver el preview</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="contenido-historial" style="display:none">
+    <div class="vcard">
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead>
+            <tr><th>Fecha</th><th>Plantilla</th><th>Mascota</th><th>Propietario</th>
+                <th>Veterinario</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tbody-historial">
+            <tr><td colspan="7"><div class="vempty"><div class="vspinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANTILLAS -->
+  <div id="contenido-plantillas" style="display:none">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <button onclick="abrirNuevaPlantilla()" class="vbtn vbtn-primary">＋ Nueva plantilla</button>
+    </div>
+    <div id="grid-plantillas" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+  </div>
+
+</div>
+
+<!-- Modal documento generado -->
+<div id="modal-doc" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:780px">
+    <div class="vmodal-head">
+      <h3>📄 Consentimiento generado</h3>
+      <button onclick="closeModal('modal-doc')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="padding:0">
+      <div id="doc-contenido" style="padding:1.5rem;max-height:60vh;overflow-y:auto;
+        font-size:.82rem;line-height:1.7"></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-doc')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="marcarFirmado()" class="vbtn vbtn-ghost" id="btn-firmar">✅ Marcar firmado</button>
+      <button onclick="imprimirDoc()" class="vbtn vbtn-primary">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal plantilla -->
+<div id="modal-plantilla" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:700px">
+    <div class="vmodal-head">
+      <h3 id="modal-plt-titulo">Nueva Plantilla</h3>
+      <button onclick="closeModal('modal-plantilla')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="plt-id"/>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Nombre *</label>
+          <input id="plt-nombre" type="text" class="vinput" placeholder="Ej: Consentimiento de Cirugía"/>
+        </div>
+        <div>
+          <label class="vlabel">Tipo</label>
+          <select id="plt-tipo" class="vinput">
+            <option value="cirugia">🔪 Cirugía</option>
+            <option value="anestesia">💉 Anestesia</option>
+            <option value="procedimiento">🩺 Procedimiento</option>
+            <option value="estetica">✂️ Estética</option>
+            <option value="vacunacion">💉 Vacunación</option>
+            <option value="otro">📎 Otro</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel">
+          Contenido HTML *
+          <span style="font-size:.65rem;color:var(--ink-faint);font-weight:400;margin-left:.5rem">
+            Variables: {{nombre_mascota}} {{especie}} {{raza}} {{peso_kg}} {{nombre_propietario}} {{dni_propietario}} {{telefono}} {{nombre_veterinario}} {{nombre_clinica}} {{logo_clinica}} {{fecha}}
+          </span>
+        </label>
+        <!-- Botón generar con IA -->
+        <button type="button" onclick="generarPromptIA()"
+          style="margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem;
+          padding:.45rem 1rem;border:1.5px solid #6366f1;border-radius:.75rem;
+          background:#f5f3ff;color:#4f46e5;font-size:.78rem;font-weight:700;
+          cursor:pointer;font-family:inherit;transition:all .15s"
+          onmouseover="this.style.background='#ede9fe'"
+          onmouseout="this.style.background='#f5f3ff'">
+          ✨ Generar prompt para IA
+        </button>
+        <textarea id="plt-contenido" rows="12" class="vinput"
+          style="font-family:'Courier New',monospace;font-size:.75rem"
+          placeholder="&lt;div style=&quot;...&quot;&gt;Contenido HTML...&lt;/div&gt;"></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-plantilla')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarPlantilla()" class="vbtn vbtn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Prompt IA -->
+<div id="modal-prompt-ia" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:620px">
+    <div class="vmodal-head">
+      <h3>✨ Prompt para generar plantilla con IA</h3>
+      <button onclick="closeModal('modal-prompt-ia')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div style="background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:.85rem;
+        padding:.85rem 1rem;font-size:.8rem;color:#4f46e5">
+        <p style="font-weight:700;margin-bottom:.3rem">📋 Instrucciones:</p>
+        <p>1. Copia el prompt de abajo</p>
+        <p>2. Pégalo en ChatGPT, Claude u otra IA</p>
+        <p>3. Copia el HTML que te devuelva</p>
+        <p>4. Pégalo en el campo "Contenido HTML" de esta plantilla</p>
+      </div>
+
+      <div>
+        <label class="vlabel">Prompt generado</label>
+        <textarea id="prompt-ia-texto" rows="16" class="vinput"
+          style="font-family:'Courier New',monospace;font-size:.72rem;line-height:1.6"
+          readonly></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-prompt-ia')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="copiarPrompt()" class="vbtn vbtn-primary">📋 Copiar prompt</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .rep-tab { padding:.5rem 1rem;border:none;background:none;cursor:pointer;
+             font-family:inherit;font-size:.82rem;font-weight:600;color:var(--ink-faint);
+             border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s; }
+  .rep-tab.active { color:var(--green-600);border-bottom-color:var(--green-500); }
+</style>
+
+<script>
+let mascotaSelId = null;
+let docGeneradoId = null;
+let busquedaTimer = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'consentimientos', title:'Consentimientos', subtitle:'Respaldo legal' });
+  cargarPlantillasSelect();
+  cargarVeterinarios();
+});
+
+function mostrarTab(tab) {
+  ['generar','historial','plantillas'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`contenido-${t}`).style.display = t===tab?'block':'none';
+  });
+  if (tab==='historial') cargarHistorial();
+  if (tab==='plantillas') cargarPlantillasGrid();
+}
+
+async function cargarPlantillasSelect() {
+  try {
+    const res = await api('/consentimientos/plantillas');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    const sel  = document.getElementById('g-plantilla');
+    sel.innerHTML = '<option value="">— Selecciona plantilla —</option>';
+    rows.filter(p=>p.activo).forEach(p => {
+      sel.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+    });
+  } catch {}
+}
+
+async function cargarVeterinarios() {
+  try {
+    const res = await api('/usuarios?rol=veterinario');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    const sel  = document.getElementById('g-vet');
+    sel.innerHTML = '<option value="">— Selecciona veterinario —</option>';
+    rows.filter(u=>u.activo).forEach(u => {
+      sel.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+    });
+    // Preseleccionar el usuario actual si es vet
+    const me = JSON.parse(localStorage.getItem('vet_user')||'{}');
+    if (me.rol==='veterinario') sel.value = me.id;
+  } catch {}
+}
+
+async function previewPlantilla() {
+  const id = document.getElementById('g-plantilla').value;
+  if (!id) {
+    document.getElementById('preview-plantilla').innerHTML =
+      '<div style="text-align:center;color:var(--ink-faint);padding:3rem"><p style="font-size:2rem">📄</p><p>Selecciona una plantilla</p></div>';
+    return;
+  }
+  try {
+    const res = await api(`/consentimientos/plantillas/${id}`);
+    if (!res?.ok) return;
+    const p = (await res.json()).data;
+    document.getElementById('preview-plantilla').innerHTML =
+      p.contenido.replace(/{{[^}]+}}/g, m => `<mark style="background:#fef9c3;padding:0 .2rem;border-radius:.2rem">${m}</mark>`);
+  } catch {}
+}
+
+function buscarMascota() {
+  clearTimeout(busquedaTimer);
+  const q = document.getElementById('g-mascota-search').value.trim();
+  if (q.length < 2) { document.getElementById('g-mascota-results').style.display='none'; return; }
+  busquedaTimer = setTimeout(async () => {
+    try {
+      const res = await api(`/mascotas?search=${encodeURIComponent(q)}&limit=6`);
+      if (!res?.ok) return;
+      const rows = (await res.json()).data || [];
+      const box  = document.getElementById('g-mascota-results');
+      if (!rows.length) { box.style.display='none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = rows.map(m => `
+        <div onclick="seleccionarMascota(${m.id},'${esc(m.nombre)}','${esc(m.especie)}','${esc(m.raza||'')}','${esc(m.propietario_nombre||'')}',${m.propietario_id})"
+          style="padding:.75rem 1rem;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:.75rem;align-items:center"
+          onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
+          <span style="font-size:1.2rem">${{perro:'🐕',gato:'🐈',ave:'🦜'}[m.especie]||'🐾'}</span>
+          <div>
+            <p style="font-weight:600;font-size:.85rem">${esc(m.nombre)}</p>
+            <p style="font-size:.72rem;color:var(--ink-faint)">${esc(m.especie)} · ${esc(m.raza||'')} · ${esc(m.propietario_nombre||'')}</p>
+          </div>
+        </div>`).join('');
+    } catch {}
+  }, 300);
+}
+
+function seleccionarMascota(id, nombre, especie, raza, propietario, propietarioId) {
+  mascotaSelId = id;
+  document.getElementById('g-mascota-search').value         = '';
+  document.getElementById('g-mascota-results').style.display = 'none';
+  document.getElementById('g-mascota-sel').style.display     = 'block';
+  document.getElementById('sel-mascota-nombre').textContent  = nombre;
+  document.getElementById('sel-mascota-info').textContent    = `${especie} · ${raza}`;
+  document.getElementById('sel-propietario').textContent     = `👤 ${propietario}`;
+}
+
+function limpiarMascota() {
+  mascotaSelId = null;
+  document.getElementById('g-mascota-sel').style.display = 'none';
+  document.getElementById('g-mascota-search').value      = '';
+}
+
+async function generarDocumento() {
+  const plantilla_id   = document.getElementById('g-plantilla').value;
+  const veterinario_id = document.getElementById('g-vet').value;
+  if (!plantilla_id)  { toast('Selecciona una plantilla.','warning'); return; }
+  if (!mascotaSelId)  { toast('Selecciona una mascota.','warning'); return; }
+
+  try {
+    const res  = await api('/consentimientos/generar', {
+      method:'POST',
+      body: { plantilla_id:parseInt(plantilla_id), mascota_id:mascotaSelId,
+              veterinario_id: veterinario_id ? parseInt(veterinario_id) : null }
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+
+    docGeneradoId = data.data.id;
+    document.getElementById('doc-contenido').innerHTML = data.data.contenido;
+    document.getElementById('btn-firmar').style.display = 'inline-flex';
+    openModal('modal-doc');
+    toast('✅ Documento generado.','success');
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+async function marcarFirmado() {
+  if (!docGeneradoId) return;
+  const ok = await vconfirm({
+    titulo     : '¿Confirmar firma del documento?',
+    mensaje    : 'Esta acción marcará el consentimiento como firmado por el propietario. No se puede revertir.',
+    labelOk    : '✅ Confirmar firma',
+    labelCancel: 'Cancelar',
+    tipo       : 'success',
+  });
+  if (!ok) return;
+  try {
+    const res = await api(`/consentimientos/${docGeneradoId}/firmar`, { method:'PATCH' });
+    if (!res?.ok) {
+      const data = await res.json();
+      apiError(res.status, data.message);
+      return;
+    }
+    toast('✅ Marcado como firmado.','success');
+    document.getElementById('btn-firmar').style.display = 'none';
+  } catch {}
+}
+
+function imprimirDoc() {
+  const contenido = document.getElementById('doc-contenido').innerHTML;
+  const v = window.open('','_blank');
+  v.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8"/><title>Consentimiento Informado</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;padding:2rem;color:#111}
+    @media print{button{display:none!important}}</style>
+    </head><body>${contenido}
+    <br/><div style="text-align:center">
+      <button onclick="window.print()"
+        style="background:#166534;color:#fff;border:none;padding:.6rem 2rem;border-radius:.5rem;
+        font-weight:700;cursor:pointer;font-size:.9rem">
+        🖨️ Imprimir / Guardar PDF
+      </button>
+    </div></body></html>`);
+  v.document.close();
+  setTimeout(() => v.print(), 800);
+}
+
+async function cargarHistorial() {
+  const tbody = document.getElementById('tbody-historial');
+  try {
+    const res  = await api('/consentimientos/historial');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">📭</span><p>Sin consentimientos generados</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td style="font-size:.78rem">${new Date(r.created_at).toLocaleDateString('es-PE')}</td>
+      <td>${esc(r.plantilla)} <span style="font-size:.65rem;color:var(--ink-faint)">(${r.tipo})</span></td>
+      <td style="font-weight:600">${esc(r.mascota)}</td>
+      <td>${esc(r.propietario)}</td>
+      <td style="font-size:.78rem">${esc(r.veterinario)}</td>
+      <td>${r.firmado
+        ? '<span style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">✅ Firmado</span>'
+        : '<span style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">⏳ Sin firma</span>'}</td>
+      <td>
+        <button class="vlink" onclick="verConsentimiento(${r.id})"
+          style="font-size:.74rem;color:var(--green-600)">Ver</button>
+      </td>
+    </tr>`).join('');
+  } catch { tbody.innerHTML=`<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
+}
+
+async function verConsentimiento(id) {
+  openModal('modal-doc');
+  document.getElementById('doc-contenido').innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  try {
+    const res = await api(`/consentimientos/${id}`);
+    if (!res?.ok) return;
+    const d = (await res.json()).data;
+    docGeneradoId = d.id;
+    document.getElementById('doc-contenido').innerHTML = d.contenido_final;
+    document.getElementById('btn-firmar').style.display = d.firmado?'none':'inline-flex';
+  } catch {}
+}
+
+async function cargarPlantillasGrid() {
+  const grid = document.getElementById('grid-plantillas');
+  grid.innerHTML = '<div class="vempty" style="grid-column:1/-1"><div class="vspinner"></div></div>';
+  try {
+    const res  = await api('/consentimientos/plantillas');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    const tipoColors = {
+      cirugia    :{ bg:'#fff1f2',color:'#be123c',icon:'🔪' },
+      anestesia  :{ bg:'#f5f3ff',color:'#6d28d9',icon:'💉' },
+      procedimiento:{ bg:'#eff6ff',color:'#1d4ed8',icon:'🩺' },
+      estetica   :{ bg:'#fdf2f8',color:'#db2777',icon:'✂️' },
+      vacunacion :{ bg:'#ecfdf5',color:'#15803d',icon:'💉' },
+      otro       :{ bg:'#f8faf8',color:'#4b5f57',icon:'📎' },
+    };
+    grid.innerHTML = rows.map(p => {
+      const tc = tipoColors[p.tipo]||tipoColors.otro;
+      return `<div class="vcard vcard-pad">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem">
+          <div style="width:42px;height:42px;border-radius:.75rem;flex-shrink:0;
+            background:${tc.bg};display:flex;align-items:center;justify-content:center;font-size:1.3rem">
+            ${tc.icon}
+          </div>
+          <div>
+            <p style="font-weight:700;font-size:.9rem">${esc(p.nombre)}</p>
+            <span style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;
+              background:${tc.bg};color:${tc.color}">${p.tipo}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="vbtn vbtn-ghost" onclick="editarPlantilla(${p.id})"
+            style="flex:1;font-size:.75rem;padding:.4rem">✏️ Editar</button>
+          <button class="vbtn vbtn-primary" onclick="usarPlantilla(${p.id})"
+            style="flex:1;font-size:.75rem;padding:.4rem">📄 Usar</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch { grid.innerHTML='<div class="vempty" style="grid-column:1/-1"><p>Error al cargar.</p></div>'; }
+}
+
+function generarPromptIA() {
+  const nombre = document.getElementById('plt-nombre').value.trim();
+  const tipo   = document.getElementById('plt-tipo').value;
+
+  const tipoLabel = {
+    cirugia     : 'Cirugía General',
+    anestesia   : 'Anestesia General',
+    procedimiento: 'Procedimiento Médico',
+    estetica    : 'Estética / Peluquería',
+    vacunacion  : 'Vacunación',
+    otro        : 'Procedimiento Veterinario',
+  }[tipo] || 'Procedimiento Veterinario';
+
+  const nombreDoc = nombre || tipoLabel;
+
+  const prompt = `Eres un experto en diseño de documentos médicos veterinarios. Necesito que generes el HTML completo para un consentimiento informado de una clínica veterinaria.
+
+NOMBRE DEL DOCUMENTO: "${nombreDoc}"
+TIPO: ${tipoLabel}
+
+REQUISITOS DEL DISEÑO:
+- HTML auto-contenido con estilos inline (sin clases CSS externas)
+- Diseño profesional, moderno y limpio
+- Máximo ancho: 720px, centrado con margin:0 auto
+- Fuente: Arial o sans-serif
+- Header con fondo verde oscuro (#166534) con el logo y nombre de la clínica
+- Cuerpo del documento con secciones bien definidas
+- Sección de firmas al final (propietario y veterinario)
+- Footer con nombre de clínica y fecha
+
+VARIABLES OBLIGATORIAS (debes incluirlas exactamente así):
+- {{logo_clinica}} → imagen del logo (en el header)
+- {{nombre_clinica}} → nombre de la clínica veterinaria
+- {{nombre_mascota}} → nombre de la mascota
+- {{especie}} → especie (perro, gato, etc.)
+- {{raza}} → raza de la mascota
+- {{peso_kg}} → peso en kg
+- {{nombre_propietario}} → nombre completo del propietario
+- {{dni_propietario}} → DNI del propietario
+- {{telefono}} → teléfono del propietario
+- {{nombre_veterinario}} → nombre del médico veterinario
+- {{fecha}} → fecha del documento
+
+ESTRUCTURA DEL DOCUMENTO:
+1. Header con {{logo_clinica}} + {{nombre_clinica}} + badge "Consentimiento Informado" + {{fecha}}
+2. Datos del paciente ({{nombre_mascota}}, {{especie}}, {{raza}}, {{peso_kg}})
+3. Datos del propietario ({{nombre_propietario}}, {{dni_propietario}}, {{telefono}})
+4. Texto legal del consentimiento específico para "${nombreDoc}" (redacta un texto profesional y completo en español)
+5. Lista de riesgos informados relevantes para este tipo de procedimiento
+6. Cláusulas de autorización
+7. Sección de firmas: propietario a la izquierda, veterinario a la derecha
+8. Footer
+
+IMPORTANTE:
+- Devuelve ÚNICAMENTE el código HTML, sin explicaciones ni markdown
+- No uses \`\`\`html ni \`\`\` 
+- El HTML debe comenzar con <div y terminar con </div>
+- Todos los estilos deben ser inline
+- Usa colores verde (#166534, #15803d, #f0fdf4) como paleta principal`;
+
+  document.getElementById('prompt-ia-texto').value = prompt;
+  openModal('modal-prompt-ia');
+}
+
+function copiarPrompt() {
+  const el = document.getElementById('prompt-ia-texto');
+  el.select();
+  el.setSelectionRange(0, 99999); // para móvil
+  try {
+    document.execCommand('copy');
+    toast('✅ Prompt copiado al portapapeles', 'success');
+  } catch {
+    navigator.clipboard.writeText(el.value).then(() => {
+      toast('✅ Prompt copiado al portapapeles', 'success');
+    }).catch(() => {
+      toast('❌ No se pudo copiar. Selecciona el texto manualmente.', 'warning');
+    });
+  }
+}
+
+function insertarVariable(variable) {
+  const textarea = document.getElementById('plt-contenido');
+  if (!textarea) return;
+  const start = textarea.selectionStart;
+  const end   = textarea.selectionEnd;
+  const texto = textarea.value;
+  textarea.value = texto.substring(0, start) + variable + texto.substring(end);
+  // Posicionar cursor después de la variable insertada
+  textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+  textarea.focus();
+}
+
+function abrirNuevaPlantilla() {
+  document.getElementById('modal-plt-titulo').textContent = '🗂️ Nueva Plantilla';
+  document.getElementById('plt-id').value       = '';
+  document.getElementById('plt-nombre').value   = '';
+  document.getElementById('plt-tipo').value     = 'procedimiento';
+  document.getElementById('plt-contenido').value= '';
+  openModal('modal-plantilla');
+}
+
+async function editarPlantilla(id) {
+  document.getElementById('modal-plt-titulo').textContent = '✏️ Editar Plantilla';
+  document.getElementById('plt-id').value = id;
+  openModal('modal-plantilla');
+  try {
+    const res = await api(`/consentimientos/plantillas/${id}`);
+    if (!res?.ok) return;
+    const p = (await res.json()).data;
+    document.getElementById('plt-nombre').value   = p.nombre;
+    document.getElementById('plt-tipo').value     = p.tipo;
+    document.getElementById('plt-contenido').value= p.contenido;
+  } catch {}
+}
+
+async function guardarPlantilla() {
+  const id      = document.getElementById('plt-id').value;
+  const nombre  = document.getElementById('plt-nombre').value.trim();
+  const tipo    = document.getElementById('plt-tipo').value;
+  const contenido = document.getElementById('plt-contenido').value.trim();
+  if (!nombre)   { toast('Nombre requerido.','warning'); return; }
+  if (!contenido){ toast('Contenido requerido.','warning'); return; }
+  const url    = id ? `/consentimientos/plantillas/${id}` : '/consentimientos/plantillas';
+  const method = id ? 'PUT' : 'POST';
+  try {
+    const res  = await api(url, { method, body:{ nombre, tipo, contenido, activo:true } });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Plantilla guardada.','success');
+    closeModal('modal-plantilla');
+    cargarPlantillasSelect();
+    cargarPlantillasGrid();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function usarPlantilla(id) {
+  mostrarTab('generar');
+  document.getElementById('g-plantilla').value = id;
+  previewPlantilla();
+}
+</script>
+</body>
+</html>
