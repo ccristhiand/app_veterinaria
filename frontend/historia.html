@@ -650,7 +650,7 @@ async function cargarVacunas(id) {
   const cont = document.getElementById('vacunas-lista');
   cont.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div>';
   try {
-    const res  = await api('/vacunas/'+id);
+    const res  = await api('/vacunas?mascota_id='+id);
     if (!res) return;
     const rows = (await res.json()).data||[];
     if (!rows.length) {
