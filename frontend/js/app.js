@@ -4,7 +4,14 @@
  */
 
 // ── Configuración ─────────────────────────────────────────────────────────────
-const API_URL = 'http://localhost:4000/api/v1';
+const _isLocalApp = window.location.hostname === 'localhost' ||
+                    window.location.hostname.endsWith('.test') ||
+                    window.location.hostname.endsWith('.local') ||
+                    window.location.hostname === '127.0.0.1';
+const _baseDomainApp = window.location.hostname.split('.').slice(-2).join('.');
+const API_URL = _isLocalApp
+  ? 'http://localhost:4000/api/v1'
+  : `https://api.${_baseDomainApp}/api/v1`;
 
 // ── Estado global ──────────────────────────────────────────────────────────────
 const State = {
@@ -19,16 +26,16 @@ const State = {
 // API HELPER
 // ══════════════════════════════════════════════════════════════════════════════
 async function api(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {
+    'Content-Type' : 'application/json',
+    'X-Tenant-Host': window.location.hostname,
+  };
   if (auth && State.accessToken) headers['Authorization'] = `Bearer ${State.accessToken}`;
-
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-
-  // Auto-refresh de token
   if (res.status === 401 && State.refreshToken) {
     const ok = await refreshTokens();
     if (ok) {
@@ -39,7 +46,6 @@ async function api(path, { method = 'GET', body, auth = true } = {}) {
       return;
     }
   }
-
   return res;
 }
 
@@ -47,7 +53,7 @@ async function refreshTokens() {
   try {
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Tenant-Host': window.location.hostname },
       body   : JSON.stringify({ refreshToken: State.refreshToken }),
     });
     if (!res.ok) return false;
@@ -74,31 +80,26 @@ async function doLogin() {
   const password = document.getElementById('login-password').value;
   const errEl    = document.getElementById('login-error');
   const btn      = document.getElementById('login-btn');
-
   errEl.classList.add('hidden');
-  btn.disabled   = true;
+  btn.disabled    = true;
   btn.textContent = 'Ingresando…';
-
   try {
     const res  = await api('/auth/login', { method: 'POST', body: { email, password }, auth: false });
     const data = await res.json();
-
     if (!res.ok) {
       errEl.textContent = data.message || 'Error al iniciar sesión.';
       errEl.classList.remove('hidden');
       return;
     }
-
     setTokens(data.accessToken, data.refreshToken);
     State.user = data.user;
     localStorage.setItem('vet_user', JSON.stringify(data.user));
-
     initApp();
   } catch (e) {
     errEl.textContent = 'No se pudo conectar al servidor.';
     errEl.classList.remove('hidden');
   } finally {
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = 'Iniciar Sesión';
   }
 }
@@ -118,9 +119,14 @@ function logout() {
 function connectSocket() {
   if (State.socket?.connected) return;
 
-  State.socket = io('http://localhost:4000', {
-    auth          : { token: State.accessToken },
-    reconnection  : true,
+  const socketUrl = _isLocalApp
+    ? 'http://localhost:4000'
+    : `https://api.${_baseDomainApp}`;
+
+  State.socket = io(socketUrl, {
+    auth             : { token: State.accessToken },
+    extraHeaders     : { 'X-Tenant-Host': window.location.hostname },
+    reconnection     : true,
     reconnectionDelay: 2000,
     reconnectionAttempts: 10,
   });
@@ -128,37 +134,23 @@ function connectSocket() {
   const indicator = document.getElementById('ws-indicator');
   const label     = document.getElementById('ws-label');
 
-  // Conexión exitosa
   State.socket.on('connect', () => {
     indicator.className = 'w-2 h-2 rounded-full bg-success notif-dot';
     label.textContent   = 'En vivo';
     label.className     = 'hidden sm:inline text-success';
-    console.log('✅ Socket conectado:', State.socket.id);
   });
 
-  // Desconexión
   State.socket.on('disconnect', (reason) => {
     indicator.className = 'w-2 h-2 rounded-full bg-danger';
     label.textContent   = 'Desconectado';
     label.className     = 'hidden sm:inline text-gray-400';
-    console.warn('🔌 Socket desconectado:', reason);
   });
 
-  // ── EVENTO: Nueva Cita ────────────────────────────────────────────────────
   State.socket.on('cita:nueva', (msg) => {
     const { payload } = msg;
-    console.log('📅 Nueva cita recibida:', payload);
-
-    // 1 — Toast de notificación
     toast(`Nueva cita: ${payload.mascota_nombre} — ${formatFecha(payload.fecha_hora)}`, 'info', 6000);
-
-    // 2 — Actualizar tabla si el panel de dashboard/citas está visible
     agregarFilaCita(payload);
-
-    // 3 — Actualizar badge del menú
     incrementarBadgeCitas();
-
-    // 4 — Añadir a lista de notificaciones en panel
     agregarNotifPanel({
       tipo   : 'cita_nueva',
       titulo : `Nueva cita: ${payload.mascota_nombre}`,
@@ -166,17 +158,13 @@ function connectSocket() {
     });
   });
 
-  // ── EVENTO: Cita actualizada ───────────────────────────────────────────────
   State.socket.on('cita:actualizada', (msg) => {
-    console.log('🔄 Cita actualizada:', msg);
     actualizarEstadoEnTabla(msg.id, msg.estado);
     toast(`Cita #${msg.id} → ${msg.estado}`, 'success');
   });
 
-  // ── EVENTO: Stock mínimo ──────────────────────────────────────────────────
   State.socket.on('notif:stock_minimo', (msg) => {
     const { payload } = msg;
-    console.warn('⚠️ Stock bajo:', payload);
     toast(`⚠️ Stock bajo: ${payload.nombre} (${payload.cantidad} ${payload.unidad})`, 'warning', 8000);
     agregarNotifPanel({
       tipo   : 'stock_minimo',
@@ -185,7 +173,6 @@ function connectSocket() {
     });
   });
 
-  // ── EVENTO: Recordatorio vacuna ────────────────────────────────────────────
   State.socket.on('notif:vacuna_recordatorio', (msg) => {
     const { payload } = msg;
     toast(`💉 Vacuna pendiente: ${payload.nombre} — ${payload.mascota_nombre}`, 'info', 7000);
@@ -196,9 +183,7 @@ function connectSocket() {
     });
   });
 
-  // Error de autenticación WS
   State.socket.on('connect_error', (err) => {
-    console.error('Socket error:', err.message);
     if (err.message === 'UNAUTHORIZED') logout();
   });
 }
@@ -210,14 +195,12 @@ function showOnly(section) {
   document.querySelectorAll('[id^="section-"]').forEach((el) => el.classList.add('hidden'));
   const target = document.getElementById(`section-${section}`);
   if (target) target.classList.remove('hidden');
-
   document.querySelectorAll('.nav-link').forEach((a) => {
     a.classList.toggle(
       'bg-primary-light text-primary font-semibold',
       a.dataset.section === section,
     );
   });
-
   document.getElementById('page-title').textContent = {
     dashboard    : 'Dashboard',
     citas        : 'Gestión de Citas',
@@ -228,7 +211,6 @@ function showOnly(section) {
   }[section] || '';
 }
 
-// Nav links
 document.querySelectorAll('.nav-link').forEach((a) => {
   a.addEventListener('click', (e) => {
     e.preventDefault();
@@ -246,29 +228,20 @@ document.querySelectorAll('.nav-link').forEach((a) => {
 // ══════════════════════════════════════════════════════════════════════════════
 async function cargarDashboard() {
   const hoy = new Date().toISOString().split('T')[0];
-
   try {
-    const [resCitas, resProp, resMasc, resInv] = await Promise.all([
+    const [resCitas, resInv] = await Promise.all([
       api(`/citas?fecha=${hoy}&limit=50`),
-      api('/propietarios?limit=1'),
-      api('/mascotas?limit=1'),
       api('/inventario'),
     ]);
-
     if (resCitas?.ok) {
       const d = await resCitas.json();
       document.getElementById('stat-citas').textContent = d.data.length;
       renderCitasHoy(d.data);
     }
-    if (resProp?.ok) {
-      /* para simplificar mostramos —; en prod paginación con count */
-    }
     if (resInv?.ok) {
       const d = await resInv.json();
       const bajos = d.data.filter((i) => i.bajo_stock).length;
       document.getElementById('stat-stock').textContent = bajos;
-      document.getElementById('stat-mascotas').textContent = '—';
-      document.getElementById('stat-propietarios').textContent = '—';
     }
   } catch (e) {
     console.error(e);
@@ -292,15 +265,12 @@ function renderCitasHoy(citas) {
   `).join('');
 }
 
-// Añade una fila nueva a la tabla en tiempo real
 function agregarFilaCita(cita) {
   const tbody = document.getElementById('citas-hoy-body');
   if (!tbody) return;
-  // Quitar "sin citas" placeholder si estaba
   if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
-
   const tr = document.createElement('tr');
-  tr.className = 'hover:bg-gray-50 transition bg-blue-50';
+  tr.className   = 'hover:bg-gray-50 transition bg-blue-50';
   tr.dataset.citaId = cita.id;
   tr.innerHTML = `
     <td class="px-5 py-3 text-gray-600">${hora(cita.fecha_hora)}</td>
@@ -310,7 +280,6 @@ function agregarFilaCita(cita) {
     <td class="px-5 py-3">${badgeEstado(cita.estado)}</td>
   `;
   tbody.prepend(tr);
-  // Quitar highlight después de 3s
   setTimeout(() => tr.classList.remove('bg-blue-50'), 3000);
 }
 
@@ -329,10 +298,8 @@ async function cargarCitas() {
   let url = '/citas?limit=50';
   if (fecha)  url += `&fecha=${fecha}`;
   if (estado) url += `&estado=${estado}`;
-
   const tbody = document.getElementById('citas-body');
   tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-8 text-center text-gray-400">Cargando…</td></tr>';
-
   try {
     const res  = await api(url);
     const data = await res.json();
@@ -364,12 +331,10 @@ async function guardarCita() {
     motivo        : document.getElementById('cita-motivo').value.trim(),
     notas         : document.getElementById('cita-notas').value.trim(),
   };
-
   if (!payload.mascota_id || !payload.veterinario_id || !payload.fecha_hora || !payload.motivo) {
     toast('Completa todos los campos obligatorios.', 'danger');
     return;
   }
-
   try {
     const res  = await api('/citas', { method: 'POST', body: payload });
     const data = await res.json();
@@ -389,7 +354,6 @@ async function cargarPropietarios() {
   const search = document.getElementById('search-prop')?.value || '';
   const tbody  = document.getElementById('propietarios-body');
   tbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-gray-400">Cargando…</td></tr>';
-
   try {
     const res  = await api(`/propietarios?search=${encodeURIComponent(search)}`);
     const data = await res.json();
@@ -424,12 +388,10 @@ async function guardarPropietario() {
     email    : document.getElementById('prop-email').value.trim(),
     direccion: document.getElementById('prop-direccion').value.trim(),
   };
-
   if (!payload.nombre || !payload.apellido || !payload.telefono) {
     toast('Nombre, apellido y teléfono son obligatorios.', 'danger');
     return;
   }
-
   try {
     const res  = await api('/propietarios', { method: 'POST', body: payload });
     const data = await res.json();
@@ -447,11 +409,9 @@ async function guardarPropietario() {
 // ══════════════════════════════════════════════════════════════════════════════
 function agregarNotifPanel({ tipo, titulo, mensaje }) {
   const list = document.getElementById('notif-list');
-  // Quitar placeholder
   if (list.querySelector('li')?.textContent?.includes('Sin notificaciones')) {
     list.innerHTML = '';
   }
-
   const iconos = { cita_nueva: '📅', stock_minimo: '⚠️', vacuna_recordatorio: '💉', sistema: 'ℹ️' };
   const li = document.createElement('li');
   li.className = 'px-4 py-3 hover:bg-gray-50';
@@ -466,8 +426,6 @@ function agregarNotifPanel({ tipo, titulo, mensaje }) {
     </div>
   `;
   list.prepend(li);
-
-  // Mostrar badge
   State.notifCount++;
   document.getElementById('notif-badge').classList.remove('hidden');
 }
@@ -507,6 +465,7 @@ function toggleSidebar() {
   sb.classList.toggle('-translate-x-full', !open);
   overlay.classList.toggle('hidden', !open);
 }
+
 function closeSidebar() {
   document.getElementById('sidebar').classList.add('-translate-x-full');
   document.getElementById('sidebar-overlay').classList.add('hidden');
@@ -521,12 +480,12 @@ function toast(message, type = 'info', duration = 4000) {
   setTimeout(() => el.remove(), duration);
 }
 
-// Helpers
 const esc = (s) => String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function formatFecha(iso) {
   return new Date(iso).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
 }
+
 function hora(iso) {
   return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
 }
@@ -543,7 +502,6 @@ function badgeEstado(estado) {
   return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}">${estado}</span>`;
 }
 
-// Cerrar notif panel al hacer clic fuera
 document.addEventListener('click', (e) => {
   const panel = document.getElementById('notif-panel');
   if (!panel.classList.contains('hidden') &&
@@ -553,7 +511,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Enter en login
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !document.getElementById('section-login').classList.contains('hidden')) {
     doLogin();
@@ -566,33 +523,21 @@ document.addEventListener('keydown', (e) => {
 function initApp() {
   const { user } = State;
   if (!user) return;
-
-  // UI usuario
-  document.getElementById('user-name').textContent = user.nombre;
-  document.getElementById('user-rol').textContent  = user.rol;
-  document.getElementById('user-avatar').textContent = user.nombre.charAt(0).toUpperCase();
-
-  // Conectar Socket
+  document.getElementById('user-name').textContent    = user.nombre;
+  document.getElementById('user-rol').textContent     = user.rol;
+  document.getElementById('user-avatar').textContent  = user.nombre.charAt(0).toUpperCase();
   connectSocket();
-
-  // Mostrar dashboard
   showOnly('dashboard');
   cargarDashboard();
-
-  // Cargar vets para el select de citas
   cargarVetsSelect();
 }
 
 async function cargarVetsSelect() {
-  // Reutilizamos el endpoint de usuarios filtrado por rol (simplificado)
-  // En producción tendría su propio endpoint GET /usuarios?rol=veterinario
   const select = document.getElementById('cita-vet-id');
   if (!select) return;
-  // Placeholder
   select.innerHTML = '<option value="">Seleccionar veterinario…</option>';
 }
 
-// Arrancar
 if (State.accessToken && State.user) {
   initApp();
 } else {

@@ -1,10 +1,21 @@
 /**
  * VetClinic SaaS — Shared JS v5
- * API_URL apunta siempre a localhost:4000 en desarrollo
+ * Detecta automáticamente si es local o producción
  */
 
-const API_URL    = 'http://localhost:4000';
-const SOCKET_URL = 'http://localhost:4000';
+// ── URL del backend ───────────────────────────────────────────────
+const _isLocal = window.location.hostname === 'localhost' ||
+                 window.location.hostname.endsWith('.test') ||
+                 window.location.hostname.endsWith('.local') ||
+                 window.location.hostname === '127.0.0.1';
+
+const _baseDomain = window.location.hostname.split('.').slice(-2).join('.');
+
+const API_URL    = _isLocal
+  ? 'http://localhost:4000'
+  : `https://api.${_baseDomain}`;
+
+const SOCKET_URL = API_URL;
 
 // ── Aplicar favicon inmediatamente al cargar shared.js ────────────
 // No espera al DOMContentLoaded — así el tab del navegador lo muestra antes
