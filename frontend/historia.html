@@ -635,7 +635,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
     if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
-    const rh = await api('/historia/mascota/'+id);
+    const rh = await api('/historia/'+id);
     if (!rh) return;
     const consultas = (await rh.json()).data||[];
     document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
@@ -650,7 +650,7 @@ async function cargarVacunas(id) {
   const cont = document.getElementById('vacunas-lista');
   cont.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div>';
   try {
-    const res  = await api('/vacunas/mascota/'+id);
+    const res  = await api('/vacunas/'+id);
     if (!res) return;
     const rows = (await res.json()).data||[];
     if (!rows.length) {
@@ -1089,7 +1089,7 @@ async function abrirEditarVacuna(id) {
   document.getElementById('ev-id').value = id;
   openModal('modal-editar-vacuna');
   try {
-    const res  = await api(`/vacunas/mascota/${mascotaId}`);
+    const res  = await api(`/vacunas/${mascotaId}`);
     if (!res) return;
     const rows = (await res.json()).data || [];
     const v    = rows.find(x => x.id === id);
