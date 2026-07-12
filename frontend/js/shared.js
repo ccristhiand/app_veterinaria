@@ -525,5 +525,5 @@ function apiError(status, message) {
     toast('🔧 Error del servidor. Intenta de nuevo.', 'danger');
   } else {
     toast(message || 'Ocurrió un error inesperado.', 'danger');
-  }
+  } 
 }
