@@ -6,7 +6,8 @@
 (async function initTenant() {
   try {
     // Cargar config del tenant (público, sin auth)
-    const res = await fetch(`${window.API_URL || 'http://localhost:4000'}/api/v1/tenant/config`, {
+    const _tenantBase = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.test') ? 'http://localhost:4000' : 'https://api.' + window.location.hostname.split('.').slice(-2).join('.');
+    const res = await fetch(`${window.API_URL || _tenantBase}/api/v1/tenant/config`, {
       headers: { 'Content-Type': 'application/json' },
     });
 
