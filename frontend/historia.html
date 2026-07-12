@@ -839,7 +839,7 @@ async function cargarEstetica(id) {
   const cont = document.getElementById('estetica-lista');
   cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div>';
   try {
-    const res  = await api('/estetica/mascota/'+id);
+    const res  = await api('/estetica?mascota_id='+id);
     if (!res) return;
     const rows = (await res.json()).data || [];
 
@@ -1073,7 +1073,7 @@ async function guardarEditConsulta() {
   };
 
   try {
-    const res = await api(`/historia/${id}`, { method:'PUT', body });
+    const res = await api(`/historia?mascota_id=${id}`, { method:'PUT', body });
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
@@ -1089,7 +1089,7 @@ async function abrirEditarVacuna(id) {
   document.getElementById('ev-id').value = id;
   openModal('modal-editar-vacuna');
   try {
-    const res  = await api(`/vacunas/${mascotaId}`);
+    const res  = await api(`/vacunas?mascota_id=${mascotaId}`);
     if (!res) return;
     const rows = (await res.json()).data || [];
     const v    = rows.find(x => x.id === id);
@@ -1136,7 +1136,7 @@ async function abrirEditarEstetica(id) {
   document.getElementById('ee-id').value = id;
   openModal('modal-editar-estetica');
   try {
-    const res  = await api(`/estetica/mascota/${mascotaId}`);
+    const res  = await api(`/estetica?mascota_id=${mascotaId}`);
     if (!res) return;
     const rows = (await res.json()).data || [];
     const s    = rows.find(x => x.id === id);
