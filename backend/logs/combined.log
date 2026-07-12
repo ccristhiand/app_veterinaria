@@ -11082,3 +11082,130 @@
 2026-07-11 19:31:01 [http]: [0mGET /api/v1/branding [36m304[0m 10.939 ms - -[0m
 2026-07-11 19:31:04 [http]: [0mGET /api/v1/branding [36m304[0m 8.985 ms - -[0m
 2026-07-11 19:31:04 [http]: [0mGET /api/v1/branding [36m304[0m 10.506 ms - -[0m
+2026-07-11 19:34:37 [info]: Socket.io inicializado correctamente
+2026-07-11 19:34:38 [info]: ✅ Conectado a DB maestra (vet_master)
+2026-07-11 19:34:38 [info]: 🚀 VetClinic SaaS en http://localhost:4000
+2026-07-11 19:34:38 [info]: 🌐 Modo multitenant activo
+2026-07-11 19:34:38 [info]: 🔗  Socket conectado | user=carlos (admin) | socket=dv-qQItJbrdTsyunAAAB
+2026-07-11 19:34:41 [info]: 🔗  Socket conectado | user=carlos (admin) | socket=5xBz9QHoYFGr7zCQAAAD
+2026-07-11 19:34:43 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:43 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:48 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:52 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:53 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:53 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:58 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:58 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:34:59 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:35:05 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
+2026-07-11 19:38:53 [error]: Error: CORS no permitido
+    at origin (E:\PRACTICANDO\app_veterinaria\backend\src\index.js:55:16)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:219:13
+    at optionsCallback (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:199:9)
+    at corsMiddleware (E:\PRACTICANDO\app_veterinaria\backend\node_modules\cors\lib\index.js:204:7)
+    at Layer.handle [as handle_request] (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\layer.js:95:5)
+    at trim_prefix (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:328:13)
+    at E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:286:9
+    at router.process_params (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:346:12)
+    at next (E:\PRACTICANDO\app_veterinaria\backend\node_modules\express\lib\router\index.js:280:10)
+    at internalNext (E:\PRACTICANDO\app_veterinaria\backend\node_modules\helmet\index.cjs:537:6)
