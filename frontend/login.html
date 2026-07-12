@@ -240,7 +240,9 @@
   </div>
 
 <script>
-  const API  = 'http://localhost:4000/api/v1';
+  const API = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.test')
+  ? 'http://localhost:4000/api/v1'
+  : 'https://api.netcodip.com/api/v1';
   const HOST = window.location.hostname;
 
   // ── Cargar branding del tenant ──────────────────────────────────
