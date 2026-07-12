@@ -116,7 +116,7 @@ router.post('/tenants', async (req, res) => {
         password: db_pass || process.env.DB_PASS || '',
         database: dbName, multipleStatements: true,
       });
-      await tenantPool.execute(schema);
+      await tenantPool.query(schema);
       await tenantPool.end();
     }
 
