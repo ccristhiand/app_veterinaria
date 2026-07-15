@@ -156,8 +156,8 @@
   <script>
     const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', conejo:'🐰', hamster:'🐹' };
 
-    const token = window.location.pathname.split('/').pop()
-      || new URLSearchParams(location.search).get('t');
+    const token = new URLSearchParams(location.search).get('t')
+  || window.location.pathname.split('/').pop();
 
     // ── URL dinámica local/producción ─────────────────────────
     const _isLocalCarnet = window.location.hostname === 'localhost' ||
