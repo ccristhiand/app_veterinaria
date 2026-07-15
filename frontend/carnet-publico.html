@@ -23,21 +23,17 @@
 </head>
 <body>
   <div style="max-width:680px;margin:0 auto">
-
     <div id="loading" style="text-align:center;padding:4rem">
       <div style="display:inline-block;width:40px;height:40px;border:3px solid #a7f3d0;
         border-top-color:#10b981;border-radius:50%;animation:spin .8s linear infinite"></div>
       <p style="margin-top:1rem;color:#6b7280">Cargando carnet…</p>
     </div>
-
     <div id="error-box" style="display:none;text-align:center;padding:4rem">
       <p style="font-size:3rem">🐾</p>
       <p style="font-size:1.1rem;font-weight:700;margin-top:.5rem">Carnet no encontrado</p>
       <p style="color:#6b7280;margin-top:.3rem">El enlace puede haber expirado o estar desactivado.</p>
     </div>
-
     <div id="contenido" style="display:none">
-
       <!-- Header -->
       <div class="card" style="margin-bottom:1.2rem">
         <div style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;
@@ -54,7 +50,6 @@
             <p style="font-size:.75rem;font-weight:700;margin-top:.2rem">VetClinic</p>
           </div>
         </div>
-
         <!-- Datos básicos -->
         <div style="padding:1.25rem 1.75rem">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
@@ -83,8 +78,6 @@
               <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-chip">—</p>
             </div>
           </div>
-
-          <!-- Alertas médicas -->
           <div id="alertas-box" style="display:none;margin-top:1rem;padding:.75rem 1rem;
             background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem">
             <p style="font-size:.72rem;font-weight:700;color:#be123c;margin-bottom:.25rem">⚠️ ALERTAS MÉDICAS</p>
@@ -97,7 +90,6 @@
           </div>
         </div>
       </div>
-
       <!-- Próximas citas -->
       <div id="citas-box" class="card" style="margin-bottom:1.2rem;display:none">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
@@ -107,7 +99,6 @@
         </div>
         <div id="citas-lista" style="padding:.5rem 0"></div>
       </div>
-
       <!-- Vacunas -->
       <div class="card" style="margin-bottom:1.2rem">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
@@ -126,7 +117,6 @@
           </table>
         </div>
       </div>
-
       <!-- Última consulta -->
       <div id="consulta-box" class="card" style="margin-bottom:1.2rem;display:none">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
@@ -153,7 +143,6 @@
           </div>
         </div>
       </div>
-
       <!-- Footer -->
       <div style="text-align:center;padding:1.5rem;color:#9ca3af;font-size:.75rem">
         <p>🐾 Carnet digital generado por VetClinic</p>
@@ -161,17 +150,24 @@
       </div>
     </div>
   </div>
-
   <style>
     @keyframes spin { to { transform:rotate(360deg); } }
   </style>
-
   <script>
     const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', conejo:'🐰', hamster:'🐹' };
+
     const token = window.location.pathname.split('/').pop()
       || new URLSearchParams(location.search).get('t');
 
-    const API = 'http://localhost:4000/api/v1';
+    // ── URL dinámica local/producción ─────────────────────────
+    const _isLocalCarnet = window.location.hostname === 'localhost' ||
+                           window.location.hostname.endsWith('.test') ||
+                           window.location.hostname === '127.0.0.1';
+    const _baseDomainCarnet = window.location.hostname.split('.').slice(-2).join('.');
+    const API = _isLocalCarnet
+      ? 'http://localhost:4000/api/v1'
+      : `https://api.${_baseDomainCarnet}/api/v1`;
+
     const host = window.location.hostname;
 
     async function cargar() {
@@ -183,13 +179,11 @@
         const { data } = await res.json();
         const { carnet, vacunas, citas, ultima_consulta } = data;
         const m = carnet;
-
         // Header
         document.getElementById('especie-icon').textContent = icons[m.especie] || '🐾';
         document.getElementById('mascota-nombre').textContent = m.mascota_nombre;
         document.getElementById('mascota-sub').textContent =
           [m.especie, m.raza, m.sexo].filter(Boolean).join(' · ');
-
         // Datos básicos
         document.getElementById('info-propietario').textContent = m.propietario || '—';
         document.getElementById('info-telefono').textContent    = m.telefono || '—';
@@ -198,7 +192,6 @@
         document.getElementById('info-peso').textContent    = m.peso_kg ? `${m.peso_kg} kg` : '—';
         document.getElementById('info-color').textContent   = m.color || '—';
         document.getElementById('info-chip').textContent    = m.microchip || 'Sin microchip';
-
         if (m.alertas_medicas) {
           document.getElementById('alertas-box').style.display = 'block';
           document.getElementById('info-alertas').textContent  = m.alertas_medicas;
@@ -207,7 +200,6 @@
           document.getElementById('alergias-box').style.display = 'block';
           document.getElementById('info-alergias').textContent  = m.alergias;
         }
-
         // Citas
         if (citas?.length) {
           document.getElementById('citas-box').style.display = 'block';
@@ -228,7 +220,6 @@
               </div>
             </div>`).join('');
         }
-
         // Vacunas
         if (vacunas?.length) {
           const hoy = new Date();
@@ -248,7 +239,6 @@
             </tr>`;
           }).join('');
         }
-
         // Última consulta
         if (ultima_consulta) {
           document.getElementById('consulta-box').style.display = 'block';
@@ -258,7 +248,6 @@
           document.getElementById('uc-diag').textContent = ultima_consulta.diagnostico || '—';
           document.getElementById('uc-trat').textContent = ultima_consulta.tratamiento  || '—';
         }
-
         document.getElementById('loading').style.display   = 'none';
         document.getElementById('contenido').style.display = 'block';
         document.title = `${m.mascota_nombre} — Carnet Digital VetClinic`;
@@ -267,8 +256,7 @@
         document.getElementById('error-box').style.display = 'block';
       }
     }
-
     cargar();
   </script>
 </body>
-</html>
+</html> 
