@@ -1073,7 +1073,7 @@ async function guardarEditConsulta() {
   };
 
   try {
-    const res = await api(`/historia?mascota_id=${id}`, { method:'PUT', body });
+    const res = await api(`/historia/${id}`, { method:'PUT', body });
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
