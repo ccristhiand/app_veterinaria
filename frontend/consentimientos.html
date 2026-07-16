@@ -8,6 +8,8 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
+  <!-- DOMPurify — sanitiza HTML para prevenir XSS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
 <div id="main-content" class="page">
@@ -237,6 +239,32 @@
   .rep-tab.active { color:var(--green-600);border-bottom-color:var(--green-500); }
 </style>
 
+<!-- Modal Confirmación Password -->
+<div id="modal-confirm-pwd" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:400px">
+    <div class="vmodal-head">
+      <h3>🔐 Confirmar identidad</h3>
+      <button onclick="document.getElementById('btn-cancel-pwd').click()" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.85rem;padding:.85rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#b45309">
+        <p style="font-weight:700;margin-bottom:.2rem">⚠️ Acción sensible</p>
+        <p>Por seguridad, confirma tu contraseña antes de guardar cambios en plantillas de consentimientos.</p>
+      </div>
+      <label class="vlabel">Tu contraseña *</label>
+      <input id="confirm-pwd-input" type="password" class="vinput"
+        placeholder="Ingresa tu contraseña actual"/>
+      <p id="confirm-pwd-error" style="display:none;color:#e11d48;font-size:.75rem;margin-top:.4rem">
+        La contraseña es requerida.
+      </p>
+    </div>
+    <div class="vmodal-foot">
+      <button id="btn-cancel-pwd" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="btn-confirm-pwd" class="vbtn vbtn-primary">🔐 Confirmar y guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let mascotaSelId = null;
 let docGeneradoId = null;
@@ -298,7 +326,10 @@ async function previewPlantilla() {
     if (!res?.ok) return;
     const p = (await res.json()).data;
     document.getElementById('preview-plantilla').innerHTML =
-      p.contenido.replace(/{{[^}]+}}/g, m => `<mark style="background:#fef9c3;padding:0 .2rem;border-radius:.2rem">${m}</mark>`);
+      DOMPurify.sanitize(
+        p.contenido.replace(/{{[^}]+}}/g, m => `<mark style="background:#fef9c3;padding:0 .2rem;border-radius:.2rem">${m}</mark>`),
+        { FORCE_BODY: true }
+      );
   } catch {}
 }
 
@@ -361,7 +392,7 @@ async function generarDocumento() {
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
 
     docGeneradoId = data.data.id;
-    document.getElementById('doc-contenido').innerHTML = data.data.contenido;
+    document.getElementById('doc-contenido').innerHTML = DOMPurify.sanitize(data.data.contenido || '', { FORCE_BODY: true });
     document.getElementById('btn-firmar').style.display = 'inline-flex';
     openModal('modal-doc');
     toast('✅ Documento generado.','success');
@@ -445,7 +476,7 @@ async function verConsentimiento(id) {
     if (!res?.ok) return;
     const d = (await res.json()).data;
     docGeneradoId = d.id;
-    document.getElementById('doc-contenido').innerHTML = d.contenido_final;
+    document.getElementById('doc-contenido').innerHTML = DOMPurify.sanitize(d.contenido_final || '', { FORCE_BODY: true });
     document.getElementById('btn-firmar').style.display = d.firmado?'none':'inline-flex';
   } catch {}
 }
@@ -555,19 +586,21 @@ IMPORTANTE:
 }
 
 function copiarPrompt() {
-  const el = document.getElementById('prompt-ia-texto');
-  el.select();
-  el.setSelectionRange(0, 99999); // para móvil
-  try {
-    document.execCommand('copy');
-    toast('✅ Prompt copiado al portapapeles', 'success');
-  } catch {
-    navigator.clipboard.writeText(el.value).then(() => {
-      toast('✅ Prompt copiado al portapapeles', 'success');
-    }).catch(() => {
-      toast('❌ No se pudo copiar. Selecciona el texto manualmente.', 'warning');
+  const texto = document.getElementById('prompt-ia-texto').value;
+  navigator.clipboard.writeText(texto)
+    .then(() => toast('✅ Prompt copiado al portapapeles', 'success'))
+    .catch(() => {
+      // Fallback manual
+      const el = document.createElement('textarea');
+      el.value = texto;
+      el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      toast('✅ Prompt copiado', 'success');
     });
-  }
 }
 
 function insertarVariable(variable) {
@@ -606,16 +639,21 @@ async function editarPlantilla(id) {
 }
 
 async function guardarPlantilla() {
-  const id      = document.getElementById('plt-id').value;
-  const nombre  = document.getElementById('plt-nombre').value.trim();
-  const tipo    = document.getElementById('plt-tipo').value;
+  const id       = document.getElementById('plt-id').value;
+  const nombre   = document.getElementById('plt-nombre').value.trim();
+  const tipo     = document.getElementById('plt-tipo').value;
   const contenido = document.getElementById('plt-contenido').value.trim();
-  if (!nombre)   { toast('Nombre requerido.','warning'); return; }
-  if (!contenido){ toast('Contenido requerido.','warning'); return; }
+  if (!nombre)    { toast('Nombre requerido.','warning'); return; }
+  if (!contenido) { toast('Contenido requerido.','warning'); return; }
+
+  // Pedir confirmación de password antes de guardar
+  const password = await pedirPasswordConfirmacion();
+  if (!password) return; // canceló
+
   const url    = id ? `/consentimientos/plantillas/${id}` : '/consentimientos/plantillas';
   const method = id ? 'PUT' : 'POST';
   try {
-    const res  = await api(url, { method, body:{ nombre, tipo, contenido, activo:true } });
+    const res  = await api(url, { method, body:{ nombre, tipo, contenido, activo:true, password_confirm: password } });
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
@@ -624,6 +662,32 @@ async function guardarPlantilla() {
     cargarPlantillasSelect();
     cargarPlantillasGrid();
   } catch { toast('Error de conexión.','danger'); }
+}
+
+// Muestra modal de confirmación y devuelve la password ingresada
+function pedirPasswordConfirmacion() {
+  return new Promise(resolve => {
+    document.getElementById('confirm-pwd-input').value = '';
+    document.getElementById('confirm-pwd-error').style.display = 'none';
+    openModal('modal-confirm-pwd');
+    document.getElementById('confirm-pwd-input').focus();
+
+    document.getElementById('btn-confirm-pwd').onclick = () => {
+      const pwd = document.getElementById('confirm-pwd-input').value;
+      if (!pwd) { document.getElementById('confirm-pwd-error').style.display='block'; return; }
+      closeModal('modal-confirm-pwd');
+      resolve(pwd);
+    };
+    document.getElementById('btn-cancel-pwd').onclick = () => {
+      closeModal('modal-confirm-pwd');
+      resolve(null);
+    };
+    // Enter para confirmar
+    document.getElementById('confirm-pwd-input').onkeydown = e => {
+      if (e.key === 'Enter') document.getElementById('btn-confirm-pwd').click();
+      if (e.key === 'Escape') document.getElementById('btn-cancel-pwd').click();
+    };
+  });
 }
 
 function usarPlantilla(id) {

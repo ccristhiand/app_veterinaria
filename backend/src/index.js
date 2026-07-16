@@ -101,6 +101,16 @@ app.get('/favicon.ico', async (req, res) => {
 // ── Panel admin SaaS (sin tenant middleware) ──────────────────────
 app.use('/admin/api', adminRoutes);
 
+// ── Rate limit estricto para login (anti fuerza bruta) ───────────
+app.use('/api/v1/auth/login', rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max     : 10,              // máximo 10 intentos por IP
+  standardHeaders: true,
+  legacyHeaders  : false,
+  message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
+  keyGenerator: (req) => req.ip,
+}));
+
 // ── Resolver tenant para todas las rutas de la API ────────────────
 // IMPORTANTE: resolveTenant debe ir ANTES de las rutas de la API
 app.use('/api', resolveTenant);

@@ -41,6 +41,41 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY c.fecha_hora ASC LIMIT 3`, [carnet.mascota_id]
     );
 
+    // Historial de citas pasadas con historia clínica y recetas (últimas 10)
+    const citas_historial_raw = await req.db.query(
+      `SELECT c.id AS cita_id, c.fecha_hora, c.motivo AS motivo_cita, c.estado,
+              u.nombre AS veterinario,
+              h.id AS historia_id, h.diagnostico, h.tratamiento, h.observaciones,
+              h.peso_kg, h.temperatura_c
+       FROM citas c
+       JOIN usuarios u ON u.id = c.veterinario_id
+       LEFT JOIN historia_clinica h ON h.cita_id = c.id
+       WHERE c.mascota_id = ? AND c.estado = 'completada'
+       ORDER BY c.fecha_hora DESC LIMIT 10`, [carnet.mascota_id]
+    );
+
+    // Cargar recetas para cada historia clínica
+    const citas_historial = await Promise.all(
+      citas_historial_raw.map(async c => {
+        if (!c.historia_id) return { ...c, recetas: [] };
+        const recetas = await req.db.query(
+          `SELECT medicamento, dosis, frecuencia, duracion_dias, instrucciones
+           FROM recetas WHERE historia_clinica_id = ?`, [c.historia_id]
+        );
+        return { ...c, recetas };
+      })
+    );
+
+    // Historial de baños/estética (últimos 10)
+    const banos = await req.db.query(
+      `SELECT s.fecha, s.tipo_bano, s.incluye_corte, s.incluye_unas,
+              s.incluye_dental, s.productos, s.observaciones, s.precio,
+              u.nombre AS atendido_por
+       FROM servicios_estetica s JOIN usuarios u ON u.id = s.atendido_por_id
+       WHERE s.mascota_id = ?
+       ORDER BY s.fecha DESC LIMIT 10`, [carnet.mascota_id]
+    );
+
     // Última consulta
     const [ultimaConsulta] = await req.db.query(
       `SELECT h.fecha, h.diagnostico, h.tratamiento, u.nombre AS veterinario
@@ -54,7 +89,7 @@ router.get('/:token', async (req, res, next) => {
 
     return res.json({
       success: true,
-      data: { carnet, vacunas, citas, ultima_consulta: ultimaConsulta || null },
+      data: { carnet, vacunas, citas, citas_historial, banos, ultima_consulta: ultimaConsulta || null },
     });
   } catch(err) { next(err); }
 });

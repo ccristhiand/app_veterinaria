@@ -1,7 +1,40 @@
 'use strict';
 
-const { Router } = require('express');
+const { Router }   = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const bcrypt         = require('bcrypt');
+const createDOMPurify = require('dompurify');
+const { JSDOM }       = require('jsdom');
+
+// Sanitizador server-side para prevenir XSS
+const _window    = new JSDOM('').window;
+const DOMPurify_ = createDOMPurify(_window);
+const sanitize   = html => DOMPurify_.sanitize(html || '', {
+  FORCE_BODY  : true,
+  ALLOWED_TAGS: ['div','p','span','h1','h2','h3','h4','h5','h6',
+                 'table','thead','tbody','tr','th','td',
+                 'ul','ol','li','strong','b','em','i','u','br',
+                 'img','a','hr','mark','section','header','footer'],
+  ALLOWED_ATTR: ['style','class','src','alt','href','target','id',
+                 'width','height','align','border','cellpadding','cellspacing'],
+  FORBID_TAGS : ['script','iframe','object','embed','form','input','button'],
+  FORBID_ATTR : ['onerror','onload','onclick','onmouseover'],
+});
+
+// Helper para verificar password del admin antes de cambios sensibles
+async function verificarPassword(req, res, password_confirm) {
+  if (!password_confirm) {
+    res.status(422).json({ success:false, message:'Debes confirmar tu contraseña para esta acción.' });
+    return false;
+  }
+  const [usuario] = await req.db.query('SELECT password FROM usuarios WHERE id=?', [req.user.id]);
+  const valido = await bcrypt.compare(password_confirm, usuario.password);
+  if (!valido) {
+    res.status(401).json({ success:false, message:'Contraseña incorrecta. Acción no autorizada.' });
+    return false;
+  }
+  return true;
+}
 
 const router = Router();
 router.use(authenticate);
@@ -28,12 +61,16 @@ router.get('/plantillas/:id', async (req, res, next) => {
 // ── POST /api/v1/consentimientos/plantillas ──────────────────────
 router.post('/plantillas', authorize('admin'), async (req, res, next) => {
   try {
-    const { nombre, tipo='procedimiento', contenido } = req.body;
-    if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre requerido.' });
+    const { nombre, tipo='procedimiento', contenido, password_confirm } = req.body;
+    if (!nombre?.trim())    return res.status(422).json({ success:false, message:'Nombre requerido.' });
     if (!contenido?.trim()) return res.status(422).json({ success:false, message:'Contenido requerido.' });
+
+    // Verificar password admin antes de guardar
+    if (!await verificarPassword(req, res, password_confirm)) return;
+
     const result = await req.db.query(
       'INSERT INTO consentimientos_plantillas (nombre,tipo,contenido) VALUES (?,?,?)',
-      [nombre.trim(), tipo, contenido]
+      [nombre.trim(), tipo, sanitize(contenido)]
     );
     return res.status(201).json({ success:true, data:{ id:result.insertId }, message:'Plantilla creada.' });
   } catch(err) { next(err); }
@@ -42,10 +79,14 @@ router.post('/plantillas', authorize('admin'), async (req, res, next) => {
 // ── PUT /api/v1/consentimientos/plantillas/:id ───────────────────
 router.put('/plantillas/:id', authorize('admin'), async (req, res, next) => {
   try {
-    const { nombre, tipo, contenido, activo } = req.body;
+    const { nombre, tipo, contenido, activo, password_confirm } = req.body;
+
+    // Verificar password admin antes de actualizar
+    if (!await verificarPassword(req, res, password_confirm)) return;
+
     await req.db.query(
       'UPDATE consentimientos_plantillas SET nombre=?,tipo=?,contenido=?,activo=? WHERE id=?',
-      [nombre, tipo, contenido, activo?1:0, req.params.id]
+      [nombre, tipo, sanitize(contenido), activo?1:0, req.params.id]
     );
     return res.json({ success:true, message:'Plantilla actualizada.' });
   } catch(err) { next(err); }

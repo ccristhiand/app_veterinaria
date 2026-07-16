@@ -7,256 +7,259 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     body { font-family:'Inter',sans-serif;background:#f0fdf4;min-height:100vh;padding:1.5rem; }
-    .card { background:#fff;border-radius:1.25rem;box-shadow:0 8px 32px rgba(0,0,0,.08);overflow:hidden; }
-    .badge { display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;
-             padding:.25rem .65rem;border-radius:999px; }
-    .badge-vac  { background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe; }
+    .card { background:#fff;border-radius:1.25rem;box-shadow:0 8px 32px rgba(0,0,0,.08);overflow:hidden;margin-bottom:1.2rem; }
+    .badge { display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.25rem .65rem;border-radius:999px; }
     .badge-ok   { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
     .badge-prox { background:#fffbeb;color:#b45309;border:1px solid #fde68a; }
     .badge-venc { background:#fff1f2;color:#be123c;border:1px solid #fecdd3; }
+    .section-title { font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin:0; }
+    .section-head { padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:.5rem; }
     table { width:100%;border-collapse:collapse;font-size:.82rem; }
-    th { background:#f6f8f6;padding:.55rem .85rem;text-align:left;font-size:.65rem;
-         font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;
-         border-bottom:1px solid #e5e7eb; }
+    th { background:#f6f8f6;padding:.55rem .85rem;text-align:left;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb; }
     td { padding:.65rem .85rem;border-bottom:1px solid #f3f4f6;color:#374151; }
+    .timeline-item { display:flex;gap:.75rem;padding:.75rem 1.25rem;border-bottom:1px solid #f3f4f6; }
+    .timeline-dot { width:10px;height:10px;border-radius:50%;background:#10b981;flex-shrink:0;margin-top:.4rem; }
+    .timeline-dot.pink { background:#ec4899; }
+    .timeline-dot.gray { background:#9ca3af; }
+    @keyframes spin { to { transform:rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div style="max-width:680px;margin:0 auto">
+  <div style="max-width:700px;margin:0 auto">
+
+    <!-- Loading -->
     <div id="loading" style="text-align:center;padding:4rem">
-      <div style="display:inline-block;width:40px;height:40px;border:3px solid #a7f3d0;
-        border-top-color:#10b981;border-radius:50%;animation:spin .8s linear infinite"></div>
+      <div style="display:inline-block;width:40px;height:40px;border:3px solid #a7f3d0;border-top-color:#10b981;border-radius:50%;animation:spin .8s linear infinite"></div>
       <p style="margin-top:1rem;color:#6b7280">Cargando carnet…</p>
     </div>
+
+    <!-- Error -->
     <div id="error-box" style="display:none;text-align:center;padding:4rem">
       <p style="font-size:3rem">🐾</p>
       <p style="font-size:1.1rem;font-weight:700;margin-top:.5rem">Carnet no encontrado</p>
       <p style="color:#6b7280;margin-top:.3rem">El enlace puede haber expirado o estar desactivado.</p>
     </div>
+
+    <!-- Contenido -->
     <div id="contenido" style="display:none">
-      <!-- Header -->
-      <div class="card" style="margin-bottom:1.2rem">
-        <div style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;
-          color:#fff;display:flex;align-items:center;gap:1.25rem">
-          <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:1rem;
-            display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0"
-            id="especie-icon">🐾</div>
-          <div>
+
+      <!-- Header mascota -->
+      <div class="card">
+        <div style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.25rem">
+          <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:1rem;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0" id="especie-icon">🐾</div>
+          <div style="flex:1">
             <h1 id="mascota-nombre" style="font-family:'Playfair Display',serif;font-size:1.6rem;margin:0"></h1>
             <p id="mascota-sub" style="opacity:.85;font-size:.88rem;margin:.2rem 0 0"></p>
           </div>
-          <div style="margin-left:auto;text-align:right">
+          <div style="text-align:right;flex-shrink:0">
             <p style="font-size:.65rem;opacity:.75;text-transform:uppercase;letter-spacing:.1em">Carnet Digital</p>
-            <p style="font-size:.75rem;font-weight:700;margin-top:.2rem">VetClinic</p>
+            <p id="clinica-nombre" style="font-size:.75rem;font-weight:700;margin-top:.2rem">VetClinic</p>
           </div>
         </div>
+
         <!-- Datos básicos -->
         <div style="padding:1.25rem 1.75rem">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Propietario</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-propietario">—</p>
-            </div>
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Teléfono</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-telefono">—</p>
-            </div>
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Fecha de nacimiento</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-nacimiento">—</p>
-            </div>
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Peso</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-peso">—</p>
-            </div>
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Color</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-color">—</p>
-            </div>
-            <div>
-              <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Microchip</p>
-              <p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-chip">—</p>
-            </div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Propietario</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-propietario">—</p></div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Teléfono</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-telefono">—</p></div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Nacimiento</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-nacimiento">—</p></div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Peso</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-peso">—</p></div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Color</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-color">—</p></div>
+            <div><p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Microchip</p><p style="font-weight:600;margin-top:.2rem;font-size:.88rem" id="info-chip">—</p></div>
           </div>
-          <div id="alertas-box" style="display:none;margin-top:1rem;padding:.75rem 1rem;
-            background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem">
+          <div id="alertas-box" style="display:none;margin-top:1rem;padding:.75rem 1rem;background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem">
             <p style="font-size:.72rem;font-weight:700;color:#be123c;margin-bottom:.25rem">⚠️ ALERTAS MÉDICAS</p>
             <p style="font-size:.82rem;color:#be123c" id="info-alertas"></p>
           </div>
-          <div id="alergias-box" style="display:none;margin-top:.5rem;padding:.75rem 1rem;
-            background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem">
+          <div id="alergias-box" style="display:none;margin-top:.5rem;padding:.75rem 1rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem">
             <p style="font-size:.72rem;font-weight:700;color:#b45309;margin-bottom:.25rem">🚨 ALERGIAS</p>
             <p style="font-size:.82rem;color:#b45309" id="info-alergias"></p>
           </div>
         </div>
       </div>
+
       <!-- Próximas citas -->
-      <div id="citas-box" class="card" style="margin-bottom:1.2rem;display:none">
-        <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
-          <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin:0">
-            📅 Próximas citas
-          </h3>
-        </div>
-        <div id="citas-lista" style="padding:.5rem 0"></div>
+      <div id="proximas-citas-box" class="card" style="display:none">
+        <div class="section-head"><p class="section-title">📅 Próximas citas</p></div>
+        <div id="proximas-citas-lista"></div>
       </div>
+
       <!-- Vacunas -->
-      <div class="card" style="margin-bottom:1.2rem">
-        <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
-          <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin:0">
-            💉 Historial de vacunas
-          </h3>
-        </div>
+      <div class="card">
+        <div class="section-head"><p class="section-title">💉 Historial de vacunas</p></div>
         <div style="overflow-x:auto">
           <table>
-            <thead>
-              <tr><th>Vacuna</th><th>Fabricante</th><th>Fecha</th><th>Próxima dosis</th><th>Estado</th></tr>
-            </thead>
+            <thead><tr><th>Vacuna</th><th>Fabricante</th><th>Fecha</th><th>Próxima dosis</th><th>Estado</th></tr></thead>
             <tbody id="tabla-vacunas">
               <tr><td colspan="5" style="text-align:center;padding:2rem;color:#9ca3af">Sin vacunas registradas</td></tr>
             </tbody>
           </table>
         </div>
       </div>
-      <!-- Última consulta -->
-      <div id="consulta-box" class="card" style="margin-bottom:1.2rem;display:none">
-        <div style="padding:1rem 1.25rem;border-bottom:1px solid #e5e7eb">
-          <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin:0">
-            🩺 Última consulta
-          </h3>
-        </div>
-        <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-          <div>
-            <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Fecha</p>
-            <p style="font-weight:600;margin-top:.2rem" id="uc-fecha">—</p>
-          </div>
-          <div>
-            <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Veterinario</p>
-            <p style="font-weight:600;margin-top:.2rem" id="uc-vet">—</p>
-          </div>
-          <div>
-            <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Diagnóstico</p>
-            <p style="margin-top:.2rem;font-size:.85rem" id="uc-diag">—</p>
-          </div>
-          <div>
-            <p style="font-size:.6rem;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Tratamiento</p>
-            <p style="margin-top:.2rem;font-size:.85rem" id="uc-trat">—</p>
-          </div>
-        </div>
+
+      <!-- Historial de citas -->
+      <div id="historial-citas-box" class="card" style="display:none">
+        <div class="section-head"><p class="section-title">🩺 Historial de consultas</p></div>
+        <div id="historial-citas-lista"></div>
       </div>
+
+      <!-- Historial de baños -->
+      <div id="banos-box" class="card" style="display:none">
+        <div class="section-head"><p class="section-title">✂️ Historial de baños y estética</p></div>
+        <div id="banos-lista"></div>
+      </div>
+
       <!-- Footer -->
       <div style="text-align:center;padding:1.5rem;color:#9ca3af;font-size:.75rem">
         <p>🐾 Carnet digital generado por VetClinic</p>
         <p style="margin-top:.25rem">Documento de referencia — no reemplaza la historia clínica oficial</p>
       </div>
+
     </div>
   </div>
-  <style>
-    @keyframes spin { to { transform:rotate(360deg); } }
-  </style>
+
   <script>
     const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', conejo:'🐰', hamster:'🐹' };
+    const token = new URLSearchParams(location.search).get('t') || window.location.pathname.split('/').pop();
 
-    const token = new URLSearchParams(location.search).get('t')
-  || window.location.pathname.split('/').pop();
-
-    // ── URL dinámica local/producción ─────────────────────────
-    const _isLocalCarnet = window.location.hostname === 'localhost' ||
-                           window.location.hostname.endsWith('.test') ||
-                           window.location.hostname === '127.0.0.1';
+    const _isLocalCarnet = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.test') || window.location.hostname === '127.0.0.1';
     const _baseDomainCarnet = window.location.hostname.split('.').slice(-2).join('.');
-    const API = _isLocalCarnet
-      ? 'http://localhost:4000/api/v1'
-      : `https://api.${_baseDomainCarnet}/api/v1`;
-
+    const API = _isLocalCarnet ? 'http://localhost:4000/api/v1' : `https://api.${_baseDomainCarnet}/api/v1`;
     const host = window.location.hostname;
+
+    const fDate = iso => new Date(iso+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
+    const fDateTime = iso => new Date(iso).toLocaleString('es-PE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const esc = s => String(s??'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
     async function cargar() {
       try {
-        const res = await fetch(`${API}/carnet/${token}`, {
-          headers: { 'X-Tenant-Host': host }
-        });
+        const res = await fetch(`${API}/carnet/${token}`, { headers:{ 'X-Tenant-Host': host } });
         if (!res.ok) throw new Error('no encontrado');
         const { data } = await res.json();
-        const { carnet, vacunas, citas, ultima_consulta } = data;
-        const m = carnet;
+        const { carnet: m, vacunas, citas, citas_historial, banos, ultima_consulta } = data;
+
         // Header
-        document.getElementById('especie-icon').textContent = icons[m.especie] || '🐾';
+        document.getElementById('especie-icon').textContent   = icons[m.especie] || '🐾';
         document.getElementById('mascota-nombre').textContent = m.mascota_nombre;
-        document.getElementById('mascota-sub').textContent =
-          [m.especie, m.raza, m.sexo].filter(Boolean).join(' · ');
+        document.getElementById('mascota-sub').textContent    = [m.especie, m.raza, m.sexo].filter(Boolean).join(' · ');
+
         // Datos básicos
         document.getElementById('info-propietario').textContent = m.propietario || '—';
-        document.getElementById('info-telefono').textContent    = m.telefono || '—';
-        document.getElementById('info-nacimiento').textContent  =
-          m.fecha_nacimiento ? new Date(m.fecha_nacimiento+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'}) : '—';
-        document.getElementById('info-peso').textContent    = m.peso_kg ? `${m.peso_kg} kg` : '—';
-        document.getElementById('info-color').textContent   = m.color || '—';
-        document.getElementById('info-chip').textContent    = m.microchip || 'Sin microchip';
-        if (m.alertas_medicas) {
-          document.getElementById('alertas-box').style.display = 'block';
-          document.getElementById('info-alertas').textContent  = m.alertas_medicas;
-        }
-        if (m.alergias) {
-          document.getElementById('alergias-box').style.display = 'block';
-          document.getElementById('info-alergias').textContent  = m.alergias;
-        }
-        // Citas
+        document.getElementById('info-telefono').textContent    = m.telefono    || '—';
+        document.getElementById('info-nacimiento').textContent  = m.fecha_nacimiento ? fDate(m.fecha_nacimiento) : '—';
+        document.getElementById('info-peso').textContent        = m.peso_kg ? `${m.peso_kg} kg` : '—';
+        document.getElementById('info-color').textContent       = m.color    || '—';
+        document.getElementById('info-chip').textContent        = m.microchip || 'Sin microchip';
+
+        if (m.alertas_medicas) { document.getElementById('alertas-box').style.display='block'; document.getElementById('info-alertas').textContent=m.alertas_medicas; }
+        if (m.alergias)        { document.getElementById('alergias-box').style.display='block'; document.getElementById('info-alergias').textContent=m.alergias; }
+
+        // Próximas citas
         if (citas?.length) {
-          document.getElementById('citas-box').style.display = 'block';
-          document.getElementById('citas-lista').innerHTML = citas.map(c => `
-            <div style="padding:.75rem 1.25rem;border-bottom:1px solid #f3f4f6;display:flex;
-              align-items:center;justify-content:space-between">
-              <div>
-                <p style="font-weight:600;font-size:.88rem">${c.motivo}</p>
-                <p style="font-size:.75rem;color:#6b7280">Dr/a. ${c.veterinario}</p>
+          document.getElementById('proximas-citas-box').style.display = 'block';
+          document.getElementById('proximas-citas-lista').innerHTML = citas.map(c => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div style="flex:1">
+                <p style="font-weight:600;font-size:.88rem">${esc(c.motivo)}</p>
+                <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">Dr/a. ${esc(c.veterinario)} · ${fDateTime(c.fecha_hora)}</p>
               </div>
-              <div style="text-align:right">
-                <p style="font-weight:700;color:#15803d;font-size:.88rem">
-                  ${new Date(c.fecha_hora).toLocaleDateString('es-PE',{day:'2-digit',month:'short'})}
-                </p>
-                <p style="font-size:.75rem;color:#6b7280">
-                  ${new Date(c.fecha_hora).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}
-                </p>
-              </div>
+              <span style="font-size:.7rem;font-weight:700;background:#f0fdf4;color:#15803d;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0;flex-shrink:0">Próxima</span>
             </div>`).join('');
         }
+
         // Vacunas
         if (vacunas?.length) {
           const hoy = new Date();
           document.getElementById('tabla-vacunas').innerHTML = vacunas.map(v => {
-            const prox = v.proxima_dosis ? new Date(v.proxima_dosis+'T12:00:00') : null;
+            const prox  = v.proxima_dosis ? new Date(v.proxima_dosis+'T12:00:00') : null;
+            const dias  = prox ? Math.ceil((prox-hoy)/(1000*60*60*24)) : null;
+            const venc  = dias !== null && dias < 0;
+            const prox30= dias !== null && dias >= 0 && dias <= 30;
             let badge = '';
-            if (!prox) badge = '<span class="badge badge-ok">Sin refuerzo</span>';
-            else if (prox < hoy) badge = '<span class="badge badge-venc">⚠️ Vencida</span>';
-            else if ((prox-hoy)/(1000*60*60*24) <= 30) badge = '<span class="badge badge-prox">⏳ Próxima</span>';
-            else badge = '<span class="badge badge-ok">✅ Al día</span>';
+            if (!prox)   badge = '<span class="badge badge-ok">Sin refuerzo</span>';
+            else if (venc)  badge = '<span class="badge badge-venc">⚠️ Vencida</span>';
+            else if (prox30) badge = '<span class="badge badge-prox">⏳ Próxima</span>';
+            else             badge = '<span class="badge badge-ok">✅ Al día</span>';
             return `<tr>
-              <td style="font-weight:600">${v.nombre}</td>
-              <td style="color:#6b7280">${v.fabricante||'—'}</td>
-              <td>${new Date(v.fecha_aplicacion+'T12:00:00').toLocaleDateString('es-PE')}</td>
-              <td>${prox?prox.toLocaleDateString('es-PE'):'—'}</td>
+              <td style="font-weight:600">${esc(v.nombre)}</td>
+              <td style="color:#6b7280">${esc(v.fabricante||'—')}</td>
+              <td>${fDate(v.fecha_aplicacion)}</td>
+              <td>${prox ? fDate(v.proxima_dosis) : '—'}</td>
               <td>${badge}</td>
             </tr>`;
           }).join('');
         }
-        // Última consulta
-        if (ultima_consulta) {
-          document.getElementById('consulta-box').style.display = 'block';
-          document.getElementById('uc-fecha').textContent =
-            new Date(ultima_consulta.fecha).toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'});
-          document.getElementById('uc-vet').textContent  = ultima_consulta.veterinario;
-          document.getElementById('uc-diag').textContent = ultima_consulta.diagnostico || '—';
-          document.getElementById('uc-trat').textContent = ultima_consulta.tratamiento  || '—';
+
+        // Historial de citas
+        if (citas_historial?.length) {
+          document.getElementById('historial-citas-box').style.display = 'block';
+          document.getElementById('historial-citas-lista').innerHTML = citas_historial.map(c => `
+            <div style="padding:1rem 1.25rem;border-bottom:1px solid #f3f4f6">
+              <div style="display:flex;align-items:flex-start;gap:.75rem">
+                <div class="timeline-dot gray" style="margin-top:.35rem"></div>
+                <div style="flex:1">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+                    <p style="font-weight:700;font-size:.9rem">${esc(c.motivo_cita)}</p>
+                    <span style="font-size:.7rem;font-weight:700;background:#f0fdf4;color:#15803d;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0;flex-shrink:0">✅ Completada</span>
+                  </div>
+                  <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">Dr/a. ${esc(c.veterinario)} · ${fDateTime(c.fecha_hora)}</p>
+                  ${c.diagnostico ? `<div style="margin-top:.5rem;padding:.5rem .75rem;background:#f0fdf4;border-radius:.65rem;font-size:.78rem"><strong style="color:#15803d">Dx:</strong> ${esc(c.diagnostico)}</div>` : ''}
+                  ${c.tratamiento ? `<div style="margin-top:.3rem;padding:.5rem .75rem;background:#f8fafc;border-radius:.65rem;font-size:.78rem"><strong style="color:#475569">Tto:</strong> ${esc(c.tratamiento)}</div>` : ''}
+                  ${c.recetas?.length ? `
+                    <div style="margin-top:.5rem">
+                      <p style="font-size:.68rem;font-weight:700;color:#6d28d9;margin-bottom:.3rem">💊 Recetas (${c.recetas.length})</p>
+                      <div style="display:flex;flex-direction:column;gap:.25rem">
+                        ${c.recetas.map(r => `
+                          <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.6rem;padding:.45rem .75rem;font-size:.75rem">
+                            <span style="font-weight:700">${esc(r.medicamento)}</span>
+                            <span style="color:#6b7280"> · ${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias ? ' · '+r.duracion_dias+' días' : ''}</span>
+                            ${r.instrucciones ? `<p style="color:#9ca3af;font-size:.68rem;margin-top:.15rem">📝 ${esc(r.instrucciones)}</p>` : ''}
+                          </div>`).join('')}
+                      </div>
+                    </div>` : ''}
+                </div>
+              </div>
+            </div>`).join('');
         }
+
+        // Baños
+        const tipoLabel = { basico:'🛁 Básico', completo:'✨ Completo', medicado:'💊 Medicado', deslanado:'✂️ Deslanado' };
+        if (banos?.length) {
+          document.getElementById('banos-box').style.display = 'block';
+          document.getElementById('banos-lista').innerHTML = banos.map(b => {
+            const servicios = [
+              b.incluye_corte  ? '✂️ Corte' : '',
+              b.incluye_unas   ? '💅 Uñas'  : '',
+              b.incluye_dental ? '🦷 Dental' : '',
+            ].filter(Boolean).join(' · ');
+            return `
+            <div class="timeline-item">
+              <div class="timeline-dot pink"></div>
+              <div style="flex:1">
+                <p style="font-weight:600;font-size:.88rem">${tipoLabel[b.tipo_bano]||b.tipo_bano}</p>
+                <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">
+                  ${esc(b.atendido_por)} · ${fDate(b.fecha)}
+                  ${servicios ? ' · '+servicios : ''}
+                </p>
+                ${b.productos ? `<p style="font-size:.72rem;color:#9ca3af;margin-top:.1rem">🧴 ${esc(b.productos)}</p>` : ''}
+              </div>
+              ${b.precio ? `<span style="font-size:.75rem;font-weight:700;color:#db2777;flex-shrink:0">S/. ${parseFloat(b.precio).toFixed(2)}</span>` : ''}
+            </div>`;
+          }).join('');
+        }
+
         document.getElementById('loading').style.display   = 'none';
         document.getElementById('contenido').style.display = 'block';
         document.title = `${m.mascota_nombre} — Carnet Digital VetClinic`;
+
       } catch {
         document.getElementById('loading').style.display   = 'none';
         document.getElementById('error-box').style.display = 'block';
       }
     }
+
     cargar();
   </script>
 </body>
-</html> 
+</html>
