@@ -1,0 +1,128 @@
+# ── API Backend ───────────────────────────────────────────────
+server {
+    listen 80;
+    server_name api.netcodip.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name api.netcodip.com;
+
+    ssl_certificate     /etc/letsencrypt/live/netcodip.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/netcodip.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# ── Frontend (todos los subdominios) ─────────────────────────
+server {
+    listen 80;
+    server_name ~^(?<tenant>.+)\.netcodip\.com$;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ~^(?<tenant>.+)\.netcodip\.com$;
+
+    ssl_certificate     /etc/letsencrypt/live/netcodip.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/netcodip.com/privkey.pem;
+
+    root /var/www/app_veterinaria/frontend;
+    index login.html;
+
+    # Sin caché para JS y HTML
+    location ~* \.(js|html)$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        try_files $uri $uri/ =404;
+    }
+
+    # API proxy
+    location /api/ {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Tenant-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Socket.io
+    location /socket.io/ {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header X-Tenant-Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # URLs sin .html — redirige /mascotas → /mascotas.html
+    location / {
+        # Primero intenta el archivo exacto
+        # Luego intenta agregar .html
+        # Luego intenta como directorio
+        # Finalmente muestra 404
+        try_files $uri $uri.html $uri/ =404;
+    }
+
+    # Página 404 personalizada
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
+    }
+}
+
+# ── Panel Admin SaaS ──────────────────────────────────────────
+server {
+    listen 80;
+    server_name admin.netcodip.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name admin.netcodip.com;
+
+    ssl_certificate     /etc/letsencrypt/live/netcodip.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/netcodip.com/privkey.pem;
+
+    root /var/www/app_veterinaria/frontend/admin;
+    index index.html;
+
+    # Sin caché
+    location ~* \.(js|html)$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        try_files $uri $uri/ =404;
+    }
+
+    location /admin/api/ {
+        proxy_pass http://localhost:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location / {
+        try_files $uri $uri.html $uri/ /index.html;
+    }
+}

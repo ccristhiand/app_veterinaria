@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Página no encontrada</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f0fdf4;
+           min-height: 100vh; display: flex; align-items: center;
+           justify-content: center; padding: 2rem; }
+    .card { background: #fff; border-radius: 1.5rem;
+            box-shadow: 0 20px 60px rgba(13,59,46,.10);
+            padding: 3rem 2.5rem; text-align: center; max-width: 480px; width: 100%; }
+    .logo-wrap { width: 80px; height: 80px; border-radius: 1.25rem;
+                 background: linear-gradient(135deg, #166534, #15803d);
+                 display: flex; align-items: center; justify-content: center;
+                 margin: 0 auto 1.25rem; overflow: hidden; }
+    .logo-wrap img { width: 100%; height: 100%; object-fit: contain; padding: .5rem; }
+    .logo-wrap span { font-size: 2.5rem; }
+    .clinica-nombre { font-size: .8rem; font-weight: 700; color: #15803d;
+                      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
+    .code { font-size: 6rem; font-weight: 800; color: #dcfce7;
+            font-family: 'Playfair Display', serif; line-height: 1; margin-bottom: .5rem; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem;
+         color: #1a2e28; margin-bottom: .75rem; }
+    p { color: #6b7280; font-size: .9rem; line-height: 1.6; margin-bottom: 2rem; }
+    .btn { display: inline-flex; align-items: center; gap: .5rem;
+           background: linear-gradient(135deg, #166534, #15803d);
+           color: #fff; padding: .85rem 2rem; border-radius: .85rem;
+           text-decoration: none; font-weight: 700; font-size: .9rem;
+           transition: opacity .15s; }
+    .btn:hover { opacity: .9; }
+    .btn-ghost { background: none; border: 1.5px solid #e2e8f0;
+                 color: #374151; margin-left: .75rem; }
+    .btn-ghost:hover { background: #f8faf8; opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Logo del tenant -->
+    <div class="logo-wrap" id="logo-wrap">
+      <span>🐾</span>
+    </div>
+    <p class="clinica-nombre" id="clinica-nombre"></p>
+
+    <div class="code">404</div>
+    <h1>Página no encontrada</h1>
+    <p id="mensaje">La página que buscas no existe o fue movida.<br/>
+       Verifica la URL o regresa al inicio.</p>
+    <div>
+      <a href="dashboard.html" class="btn">🏠 Ir al Dashboard</a>
+      <a href="javascript:history.back()" class="btn btn-ghost">← Volver</a>
+    </div>
+  </div>
+
+  <script>
+    // Cargar branding del tenant
+    const _isLocal = window.location.hostname === 'localhost' || window.location.hostname.endsWith('.test');
+    const _base    = window.location.hostname.split('.').slice(-2).join('.');
+    const API      = _isLocal ? 'http://localhost:4000/api/v1' : `https://api.${_base}/api/v1`;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API}/branding`, {
+          headers: { 'X-Tenant-Host': window.location.hostname }
+        });
+        if (!res.ok) return;
+        const { data } = await res.json();
+        if (!data) return;
+
+        // Nombre de la clínica
+        if (data.nombre_clinica) {
+          document.getElementById('clinica-nombre').textContent = data.nombre_clinica;
+          document.title = `Página no encontrada — ${data.nombre_clinica}`;
+          document.getElementById('mensaje').innerHTML =
+            `La página que buscas no existe en <strong>${data.nombre_clinica}</strong>.<br/>
+             Verifica la URL o regresa al inicio.`;
+        }
+
+        // Logo
+        const logoUrl = data.logo_url || data.favicon_url;
+        if (logoUrl) {
+          const wrap = document.getElementById('logo-wrap');
+          wrap.innerHTML = `<img src="${logoUrl}" alt="${data.nombre_clinica || 'Logo'}"/>`;
+        }
+
+        // Color primario del tenant
+        if (data.color_primario) {
+          document.querySelector('.btn').style.background =
+            `linear-gradient(135deg, ${data.color_primario}, ${data.color_acento || data.color_primario})`;
+          document.querySelector('.logo-wrap').style.background =
+            `linear-gradient(135deg, ${data.color_primario}, ${data.color_acento || data.color_primario})`;
+        }
+
+      } catch {}
+    })();
+  </script>
+</body>
+</html>

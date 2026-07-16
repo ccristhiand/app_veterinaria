@@ -71,6 +71,12 @@ function renderShell({ activePage, title, subtitle }) {
         <div style="flex:1;min-width:0">
           <p class="sb-user-name" id="user-name">Cargando…</p>
           <p class="sb-user-rol"  id="user-rol">—</p>
+          <a href="cambiar-password.html"
+            style="font-size:.65rem;color:#a7f3d0;text-decoration:none;font-weight:600;
+            display:inline-flex;align-items:center;gap:.25rem;margin-top:.1rem;opacity:.8"
+            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
+            🔐 Cambiar contraseña
+          </a>
         </div>
         <button onclick="logout()" class="sb-logout" title="Cerrar sesión">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">

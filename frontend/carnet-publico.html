@@ -52,8 +52,9 @@
             <p id="mascota-sub" style="opacity:.85;font-size:.88rem;margin:.2rem 0 0"></p>
           </div>
           <div style="text-align:right;flex-shrink:0">
-            <p style="font-size:.65rem;opacity:.75;text-transform:uppercase;letter-spacing:.1em">Carnet Digital</p>
-            <p id="clinica-nombre" style="font-size:.75rem;font-weight:700;margin-top:.2rem">VetClinic</p>
+            <div id="clinica-logo-wrap" style="margin-bottom:.35rem;display:flex;justify-content:flex-end">🐾</div>
+            <p id="clinica-nombre" style="font-size:.78rem;font-weight:700;opacity:.9">VetClinic</p>
+            <p style="font-size:.62rem;opacity:.65;text-transform:uppercase;letter-spacing:.1em;margin-top:.1rem">Carnet Digital</p>
           </div>
         </div>
 
@@ -136,7 +137,28 @@
         const res = await fetch(`${API}/carnet/${token}`, { headers:{ 'X-Tenant-Host': host } });
         if (!res.ok) throw new Error('no encontrado');
         const { data } = await res.json();
-        const { carnet: m, vacunas, citas, citas_historial, banos, ultima_consulta } = data;
+        const { carnet: m, vacunas, citas, citas_historial, historias_sin_cita, banos, ultima_consulta, branding } = data;
+
+        // Aplicar branding del tenant
+        const colorPrimario = branding?.color_primario || '#166534';
+        const colorAcento   = branding?.color_acento   || '#15803d';
+        const nombreClinica = branding?.nombre_clinica  || 'VetClinic';
+        const logoUrl       = branding?.logo_url        || null;
+
+        // Actualizar header con colores del tenant
+        document.querySelector('[style*="linear-gradient(135deg,#166534"]').style.background =
+          `linear-gradient(135deg,${colorPrimario},${colorAcento})`;
+
+        // Logo y nombre de la clínica
+        document.getElementById('clinica-nombre').textContent = nombreClinica;
+        document.title = `${m.mascota_nombre||''} — Carnet Digital · ${nombreClinica}`;
+        if (logoUrl) {
+          document.getElementById('clinica-logo-wrap').innerHTML =
+            `<img src="${logoUrl}" alt="${nombreClinica}"
+               style="max-height:40px;max-width:100px;object-fit:contain;filter:brightness(0) invert(1)"/>`;
+        } else {
+          document.getElementById('clinica-logo-wrap').textContent = '🐾';
+        }
 
         // Header
         document.getElementById('especie-icon').textContent   = icons[m.especie] || '🐾';
@@ -192,15 +214,20 @@
         }
 
         // Historial de citas
-        if (citas_historial?.length) {
+        const todasConsultas = [
+          ...(citas_historial || []),
+          ...(historias_sin_cita || [])
+        ].sort((a,b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+
+        if (todasConsultas.length) {
           document.getElementById('historial-citas-box').style.display = 'block';
-          document.getElementById('historial-citas-lista').innerHTML = citas_historial.map(c => `
+          document.getElementById('historial-citas-lista').innerHTML = todasConsultas.map(c => `
             <div style="padding:1rem 1.25rem;border-bottom:1px solid #f3f4f6">
               <div style="display:flex;align-items:flex-start;gap:.75rem">
                 <div class="timeline-dot gray" style="margin-top:.35rem"></div>
                 <div style="flex:1">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
-                    <p style="font-weight:700;font-size:.9rem">${esc(c.motivo_cita)}</p>
+                    <p style="font-weight:700;font-size:.9rem">${esc(c.motivo_cita || c.motivo_historia || '—')}</p>
                     <span style="font-size:.7rem;font-weight:700;background:#f0fdf4;color:#15803d;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0;flex-shrink:0">✅ Completada</span>
                   </div>
                   <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">Dr/a. ${esc(c.veterinario)} · ${fDateTime(c.fecha_hora)}</p>

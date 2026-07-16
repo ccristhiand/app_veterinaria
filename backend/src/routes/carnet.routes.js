@@ -26,6 +26,27 @@ router.get('/:token', async (req, res, next) => {
 
     if (!carnet) return res.status(404).json({ success:false, message:'Carnet no encontrado o desactivado.' });
 
+    // Branding del tenant
+    const [branding] = await req.db.query(
+      'SELECT nombre, logo_url, color_primario, color_acento FROM empresa_config LIMIT 1'
+    ).catch(() => [null]);
+
+    // También intentar desde tenant_config en vet_master
+    const { masterQuery } = require('../config/masterDB');
+    const host = req.headers['x-tenant-host'] || req.hostname || '';
+    const [tenantBranding] = await masterQuery(
+      `SELECT tc.nombre_clinica, tc.logo_url, tc.color_primario, tc.color_acento
+       FROM tenants t JOIN tenant_config tc ON tc.tenant_id = t.id
+       WHERE t.subdominio = ? LIMIT 1`, [host]
+    ).catch(() => [null]);
+
+    const clinicaBranding = {
+      nombre_clinica: tenantBranding?.nombre_clinica || branding?.nombre || 'VetClinic',
+      logo_url      : tenantBranding?.logo_url       || branding?.logo_url || null,
+      color_primario: tenantBranding?.color_primario || branding?.color_primario || '#166534',
+      color_acento  : tenantBranding?.color_acento   || branding?.color_acento  || '#15803d',
+    };
+
     // Vacunas
     const vacunas = await req.db.query(
       `SELECT nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas
@@ -46,12 +67,28 @@ router.get('/:token', async (req, res, next) => {
       `SELECT c.id AS cita_id, c.fecha_hora, c.motivo AS motivo_cita, c.estado,
               u.nombre AS veterinario,
               h.id AS historia_id, h.diagnostico, h.tratamiento, h.observaciones,
-              h.peso_kg, h.temperatura_c
+              h.peso_kg, h.temperatura_c, h.motivo AS motivo_historia
        FROM citas c
        JOIN usuarios u ON u.id = c.veterinario_id
-       LEFT JOIN historia_clinica h ON h.cita_id = c.id
+       LEFT JOIN historia_clinica h ON h.cita_id = c.id OR (
+         h.mascota_id = c.mascota_id AND
+         h.cita_id IS NULL AND
+         DATE(h.fecha) = DATE(c.fecha_hora)
+       )
        WHERE c.mascota_id = ? AND c.estado = 'completada'
+       GROUP BY c.id
        ORDER BY c.fecha_hora DESC LIMIT 10`, [carnet.mascota_id]
+    );
+
+    // También cargar historias clínicas sin cita vinculada
+    const historias_sin_cita = await req.db.query(
+      `SELECT h.id AS historia_id, h.fecha AS fecha_hora, h.motivo AS motivo_cita,
+              h.diagnostico, h.tratamiento, h.observaciones, h.peso_kg, h.temperatura_c,
+              u.nombre AS veterinario
+       FROM historia_clinica h
+       JOIN usuarios u ON u.id = h.veterinario_id
+       WHERE h.mascota_id = ? AND h.cita_id IS NULL
+       ORDER BY h.fecha DESC LIMIT 5`, [carnet.mascota_id]
     );
 
     // Cargar recetas para cada historia clínica
@@ -63,6 +100,17 @@ router.get('/:token', async (req, res, next) => {
            FROM recetas WHERE historia_clinica_id = ?`, [c.historia_id]
         );
         return { ...c, recetas };
+      })
+    );
+
+    // Cargar recetas para historias sin cita
+    const historias_con_recetas = await Promise.all(
+      historias_sin_cita.map(async h => {
+        const recetas = await req.db.query(
+          `SELECT medicamento, dosis, frecuencia, duracion_dias, instrucciones
+           FROM recetas WHERE historia_clinica_id = ?`, [h.historia_id]
+        );
+        return { ...h, recetas, sin_cita: true };
       })
     );
 
@@ -89,7 +137,7 @@ router.get('/:token', async (req, res, next) => {
 
     return res.json({
       success: true,
-      data: { carnet, vacunas, citas, citas_historial, banos, ultima_consulta: ultimaConsulta || null },
+      data: { carnet, vacunas, citas, citas_historial, historias_sin_cita: historias_con_recetas, banos, ultima_consulta: ultimaConsulta || null, branding: clinicaBranding },
     });
   } catch(err) { next(err); }
 });

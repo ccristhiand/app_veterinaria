@@ -271,6 +271,7 @@ async function cargar() {
                 ${esc(u.nombre)}
                 ${esSelf ? '<span style="font-size:.62rem;background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:999px;font-weight:700;margin-left:.3rem">Tú</span>' : ''}
               </p>
+              ${u.must_change_password ? '<span style="font-size:.62rem;background:#fffbeb;color:#b45309;padding:.1rem .4rem;border-radius:999px;font-weight:700;border:1px solid #fde68a">⚠️ Debe cambiar password</span>' : ''}
             </div>
           </div>
         </td>
@@ -299,6 +300,12 @@ async function cargar() {
               style="font-size:.75rem;color:${u.activo?'#e11d48':'#15803d'}">
               ${u.activo ? '🚫 Desactivar' : '✅ Activar'}
             </button>` : ''}
+            ${esSelf ? `
+            <span style="color:var(--line)">·</span>
+            <a href="cambiar-password.html"
+              style="font-size:.75rem;color:#6d28d9;font-weight:600;text-decoration:none">
+              🔐 Mi password
+            </a>` : ''}
           </div>
         </td>
       </tr>`;
