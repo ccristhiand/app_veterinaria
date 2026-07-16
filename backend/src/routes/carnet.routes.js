@@ -66,17 +66,18 @@ router.get('/:token', async (req, res, next) => {
     const citas_historial_raw = await req.db.query(
       `SELECT c.id AS cita_id, c.fecha_hora, c.motivo AS motivo_cita, c.estado,
               u.nombre AS veterinario,
-              h.id AS historia_id, h.diagnostico, h.tratamiento, h.observaciones,
-              h.peso_kg, h.temperatura_c, h.motivo AS motivo_historia
+              MAX(h.id) AS historia_id,
+              MAX(h.diagnostico) AS diagnostico,
+              MAX(h.tratamiento) AS tratamiento,
+              MAX(h.observaciones) AS observaciones,
+              MAX(h.peso_kg) AS peso_kg,
+              MAX(h.temperatura_c) AS temperatura_c,
+              MAX(h.motivo) AS motivo_historia
        FROM citas c
        JOIN usuarios u ON u.id = c.veterinario_id
-       LEFT JOIN historia_clinica h ON h.cita_id = c.id OR (
-         h.mascota_id = c.mascota_id AND
-         h.cita_id IS NULL AND
-         DATE(h.fecha) = DATE(c.fecha_hora)
-       )
+       LEFT JOIN historia_clinica h ON h.cita_id = c.id
        WHERE c.mascota_id = ? AND c.estado = 'completada'
-       GROUP BY c.id
+       GROUP BY c.id, c.fecha_hora, c.motivo, c.estado, u.nombre
        ORDER BY c.fecha_hora DESC LIMIT 10`, [carnet.mascota_id]
     );
 

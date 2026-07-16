@@ -373,4 +373,12 @@ curl https://api.tudominio.pe/health
 - **Suspensión** — cierre forzado de sesiones con motivo
 - **Multimoneda** — configurable por clínica (S/., $, €, etc.)
 
+# Eliminar y recrear
+sudo rm /etc/nginx/sites-available/vetclinic
+sudo rm /etc/nginx/sites-enabled/vetclinic
 sudo nano /etc/nginx/sites-available/vetclinic
+
+# pare reiniciar
+sudo ln -s /etc/nginx/sites-available/vetclinic /etc/nginx/sites-enabled/vetclinic
+sudo nginx -t
+sudo systemctl reload nginx
