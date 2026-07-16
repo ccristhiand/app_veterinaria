@@ -7,13 +7,15 @@
 
 -- ── Usuarios del sistema ──────────────────────────────────────
 CREATE TABLE usuarios (
-  id         INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  nombre     VARCHAR(100)  NOT NULL,
-  email      VARCHAR(150)  NOT NULL UNIQUE,
-  password   VARCHAR(255)  NOT NULL,
-  rol        ENUM('admin','veterinario','recepcionista') NOT NULL DEFAULT 'recepcionista',
-  activo     TINYINT(1)    NOT NULL DEFAULT 1,
-  created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+  id                   INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  nombre               VARCHAR(100)  NOT NULL,
+  email                VARCHAR(150)  NOT NULL UNIQUE,
+  password             VARCHAR(255)  NOT NULL,
+  rol                  ENUM('admin','veterinario','recepcionista') NOT NULL DEFAULT 'recepcionista',
+  activo               TINYINT(1)    NOT NULL DEFAULT 1,
+  must_change_password TINYINT(1)    NOT NULL DEFAULT 1,
+  last_password_change TIMESTAMP     NULL DEFAULT NULL,
+  created_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- ── Propietarios ─────────────────────────────────────────────
@@ -182,7 +184,6 @@ CREATE TABLE servicios_catalogo (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ── Configuración empresa (facturación) ───────────────────────
 -- ── Configuración empresa (facturación) ───────────────────────
 CREATE TABLE empresa_config (
   id               INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,

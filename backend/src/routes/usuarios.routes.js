@@ -8,6 +8,18 @@ const { masterQuery } = require('../config/masterDB');
 const router = Router();
 router.use(authenticate);
 
+
+// ── GET /api/v1/usuarios/me — perfil del usuario autenticado ──────
+router.get('/me', async (req, res, next) => {
+  try {
+    const [user] = await req.db.query(
+      'SELECT id, nombre, email, rol, activo, must_change_password, last_password_change, created_at FROM usuarios WHERE id=?',
+      [req.user.id]
+    );
+    return res.json({ success: true, data: user });
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/usuarios — listar usuarios de la clínica ──────────
 router.get('/', async (req, res, next) => {
   try {
@@ -103,7 +115,7 @@ router.post('/', authorize('admin'), async (req, res, next) => {
 
     const hash   = await bcrypt.hash(password, 10);
     const result = await req.db.query(
-      'INSERT INTO usuarios (nombre, email, password, rol, activo) VALUES (?,?,?,?,1)',
+      'INSERT INTO usuarios (nombre, email, password, rol, activo, must_change_password) VALUES (?,?,?,?,1,1)',
       [nombre.trim(), email.trim().toLowerCase(), hash, rol]
     );
 
