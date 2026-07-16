@@ -22,19 +22,19 @@ const MODULOS_POR_PLAN = {
 
 // ── Todos los links del sistema ───────────────────────────────────
 const TODOS_LOS_LINKS = [
-  { id:'dashboard',      icon:'📊', label:'Dashboard',        href:'dashboard.html',      roles:['admin','veterinario','recepcionista'] },
-  { id:'citas',          icon:'📅', label:'Citas',            href:'citas.html',          roles:['admin','veterinario','recepcionista'] },
-  { id:'propietarios',   icon:'👥', label:'Propietarios',     href:'propietarios.html',   roles:['admin','veterinario','recepcionista'] },
-  { id:'mascotas',       icon:'🐾', label:'Mascotas',         href:'mascotas.html',       roles:['admin','veterinario','recepcionista'] },
-  { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia.html',       roles:['admin','veterinario','recepcionista'] },
-  { id:'inventario',     icon:'📦', label:'Inventario',       href:'inventario.html',     roles:['admin','veterinario','recepcionista'] },
-  { id:'facturacion',    icon:'🧾', label:'Facturación',      href:'facturacion.html',    roles:['admin','recepcionista'] },
-  { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja.html',           roles:['admin','recepcionista'] },
-  { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios.html',      roles:['admin','recepcionista'] },
-  { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes.html',       roles:['admin'] },
-  { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos.html',roles:['admin','veterinario'] },
-  { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios.html',       roles:['admin'] },
-  { id:'configuracion',  icon:'⚙️', label:'Configuración',    href:'configuracion.html',  roles:['admin'] },
+  { id:'dashboard',      icon:'📊', label:'Dashboard',        href:'dashboard',      roles:['admin','veterinario','recepcionista'] },
+  { id:'citas',          icon:'📅', label:'Citas',            href:'citas',          roles:['admin','veterinario','recepcionista'] },
+  { id:'propietarios',   icon:'👥', label:'Propietarios',     href:'propietarios',   roles:['admin','veterinario','recepcionista'] },
+  { id:'mascotas',       icon:'🐾', label:'Mascotas',         href:'mascotas',       roles:['admin','veterinario','recepcionista'] },
+  { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia',       roles:['admin','veterinario','recepcionista'] },
+  { id:'inventario',     icon:'📦', label:'Inventario',       href:'inventario',     roles:['admin','veterinario','recepcionista'] },
+  { id:'facturacion',    icon:'🧾', label:'Facturación',      href:'facturacion',    roles:['admin','recepcionista'] },
+  { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja',           roles:['admin','recepcionista'] },
+  { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios',      roles:['admin','recepcionista'] },
+  { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
+  { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos',roles:['admin','veterinario'] },
+  { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios',       roles:['admin'] },
+  { id:'configuracion',  icon:'⚙️', label:'Configuración',    href:'configuracion',  roles:['admin'] },
 ];
 
 function renderShell({ activePage, title, subtitle }) {
@@ -71,7 +71,7 @@ function renderShell({ activePage, title, subtitle }) {
         <div style="flex:1;min-width:0">
           <p class="sb-user-name" id="user-name">Cargando…</p>
           <p class="sb-user-rol"  id="user-rol">—</p>
-          <a href="cambiar-password.html"
+          <a href="cambiar-password"
             style="font-size:.65rem;color:#a7f3d0;text-decoration:none;font-weight:600;
             display:inline-flex;align-items:center;gap:.25rem;margin-top:.1rem;opacity:.8"
             onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
@@ -244,7 +244,7 @@ function aplicarModulosPlan(branding, activePage) {
             Plan actual: <strong>${plan.toUpperCase()}</strong>
           </div>
           <br/>
-          <a href="dashboard.html" class="vbtn vbtn-primary" style="margin-top:1.25rem;display:inline-flex">
+          <a href="dashboard" class="vbtn vbtn-primary" style="margin-top:1.25rem;display:inline-flex">
             ← Volver al Dashboard
           </a>
         </div>`;
