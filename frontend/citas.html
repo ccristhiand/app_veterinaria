@@ -548,7 +548,7 @@ async function seleccionarProp(id, nombre, apellido, dni, telefono) {
           </button>`).join('')
       : `<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">
           Este propietario no tiene mascotas.
-          <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar mascota</a>
+          <a href="mascotas" style="color:var(--green-600);font-weight:600">Registrar mascota</a>
          </div>`;
   } catch {
     document.getElementById('mascotas-lista').innerHTML =
@@ -638,7 +638,7 @@ function irAAtender() {
   sessionStorage.setItem('historia_mascota_id', citaAtenderData.mascotaId);
   sessionStorage.setItem('historia_cita_id',    citaAtenderData.id);
   sessionStorage.setItem('historia_motivo',     citaAtenderData.motivo);
-  window.location.href = 'historia.html';
+  window.location.href = 'historia';
 }
 
 // ── Editar cita ───────────────────────────────────────────────────

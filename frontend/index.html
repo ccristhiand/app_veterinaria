@@ -368,6 +368,16 @@
       }
 
       const { accessToken, refreshToken, user } = data.data;
+
+        // Primer login — debe cambiar password
+        if (data.must_change_password) {
+          localStorage.setItem('vet_temp_token', data.temp_token);
+          localStorage.setItem('vet_temp_user',  JSON.stringify(data.user));
+          btnText.textContent = 'Redirigiendo…';
+          setTimeout(() => window.location.href = 'cambiar-password', 500);
+          return;
+        }
+
       localStorage.setItem('vet_access',  accessToken);
       localStorage.setItem('vet_refresh', refreshToken);
       localStorage.setItem('vet_user',    JSON.stringify(user));

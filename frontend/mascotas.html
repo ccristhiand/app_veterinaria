@@ -185,7 +185,6 @@
     <div class="vmodal-body" id="det-body"></div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-det')" class="vbtn vbtn-ghost">Cerrar</button>
-      <button id="det-carnet-btn" class="vbtn vbtn-ghost">📱 Carnet Digital</button>
       <button id="det-historia-btn" class="vbtn vbtn-ghost">📋 Ver Historia</button>
       <button id="det-editar-btn"   class="vbtn vbtn-primary">✏️ Editar</button>
     </div>
@@ -426,13 +425,12 @@ async function verDetalle(id) {
 
   document.getElementById('det-historia-btn').onclick = () => {
     sessionStorage.setItem('historia_mascota_id', id);
-    window.location.href = 'historia.html';
+    window.location.href = 'historia';
   };
   document.getElementById('det-editar-btn').onclick = () => {
     closeModal('modal-det');
     abrirModalEditar(id);
   };
-  document.getElementById('det-carnet-btn').onclick = () => abrirCarnet(id);
 
   openModal('modal-det');
 
@@ -527,122 +525,6 @@ function ib(label, val) {
     </p>
   </div>`;
 }
-
-// ── Carnet Digital ────────────────────────────────────────────────
-async function abrirCarnet(mascotaId) {
-  openModal('modal-carnet');
-  document.getElementById('carnet-body').innerHTML =
-    '<div class="vempty"><div class="vspinner"></div><p>Generando carnet…</p></div>';
-
-  try {
-    const res = await api(`/carnet/mascota/${mascotaId}`);
-    if (!res?.ok) { toast('Error al obtener carnet.','danger'); return; }
-    const carnet = (await res.json()).data;
-
-    const url = `${window.location.origin}/carnet-publico.html?t=${carnet.token}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=166534&qzone=2`;
-
-    document.getElementById('carnet-body').innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1.25rem">
-
-        <!-- QR -->
-        <div style="background:#f0fdf4;border:2px solid #a7f3d0;border-radius:1.25rem;
-          padding:1.25rem;text-align:center">
-          <img src="${qrUrl}" alt="QR Carnet" width="180" height="180"
-            style="border-radius:.5rem;display:block;margin:0 auto"/>
-          <p style="font-size:.72rem;color:#15803d;font-weight:700;margin-top:.6rem">
-            📱 Escanear para ver el carnet
-          </p>
-        </div>
-
-        <!-- Estado -->
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <span style="width:10px;height:10px;border-radius:50%;background:${carnet.activo?'#10b981':'#e11d48'}"></span>
-          <span style="font-size:.8rem;font-weight:600;color:${carnet.activo?'#15803d':'#be123c'}">
-            ${carnet.activo ? 'Carnet activo' : 'Carnet desactivado'}
-          </span>
-          <span style="font-size:.72rem;color:var(--ink-faint)">· ${carnet.vistas} vista${carnet.vistas!==1?'s':''}</span>
-        </div>
-
-        <!-- URL -->
-        <div style="width:100%;background:#f8faf8;border:1px solid var(--line);
-          border-radius:.85rem;padding:.85rem 1rem">
-          <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;
-            text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Enlace público</p>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <p id="carnet-url" style="font-size:.75rem;color:#1d4ed8;word-break:break-all;
-              flex:1;font-family:'Courier New',monospace">${url}</p>
-            <button onclick="copiarLink('${url}')"
-              style="background:none;border:1.5px solid var(--line);border-radius:.65rem;
-              padding:.35rem .75rem;font-size:.72rem;cursor:pointer;font-weight:600;
-              color:var(--ink-soft);white-space:nowrap;flex-shrink:0">
-              📋 Copiar
-            </button>
-          </div>
-        </div>
-
-        <!-- Acciones -->
-        <div style="display:flex;gap:.6rem;width:100%;flex-wrap:wrap">
-          <a href="${url}" target="_blank" class="vbtn vbtn-primary"
-            style="flex:1;text-align:center;text-decoration:none">
-            👁️ Ver carnet
-          </a>
-          <button onclick="regenerarToken(${mascotaId})" class="vbtn vbtn-ghost" style="flex:1">
-            🔄 Regenerar QR
-          </button>
-        </div>
-
-        <p style="font-size:.7rem;color:var(--ink-faint);text-align:center">
-          Comparte este QR o enlace con el propietario para que vea el historial de su mascota sin necesidad de login.
-        </p>
-      </div>`;
-
-  } catch { toast('Error de conexión.','danger'); }
-}
-
-function copiarLink(url) {
-  navigator.clipboard.writeText(url).then(() => {
-    toast('✅ Enlace copiado al portapapeles', 'success');
-  }).catch(() => {
-    const inp = document.createElement('input');
-    inp.value = url; document.body.appendChild(inp);
-    inp.select(); document.execCommand('copy');
-    inp.remove();
-    toast('✅ Enlace copiado', 'success');
-  });
-}
-
-async function regenerarToken(mascotaId) {
-  const ok = await vconfirm({
-    titulo     : '¿Regenerar QR?',
-    mensaje    : 'El enlace anterior dejará de funcionar y se generará uno nuevo.',
-    labelOk    : '🔄 Regenerar',
-    labelCancel: 'Cancelar',
-    tipo       : 'warning',
-  });
-  if (!ok) return;
-  try {
-    const res = await api(`/carnet/mascota/${mascotaId}/regenerar`, { method:'POST' });
-    if (!res?.ok) { toast('Error al regenerar.','danger'); return; }
-    toast('✅ QR regenerado.', 'success');
-    abrirCarnet(mascotaId);
-  } catch { toast('Error de conexión.','danger'); }
-}
 </script>
-
-<!-- Modal Carnet Digital -->
-<div id="modal-carnet" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:480px">
-    <div class="vmodal-head">
-      <h3>📱 Carnet Digital</h3>
-      <button onclick="closeModal('modal-carnet')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body" id="carnet-body">
-      <div class="vempty"><div class="vspinner"></div></div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-carnet')" class="vbtn vbtn-ghost">Cerrar</button>
-    </div>
-  </div>
-</div>
+</body>
 </html>
