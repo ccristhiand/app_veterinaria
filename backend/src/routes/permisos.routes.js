@@ -44,7 +44,7 @@ router.get('/:tenantId', async (req, res, next) => {
 
 // ── PUT /api/v1/admin/permisos/:tenantId ──────────────────────
 // Body: { rol, modulo, permiso, activo }
-router.put('/:tenantId', auditMiddleware('permisos:actualizado', 'permisos'), async (req, res, next) => {
+router.put('/:tenantId', async (req, res, next) => {
   try {
     const { rol, modulo, permiso, activo } = req.body;
     if (!rol || !modulo || !permiso)
@@ -68,7 +68,7 @@ router.put('/:tenantId', auditMiddleware('permisos:actualizado', 'permisos'), as
 
 // ── PUT /api/v1/admin/permisos/:tenantId/bulk ─────────────────
 // Guardar todos los permisos de una vez
-router.put('/:tenantId/bulk', auditMiddleware('permisos:actualizado', 'permisos'), async (req, res, next) => {
+router.put('/:tenantId/bulk', async (req, res, next) => {
   try {
     const { permisos } = req.body; // [{ rol, modulo, permiso, activo }]
     if (!Array.isArray(permisos) || !permisos.length)
