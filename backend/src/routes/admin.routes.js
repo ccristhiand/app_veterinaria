@@ -287,7 +287,56 @@ router.get('/stats', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-module.exports = router;
+
+// ── POST /admin/api/tenants/:id/suspender ────────────────────
+router.post('/tenants/:id/suspender', async (req, res) => {
+  try {
+    const { motivo } = req.body;
+    if (!motivo?.trim())
+      return res.status(422).json({ success: false, message: 'El motivo de suspensión es obligatorio.' });
+
+    const [t] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
+    if (!t) return res.status(404).json({ success: false, message: 'Clínica no encontrada.' });
+    if (!t.activo) return res.status(422).json({ success: false, message: 'La clínica ya está suspendida.' });
+
+    await masterQuery(
+      'UPDATE tenants SET activo=0 WHERE id=?', [req.params.id]
+    );
+
+    // Guardar motivo en tenant_config
+    await masterQuery(
+      'UPDATE tenant_config SET motivo_suspension=?, fecha_suspension=NOW() WHERE tenant_id=?',
+      [motivo.trim(), req.params.id]
+    ).catch(() => {}); // No crítico si la columna no existe aún
+
+    invalidateTenantCache(t.subdominio);
+    evictTenantPool(t.db_name);
+
+    logger.info(`🚫 Clínica suspendida: ${t.slug} — Motivo: ${motivo}`);
+
+    return res.json({ success: true, message: `Clínica "${t.slug}" suspendida correctamente.` });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── POST /admin/api/tenants/:id/reactivar ────────────────────
+router.post('/tenants/:id/reactivar', async (req, res) => {
+  try {
+    const [t] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
+    if (!t) return res.status(404).json({ success: false, message: 'Clínica no encontrada.' });
+    if (t.activo) return res.status(422).json({ success: false, message: 'La clínica ya está activa.' });
+
+    await masterQuery('UPDATE tenants SET activo=1 WHERE id=?', [req.params.id]);
+    await masterQuery(
+      'UPDATE tenant_config SET motivo_suspension=NULL, fecha_suspension=NULL WHERE tenant_id=?',
+      [req.params.id]
+    ).catch(() => {});
+
+    invalidateTenantCache(t.subdominio);
+
+    return res.json({ success: true, message: `Clínica "${t.slug}" reactivada correctamente.` });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 
 // ── GET /admin/api/tenants/:id/stats ─────────────────────────────
 router.get('/tenants/:id/stats', async (req, res) => {
@@ -338,3 +387,5 @@ router.get('/tenants/:id/stats', async (req, res) => {
     res.status(500).json({ success:false, message:err.message });
   }
 });
+
+module.exports = router;
