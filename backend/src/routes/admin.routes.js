@@ -198,8 +198,8 @@ router.put('/tenants/:id', async (req, res) => {
          modulo_estetica=?, modulo_facturacion=?, modulo_inventario=?,
          modulo_vacunas=?, modulo_consentimientos=?, modulo_carnet=?
        WHERE tenant_id=?`,
-      [nombre_clinica, logo_url||null,
-       color_primario, color_sidebar, color_acento,
+      [nombre_clinica||'VetClinic', logo_url||null,
+       color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
        max_usuarios || 5,
        modulo_estetica?1:0, modulo_facturacion?1:0,
        modulo_inventario?1:0, modulo_vacunas?1:0,
