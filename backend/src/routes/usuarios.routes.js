@@ -132,8 +132,6 @@ router.post('/', authorize('admin'), async (req, res, next) => {
 // ── PUT /api/v1/usuarios/:id — editar (solo admin) ────────────────
 router.put('/:id', authorize('admin'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM usuarios WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { nombre, email, rol, password } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });

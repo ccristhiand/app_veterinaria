@@ -332,8 +332,6 @@ router.post('/', auditMiddleware('facturacion:creado', 'facturacion'), async (re
 // Registrar pago(s) en una factura pendiente
 router.patch('/:id/pagar', auditMiddleware('facturacion:actualizado', 'facturacion'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM facturas WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { pagos = [], metodo_pago } = req.body;
 
     const [fac] = await req.db.query('SELECT id, estado, total FROM facturas WHERE id = ?', [req.params.id]);
@@ -382,8 +380,6 @@ router.patch('/:id/pagar', auditMiddleware('facturacion:actualizado', 'facturaci
 // ── PATCH /api/v1/facturas/:id/anular — solo admin ───────────────
 router.patch('/:id/anular', authorize('admin'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM facturas WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { observaciones } = req.body;
     if (!observaciones?.trim())
       return res.status(422).json({ success:false, message:'El motivo de anulación es obligatorio.' });

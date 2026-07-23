@@ -68,8 +68,6 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
 // ── PUT /api/v1/inventario/:id — editar ítem completo ─────────────
 router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:actualizado', 'inventario'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM inventario WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const {
       nombre, categoria, cantidad, unidad,
       stock_minimo, precio_unitario, proveedor,
@@ -109,8 +107,6 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
 // ── PATCH /api/v1/inventario/:id — actualizar solo stock ──────────
 router.patch('/:id', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:actualizado', 'inventario'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM inventario WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { cantidad } = req.body;
     if (cantidad === undefined || cantidad === null)
       return res.status(422).json({ success:false, message:'cantidad requerida.' });
@@ -172,8 +168,6 @@ router.patch('/:id', authorize('admin','veterinario','recepcionista'), auditMidd
 // ── DELETE /api/v1/inventario/:id — eliminar ítem ─────────────────
 router.delete('/:id', authorize('admin'), auditMiddleware('inventario:eliminado', 'inventario'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM inventario WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     await req.db.query('DELETE FROM inventario WHERE id=?', [req.params.id]);
     return res.json({ success:true, message:'Ítem eliminado.' });
   } catch(err) { next(err); }

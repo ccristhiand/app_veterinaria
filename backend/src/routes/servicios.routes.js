@@ -35,8 +35,6 @@ router.post('/', authorize('admin'), auditMiddleware('servicios:creado', 'servic
 
 router.put('/:id', authorize('admin'), auditMiddleware('servicios:actualizado', 'servicios'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM servicios_catalogo WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { nombre, categoria, precio, descripcion, activo } = req.body;
     await req.db.query(
       'UPDATE servicios_catalogo SET nombre=?, categoria=?, precio=?, descripcion=?, activo=? WHERE id=?',
@@ -48,8 +46,6 @@ router.put('/:id', authorize('admin'), auditMiddleware('servicios:actualizado', 
 
 router.delete('/:id', authorize('admin'), auditMiddleware('servicios:eliminado', 'servicios'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM servicios_catalogo WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     await req.db.query('UPDATE servicios_catalogo SET activo=0 WHERE id=?', [req.params.id]);
     return res.json({ success: true, message: 'Servicio desactivado.' });
   } catch (err) { next(err); }

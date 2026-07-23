@@ -49,8 +49,6 @@ router.post('/', auditMiddleware('estetica:creado', 'estetica'), async (req, res
 
 router.put('/:id', auditMiddleware('estetica:actualizado', 'estetica'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM servicios_estetica WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { fecha, tipo_bano, incluye_corte, incluye_unas,
             incluye_dental, productos, precio, observaciones } = req.body;
     await req.db.query(

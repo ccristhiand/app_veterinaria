@@ -2,6 +2,7 @@
 
 const { Router }    = require('express');
 const { masterQuery } = require('../config/masterDB');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
 
 const router = Router();
 

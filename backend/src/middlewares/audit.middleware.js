@@ -1,49 +1,45 @@
 'use strict';
 
-/**
- * VetClinic SaaS — Middleware de Auditoría
- * Registra automáticamente todas las operaciones CRUD en vet_master
- * 
- * Uso en routes:
- *   router.post('/', audit('mascota:creada', 'mascotas'), async (req, res, next) => { ... })
- * 
- * O manual dentro de un handler:
- *   await auditLog(req, res, 'factura:anulada', 'facturacion', { anterior, nuevo })
- */
-
 const { masterQuery } = require('../config/masterDB');
 
 // ── Mapeo de módulos por ruta ──────────────────────────────────
 const MODULO_MAP = {
-  '/mascotas'         : 'mascotas',
-  '/propietarios'     : 'propietarios',
-  '/citas'            : 'citas',
-  '/historia'         : 'historia_clinica',
-  '/vacunas'          : 'vacunas',
-  '/inventario'       : 'inventario',
-  '/facturas'         : 'facturacion',
-  '/caja'             : 'caja',
-  '/usuarios'         : 'usuarios',
-  '/estetica'         : 'estetica',
-  '/consentimientos'  : 'consentimientos',
-  '/carnet'           : 'carnet',
-  '/empresa'          : 'configuracion',
-  '/servicios'        : 'servicios',
-  '/reportes'         : 'reportes',
-  '/auth'             : 'autenticacion',
+  '/mascotas'        : 'mascotas',
+  '/propietarios'    : 'propietarios',
+  '/citas'           : 'citas',
+  '/historia'        : 'historia_clinica',
+  '/vacunas'         : 'vacunas',
+  '/inventario'      : 'inventario',
+  '/facturas'        : 'facturacion',
+  '/caja'            : 'caja',
+  '/usuarios'        : 'usuarios',
+  '/estetica'        : 'estetica',
+  '/consentimientos' : 'consentimientos',
+  '/carnet'          : 'carnet',
+  '/empresa'         : 'configuracion',
+  '/servicios'       : 'servicios',
+  '/auth'            : 'autenticacion',
 };
 
-// ── Mapeo de acciones por método HTTP ─────────────────────────
-const ACCION_MAP = {
-  POST   : 'creado',
-  PUT    : 'actualizado',
-  PATCH  : 'actualizado',
-  DELETE : 'eliminado',
-  GET    : 'consultado',
+// ── Mapeo tabla por módulo ─────────────────────────────────────
+const TABLA_MAP = {
+  'mascotas'         : 'mascotas',
+  'propietarios'     : 'propietarios',
+  'citas'            : 'citas',
+  'historia_clinica' : 'historia_clinica',
+  'vacunas'          : 'vacunas',
+  'inventario'       : 'inventario',
+  'facturacion'      : 'facturas',
+  'caja'             : 'caja_cierres',
+  'usuarios'         : 'usuarios',
+  'estetica'         : 'servicios_estetica',
+  'consentimientos'  : 'consentimientos_plantillas',
+  'servicios'        : 'servicios_catalogo',
+  'configuracion'    : 'empresa_config',
 };
 
 /**
- * Función principal de log — fire and forget (no bloquea)
+ * Función principal de log — fire and forget
  */
 async function auditLog(req, res, accionOverride = null, moduloOverride = null, {
   anterior  = null,
@@ -53,20 +49,17 @@ async function auditLog(req, res, accionOverride = null, moduloOverride = null, 
   duracion  = null,
 } = {}) {
   try {
-    // Detectar módulo
-    const path    = req.path || req.url || '';
-    const modulo  = moduloOverride || Object.entries(MODULO_MAP)
+    const path   = req.path || req.url || '';
+    const modulo = moduloOverride || Object.entries(MODULO_MAP)
       .find(([k]) => path.includes(k))?.[1] || 'sistema';
 
-    // Detectar acción
-    const metodo  = req.method?.toUpperCase() || 'GET';
-    const accion  = accionOverride || `${modulo}:${ACCION_MAP[metodo] || 'consultado'}`;
+    const metodo = req.method?.toUpperCase() || 'GET';
+    const accion = accionOverride || `${modulo}:${metodo === 'POST' ? 'creado' : metodo === 'DELETE' ? 'eliminado' : 'actualizado'}`;
 
-    // Solo loguear CRUD + auth (no GET de listados)
-    if (metodo === 'GET' && !accionOverride && !path.includes('/auth')) return;
+    if (metodo === 'GET' && !accionOverride) return;
 
-    const tenant  = req.tenant;
-    const user    = req.user;
+    const tenant = req.tenant;
+    const user   = req.user;
 
     await masterQuery(
       `INSERT INTO tenant_logs
@@ -75,71 +68,81 @@ async function auditLog(req, res, accionOverride = null, moduloOverride = null, 
          data_anterior, data_nueva, resultado, error_mensaje, duracion_ms)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        tenant?.id            || null,
+        tenant?.id             || null,
         tenant?.nombre_clinica || tenant?.slug || null,
-        user?.id              || null,
-        user?.nombre          || null,
-        user?.rol             || null,
-        accion,
-        modulo,
-        metodo,
-        req.originalUrl       || path,
-        req.ip                || req.headers['x-real-ip'] || null,
+        user?.id               || null,
+        user?.nombre           || null,
+        user?.rol              || null,
+        accion, modulo, metodo,
+        req.originalUrl || path,
+        req.ip || req.headers['x-real-ip'] || null,
         req.headers['user-agent']?.substring(0, 500) || null,
-        anterior  ? JSON.stringify(anterior)  : null,
-        nuevo     ? JSON.stringify(nuevo)     : null,
+        anterior ? JSON.stringify(anterior) : null,
+        nuevo    ? JSON.stringify(nuevo)    : null,
         resultado,
-        error     ? String(error).substring(0, 1000) : null,
+        error ? String(error).substring(0, 1000) : null,
         duracion,
       ]
     );
   } catch (err) {
-    // El log nunca debe romper la app
     console.error('[audit] Error al guardar log:', err.message);
   }
 }
 
 /**
- * Middleware automático para rutas — wrappea el res.json para capturar respuesta
- * 
- * Uso: router.post('/', auditMiddleware(), async handler)
+ * Middleware automático — captura dato anterior en PUT/PATCH/DELETE
+ * y lo incluye en el mismo registro de log
  */
 function auditMiddleware(accionOverride = null, moduloOverride = null) {
   return async (req, res, next) => {
     const inicio = Date.now();
     const metodo = req.method?.toUpperCase();
 
-    // Solo loguear operaciones CRUD
     if (metodo === 'GET') return next();
 
-    // Capturar body antes de que se modifique
+    // Capturar body (sin passwords)
     const bodyOriginal = req.body ? { ...req.body } : null;
-    // Remover password del log
-    if (bodyOriginal?.password)         delete bodyOriginal.password;
-    if (bodyOriginal?.password_confirm) delete bodyOriginal.password_confirm;
-    if (bodyOriginal?.password_actual)  delete bodyOriginal.password_actual;
-    if (bodyOriginal?.password_nuevo)   delete bodyOriginal.password_nuevo;
+    ['password','password_confirm','password_actual','password_nuevo','password_admin']
+      .forEach(k => { if (bodyOriginal?.[k]) delete bodyOriginal[k]; });
 
-    // Interceptar res.json para capturar la respuesta
+    // ── Capturar dato ANTERIOR para PUT/PATCH/DELETE ───────────
+    let datAnterior = null;
+    if (['PUT', 'PATCH', 'DELETE'].includes(metodo) && req.params?.id && req.db) {
+      try {
+        const modulo = moduloOverride || Object.entries(MODULO_MAP)
+          .find(([k]) => (req.path||'').includes(k))?.[1];
+        const tabla = modulo ? TABLA_MAP[modulo] : null;
+
+        if (tabla) {
+          const [row] = await req.db.query(
+            `SELECT * FROM ${tabla} WHERE id = ?`, [req.params.id]
+          );
+          if (row) {
+            // Remover password del dato anterior
+            if (row.password) delete row.password;
+            datAnterior = row;
+          }
+        }
+      } catch { /* no crítico */ }
+    }
+
+    // ── Interceptar res.json para capturar respuesta ───────────
     const originalJson = res.json.bind(res);
     res.json = function(data) {
       const duracion  = Date.now() - inicio;
       const resultado = res.statusCode < 400 ? 'exito' : 'error';
       const error     = resultado === 'error' ? data?.message : null;
 
-      // Determinar anterior y nuevo según el método
-      let anterior = null;
+      let anterior = datAnterior;
       let nuevo    = null;
 
       if (metodo === 'POST') {
         nuevo = data?.data || bodyOriginal;
       } else if (metodo === 'PUT' || metodo === 'PATCH') {
         nuevo = bodyOriginal;
-      } else if (metodo === 'DELETE') {
-        anterior = bodyOriginal;
       }
+      // DELETE: solo anterior, sin nuevo
 
-      // Log asíncrono — no bloquea
       auditLog(req, res, accionOverride, moduloOverride, {
         anterior, nuevo, resultado, error, duracion
       });
@@ -152,7 +155,7 @@ function auditMiddleware(accionOverride = null, moduloOverride = null) {
 }
 
 /**
- * Middleware de log para login/logout (sin req.tenant ni req.user completo)
+ * Log específico para autenticación
  */
 function auditAuth(accion, tenantId, tenantNombre, usuario, ip, userAgent, resultado = 'exito', error = null) {
   masterQuery(
@@ -162,9 +165,9 @@ function auditAuth(accion, tenantId, tenantNombre, usuario, ip, userAgent, resul
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [
       tenantId, tenantNombre,
-      usuario?.id || null,
+      usuario?.id    || null,
       usuario?.nombre || null,
-      usuario?.rol || null,
+      usuario?.rol    || null,
       accion, 'autenticacion',
       ip, userAgent?.substring(0, 500),
       resultado, error,

@@ -81,8 +81,6 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
 // PUT /api/v1/citas/:id
 router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM citas WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id } = req.body;
     await req.db.query(
       `UPDATE citas SET fecha_hora=?, duracion_min=?, motivo=?, notas=?, estado=?, veterinario_id=?
@@ -98,8 +96,6 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
 // PATCH /api/v1/citas/:id/estado
 router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM citas WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { estado } = req.body;
     await req.db.query('UPDATE citas SET estado=? WHERE id=?', [estado, req.params.id]);
     const io = req.app.get('io');

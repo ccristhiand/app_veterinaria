@@ -42,8 +42,6 @@ router.post('/', auditMiddleware('vacunas:creado', 'vacunas'), async (req, res, 
 
 router.put('/:id', auditMiddleware('vacunas:actualizado', 'vacunas'), async (req, res, next) => {
   try {
-    const [_ant] = await req.db.query('SELECT * FROM vacunas WHERE id=?', [req.params.id]).catch(()=>[null]);
-    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas } = req.body;
     await req.db.query(
       `UPDATE vacunas SET nombre=?, fabricante=?, lote=?, fecha_aplicacion=?, proxima_dosis=?, notas=?
