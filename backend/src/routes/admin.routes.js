@@ -11,7 +11,7 @@ const mysql         = require('mysql2/promise');
 const path          = require('path');
 const fs            = require('fs');
 
-const router = Router();
+const router       = Router();
 const ADMIN_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'admin-secret';
 
 // ── Auth admin ────────────────────────────────────────────────────
@@ -41,15 +41,18 @@ router.post('/login', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── Usar adminAuth en todas las rutas siguientes ──────────────────
 router.use(adminAuth);
 
-// ── GET /admin/api/tenants — listar todos ─────────────────────────
+// ── GET /admin/api/tenants ────────────────────────────────────────
 router.get('/tenants', async (req, res) => {
   try {
     const tenants = await masterQuery(
-      `SELECT t.*, tc.nombre_clinica, tc.logo_url, tc.color_primario,
-              tc.modulo_facturacion, tc.modulo_estetica, tc.modulo_inventario
+      `SELECT t.*, tc.nombre_clinica, tc.logo_url, tc.color_primario, tc.color_acento,
+              tc.modulo_facturacion, tc.modulo_estetica, tc.modulo_inventario,
+              tc.modulo_vacunas, tc.modulo_consentimientos, tc.modulo_carnet,
+              tc.max_usuarios, tc.moneda, tc.simbolo_moneda, tc.igv_porcentaje,
+              tc.ruc, tc.razon_social, tc.telefono, tc.email, tc.direccion,
+              tc.web, tc.favicon_url, tc.color_sidebar
        FROM tenants t
        LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
        ORDER BY t.created_at DESC`
@@ -58,7 +61,7 @@ router.get('/tenants', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── GET /admin/api/tenants/:id — detalle ──────────────────────────
+// ── GET /admin/api/tenants/:id ────────────────────────────────────
 router.get('/tenants/:id', async (req, res) => {
   try {
     const [tenant] = await masterQuery(
@@ -76,114 +79,129 @@ router.get('/tenants/:id', async (req, res) => {
 router.post('/tenants', async (req, res) => {
   try {
     const {
-      slug, subdominio, nombre_clinica,
-      db_host, db_user, db_pass,
+      nombre_clinica, subdominio,
       plan, color_primario, color_sidebar, color_acento,
-      logo_url, moneda, simbolo_moneda, pais, zona_horaria,
-      // Admin inicial de la clínica
+      logo_url, moneda, simbolo_moneda, igv_porcentaje,
+      max_usuarios, modulo_estetica, modulo_facturacion, modulo_inventario,
+      modulo_vacunas, modulo_consentimientos, modulo_carnet,
       admin_nombre, admin_email, admin_password,
     } = req.body;
 
-    if (!slug || !subdominio || !nombre_clinica) {
-      return res.status(422).json({ success: false, message: 'slug, subdominio y nombre_clinica son obligatorios.' });
+    if (!nombre_clinica || !subdominio) {
+      return res.status(422).json({ success: false, message: 'nombre_clinica y subdominio son obligatorios.' });
     }
     if (!admin_email || !admin_password) {
-      return res.status(422).json({ success: false, message: 'Se requiere email y password del administrador inicial.' });
+      return res.status(422).json({ success: false, message: 'Se requiere email y password del admin inicial.' });
     }
 
-    const dbName = `vet_${slug.replace(/-/g,'_')}`;
+    // ── Generar slug y nombre de BD desde subdominio ──────────────
+    // subdominio puede venir como "prueba" o "prueba.netcodip.com"
+    // Extraer solo la primera parte
+    const slugBase = subdominio.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const slug     = slugBase;
+    const dbName   = `vet_${slugBase}`;
+    const subdominioFull = subdominio.includes('.') ? subdominio : `${subdominio}.netcodip.com`;
 
     // 1. Verificar que no existe
-    const [existe] = await masterQuery('SELECT id FROM tenants WHERE slug = ? OR subdominio = ?', [slug, subdominio]);
-    if (existe) return res.status(422).json({ success: false, message: 'El slug o subdominio ya existe.' });
+    const [existe] = await masterQuery(
+      'SELECT id FROM tenants WHERE slug = ? OR subdominio = ?', [slug, subdominioFull]
+    );
+    if (existe) return res.status(422).json({ success: false, message: 'El subdominio ya existe.' });
 
-    // 2. Crear la base de datos del tenant
+    // 2. Crear la BD del tenant
+    const dbHost = process.env.DB_HOST || 'localhost';
+    const dbUser = process.env.DB_USER || 'cadc';
+    const dbPass = process.env.DB_PASS || '';
+
     const tempConn = await mysql.createConnection({
-      host: db_host || process.env.DB_HOST || 'localhost',
-      user: db_user || process.env.DB_USER || 'root',
-      password: db_pass || process.env.DB_PASS || '',
+      host: dbHost, user: dbUser, password: dbPass,
     });
-    await tempConn.execute(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    await tempConn.execute(
+      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
     await tempConn.end();
 
-    // 3. Ejecutar schema base
+    // 3. Ejecutar schema base — statement por statement
     const schemaPath = path.join(__dirname, '../../sql/tenant_schema.sql');
     if (fs.existsSync(schemaPath)) {
-      const schema = fs.readFileSync(schemaPath, 'utf8');
-      const tenantPool = await mysql.createPool({
-        host: db_host || process.env.DB_HOST || 'localhost',
-        user: db_user || process.env.DB_USER || 'root',
-        password: db_pass || process.env.DB_PASS || '',
-        database: dbName, multipleStatements: true,
+      let schema = fs.readFileSync(schemaPath, 'utf8');
+
+      // Limpiar el schema — solo hasta el final del SQL válido
+      // Eliminar cualquier código JS o texto que no sea SQL
+      const jsIndex = schema.indexOf("'use strict'");
+      if (jsIndex > 0) schema = schema.substring(0, jsIndex);
+
+      const tenantConn = await mysql.createConnection({
+        host: dbHost, user: dbUser, password: dbPass,
+        database: dbName, multipleStatements: false,
       });
-      // Ejecutar cada statement del schema por separado
+
       const statements = schema
-        .replace(/--[^\n]*/g, '')  // eliminar comentarios de línea
+        .replace(/--[^\n]*/g, '')   // eliminar comentarios --
+        .replace(/\/\*[\s\S]*?\*\//g, '') // eliminar comentarios /* */
         .split(';')
         .map(s => s.trim())
-        .filter(s => s.length > 10); // filtrar vacíos y fragmentos cortos
+        .filter(s => s.length > 10);
 
-      const conn = await tenantPool.getConnection();
       try {
         for (const stmt of statements) {
-          await conn.execute(stmt);
+          await tenantConn.execute(stmt);
         }
       } finally {
-        conn.release();
-        await tenantPool.end();
+        await tenantConn.end();
       }
-      await tenantPool.end();
     }
 
-    // 4. Registrar en tabla maestra
+    // 4. Registrar en vet_master
     const result = await masterQuery(
       `INSERT INTO tenants (slug, subdominio, db_name, db_host, db_user, db_pass, plan)
        VALUES (?,?,?,?,?,?,?)`,
-      [slug, subdominio, dbName,
-       db_host || process.env.DB_HOST || 'localhost',
-       db_user || process.env.DB_USER || 'root',
-       db_pass || process.env.DB_PASS || '',
-       plan || 'basic']
+      [slug, subdominioFull, dbName, dbHost, dbUser, dbPass, plan || 'pro']
     );
     const tenantId = result.insertId;
 
-    // 5. Config inicial
+    // 5. Config inicial en tenant_config
     await masterQuery(
       `INSERT INTO tenant_config
          (tenant_id, nombre_clinica, logo_url, color_primario, color_sidebar, color_acento,
-          moneda, simbolo_moneda, pais, zona_horaria)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          moneda, simbolo_moneda, igv_porcentaje, max_usuarios,
+          modulo_estetica, modulo_facturacion, modulo_inventario,
+          modulo_vacunas, modulo_consentimientos, modulo_carnet)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [tenantId, nombre_clinica, logo_url||null,
        color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
-       moneda||'PEN', simbolo_moneda||'S/.', pais||'Peru', zona_horaria||'America/Lima']
+       moneda||'PEN', simbolo_moneda||'S/.', igv_porcentaje||18, max_usuarios||5,
+       modulo_estetica?1:0, modulo_facturacion?1:0, modulo_inventario?1:0,
+       modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0]
     );
 
-    // 6. Crear usuario admin inicial en la DB del tenant
-    const tenantObj = {
-      db_name: dbName,
-      db_host: db_host || process.env.DB_HOST || 'localhost',
-      db_user: db_user || process.env.DB_USER || 'root',
-      db_pass: db_pass || process.env.DB_PASS || '',
-    };
-    const tenantDB  = createDBHelper(getPoolForTenant(tenantObj));
+    // 6. Crear usuario admin inicial en la BD del tenant
+    const tenantConn2 = await mysql.createConnection({
+      host: dbHost, user: dbUser, password: dbPass, database: dbName,
+    });
     const hashedPass = await bcrypt.hash(admin_password, 10);
-    await tenantDB.query(
-      "INSERT INTO usuarios (nombre, email, password, rol) VALUES (?,?,?,'admin')",
+    await tenantConn2.execute(
+      "INSERT INTO usuarios (nombre, email, password, rol, must_change_password) VALUES (?,?,?,'admin',0)",
       [admin_nombre || 'Administrador', admin_email, hashedPass]
     );
 
-    // 7. Config empresa inicial
-    await tenantDB.query(
-      "INSERT INTO empresa_config (nombre) VALUES (?)",
-      [nombre_clinica]
+    // 7. Actualizar empresa_config con nombre de la clínica
+    await tenantConn2.execute(
+      'UPDATE empresa_config SET nombre=?, simbolo_moneda=?, igv_porcentaje=? WHERE id=1',
+      [nombre_clinica, simbolo_moneda||'S/.', igv_porcentaje||18]
     );
+    await tenantConn2.end();
+
+    // 8. Config de backup por defecto
+    await masterQuery(
+      `INSERT IGNORE INTO tenant_backup_config (tenant_id) VALUES (?)`, [tenantId]
+    ).catch(() => {});
 
     logger.info(`✅ Tenant creado: ${slug} → ${dbName}`);
-
     return res.status(201).json({
       success: true,
       message: `Clínica "${nombre_clinica}" creada correctamente.`,
-      data: { tenantId, dbName, subdominio },
+      data: { tenantId, dbName, subdominio: subdominioFull, url: `https://${subdominioFull}` },
     });
   } catch (err) {
     logger.error(`Error creando tenant: ${err.message}`);
@@ -191,7 +209,7 @@ router.post('/tenants', async (req, res) => {
   }
 });
 
-// ── PUT /admin/api/tenants/:id — actualizar config ────────────────
+// ── PUT /admin/api/tenants/:id ────────────────────────────────────
 router.put('/tenants/:id', async (req, res) => {
   try {
     const {
@@ -202,13 +220,11 @@ router.put('/tenants/:id', async (req, res) => {
       modulo_consentimientos, modulo_carnet,
     } = req.body;
 
-    // Actualizar tabla tenants
     await masterQuery(
       'UPDATE tenants SET plan=?, activo=?, trial_hasta=? WHERE id=?',
       [plan||'pro', activo !== undefined ? (activo?1:0) : 1, trial_hasta||null, req.params.id]
     );
 
-    // Actualizar tenant_config
     await masterQuery(
       `UPDATE tenant_config SET
          nombre_clinica=?, ruc=?, razon_social=?, telefono=?, email=?, direccion=?, web=?,
@@ -230,29 +246,27 @@ router.put('/tenants/:id', async (req, res) => {
       ]
     );
 
-    // Sincronizar nombre en empresa_config del tenant
+    // Sincronizar con empresa_config del tenant
     try {
       const [t] = await masterQuery(
         'SELECT db_host, db_port, db_user, db_pass, db_name FROM tenants WHERE id=?',
         [req.params.id]
       );
       if (t) {
-        const mysql      = require('mysql2/promise');
-        const tenantConn = await mysql.createConnection({
-          host: t.db_host, port: t.db_port,
+        const conn = await mysql.createConnection({
+          host: t.db_host, port: t.db_port||3306,
           user: t.db_user, password: t.db_pass, database: t.db_name,
         });
-        await tenantConn.execute(
+        await conn.execute(
           'UPDATE empresa_config SET nombre=?, simbolo_moneda=?, igv_porcentaje=? WHERE id=1',
           [nombre_clinica||'VetClinic', simbolo_moneda||'S/.', igv_porcentaje||18]
         );
-        await tenantConn.end();
+        await conn.end();
       }
     } catch(e) {
       console.warn('[admin] No se pudo sincronizar empresa_config:', e.message);
     }
 
-    // Invalidar caché
     const [t2] = await masterQuery('SELECT subdominio FROM tenants WHERE id=?', [req.params.id]);
     if (t2) invalidateTenantCache(t2.subdominio);
 
@@ -260,7 +274,7 @@ router.put('/tenants/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── PATCH /admin/api/tenants/:id/toggle — activar/suspender ───────
+// ── PATCH /admin/api/tenants/:id/toggle ──────────────────────────
 router.patch('/tenants/:id/toggle', async (req, res) => {
   try {
     const [t] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
@@ -273,117 +287,75 @@ router.patch('/tenants/:id/toggle', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── GET /admin/api/stats — métricas globales ──────────────────────
-router.get('/stats', async (req, res) => {
-  try {
-    const [total]     = await masterQuery('SELECT COUNT(*) AS n FROM tenants');
-    const [activos]   = await masterQuery('SELECT COUNT(*) AS n FROM tenants WHERE activo=1');
-    const [porPlan]   = await masterQuery('SELECT plan, COUNT(*) AS n FROM tenants GROUP BY plan');
-    const poolStats   = getPoolStats();
-
-    // Contar registros de cada tenant
-    const tenants = await masterQuery('SELECT id, slug, db_name, activo FROM tenants WHERE activo=1');
-    const metrics = [];
-    for (const t of tenants.slice(0, 10)) { // límite para no sobrecargar
-      try {
-        const db = createDBHelper(getPoolForTenant(t));
-        const [citas]    = await db.query('SELECT COUNT(*) AS n FROM citas WHERE DATE(created_at)=CURDATE()');
-        const [usuarios] = await db.query('SELECT COUNT(*) AS n FROM usuarios WHERE activo=1');
-        metrics.push({ slug: t.slug, citas_hoy: citas.n, usuarios: usuarios.n });
-      } catch { metrics.push({ slug: t.slug, citas_hoy: 0, usuarios: 0 }); }
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        total_tenants  : total.n,
-        activos        : activos.n,
-        por_plan       : porPlan,
-        pools_activos  : poolStats.length,
-        pools          : poolStats,
-        metricas       : metrics,
-      },
-    });
-  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
-});
-
-
-// ── POST /admin/api/tenants/:id/suspender ────────────────────
+// ── POST /admin/api/tenants/:id/suspender ────────────────────────
 router.post('/tenants/:id/suspender', async (req, res) => {
   try {
     const { motivo } = req.body;
     if (!motivo?.trim())
-      return res.status(422).json({ success: false, message: 'El motivo de suspensión es obligatorio.' });
-
+      return res.status(422).json({ success: false, message: 'El motivo es obligatorio.' });
     const [t] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
-    if (!t) return res.status(404).json({ success: false, message: 'Clínica no encontrada.' });
-    if (!t.activo) return res.status(422).json({ success: false, message: 'La clínica ya está suspendida.' });
-
+    if (!t) return res.status(404).json({ success: false, message: 'No encontrado.' });
+    if (!t.activo) return res.status(422).json({ success: false, message: 'Ya está suspendida.' });
+    await masterQuery('UPDATE tenants SET activo=0 WHERE id=?', [req.params.id]);
     await masterQuery(
-      'UPDATE tenants SET activo=0 WHERE id=?', [req.params.id]
-    );
-
-    // Guardar motivo en tenant_config
-    await masterQuery(
-      'UPDATE tenant_config SET motivo_suspension=?, fecha_suspension=NOW() WHERE tenant_id=?',
+      'UPDATE tenant_config SET motivo_suspension=? WHERE tenant_id=?',
       [motivo.trim(), req.params.id]
-    ).catch(() => {}); // No crítico si la columna no existe aún
-
+    ).catch(() => {});
     invalidateTenantCache(t.subdominio);
     evictTenantPool(t.db_name);
-
-    logger.info(`🚫 Clínica suspendida: ${t.slug} — Motivo: ${motivo}`);
-
-    return res.json({ success: true, message: `Clínica "${t.slug}" suspendida correctamente.` });
+    return res.json({ success: true, message: `Clínica suspendida.` });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── POST /admin/api/tenants/:id/reactivar ────────────────────
+// ── POST /admin/api/tenants/:id/reactivar ────────────────────────
 router.post('/tenants/:id/reactivar', async (req, res) => {
   try {
     const [t] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
-    if (!t) return res.status(404).json({ success: false, message: 'Clínica no encontrada.' });
-    if (t.activo) return res.status(422).json({ success: false, message: 'La clínica ya está activa.' });
-
+    if (!t) return res.status(404).json({ success: false, message: 'No encontrado.' });
+    if (t.activo) return res.status(422).json({ success: false, message: 'Ya está activa.' });
     await masterQuery('UPDATE tenants SET activo=1 WHERE id=?', [req.params.id]);
     await masterQuery(
-      'UPDATE tenant_config SET motivo_suspension=NULL, fecha_suspension=NULL WHERE tenant_id=?',
+      'UPDATE tenant_config SET motivo_suspension=NULL WHERE tenant_id=?',
       [req.params.id]
     ).catch(() => {});
-
     invalidateTenantCache(t.subdominio);
-
-    return res.json({ success: true, message: `Clínica "${t.slug}" reactivada correctamente.` });
+    return res.json({ success: true, message: 'Clínica reactivada.' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// ── GET /admin/api/stats ──────────────────────────────────────────
+router.get('/stats', async (req, res) => {
+  try {
+    const [total]   = await masterQuery('SELECT COUNT(*) AS n FROM tenants');
+    const [activos] = await masterQuery('SELECT COUNT(*) AS n FROM tenants WHERE activo=1');
+    const porPlan   = await masterQuery('SELECT plan, COUNT(*) AS n FROM tenants GROUP BY plan');
+    const poolStats = getPoolStats();
+    return res.json({
+      success: true,
+      data: { total_tenants: total.n, activos: activos.n, por_plan: porPlan, pools_activos: poolStats.length },
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
 // ── GET /admin/api/tenants/:id/stats ─────────────────────────────
 router.get('/tenants/:id/stats', async (req, res) => {
   try {
-    const [tenant] = await masterQuery(
-      'SELECT * FROM tenants WHERE id=?', [req.params.id]
-    );
-    if (!tenant) return res.status(404).json({ success:false, message:'Tenant no encontrado.' });
+    const [tenant] = await masterQuery('SELECT * FROM tenants WHERE id=?', [req.params.id]);
+    if (!tenant) return res.status(404).json({ success: false, message: 'No encontrado.' });
 
-    // Conectar a la BD del tenant
-    const mysql   = require('mysql2/promise');
-    const tenantConn = await mysql.createConnection({
-      host    : tenant.db_host, port: tenant.db_port,
-      user    : tenant.db_user, password: tenant.db_pass,
-      database: tenant.db_name,
+    const conn = await mysql.createConnection({
+      host: tenant.db_host, port: tenant.db_port||3306,
+      user: tenant.db_user, password: tenant.db_pass, database: tenant.db_name,
     });
 
-    const [[{ propietarios }]] = await tenantConn.execute('SELECT COUNT(*) AS propietarios FROM propietarios');
-    const [[{ mascotas }]]     = await tenantConn.execute('SELECT COUNT(*) AS mascotas FROM mascotas');
-    const [[{ citas_hoy }]]    = await tenantConn.execute("SELECT COUNT(*) AS citas_hoy FROM citas WHERE DATE(fecha_hora)=CURDATE()");
-    const [[{ facturas_mes }]] = await tenantConn.execute("SELECT COUNT(*) AS facturas_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
-    const [[{ ingresos_mes }]] = await tenantConn.execute("SELECT COALESCE(SUM(total),0) AS ingresos_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
-    const [[{ usuarios_total }]] = await tenantConn.execute('SELECT COUNT(*) AS usuarios_total FROM usuarios WHERE activo=1');
+    const [[{ propietarios }]]  = await conn.execute('SELECT COUNT(*) AS propietarios FROM propietarios');
+    const [[{ mascotas }]]      = await conn.execute('SELECT COUNT(*) AS mascotas FROM mascotas');
+    const [[{ citas_hoy }]]     = await conn.execute("SELECT COUNT(*) AS citas_hoy FROM citas WHERE DATE(fecha_hora)=CURDATE()");
+    const [[{ facturas_mes }]]  = await conn.execute("SELECT COUNT(*) AS facturas_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
+    const [[{ ingresos_mes }]]  = await conn.execute("SELECT COALESCE(SUM(total),0) AS ingresos_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
+    const [[{ usuarios_total }]]= await conn.execute('SELECT COUNT(*) AS usuarios_total FROM usuarios WHERE activo=1');
+    await conn.end();
 
-    await tenantConn.end();
-
-    // Usuarios online (desde Socket.io en memoria)
     const io = req.app?.get('io');
     let usuarios_online = 0;
     if (io) {
@@ -403,9 +375,7 @@ router.get('/tenants/:id/stats', async (req, res) => {
         usuarios_online,
       }
     });
-  } catch(err) {
-    res.status(500).json({ success:false, message:err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 module.exports = router;
