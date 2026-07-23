@@ -19,6 +19,8 @@ router.get('/', async (req, res, next) => {
 // PUT /api/v1/empresa
 router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado', 'configuracion'), async (req, res, next) => {
   try {
+    const [_ant] = await req.db.query('SELECT * FROM empresa_config LIMIT 1').catch(()=>[null]);
+    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const {
       nombre, razon_social, ruc, direccion, distrito, ciudad,
       telefono, email, web, logo_url,

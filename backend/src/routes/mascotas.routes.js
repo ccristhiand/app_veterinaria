@@ -75,6 +75,8 @@ router.post('/', auditMiddleware('mascotas:creado', 'mascotas'), async (req, res
 
 router.put('/:id', auditMiddleware('mascotas:actualizado', 'mascotas'), async (req, res, next) => {
   try {
+    const [_ant] = await req.db.query('SELECT * FROM mascotas WHERE id=?', [req.params.id]).catch(()=>[null]);
+    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { nombre, especie, raza, sexo, fecha_nacimiento,
             peso_kg, color, microchip, alergias, alertas_medicas } = req.body;
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });

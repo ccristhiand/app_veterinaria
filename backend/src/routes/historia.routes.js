@@ -84,6 +84,8 @@ router.post('/', auditMiddleware('historia_clinica:creado', 'historia_clinica'),
 // PUT /api/v1/historia/:id
 router.put('/:id', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
+    const [_ant] = await req.db.query('SELECT * FROM historia_clinica WHERE id=?', [req.params.id]).catch(()=>[null]);
+    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { motivo, anamnesis, exploracion, diagnostico, tratamiento,
             observaciones, peso_kg, temperatura_c, recetas } = req.body;
     await req.db.withTransaction(async (conn) => {

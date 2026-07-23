@@ -66,6 +66,8 @@ router.post('/', auditMiddleware('propietarios:creado', 'propietarios'), async (
 
 router.put('/:id', auditMiddleware('propietarios:actualizado', 'propietarios'), async (req, res, next) => {
   try {
+    const [_ant] = await req.db.query('SELECT * FROM propietarios WHERE id=?', [req.params.id]).catch(()=>[null]);
+    if (_ant) auditLog(req, res, null, null, { anterior: _ant });
     const { nombre, apellido, dni, telefono, email, direccion, ruc, razon_social, direccion_fiscal } = req.body;
     if (!nombre?.trim() || !apellido?.trim()) {
       return res.status(422).json({ success: false, message: 'Nombre y apellido son obligatorios.' });
