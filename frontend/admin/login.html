@@ -68,8 +68,8 @@
         });
         const data = await res.json();
         if (!res.ok) { err.textContent = data.message || 'Credenciales inválidas.'; err.style.display='block'; return; }
-        localStorage.setItem('admin_token', data.token);
-        localStorage.setItem('admin_user',  JSON.stringify(data.admin));
+        localStorage.setItem('admin_token', data.data?.token || data.token);
+        localStorage.setItem('admin_user',  JSON.stringify({ nombre: data.data?.nombre || data.nombre, rol: data.data?.rol || data.rol }));
         window.location.href = 'index.html';
       } catch {
         err.textContent = 'Error de conexión.';
