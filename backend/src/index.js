@@ -40,7 +40,7 @@ const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
-// const adminBackupRoutes  = require('./routes/admin_backup.routes');
+const adminBackupRoutes  = require('./routes/admin_backup.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -162,6 +162,14 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     server.listen(PORT, () => {
       logger.info(`🚀 VetClinic SaaS en http://localhost:${PORT}`);
       logger.info(`🌐 Modo multitenant activo`);
+
+      // Iniciar scheduler de backups automáticos
+      try {
+        const { iniciarBackupScheduler } = require('./jobs/backup.scheduler');
+        iniciarBackupScheduler();
+      } catch (e) {
+        logger.warn('⚠️  Backup scheduler no disponible: ' + e.message);
+      }
     });
   } catch (err) {
     logger.error('Error al iniciar:', err);

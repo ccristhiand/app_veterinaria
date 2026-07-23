@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Backups — VetClinic SaaS Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    .main{margin-left:240px;padding:2rem;min-height:100vh}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:#0f172a;color:#e2e8f0}
+    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    .stat-card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.25rem}
+    table{width:100%;border-collapse:collapse}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155;white-space:nowrap}
+    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.82rem;vertical-align:middle}
+    tr:hover td{background:#0f172a50}
+    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
+    input:focus,select:focus{border-color:#6366f1}
+    input[type="time"]{width:auto}
+    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
+    .btn-primary:hover{opacity:.88}
+    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
+    .btn-green{background:linear-gradient(135deg,#166534,#15803d);color:#fff;border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .badge-exitoso{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-fallido{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-proceso{background:#1e3a5f;color:#93c5fd;border:1px solid #1e40af;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-diario{background:#1e293b;color:#64748b;border:1px solid #334155;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-semanal{background:#3b0764;color:#d8b4fe;border:1px solid #6d28d9;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-mensual{background:#451a03;color:#fed7aa;border:1px solid #b45309;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-manual{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:580px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b}
+    .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
+    .hidden{display:none!important}
+    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .progress-bar{height:6px;background:#0f172a;border-radius:3px;overflow:hidden;margin-top:.4rem}
+    .progress-fill{height:100%;border-radius:3px;transition:width .3s}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.open{transform:translateX(0)}
+      .main{margin-left:0;padding:1rem}
+      .hide-mobile{display:none!important}
+      .grid-stats{grid-template-columns:1fr 1fr!important}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div style="padding:1.25rem 1.2rem;border-bottom:1px solid #334155;display:flex;align-items:center;gap:.75rem">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🐾</div>
+    <div style="flex:1"><p style="font-weight:800;font-size:.92rem;color:#f1f5f9">VetClinic</p><p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.12em">SaaS Admin</p></div>
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.1rem;display:none" id="btn-close-sb">✕</button>
+  </div>
+  <nav style="padding:.75rem;flex:1">
+    <a href="index.html"    class="nav-item"        >📊 Dashboard</a>
+    <a href="clinicas.html" class="nav-item"         >🏥 Clínicas</a>
+    <a href="logs.html"     class="nav-item"         >📋 Logs de auditoría</a>
+    <a href="backup.html"   class="nav-item active"  >💾 Backups</a>
+  </nav>
+  <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
+    <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center" id="admin-avatar">A</div>
+      <div><p style="font-size:.82rem;font-weight:700;color:#f1f5f9" id="admin-nombre">Admin</p><p style="font-size:.65rem;color:#475569">Super Admin</p></div>
+    </div>
+    <button onclick="cerrarSesion()" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:.5rem;border-radius:.65rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600">🚪 Cerrar sesión</button>
+  </div>
+</aside>
+
+<div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
+
+<main class="main">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+      <div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">💾 Backups</h1>
+        <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Google Drive · Retención automática</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button onclick="abrirConfig()" class="btn-ghost">⚙️ Configurar</button>
+      <button onclick="backupTodas()" class="btn-green">▶️ Backup todas las clínicas</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+    <div class="stat-card">
+      <p style="font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Total backups</p>
+      <p style="font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-top:.35rem" id="stat-total">—</p>
+    </div>
+    <div class="stat-card">
+      <p style="font-size:.65rem;color:#4ade80;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Exitosos hoy</p>
+      <p style="font-size:1.8rem;font-weight:800;color:#4ade80;margin-top:.35rem" id="stat-hoy">—</p>
+    </div>
+    <div class="stat-card">
+      <p style="font-size:.65rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Fallidos (7 días)</p>
+      <p style="font-size:1.8rem;font-weight:800;color:#f87171;margin-top:.35rem" id="stat-fallidos">—</p>
+    </div>
+    <div class="stat-card">
+      <p style="font-size:.65rem;color:#fed7aa;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Espacio usado</p>
+      <p style="font-size:1.8rem;font-weight:800;color:#fed7aa;margin-top:.35rem" id="stat-gb">—</p>
+      <!-- Barra de uso Drive -->
+      <div class="progress-bar">
+        <div class="progress-fill" id="drive-progress" style="background:linear-gradient(135deg,#6366f1,#4f46e5);width:0%"></div>
+      </div>
+      <p style="font-size:.65rem;color:#475569;margin-top:.25rem">de 15 GB disponibles</p>
+    </div>
+  </div>
+
+  <!-- Estado por clínica -->
+  <div class="card" style="margin-bottom:1.5rem;padding:0;overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado por clínica</h2>
+      <button onclick="cargarStats()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem">🔄</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Clínica</th>
+            <th>Último backup exitoso</th>
+            <th class="hide-mobile">Total backups</th>
+            <th class="hide-mobile">Espacio usado</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-clinicas">
+          <tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">
+            <div class="spinner" style="margin:0 auto"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Historial de backups -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Historial de backups</h2>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <select id="f-tenant" style="width:auto" onchange="cargarHistorial()">
+          <option value="">Todas las clínicas</option>
+        </select>
+        <select id="f-tipo" style="width:auto" onchange="cargarHistorial()">
+          <option value="">Todos los tipos</option>
+          <option value="diario">Diario</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensual">Mensual</option>
+          <option value="manual">Manual</option>
+        </select>
+        <select id="f-estado" style="width:auto" onchange="cargarHistorial()">
+          <option value="">Todos</option>
+          <option value="exitoso">✅ Exitoso</option>
+          <option value="fallido">❌ Fallido</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Clínica</th>
+            <th>Tipo</th>
+            <th class="hide-mobile">Archivo</th>
+            <th class="hide-mobile">Tamaño</th>
+            <th class="hide-mobile">Duración</th>
+            <th>Estado</th>
+            <th>Drive</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-historial">
+          <tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+            <div class="spinner" style="margin:0 auto"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:1rem 1.25rem;border-top:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span id="pag-info" style="font-size:.78rem;color:#475569"></span>
+      <div style="display:flex;gap:.4rem" id="pag-btns"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal Configuración -->
+<div id="modal-config" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="font-weight:700;color:#f1f5f9">⚙️ Configurar backups</h3>
+      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body" id="config-body">
+      <div style="text-align:center;padding:2rem"><div class="spinner" style="margin:0 auto"></div></div>
+    </div>
+    <div class="modal-foot">
+      <button onclick="cerrarModal()" class="btn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin_shared.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = 'login.html';
+
+  const admin = getAdmin();
+  if (admin) {
+    document.getElementById('admin-nombre').textContent = admin.nombre || admin.email;
+    document.getElementById('admin-avatar').textContent = (admin.nombre||'A').charAt(0).toUpperCase();
+  }
+
+  function toggleSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('sidebar-overlay');
+    const btn = document.getElementById('btn-close-sb');
+    const open = sb.classList.toggle('open');
+    ov.style.display  = open ? 'block' : 'none';
+    btn.style.display = open ? 'block' : 'none';
+  }
+  if (window.innerWidth <= 768) document.getElementById('btn-menu').style.display = 'block';
+
+  // ── Stats globales ─────────────────────────────────────────
+  async function cargarStats() {
+    try {
+      const res  = await adminFetch('/backups/stats');
+      if (!res?.ok) return;
+      const { stats, total_gb } = (await res.json()).data;
+
+      const hoy = new Date().toISOString().split('T')[0];
+      let totalBackups = 0, exitososHoy = 0, fallidos7 = 0;
+
+      stats.forEach(s => {
+        totalBackups += parseInt(s.total || 0);
+        fallidos7    += parseInt(s.fallidos || 0);
+      });
+
+      document.getElementById('stat-total').textContent   = fNum(totalBackups);
+      document.getElementById('stat-fallidos').textContent = fNum(fallidos7);
+      document.getElementById('stat-gb').textContent       = `${total_gb} GB`;
+
+      // Barra de progreso Drive (15GB max)
+      const pct = Math.min((total_gb / 15) * 100, 100);
+      document.getElementById('drive-progress').style.width = pct + '%';
+      if (pct > 80) document.getElementById('drive-progress').style.background = '#f87171';
+
+      // Tabla por clínica
+      const tbody = document.getElementById('tbody-clinicas');
+      if (!stats.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">Sin datos de backup</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = stats.map(s => {
+        const ultimoStr = s.ultimo_exitoso ? new Date(s.ultimo_exitoso).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+        const horasDesde = s.ultimo_exitoso ? Math.floor((Date.now() - new Date(s.ultimo_exitoso)) / 3600000) : 999;
+        const estadoColor = horasDesde < 25 ? '#4ade80' : horasDesde < 49 ? '#fb923c' : '#f87171';
+        const estadoLabel = horasDesde < 25 ? '✅ Al día' : horasDesde < 49 ? '⚠️ Ayer' : '❌ Atrasado';
+
+        return `<tr>
+          <td style="font-weight:700">${esc(s.tenant_nombre||'—')}</td>
+          <td style="font-size:.78rem;color:#94a3b8">${ultimoStr}</td>
+          <td class="hide-mobile" style="color:#94a3b8">${fNum(s.total)}</td>
+          <td class="hide-mobile" style="color:#94a3b8">${s.total_mb ? (s.total_mb/1024).toFixed(2)+' GB' : '—'}</td>
+          <td><span style="font-size:.72rem;font-weight:700;color:${estadoColor}">${estadoLabel}</span></td>
+          <td>
+            <button onclick="backupClinica('${esc(s.tenant_id||'')}','${esc(s.tenant_nombre||'')}')"
+              class="btn-green" style="padding:.3rem .7rem;font-size:.72rem">
+              ▶️ Backup
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Estadísticos adicionales
+      exitososHoy = stats.filter(s => s.ultimo_exitoso && new Date(s.ultimo_exitoso).toISOString().split('T')[0] === hoy).length;
+      document.getElementById('stat-hoy').textContent = exitososHoy;
+
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Historial ──────────────────────────────────────────────
+  let paginaActual = 1;
+  async function cargarHistorial(pagina = 1) {
+    paginaActual = pagina;
+    const params = new URLSearchParams({
+      page     : pagina,
+      limit    : 30,
+      tenant_id: document.getElementById('f-tenant').value,
+      tipo     : document.getElementById('f-tipo').value,
+      estado   : document.getElementById('f-estado').value,
+    });
+
+    const tbody = document.getElementById('tbody-historial');
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+      <div class="spinner" style="margin:0 auto"></div></td></tr>`;
+
+    try {
+      const res  = await adminFetch(`/backups?${params}`);
+      if (!res?.ok) return;
+      const { data, meta } = await res.json();
+
+      document.getElementById('pag-info').textContent =
+        `${meta.total.toLocaleString()} registros · Página ${meta.page} de ${meta.pages}`;
+
+      const btns = document.getElementById('pag-btns');
+      btns.innerHTML = '';
+      if (meta.page > 1) {
+        const b = document.createElement('button');
+        b.className='btn-ghost';b.style.padding='.35rem .75rem';b.style.fontSize='.78rem';
+        b.textContent='← Anterior';b.onclick=()=>cargarHistorial(meta.page-1);btns.appendChild(b);
+      }
+      if (meta.page < meta.pages) {
+        const b = document.createElement('button');
+        b.className='btn-ghost';b.style.padding='.35rem .75rem';b.style.fontSize='.78rem';
+        b.textContent='Siguiente →';b.onclick=()=>cargarHistorial(meta.page+1);btns.appendChild(b);
+      }
+
+      if (!data.length) {
+        tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">Sin backups</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(b => {
+        const fecha = new Date(b.created_at).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        return `<tr>
+          <td style="white-space:nowrap;font-size:.78rem">${fecha}</td>
+          <td style="font-weight:600">${esc(b.tenant_nombre||'—')}</td>
+          <td><span class="badge-${b.tipo}">${b.tipo}</span></td>
+          <td class="hide-mobile" style="font-family:monospace;font-size:.72rem;color:#64748b">${esc(b.archivo)}</td>
+          <td class="hide-mobile" style="color:#94a3b8">${b.tamaño_mb ? b.tamaño_mb+' MB' : '—'}</td>
+          <td class="hide-mobile" style="color:#94a3b8">${b.duracion_seg ? b.duracion_seg+'s' : '—'}</td>
+          <td><span class="badge-${b.estado}">${b.estado==='exitoso'?'✅':b.estado==='fallido'?'❌':'⏳'} ${b.estado}</span></td>
+          <td>
+            ${b.drive_url
+              ? `<a href="${esc(b.drive_url)}" target="_blank" style="color:#6366f1;font-size:.75rem;font-weight:600;text-decoration:none">📥 Drive</a>`
+              : '<span style="color:#334155;font-size:.75rem">—</span>'}
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Backup manual por clínica ──────────────────────────────
+  async function backupClinica(tenantId, nombre) {
+    if (!confirm(`¿Iniciar backup manual de "${nombre}"?`)) return;
+    const res  = await adminFetch(`/backups/manual/${tenantId}`, { method:'POST' });
+    const data = await res.json();
+    toast(data.message || (res.ok ? '✅ Backup iniciado' : '❌ Error'), res.ok ? 'success' : 'error');
+    if (res.ok) setTimeout(() => { cargarStats(); cargarHistorial(); }, 3000);
+  }
+
+  // ── Backup todas las clínicas ──────────────────────────────
+  async function backupTodas() {
+    if (!confirm('¿Iniciar backup de TODAS las clínicas ahora?')) return;
+    const res  = await adminFetch('/backups/manual-all', { method:'POST' });
+    const data = await res.json();
+    toast(data.message || (res.ok ? '✅ Backup general iniciado' : '❌ Error'), res.ok ? 'success' : 'error');
+    if (res.ok) setTimeout(() => { cargarStats(); cargarHistorial(); }, 5000);
+  }
+
+  // ── Configuración ──────────────────────────────────────────
+  async function abrirConfig() {
+    document.getElementById('modal-config').classList.remove('hidden');
+    const body = document.getElementById('config-body');
+    body.innerHTML = '<div style="text-align:center;padding:2rem"><div class="spinner" style="margin:0 auto"></div></div>';
+
+    try {
+      const res  = await adminFetch('/backups/config');
+      if (!res?.ok) { body.innerHTML='<p style="color:#f87171">Error al cargar configuración</p>'; return; }
+      const rows = (await res.json()).data || [];
+
+      body.innerHTML = rows.length
+        ? rows.map(c => `
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1.1rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem">
+              <p style="font-weight:700;font-size:.9rem">${esc(c.nombre_clinica||c.subdominio)}</p>
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;color:#94a3b8;text-transform:none;letter-spacing:0;margin:0">
+                <input type="checkbox" ${c.activo?'checked':''} id="activo-${c.tenant_id}"
+                  style="width:auto;accent-color:#6366f1"/>
+                Backups activos
+              </label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.75rem;align-items:end">
+              <div>
+                <label>Hora backup</label>
+                <input type="time" id="hora-${c.tenant_id}" value="${c.hora_backup?.substring(0,5)||'02:00'}"
+                  style="width:100%"/>
+              </div>
+              <div>
+                <label>Diarios</label>
+                <input type="number" id="dias-${c.tenant_id}" value="${c.retener_diarios||7}" min="1" max="30"/>
+              </div>
+              <div>
+                <label>Semanales</label>
+                <input type="number" id="sem-${c.tenant_id}" value="${c.retener_semanales||4}" min="1" max="12"/>
+              </div>
+              <div>
+                <label>Mensuales</label>
+                <input type="number" id="men-${c.tenant_id}" value="${c.retener_mensuales||3}" min="1" max="12"/>
+              </div>
+            </div>
+            <div style="margin-top:.85rem;display:flex;justify-content:flex-end">
+              <button onclick="guardarConfig(${c.tenant_id})" class="btn-primary" style="font-size:.78rem;padding:.45rem .9rem">
+                💾 Guardar
+              </button>
+            </div>
+          </div>`).join('')
+        : '<p style="color:#475569;text-align:center;padding:2rem">Sin clínicas configuradas</p>';
+
+    } catch(e) { body.innerHTML='<p style="color:#f87171">Error al cargar</p>'; }
+  }
+
+  async function guardarConfig(tenantId) {
+    const body = {
+      activo             : document.getElementById(`activo-${tenantId}`)?.checked,
+      hora_backup        : document.getElementById(`hora-${tenantId}`)?.value+':00',
+      retener_diarios    : parseInt(document.getElementById(`dias-${tenantId}`)?.value)||7,
+      retener_semanales  : parseInt(document.getElementById(`sem-${tenantId}`)?.value)||4,
+      retener_mensuales  : parseInt(document.getElementById(`men-${tenantId}`)?.value)||3,
+    };
+    const res = await adminFetch(`/backups/config/${tenantId}`, { method:'PUT', body });
+    toast(res?.ok ? '✅ Configuración guardada' : '❌ Error al guardar', res?.ok ? 'success' : 'error');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-config').classList.add('hidden');
+  }
+
+  // ── Cargar tenants para filtro ─────────────────────────────
+  async function cargarTenants() {
+    const res = await adminFetch('/tenants');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    const sel  = document.getElementById('f-tenant');
+    rows.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.nombre_clinica || t.slug;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  cargarTenants();
+  cargarStats();
+  cargarHistorial();
+
+  // Auto-refresh cada 30s
+  setInterval(() => { cargarStats(); cargarHistorial(); }, 30000);
+</script>
+</body>
+</html>
