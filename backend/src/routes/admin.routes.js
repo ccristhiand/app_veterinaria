@@ -116,7 +116,22 @@ router.post('/tenants', async (req, res) => {
         password: db_pass || process.env.DB_PASS || '',
         database: dbName, multipleStatements: true,
       });
-      await tenantPool.execute(schema);
+      // Ejecutar cada statement del schema por separado
+      const statements = schema
+        .replace(/--[^\n]*/g, '')  // eliminar comentarios de línea
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 10); // filtrar vacíos y fragmentos cortos
+
+      const conn = await tenantPool.getConnection();
+      try {
+        for (const stmt of statements) {
+          await conn.execute(stmt);
+        }
+      } finally {
+        conn.release();
+        await tenantPool.end();
+      }
       await tenantPool.end();
     }
 
