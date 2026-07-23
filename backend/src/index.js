@@ -40,7 +40,7 @@ const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
-const adminBackupRoutes  = require('./routes/admin_backup.routes');
+// const adminBackupRoutes  = require('./routes/admin_backup.routes');
 
 const app    = express();
 const server = http.createServer(app);
