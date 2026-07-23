@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
 router.get('/stats', async (req, res) => {
   try {
     const stats = await masterQuery(`
-      SELECT tenant_nombre,
+      SELECT tenant_id, tenant_nombre,
         COUNT(*) AS total,
         SUM(CASE WHEN estado='exitoso' THEN 1 ELSE 0 END) AS exitosos,
         SUM(CASE WHEN estado='fallido' THEN 1 ELSE 0 END) AS fallidos,
