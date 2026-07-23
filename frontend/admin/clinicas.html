@@ -18,34 +18,34 @@
     th{padding:.7rem 1rem;text-align:left;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
     td{padding:.85rem 1rem;border-bottom:1px solid #1e293b;font-size:.83rem;vertical-align:middle}
     tr:hover td{background:#0f172a50}
-    .badge{font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
-    .badge-active{background:#052e16;color:#4ade80;border:1px solid #166534}
-    .badge-inactive{background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
-    .badge-basic{background:#1e3a5f;color:#93c5fd}
-    .badge-pro{background:#3b0764;color:#d8b4fe}
-    .badge-enterprise{background:#451a03;color:#fed7aa}
     .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
     .btn-primary:hover{opacity:.88}
     .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
     .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
     .btn-danger{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;padding:.4rem .85rem;border-radius:.65rem;cursor:pointer;font-size:.75rem;font-family:inherit}
+    .btn-success{background:#052e16;color:#4ade80;border:1px solid #166534;padding:.4rem .85rem;border-radius:.65rem;cursor:pointer;font-size:.75rem;font-family:inherit}
     input,select,textarea{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
-    input:focus,select:focus{border-color:#6366f1}
+    input:focus,select:focus,textarea:focus{border-color:#6366f1}
     label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
-    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:600px;max-height:90vh;overflow-y:auto}
+    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:680px;max-height:90vh;overflow-y:auto}
     .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b;z-index:1}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
-    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#1e293b}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+    .section-title{font-size:.7rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.12em;padding:.5rem 0;border-bottom:1px solid #334155;margin-bottom:.5rem}
+    .checkbox-group{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}
+    .checkbox-item{display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8}
+    .checkbox-item input{width:auto;accent-color:#6366f1}
     .hidden{display:none!important}
-    .spinner{width:20px;height:20px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite}
+    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
     @media(max-width:768px){
       .sidebar{transform:translateX(-100%)}
       .sidebar.open{transform:translateX(0)}
       .main{margin-left:0;padding:1rem}
-      .grid2{grid-template-columns:1fr!important}
+      .grid2,.grid3{grid-template-columns:1fr!important}
       .hide-mobile{display:none!important}
     }
   </style>
@@ -60,9 +60,9 @@
     <button onclick="toggleSidebar()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.1rem;display:none" id="btn-close-sb">✕</button>
   </div>
   <nav style="padding:.75rem;flex:1">
-    <a href="index.html"    class="nav-item"        data-page="dashboard">📊 Dashboard</a>
-    <a href="clinicas.html" class="nav-item active"  data-page="clinicas">🏥 Clínicas</a>
-    <a href="logs.html"     class="nav-item"         data-page="logs">📋 Logs de auditoría</a>
+    <a href="index.html"    class="nav-item">📊 Dashboard</a>
+    <a href="clinicas.html" class="nav-item active">🏥 Clínicas</a>
+    <a href="logs.html"     class="nav-item">📋 Logs de auditoría</a>
   </nav>
   <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
     <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem">
@@ -75,9 +75,7 @@
 
 <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
 
-<!-- Main -->
 <main class="main">
-
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div style="display:flex;align-items:center;gap:1rem">
       <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
@@ -91,8 +89,7 @@
 
   <!-- Filtros -->
   <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
-    <input id="filtro-buscar" type="text" placeholder="Buscar por nombre o subdominio…"
-      style="max-width:280px" oninput="filtrar()"/>
+    <input id="filtro-buscar" type="text" placeholder="Buscar por nombre o subdominio…" style="max-width:280px" oninput="filtrar()"/>
     <select id="filtro-plan" style="max-width:150px" onchange="filtrar()">
       <option value="">Todos los planes</option>
       <option value="basic">Basic</option>
@@ -123,17 +120,12 @@
         </thead>
         <tbody id="tbody-clinicas">
           <tr><td colspan="7" style="text-align:center;padding:2.5rem;color:#475569">
-            <div style="display:flex;align-items:center;justify-content:center;gap:.75rem"><div class="spinner"></div> Cargando…</div>
+            <div class="spinner" style="margin:0 auto"></div>
           </td></tr>
         </tbody>
       </table>
     </div>
-    <div id="paginacion" style="padding:1rem 1.25rem;border-top:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-      <span id="pag-info" style="font-size:.78rem;color:#475569"></span>
-      <div style="display:flex;gap:.4rem" id="pag-btns"></div>
-    </div>
   </div>
-
 </main>
 
 <!-- Modal Nueva / Editar Clínica -->
@@ -145,11 +137,23 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="m-id"/>
+
+      <!-- Sección: Datos básicos -->
+      <p class="section-title">📋 Datos básicos</p>
       <div class="grid2">
         <div><label>Nombre de la clínica *</label><input id="m-nombre" type="text" placeholder="Clínica Patitas"/></div>
         <div><label>Subdominio *</label><input id="m-subdominio" type="text" placeholder="patitas"/></div>
+        <div><label>RUC / NIT</label><input id="m-ruc" type="text" placeholder="20123456789"/></div>
+        <div><label>Razón social</label><input id="m-razon-social" type="text" placeholder="Veterinaria Patitas SAC"/></div>
+        <div><label>Teléfono</label><input id="m-telefono" type="text" placeholder="+51 999 999 999"/></div>
+        <div><label>Email</label><input id="m-email" type="email" placeholder="info@clinica.com"/></div>
       </div>
-      <div class="grid2">
+      <div><label>Dirección</label><input id="m-direccion" type="text" placeholder="Av. Principal 123, Lima"/></div>
+      <div><label>Web</label><input id="m-web" type="text" placeholder="https://clinica.com"/></div>
+
+      <!-- Sección: Plan y configuración -->
+      <p class="section-title">💼 Plan y configuración</p>
+      <div class="grid3">
         <div><label>Plan</label>
           <select id="m-plan">
             <option value="basic">Basic</option>
@@ -157,51 +161,80 @@
             <option value="enterprise">Enterprise</option>
           </select>
         </div>
-        <div><label>Max usuarios</label><input id="m-max-usuarios" type="number" value="5"/></div>
+        <div><label>Max usuarios</label><input id="m-max-usuarios" type="number" value="5" min="1"/></div>
+        <div><label>Trial hasta</label><input id="m-trial" type="date"/></div>
       </div>
-      <div><label>Logo URL</label><input id="m-logo" type="url" placeholder="https://…"/></div>
-      <div class="grid2">
+
+      <!-- Estado (solo en edición) -->
+      <div id="bloque-activo" style="display:none">
+        <label>Estado de la clínica</label>
+        <select id="m-activo">
+          <option value="1">✅ Activa</option>
+          <option value="0">❌ Suspendida</option>
+        </select>
+      </div>
+
+      <!-- Sección: Branding -->
+      <p class="section-title">🎨 Branding</p>
+      <div><label>Logo URL</label><input id="m-logo" type="url" placeholder="https://…/logo.png"/></div>
+      <div><label>Favicon URL</label><input id="m-favicon" type="url" placeholder="https://…/favicon.ico"/></div>
+      <div class="grid3">
         <div><label>Color primario</label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input id="m-color-p" type="color" value="#166534" style="width:44px;height:38px;padding:2px;cursor:pointer"/>
-            <input id="m-color-p-hex" type="text" value="#166534" oninput="document.getElementById('m-color-p').value=this.value" style="flex:1"/>
+            <input id="m-color-p" type="color" value="#166534" style="width:44px;height:38px;padding:2px;cursor:pointer;flex-shrink:0"/>
+            <input id="m-color-p-hex" type="text" value="#166534" oninput="document.getElementById('m-color-p').value=this.value"/>
           </div>
         </div>
         <div><label>Color sidebar</label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input id="m-color-s" type="color" value="#0d3b2e" style="width:44px;height:38px;padding:2px;cursor:pointer"/>
-            <input id="m-color-s-hex" type="text" value="#0d3b2e" oninput="document.getElementById('m-color-s').value=this.value" style="flex:1"/>
+            <input id="m-color-s" type="color" value="#0d3b2e" style="width:44px;height:38px;padding:2px;cursor:pointer;flex-shrink:0"/>
+            <input id="m-color-s-hex" type="text" value="#0d3b2e" oninput="document.getElementById('m-color-s').value=this.value"/>
+          </div>
+        </div>
+        <div><label>Color acento</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="m-color-a" type="color" value="#10b981" style="width:44px;height:38px;padding:2px;cursor:pointer;flex-shrink:0"/>
+            <input id="m-color-a-hex" type="text" value="#10b981" oninput="document.getElementById('m-color-a').value=this.value"/>
           </div>
         </div>
       </div>
-      <!-- Módulos -->
-      <div>
-        <label>Módulos habilitados</label>
-        <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem">
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-estetica" checked style="width:auto;accent-color:#6366f1"/> Estética
-          </label>
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-facturacion" checked style="width:auto;accent-color:#6366f1"/> Facturación
-          </label>
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-inventario" checked style="width:auto;accent-color:#6366f1"/> Inventario
-          </label>
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-vacunas" checked style="width:auto;accent-color:#6366f1"/> Vacunas
-          </label>
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-consentimientos" checked style="width:auto;accent-color:#6366f1"/> Consentimientos
-          </label>
-          <label style="display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8">
-            <input type="checkbox" id="m-carnet" checked style="width:auto;accent-color:#6366f1"/> Carnet digital
-          </label>
+
+      <!-- Sección: Facturación -->
+      <p class="section-title">💰 Facturación</p>
+      <div class="grid3">
+        <div><label>Moneda</label>
+          <select id="m-moneda">
+            <option value="PEN">PEN — Sol peruano</option>
+            <option value="COP">COP — Peso colombiano</option>
+            <option value="MXN">MXN — Peso mexicano</option>
+            <option value="CLP">CLP — Peso chileno</option>
+            <option value="ARS">ARS — Peso argentino</option>
+            <option value="USD">USD — Dólar</option>
+          </select>
         </div>
+        <div><label>Símbolo</label><input id="m-simbolo" type="text" placeholder="S/." style="max-width:80px"/></div>
+        <div><label>IGV / IVA %</label><input id="m-igv" type="number" step="0.01" value="18" placeholder="18"/></div>
       </div>
+
+      <!-- Sección: Módulos -->
+      <p class="section-title">🧩 Módulos habilitados</p>
+      <div class="checkbox-group">
+        <label class="checkbox-item"><input type="checkbox" id="m-estetica" checked/> ✂️ Estética</label>
+        <label class="checkbox-item"><input type="checkbox" id="m-facturacion" checked/> 💰 Facturación</label>
+        <label class="checkbox-item"><input type="checkbox" id="m-inventario" checked/> 📦 Inventario</label>
+        <label class="checkbox-item"><input type="checkbox" id="m-vacunas" checked/> 💉 Vacunas</label>
+        <label class="checkbox-item"><input type="checkbox" id="m-consentimientos" checked/> 📄 Consentimientos</label>
+        <label class="checkbox-item"><input type="checkbox" id="m-carnet" checked/> 🪪 Carnet digital</label>
+      </div>
+
       <!-- Password admin (solo nueva) -->
       <div id="bloque-password">
-        <label>Password del admin inicial *</label>
-        <input id="m-password" type="password" placeholder="Mínimo 8 caracteres"/>
+        <p class="section-title">🔐 Acceso inicial</p>
+        <div class="grid2">
+          <div><label>Nombre del admin</label><input id="m-admin-nombre" type="text" placeholder="Administrador"/></div>
+          <div><label>Email del admin *</label><input id="m-admin-email" type="email" placeholder="admin@clinica.com"/></div>
+        </div>
+        <div><label>Password inicial *</label><input id="m-password" type="password" placeholder="Mínimo 8 caracteres"/></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -219,8 +252,8 @@
       <button onclick="document.getElementById('modal-suspender').classList.add('hidden')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:.85rem;color:#94a3b8">¿Seguro que deseas suspender <strong id="s-nombre" style="color:#f1f5f9"></strong>? Los usuarios perderán acceso inmediatamente.</p>
-      <div><label>Motivo de suspensión *</label><textarea id="s-motivo" rows="3" placeholder="Indica el motivo de la suspensión…"></textarea></div>
+      <p style="font-size:.85rem;color:#94a3b8">¿Seguro que deseas suspender <strong id="s-nombre" style="color:#f1f5f9"></strong>?</p>
+      <div><label>Motivo de suspensión *</label><textarea id="s-motivo" rows="3" placeholder="Indica el motivo…"></textarea></div>
       <input type="hidden" id="s-id"/>
     </div>
     <div class="modal-foot">
@@ -236,8 +269,8 @@
 
   const admin = getAdmin();
   if (admin) {
-    document.getElementById('admin-nombre').textContent  = admin.nombre || admin.email;
-    document.getElementById('admin-avatar').textContent  = (admin.nombre||'A').charAt(0).toUpperCase();
+    document.getElementById('admin-nombre').textContent = admin.nombre || admin.email;
+    document.getElementById('admin-avatar').textContent = (admin.nombre||'A').charAt(0).toUpperCase();
   }
 
   function toggleSidebar() {
@@ -248,18 +281,17 @@
     ov.style.display  = open ? 'block' : 'none';
     btn.style.display = open ? 'block' : 'none';
   }
-
   if (window.innerWidth <= 768) document.getElementById('btn-menu').style.display = 'block';
 
-  let todasClinicas = [];
-  let editandoId    = null;
-
-  // Color inputs sync
-  ['p','s'].forEach(k => {
+  // Sync color pickers
+  ['p','s','a'].forEach(k => {
     document.getElementById(`m-color-${k}`).addEventListener('input', function() {
       document.getElementById(`m-color-${k}-hex`).value = this.value;
     });
   });
+
+  let todasClinicas = [];
+  let editandoId    = null;
 
   async function cargar() {
     const res = await adminFetch('/tenants');
@@ -280,8 +312,6 @@
       const matchE = estado === '' || String(c.activo) === estado;
       return matchQ && matchP && matchE;
     });
-
-    document.getElementById('pag-info').textContent = `${rows.length} clínica${rows.length!==1?'s':''}`;
 
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin resultados</td></tr>';
@@ -309,10 +339,10 @@
         <td>${badgeActivo(c.activo)}</td>
         <td>
           <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-            <button onclick="abrirModalEditar(${c.id})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem">✏️</button>
+            <button onclick="abrirModalEditar(${c.id})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem">✏️ Editar</button>
             ${c.activo
               ? `<button onclick="abrirSuspender(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-danger" style="padding:.35rem .7rem">🚫</button>`
-              : `<button onclick="reactivar(${c.id},'${esc(c.nombre_clinica||c.slug)}')" style="background:#052e16;color:#4ade80;border:1px solid #166534;padding:.35rem .7rem;border-radius:.65rem;cursor:pointer;font-size:.72rem;font-family:inherit">✅</button>`}
+              : `<button onclick="reactivar(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-success" style="padding:.35rem .7rem">✅</button>`}
           </div>
         </td>
       </tr>`).join('');
@@ -320,18 +350,30 @@
 
   function abrirModalNueva() {
     editandoId = null;
-    document.getElementById('modal-titulo').textContent = '🏥 Nueva Clínica';
-    document.getElementById('btn-guardar').textContent  = '💾 Crear clínica';
-    document.getElementById('m-id').value = '';
+    document.getElementById('modal-titulo').textContent   = '🏥 Nueva Clínica';
+    document.getElementById('btn-guardar').textContent    = '💾 Crear clínica';
     document.getElementById('bloque-password').style.display = 'block';
-    ['m-nombre','m-subdominio','m-logo','m-password'].forEach(id => document.getElementById(id).value='');
-    document.getElementById('m-plan').value = 'pro';
+    document.getElementById('bloque-activo').style.display   = 'none';
+    // Limpiar campos
+    ['m-nombre','m-subdominio','m-ruc','m-razon-social','m-telefono','m-email',
+     'm-direccion','m-web','m-logo','m-favicon','m-admin-nombre','m-admin-email','m-password'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    document.getElementById('m-plan').value         = 'pro';
     document.getElementById('m-max-usuarios').value = '5';
-    document.getElementById('m-color-p').value = '#166534';
-    document.getElementById('m-color-p-hex').value = '#166534';
-    document.getElementById('m-color-s').value = '#0d3b2e';
-    document.getElementById('m-color-s-hex').value = '#0d3b2e';
-    ['m-estetica','m-facturacion','m-inventario','m-vacunas','m-consentimientos','m-carnet'].forEach(id => document.getElementById(id).checked = true);
+    document.getElementById('m-trial').value        = '';
+    document.getElementById('m-moneda').value       = 'PEN';
+    document.getElementById('m-simbolo').value      = 'S/.';
+    document.getElementById('m-igv').value          = '18';
+    document.getElementById('m-color-p').value      = '#166534';
+    document.getElementById('m-color-p-hex').value  = '#166534';
+    document.getElementById('m-color-s').value      = '#0d3b2e';
+    document.getElementById('m-color-s-hex').value  = '#0d3b2e';
+    document.getElementById('m-color-a').value      = '#10b981';
+    document.getElementById('m-color-a-hex').value  = '#10b981';
+    ['m-estetica','m-facturacion','m-inventario','m-vacunas','m-consentimientos','m-carnet']
+      .forEach(id => document.getElementById(id).checked = true);
     document.getElementById('modal-clinica').classList.remove('hidden');
   }
 
@@ -339,57 +381,97 @@
     const c = todasClinicas.find(x => x.id === id);
     if (!c) return;
     editandoId = id;
-    document.getElementById('modal-titulo').textContent = '✏️ Editar Clínica';
-    document.getElementById('btn-guardar').textContent  = '💾 Guardar cambios';
+    document.getElementById('modal-titulo').textContent   = '✏️ Editar Clínica';
+    document.getElementById('btn-guardar').textContent    = '💾 Guardar cambios';
     document.getElementById('bloque-password').style.display = 'none';
-    document.getElementById('m-id').value            = c.id;
-    document.getElementById('m-nombre').value        = c.nombre_clinica || '';
-    document.getElementById('m-subdominio').value    = c.subdominio || '';
-    document.getElementById('m-plan').value          = c.plan || 'pro';
-    document.getElementById('m-max-usuarios').value  = c.max_usuarios || 5;
-    document.getElementById('m-logo').value          = c.logo_url || '';
-    document.getElementById('m-color-p').value       = c.color_primario || '#166534';
-    document.getElementById('m-color-p-hex').value   = c.color_primario || '#166534';
-    document.getElementById('m-color-s').value       = c.color_sidebar  || '#0d3b2e';
-    document.getElementById('m-color-s-hex').value   = c.color_sidebar  || '#0d3b2e';
+    document.getElementById('bloque-activo').style.display   = 'block';
+
+    document.getElementById('m-id').value             = c.id;
+    document.getElementById('m-nombre').value         = c.nombre_clinica || '';
+    document.getElementById('m-subdominio').value     = c.subdominio     || '';
+    document.getElementById('m-ruc').value            = c.ruc            || '';
+    document.getElementById('m-razon-social').value   = c.razon_social   || '';
+    document.getElementById('m-telefono').value       = c.telefono       || '';
+    document.getElementById('m-email').value          = c.email          || '';
+    document.getElementById('m-direccion').value      = c.direccion      || '';
+    document.getElementById('m-web').value            = c.web            || '';
+    document.getElementById('m-logo').value           = c.logo_url       || '';
+    document.getElementById('m-favicon').value        = c.favicon_url    || '';
+    document.getElementById('m-plan').value           = c.plan           || 'pro';
+    document.getElementById('m-max-usuarios').value   = c.max_usuarios   || 5;
+    document.getElementById('m-trial').value          = c.trial_hasta?.split('T')[0] || '';
+    document.getElementById('m-activo').value         = c.activo ? '1' : '0';
+    document.getElementById('m-moneda').value         = c.moneda         || 'PEN';
+    document.getElementById('m-simbolo').value        = c.simbolo_moneda || 'S/.';
+    document.getElementById('m-igv').value            = c.igv_porcentaje || '18';
+
+    const cp = c.color_primario || '#166534';
+    const cs = c.color_sidebar  || '#0d3b2e';
+    const ca = c.color_acento   || '#10b981';
+    document.getElementById('m-color-p').value     = cp;
+    document.getElementById('m-color-p-hex').value = cp;
+    document.getElementById('m-color-s').value     = cs;
+    document.getElementById('m-color-s-hex').value = cs;
+    document.getElementById('m-color-a').value     = ca;
+    document.getElementById('m-color-a-hex').value = ca;
+
     document.getElementById('m-estetica').checked        = !!c.modulo_estetica;
     document.getElementById('m-facturacion').checked     = !!c.modulo_facturacion;
     document.getElementById('m-inventario').checked      = !!c.modulo_inventario;
     document.getElementById('m-vacunas').checked         = !!c.modulo_vacunas;
     document.getElementById('m-consentimientos').checked = !!c.modulo_consentimientos;
     document.getElementById('m-carnet').checked          = !!c.modulo_carnet;
+
     document.getElementById('modal-clinica').classList.remove('hidden');
   }
 
-  function cerrarModal() { document.getElementById('modal-clinica').classList.add('hidden'); }
+  function cerrarModal() {
+    document.getElementById('modal-clinica').classList.add('hidden');
+    editandoId = null;
+  }
 
   async function guardarClinica() {
-    const nombre    = document.getElementById('m-nombre').value.trim();
+    const nombre     = document.getElementById('m-nombre').value.trim();
     const subdominio = document.getElementById('m-subdominio').value.trim().toLowerCase();
     if (!nombre || !subdominio) { toast('Nombre y subdominio son obligatorios.','error'); return; }
 
     const body = {
-      nombre_clinica     : nombre,
+      nombre_clinica        : nombre,
       subdominio,
-      slug               : subdominio,
-      plan               : document.getElementById('m-plan').value,
-      max_usuarios       : parseInt(document.getElementById('m-max-usuarios').value)||5,
-      logo_url           : document.getElementById('m-logo').value.trim()||null,
-      color_primario     : document.getElementById('m-color-p-hex').value,
-      color_sidebar      : document.getElementById('m-color-s-hex').value,
-      color_acento       : document.getElementById('m-color-p-hex').value,
-      modulo_estetica    : document.getElementById('m-estetica').checked,
-      modulo_facturacion : document.getElementById('m-facturacion').checked,
-      modulo_inventario  : document.getElementById('m-inventario').checked,
-      modulo_vacunas     : document.getElementById('m-vacunas').checked,
+      slug                  : subdominio,
+      ruc                   : document.getElementById('m-ruc').value.trim() || null,
+      razon_social          : document.getElementById('m-razon-social').value.trim() || null,
+      telefono              : document.getElementById('m-telefono').value.trim() || null,
+      email                 : document.getElementById('m-email').value.trim() || null,
+      direccion             : document.getElementById('m-direccion').value.trim() || null,
+      web                   : document.getElementById('m-web').value.trim() || null,
+      logo_url              : document.getElementById('m-logo').value.trim() || null,
+      favicon_url           : document.getElementById('m-favicon').value.trim() || null,
+      plan                  : document.getElementById('m-plan').value,
+      max_usuarios          : parseInt(document.getElementById('m-max-usuarios').value) || 5,
+      trial_hasta           : document.getElementById('m-trial').value || null,
+      activo                : editandoId ? parseInt(document.getElementById('m-activo').value) : 1,
+      moneda                : document.getElementById('m-moneda').value,
+      simbolo_moneda        : document.getElementById('m-simbolo').value.trim() || 'S/.',
+      igv_porcentaje        : parseFloat(document.getElementById('m-igv').value) || 18,
+      color_primario        : document.getElementById('m-color-p-hex').value || '#166534',
+      color_sidebar         : document.getElementById('m-color-s-hex').value || '#0d3b2e',
+      color_acento          : document.getElementById('m-color-a-hex').value || '#10b981',
+      modulo_estetica       : document.getElementById('m-estetica').checked,
+      modulo_facturacion    : document.getElementById('m-facturacion').checked,
+      modulo_inventario     : document.getElementById('m-inventario').checked,
+      modulo_vacunas        : document.getElementById('m-vacunas').checked,
       modulo_consentimientos: document.getElementById('m-consentimientos').checked,
-      modulo_carnet      : document.getElementById('m-carnet').checked,
+      modulo_carnet         : document.getElementById('m-carnet').checked,
     };
 
     if (!editandoId) {
       const pwd = document.getElementById('m-password').value;
       if (!pwd || pwd.length < 8) { toast('Password mínimo 8 caracteres.','error'); return; }
-      body.password_admin = pwd;
+      body.admin_nombre   = document.getElementById('m-admin-nombre').value.trim() || 'Administrador';
+      body.admin_email    = document.getElementById('m-admin-email').value.trim();
+      body.admin_password = pwd;
+      if (!body.admin_email) { toast('Email del admin es obligatorio.','error'); return; }
     }
 
     const url    = editandoId ? `/tenants/${editandoId}` : '/tenants';
@@ -407,7 +489,10 @@
       cerrarModal();
       cargar();
     } catch { toast('Error de conexión.','error'); }
-    finally { btn.textContent = editandoId ? '💾 Guardar cambios' : '💾 Crear clínica'; btn.disabled = false; }
+    finally {
+      btn.textContent = editandoId ? '💾 Guardar cambios' : '💾 Crear clínica';
+      btn.disabled = false;
+    }
   }
 
   function abrirSuspender(id, nombre) {
@@ -431,8 +516,9 @@
 
   async function reactivar(id, nombre) {
     if (!confirm(`¿Reactivar "${nombre}"?`)) return;
-    const res = await adminFetch(`/tenants/${id}`, { method:'PUT', body:{ activo:true } });
-    if (!res?.ok) { toast('Error al reactivar.','error'); return; }
+    const res  = await adminFetch(`/tenants/${id}/reactivar`, { method:'POST' });
+    const data = await res.json();
+    if (!res?.ok) { toast(data.message||'Error al reactivar.','error'); return; }
     toast('✅ Clínica reactivada','success');
     cargar();
   }

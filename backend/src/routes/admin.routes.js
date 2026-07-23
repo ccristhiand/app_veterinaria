@@ -180,55 +180,60 @@ router.post('/tenants', async (req, res) => {
 router.put('/tenants/:id', async (req, res) => {
   try {
     const {
-      nombre_clinica, logo_url, color_primario, color_sidebar, color_acento,
-      plan, activo, trial_hasta, max_usuarios,
+      nombre_clinica, ruc, razon_social, telefono, email, direccion, web,
+      logo_url, favicon_url, color_primario, color_sidebar, color_acento,
+      plan, activo, trial_hasta, max_usuarios, moneda, simbolo_moneda, igv_porcentaje,
       modulo_estetica, modulo_facturacion, modulo_inventario, modulo_vacunas,
       modulo_consentimientos, modulo_carnet,
     } = req.body;
 
+    // Actualizar tabla tenants
     await masterQuery(
-      "UPDATE tenants SET plan=?, activo=?, trial_hasta=? WHERE id=?",
-      [plan, activo?1:0, trial_hasta||null, req.params.id]
+      'UPDATE tenants SET plan=?, activo=?, trial_hasta=? WHERE id=?',
+      [plan||'pro', activo !== undefined ? (activo?1:0) : 1, trial_hasta||null, req.params.id]
     );
+
+    // Actualizar tenant_config
     await masterQuery(
       `UPDATE tenant_config SET
-         nombre_clinica=?, logo_url=?,
+         nombre_clinica=?, ruc=?, razon_social=?, telefono=?, email=?, direccion=?, web=?,
+         logo_url=?, favicon_url=?,
          color_primario=?, color_sidebar=?, color_acento=?,
-         max_usuarios=?,
+         max_usuarios=?, moneda=?, simbolo_moneda=?, igv_porcentaje=?,
          modulo_estetica=?, modulo_facturacion=?, modulo_inventario=?,
          modulo_vacunas=?, modulo_consentimientos=?, modulo_carnet=?
        WHERE tenant_id=?`,
-      [nombre_clinica||'VetClinic', logo_url||null,
-       color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
-       max_usuarios || 5,
-       modulo_estetica?1:0, modulo_facturacion?1:0,
-       modulo_inventario?1:0, modulo_vacunas?1:0,
-       modulo_consentimientos?1:0, modulo_carnet?1:0,
-       req.params.id]
+      [
+        nombre_clinica||'VetClinic', ruc||null, razon_social||null,
+        telefono||null, email||null, direccion||null, web||null,
+        logo_url||null, favicon_url||null,
+        color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
+        max_usuarios||5, moneda||'PEN', simbolo_moneda||'S/.', igv_porcentaje||18,
+        modulo_estetica?1:0, modulo_facturacion?1:0, modulo_inventario?1:0,
+        modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0,
+        req.params.id
+      ]
     );
 
     // Sincronizar nombre en empresa_config del tenant
-    // Esto actualiza el nombre que aparece en consentimientos, facturas y reportes
     try {
       const [t] = await masterQuery(
         'SELECT db_host, db_port, db_user, db_pass, db_name FROM tenants WHERE id=?',
         [req.params.id]
       );
       if (t) {
-        const mysql     = require('mysql2/promise');
+        const mysql      = require('mysql2/promise');
         const tenantConn = await mysql.createConnection({
-          host    : t.db_host, port: t.db_port,
-          user    : t.db_user, password: t.db_pass,
-          database: t.db_name,
+          host: t.db_host, port: t.db_port,
+          user: t.db_user, password: t.db_pass, database: t.db_name,
         });
         await tenantConn.execute(
-          'UPDATE empresa_config SET nombre=? WHERE id=1',
-          [nombre_clinica]
+          'UPDATE empresa_config SET nombre=?, simbolo_moneda=?, igv_porcentaje=? WHERE id=1',
+          [nombre_clinica||'VetClinic', simbolo_moneda||'S/.', igv_porcentaje||18]
         );
         await tenantConn.end();
       }
     } catch(e) {
-      // No crítico — el nombre del tenant_config es la fuente primaria
       console.warn('[admin] No se pudo sincronizar empresa_config:', e.message);
     }
 
