@@ -13,7 +13,7 @@ const ADMIN_API     = _adminIsLocal
 
 // ── Auth ──────────────────────────────────────────────────────
 function getToken()  { return localStorage.getItem('admin_token'); }
-function getAdmin()  { return JSON.parse(localStorage.getItem('admin_user') || 'null'); }
+function getAdmin()  { try { const r = localStorage.getItem('admin_user'); return r && r !== 'undefined' ? JSON.parse(r) : null; } catch { return null; } }
 function isLoggedIn(){ return !!getToken(); }
 
 function requireAuth() {
