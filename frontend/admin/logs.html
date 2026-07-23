@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Logs de Auditoría — VetClinic SaaS Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    .main{margin-left:240px;padding:2rem;min-height:100vh}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:#0f172a;color:#e2e8f0}
+    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    table{width:100%;border-collapse:collapse}
+    th{padding:.6rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155;white-space:nowrap}
+    td{padding:.75rem 1rem;border-bottom:1px solid #1e293b;font-size:.8rem;vertical-align:top}
+    tr:hover td{background:#0f172a50}
+    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.55rem .85rem;color:#e2e8f0;font-size:.82rem;font-family:inherit;outline:none;transition:border-color .15s}
+    input:focus,select:focus{border-color:#6366f1}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit}
+    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
+    .badge-exito{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-error{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:700px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b}
+    .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+    .hidden{display:none!important}
+    .spinner{width:20px;height:20px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .json-box{background:#0f172a;border:1px solid #334155;border-radius:.75rem;padding:1rem;font-family:'Courier New',monospace;font-size:.72rem;color:#94a3b8;overflow-x:auto;white-space:pre-wrap;max-height:300px;overflow-y:auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.open{transform:translateX(0)}
+      .main{margin-left:0;padding:1rem}
+      .hide-mobile{display:none!important}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div style="padding:1.25rem 1.2rem;border-bottom:1px solid #334155;display:flex;align-items:center;gap:.75rem">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🐾</div>
+    <div style="flex:1"><p style="font-weight:800;font-size:.92rem;color:#f1f5f9">VetClinic</p><p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.12em">SaaS Admin</p></div>
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.1rem;display:none" id="btn-close-sb">✕</button>
+  </div>
+  <nav style="padding:.75rem;flex:1">
+    <a href="index.html"    class="nav-item"        data-page="dashboard">📊 Dashboard</a>
+    <a href="clinicas.html" class="nav-item"         data-page="clinicas">🏥 Clínicas</a>
+    <a href="logs.html"     class="nav-item active"  data-page="logs">📋 Logs de auditoría</a>
+  </nav>
+  <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
+    <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center" id="admin-avatar">A</div>
+      <div><p style="font-size:.82rem;font-weight:700;color:#f1f5f9" id="admin-nombre">Admin</p><p style="font-size:.65rem;color:#475569">Super Admin</p></div>
+    </div>
+    <button onclick="cerrarSesion()" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:.5rem;border-radius:.65rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600">🚪 Cerrar sesión</button>
+  </div>
+</aside>
+
+<div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
+
+<main class="main">
+
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+    <div style="flex:1">
+      <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">Logs de auditoría</h1>
+      <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Registro completo de actividad del sistema</p>
+    </div>
+    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+  </div>
+
+  <!-- Filtros -->
+  <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;align-items:flex-end">
+    <select id="f-tenant" style="max-width:180px" onchange="cargar()">
+      <option value="">Todas las clínicas</option>
+    </select>
+    <select id="f-modulo" style="max-width:150px" onchange="cargar()">
+      <option value="">Todos los módulos</option>
+      <option value="autenticacion">🔐 Autenticación</option>
+      <option value="mascotas">🐾 Mascotas</option>
+      <option value="propietarios">👥 Propietarios</option>
+      <option value="citas">📅 Citas</option>
+      <option value="historia_clinica">📋 Historia clínica</option>
+      <option value="facturacion">💰 Facturación</option>
+      <option value="inventario">📦 Inventario</option>
+      <option value="vacunas">💉 Vacunas</option>
+      <option value="usuarios">👤 Usuarios</option>
+      <option value="configuracion">⚙️ Configuración</option>
+    </select>
+    <select id="f-resultado" style="max-width:130px" onchange="cargar()">
+      <option value="">Todos</option>
+      <option value="exito">✅ Éxito</option>
+      <option value="error">❌ Error</option>
+    </select>
+    <input id="f-desde" type="date" style="max-width:150px" onchange="cargar()"/>
+    <input id="f-hasta" type="date" style="max-width:150px" onchange="cargar()"/>
+    <button onclick="limpiarFiltros()" class="btn-ghost" style="font-size:.78rem">✕ Limpiar</button>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Clínica</th>
+            <th>Usuario</th>
+            <th>Módulo</th>
+            <th>Acción</th>
+            <th class="hide-mobile">IP</th>
+            <th>Resultado</th>
+            <th>Detalle</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-logs">
+          <tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#475569">
+            <div style="display:flex;align-items:center;justify-content:center;gap:.75rem"><div class="spinner"></div> Cargando logs…</div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Paginación -->
+    <div style="padding:1rem 1.25rem;border-top:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span id="pag-info" style="font-size:.78rem;color:#475569"></span>
+      <div style="display:flex;gap:.4rem" id="pag-btns"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal Detalle Log -->
+<div id="modal-log" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="font-weight:700;color:#f1f5f9" id="log-titulo">Detalle del log</h3>
+      <button onclick="document.getElementById('modal-log').classList.add('hidden')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body" id="log-body"></div>
+  </div>
+</div>
+
+<script src="admin_shared.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = 'login.html';
+
+  const admin = getAdmin();
+  if (admin) {
+    document.getElementById('admin-nombre').textContent = admin.nombre || admin.email;
+    document.getElementById('admin-avatar').textContent = (admin.nombre||'A').charAt(0).toUpperCase();
+  }
+
+  function toggleSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('sidebar-overlay');
+    const btn = document.getElementById('btn-close-sb');
+    const open = sb.classList.toggle('open');
+    ov.style.display  = open ? 'block' : 'none';
+    btn.style.display = open ? 'block' : 'none';
+  }
+
+  if (window.innerWidth <= 768) document.getElementById('btn-menu').style.display = 'block';
+
+  let paginaActual = 1;
+
+  // Cargar tenants para el filtro
+  async function cargarTenants() {
+    const res = await adminFetch('/tenants');
+    if (!res?.ok) return;
+    const rows = (await res.json()).data || [];
+    const sel  = document.getElementById('f-tenant');
+    rows.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value       = t.id;
+      opt.textContent = t.nombre_clinica || t.slug;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function cargar(pagina = 1) {
+    paginaActual = pagina;
+    const params = new URLSearchParams({
+      page    : pagina,
+      limit   : 50,
+      tenant_id: document.getElementById('f-tenant').value,
+      modulo  : document.getElementById('f-modulo').value,
+      resultado: document.getElementById('f-resultado').value,
+      desde   : document.getElementById('f-desde').value,
+      hasta   : document.getElementById('f-hasta').value,
+    });
+
+    const tbody = document.getElementById('tbody-logs');
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+      <div style="display:flex;align-items:center;justify-content:center;gap:.75rem"><div class="spinner"></div> Cargando…</div>
+    </td></tr>`;
+
+    try {
+      const res  = await adminFetch(`/logs?${params}`);
+      if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error al cargar logs</td></tr>'; return; }
+      const { data, meta } = await res.json();
+
+      document.getElementById('pag-info').textContent =
+        `${meta.total.toLocaleString()} registros · Página ${meta.page} de ${meta.pages}`;
+
+      // Botones de paginación
+      const btns = document.getElementById('pag-btns');
+      btns.innerHTML = '';
+      if (meta.page > 1) {
+        const b = document.createElement('button');
+        b.className = 'btn-ghost'; b.style.padding = '.35rem .75rem'; b.style.fontSize = '.78rem';
+        b.textContent = '← Anterior'; b.onclick = () => cargar(meta.page - 1);
+        btns.appendChild(b);
+      }
+      if (meta.page < meta.pages) {
+        const b = document.createElement('button');
+        b.className = 'btn-ghost'; b.style.padding = '.35rem .75rem'; b.style.fontSize = '.78rem';
+        b.textContent = 'Siguiente →'; b.onclick = () => cargar(meta.page + 1);
+        btns.appendChild(b);
+      }
+
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">Sin logs para los filtros seleccionados</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map((log, i) => {
+        const fecha = new Date(log.created_at);
+        const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
+        const horaStr  = fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        const moduloIcons = {
+          autenticacion:'🔐', mascotas:'🐾', propietarios:'👥', citas:'📅',
+          historia_clinica:'📋', facturacion:'💰', inventario:'📦', vacunas:'💉',
+          usuarios:'👤', configuracion:'⚙️', sistema:'🖥️',
+        };
+        return `<tr style="cursor:pointer" onclick="verDetalle(${i})" data-log-idx="${i}">
+          <td style="white-space:nowrap">
+            <p style="font-size:.78rem;color:#f1f5f9">${fechaStr}</p>
+            <p style="font-size:.68rem;color:#475569;font-family:monospace">${horaStr}</p>
+          </td>
+          <td style="font-size:.78rem;font-weight:600">${esc(log.tenant_nombre||'—')}</td>
+          <td>
+            <p style="font-size:.78rem">${esc(log.usuario_nombre||'Sistema')}</p>
+            <p style="font-size:.65rem;color:#475569">${esc(log.usuario_rol||'')}</p>
+          </td>
+          <td style="white-space:nowrap">
+            ${moduloIcons[log.modulo]||'📌'} <span style="font-size:.75rem">${esc(log.modulo)}</span>
+          </td>
+          <td style="font-size:.75rem;font-family:monospace;color:#818cf8">${esc(log.accion)}</td>
+          <td class="hide-mobile" style="font-size:.7rem;color:#475569;font-family:monospace">${esc(log.ip||'—')}</td>
+          <td><span class="badge-${log.resultado}">${log.resultado === 'exito' ? '✅' : '❌'} ${log.resultado}</span></td>
+          <td><button onclick="event.stopPropagation();verDetalle(${i})" style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:.75rem;font-weight:600">Ver JSON</button></td>
+        </tr>`;
+      }).join('');
+
+      // Guardar datos para el modal
+      window._logsData = data;
+
+    } catch(e) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function verDetalle(idx) {
+    const log = window._logsData?.[idx];
+    if (!log) return;
+    document.getElementById('log-titulo').textContent = `📋 ${log.accion}`;
+    const fecha = new Date(log.created_at).toLocaleString('es-PE');
+    document.getElementById('log-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+        ${[
+          ['Clínica', log.tenant_nombre],
+          ['Usuario', log.usuario_nombre],
+          ['Rol', log.usuario_rol],
+          ['Módulo', log.modulo],
+          ['Acción', log.accion],
+          ['Método', log.metodo_http],
+          ['IP', log.ip],
+          ['Fecha', fecha],
+          ['Duración', log.duracion_ms ? log.duracion_ms+'ms' : '—'],
+          ['Resultado', log.resultado],
+        ].map(([k,v]) => `
+          <div style="background:#0f172a;border-radius:.65rem;padding:.6rem .85rem">
+            <p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${k}</p>
+            <p style="font-size:.82rem;color:#e2e8f0;font-weight:600;margin-top:.15rem">${esc(v||'—')}</p>
+          </div>`).join('')}
+      </div>
+      ${log.endpoint ? `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:.68rem;color:#475569;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Endpoint</p>
+          <div class="json-box">${esc(log.endpoint)}</div>
+        </div>` : ''}
+      ${log.error_mensaje ? `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:.68rem;color:#f87171;margin-bottom:.35rem;font-weight:700">❌ Error</p>
+          <div class="json-box" style="border-color:#7f1d1d;color:#f87171">${esc(log.error_mensaje)}</div>
+        </div>` : ''}
+      ${log.data_anterior ? `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:.68rem;color:#fb923c;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📤 Data anterior</p>
+          <div class="json-box" style="border-color:#431407">${JSON.stringify(JSON.parse(typeof log.data_anterior === 'string' ? log.data_anterior : JSON.stringify(log.data_anterior)), null, 2)}</div>
+        </div>` : ''}
+      ${log.data_nueva ? `
+        <div>
+          <p style="font-size:.68rem;color:#4ade80;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📥 Data nueva</p>
+          <div class="json-box" style="border-color:#052e16">${JSON.stringify(JSON.parse(typeof log.data_nueva === 'string' ? log.data_nueva : JSON.stringify(log.data_nueva)), null, 2)}</div>
+        </div>` : ''}
+    `;
+    document.getElementById('modal-log').classList.remove('hidden');
+  }
+
+  function limpiarFiltros() {
+    ['f-tenant','f-modulo','f-resultado','f-desde','f-hasta'].forEach(id => {
+      const el = document.getElementById(id);
+      el.value = '';
+    });
+    cargar();
+  }
+
+  cargarTenants();
+  cargar();
+</script>
+</body>
+</html>
