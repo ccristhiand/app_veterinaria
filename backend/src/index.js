@@ -31,28 +31,30 @@ const empresaRoutes     = require('./routes/empresa.routes');
 const facturasRoutes    = require('./routes/facturas.routes');
 const serviciosRoutes   = require('./routes/servicios.routes');
 const reportesRoutes    = require('./routes/reportes.routes');
-const cajaRoutes           = require('./routes/caja.routes');
-// const recordatoriosRoutes  = require('./routes/recordatorios.routes'); // Desactivado temporalmente
-const carnetRoutes         = require('./routes/carnet.routes');
-const consentimientosRoutes= require('./routes/consentimientos.routes');
-const brandingRoutes       = require('./routes/branding.routes');
+const cajaRoutes             = require('./routes/caja.routes');
+const carnetRoutes           = require('./routes/carnet.routes');
+const consentimientosRoutes  = require('./routes/consentimientos.routes');
+const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
+
 // Panel admin SaaS
-const adminRoutes       = require('./routes/admin.routes');
+const adminRoutes        = require('./routes/admin.routes');
+const adminLogsRoutes    = require('./routes/admin_logs.routes');
+const adminBackupRoutes  = require('./routes/admin_backup.routes');
 
 const app    = express();
 const server = http.createServer(app);
 
 // ── CORS dinámico por tenant ──────────────────────────────────────
 const corsOptions = {
-  origin: true, // Nginx actúa como firewall — aceptar cualquier origen
+  origin: true,
   credentials: true,
 };
 
 // ── Socket.io ────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'], credentials: true },
-  pingTimeout: 20000, pingInterval: 10000,
+  pingTimeout: 60000, pingInterval: 25000,
 });
 app.set('io', io);
 initSocket(io);
@@ -72,7 +74,6 @@ app.use(rateLimit({
   max     : parseInt(process.env.RATE_LIMIT_MAX       || '200',    10),
   standardHeaders: true, legacyHeaders: false,
   message: { success: false, message: 'Demasiadas peticiones.' },
-  // Rate limit por tenant + IP
   keyGenerator: (req) => `${req.hostname}:${req.ip}`,
 }));
 
@@ -99,12 +100,14 @@ app.get('/favicon.ico', async (req, res) => {
 });
 
 // ── Panel admin SaaS (sin tenant middleware) ──────────────────────
-app.use('/admin/api', adminRoutes);
+app.use('/admin/api/logs',    adminLogsRoutes);
+app.use('/admin/api/backups', adminBackupRoutes);
+app.use('/admin/api',         adminRoutes);
 
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max     : 500,              // máximo 10 intentos por IP
+  windowMs: 15 * 60 * 1000,
+  max     : 10,
   standardHeaders: true,
   legacyHeaders  : false,
   message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
@@ -112,31 +115,29 @@ app.use('/api/v1/auth/login', rateLimit({
 }));
 
 // ── Resolver tenant para todas las rutas de la API ────────────────
-// IMPORTANTE: resolveTenant debe ir ANTES de las rutas de la API
 app.use('/api', resolveTenant);
 
 const API = '/api/v1';
-app.use(`${API}/auth`,           authRoutes);
-app.use(`${API}/tenant`,         tenantRoutes);
-app.use(`${API}/propietarios`,   propietarioRoutes);
-app.use(`${API}/mascotas`,       mascotaRoutes);
-app.use(`${API}/citas`,          citaRoutes);
-app.use(`${API}/historia`,       historiaRoutes);
-app.use(`${API}/inventario`,     inventarioRoutes);
-app.use(`${API}/notificaciones`, notifRoutes);
-app.use(`${API}/usuarios`,       usuarioRoutes);
-app.use(`${API}/vacunas`,        vacunaRoutes);
-app.use(`${API}/estetica`,       esteticaRoutes);
-app.use(`${API}/empresa`,        empresaRoutes);
-app.use(`${API}/facturas`,       facturasRoutes);
-app.use(`${API}/servicios`,      serviciosRoutes);
-app.use(`${API}/reportes`,       reportesRoutes);
-app.use(`${API}/caja`,              cajaRoutes);
-// app.use(`${API}/recordatorios`,  recordatoriosRoutes); // Desactivado temporalmente
-app.use(`${API}/carnet`,            carnetRoutes);
-app.use(`${API}/consentimientos`,   consentimientosRoutes);
-app.use(`${API}/branding`,          brandingRoutes);
-app.use('/admin/api/permisos',      permisosAdminRoutes);
+app.use(`${API}/auth`,             authRoutes);
+app.use(`${API}/tenant`,           tenantRoutes);
+app.use(`${API}/propietarios`,     propietarioRoutes);
+app.use(`${API}/mascotas`,         mascotaRoutes);
+app.use(`${API}/citas`,            citaRoutes);
+app.use(`${API}/historia`,         historiaRoutes);
+app.use(`${API}/inventario`,       inventarioRoutes);
+app.use(`${API}/notificaciones`,   notifRoutes);
+app.use(`${API}/usuarios`,         usuarioRoutes);
+app.use(`${API}/vacunas`,          vacunaRoutes);
+app.use(`${API}/estetica`,         esteticaRoutes);
+app.use(`${API}/empresa`,          empresaRoutes);
+app.use(`${API}/facturas`,         facturasRoutes);
+app.use(`${API}/servicios`,        serviciosRoutes);
+app.use(`${API}/reportes`,         reportesRoutes);
+app.use(`${API}/caja`,             cajaRoutes);
+app.use(`${API}/carnet`,           carnetRoutes);
+app.use(`${API}/consentimientos`,  consentimientosRoutes);
+app.use(`${API}/branding`,         brandingRoutes);
+app.use('/admin/api/permisos',     permisosAdminRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>
@@ -144,7 +145,6 @@ app.use((_req, res) =>
 );
 
 // ── Error handler ─────────────────────────────────────────────────
-// eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   logger.error(err);
   const status  = err.status || err.statusCode || 500;
