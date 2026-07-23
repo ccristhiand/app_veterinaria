@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -42,7 +44,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('propietarios:creado', 'propietarios'), async (req, res, next) => {
   try {
     const { nombre, apellido, dni, telefono, email, direccion, ruc, razon_social, direccion_fiscal } = req.body;
     if (!nombre?.trim() || !apellido?.trim()) {
@@ -62,7 +64,7 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('propietarios:actualizado', 'propietarios'), async (req, res, next) => {
   try {
     const { nombre, apellido, dni, telefono, email, direccion, ruc, razon_social, direccion_fiscal } = req.body;
     if (!nombre?.trim() || !apellido?.trim()) {

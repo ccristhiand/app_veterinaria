@@ -116,7 +116,7 @@ router.post('/tenants', async (req, res) => {
         password: db_pass || process.env.DB_PASS || '',
         database: dbName, multipleStatements: true,
       });
-      await tenantPool.query(schema);
+      await tenantPool.execute(schema);
       await tenantPool.end();
     }
 
@@ -288,3 +288,53 @@ router.get('/stats', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── GET /admin/api/tenants/:id/stats ─────────────────────────────
+router.get('/tenants/:id/stats', async (req, res) => {
+  try {
+    const [tenant] = await masterQuery(
+      'SELECT * FROM tenants WHERE id=?', [req.params.id]
+    );
+    if (!tenant) return res.status(404).json({ success:false, message:'Tenant no encontrado.' });
+
+    // Conectar a la BD del tenant
+    const mysql   = require('mysql2/promise');
+    const tenantConn = await mysql.createConnection({
+      host    : tenant.db_host, port: tenant.db_port,
+      user    : tenant.db_user, password: tenant.db_pass,
+      database: tenant.db_name,
+    });
+
+    const [[{ propietarios }]] = await tenantConn.execute('SELECT COUNT(*) AS propietarios FROM propietarios');
+    const [[{ mascotas }]]     = await tenantConn.execute('SELECT COUNT(*) AS mascotas FROM mascotas');
+    const [[{ citas_hoy }]]    = await tenantConn.execute("SELECT COUNT(*) AS citas_hoy FROM citas WHERE DATE(fecha_hora)=CURDATE()");
+    const [[{ facturas_mes }]] = await tenantConn.execute("SELECT COUNT(*) AS facturas_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
+    const [[{ ingresos_mes }]] = await tenantConn.execute("SELECT COALESCE(SUM(total),0) AS ingresos_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
+    const [[{ usuarios_total }]] = await tenantConn.execute('SELECT COUNT(*) AS usuarios_total FROM usuarios WHERE activo=1');
+
+    await tenantConn.end();
+
+    // Usuarios online (desde Socket.io en memoria)
+    const io = req.app?.get('io');
+    let usuarios_online = 0;
+    if (io) {
+      const sockets = await io.fetchSockets();
+      usuarios_online = sockets.filter(s => s.data?.tenantId == req.params.id).length;
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        propietarios   : parseInt(propietarios),
+        mascotas       : parseInt(mascotas),
+        citas_hoy      : parseInt(citas_hoy),
+        facturas_mes   : parseInt(facturas_mes),
+        ingresos_mes   : parseFloat(ingresos_mes),
+        usuarios_total : parseInt(usuarios_total),
+        usuarios_online,
+      }
+    });
+  } catch(err) {
+    res.status(500).json({ success:false, message:err.message });
+  }
+});

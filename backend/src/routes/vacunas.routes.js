@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -24,7 +26,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('vacunas:creado', 'vacunas'), async (req, res, next) => {
   try {
     const { mascota_id, nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas } = req.body;
     if (!mascota_id || !nombre || !fecha_aplicacion)
@@ -38,7 +40,7 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('vacunas:actualizado', 'vacunas'), async (req, res, next) => {
   try {
     const { nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas } = req.body;
     await req.db.query(

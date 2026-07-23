@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -30,7 +32,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ── POST /api/v1/inventario — crear ítem ──────────────────────────
-router.post('/', authorize('admin','veterinario','recepcionista'), async (req, res, next) => {
+router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:creado', 'inventario'), async (req, res, next) => {
   try {
     const {
       nombre, categoria='medicamento', cantidad=0, unidad='unidad',
@@ -64,7 +66,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), async (req, r
 });
 
 // ── PUT /api/v1/inventario/:id — editar ítem completo ─────────────
-router.put('/:id', authorize('admin','veterinario','recepcionista'), async (req, res, next) => {
+router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:actualizado', 'inventario'), async (req, res, next) => {
   try {
     const {
       nombre, categoria, cantidad, unidad,
@@ -103,7 +105,7 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), async (req,
 });
 
 // ── PATCH /api/v1/inventario/:id — actualizar solo stock ──────────
-router.patch('/:id', authorize('admin','veterinario','recepcionista'), async (req, res, next) => {
+router.patch('/:id', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:actualizado', 'inventario'), async (req, res, next) => {
   try {
     const { cantidad } = req.body;
     if (cantidad === undefined || cantidad === null)
@@ -164,7 +166,7 @@ router.patch('/:id', authorize('admin','veterinario','recepcionista'), async (re
 });
 
 // ── DELETE /api/v1/inventario/:id — eliminar ítem ─────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), auditMiddleware('inventario:eliminado', 'inventario'), async (req, res, next) => {
   try {
     await req.db.query('DELETE FROM inventario WHERE id=?', [req.params.id]);
     return res.json({ success:true, message:'Ítem eliminado.' });

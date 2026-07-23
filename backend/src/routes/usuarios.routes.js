@@ -3,6 +3,8 @@
 const { Router }  = require('express');
 const bcrypt      = require('bcryptjs');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 const { masterQuery } = require('../config/masterDB');
 
 const router = Router();

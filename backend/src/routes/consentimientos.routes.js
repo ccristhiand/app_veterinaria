@@ -2,6 +2,8 @@
 
 const { Router }   = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 const bcrypt         = require('bcrypt');
 const createDOMPurify = require('dompurify');
 const { JSDOM }       = require('jsdom');
@@ -94,7 +96,7 @@ router.put('/plantillas/:id', authorize('admin'), async (req, res, next) => {
 
 // ── POST /api/v1/consentimientos/generar ─────────────────────────
 // Genera un consentimiento llenado con los datos de la mascota
-router.post('/generar', async (req, res, next) => {
+router.post('/generar', auditMiddleware('consentimientos:creado', 'consentimientos'), async (req, res, next) => {
   try {
     const { plantilla_id, mascota_id, veterinario_id } = req.body;
     if (!plantilla_id || !mascota_id)

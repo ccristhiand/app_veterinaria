@@ -3,6 +3,8 @@
 const { Router }              = require('express');
 const { masterQuery }         = require('../config/masterDB');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 const { invalidateTenantCache }   = require('../middlewares/tenant.middleware');
 
 const router = Router();

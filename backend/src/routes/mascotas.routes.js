@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -50,7 +52,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('mascotas:creado', 'mascotas'), async (req, res, next) => {
   try {
     const { propietario_id, nombre, especie, raza, sexo, fecha_nacimiento,
             peso_kg, color, microchip, alergias, alertas_medicas } = req.body;
@@ -71,7 +73,7 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('mascotas:actualizado', 'mascotas'), async (req, res, next) => {
   try {
     const { nombre, especie, raza, sexo, fecha_nacimiento,
             peso_kg, color, microchip, alergias, alertas_medicas } = req.body;

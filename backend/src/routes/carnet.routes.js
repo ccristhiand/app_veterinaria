@@ -3,6 +3,8 @@
 const { Router } = require('express');
 const crypto     = require('crypto');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 

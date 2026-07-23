@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -44,7 +46,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/v1/historia
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('historia_clinica:creado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { mascota_id, cita_id, fecha, motivo, anamnesis, exploracion,
             diagnostico, tratamiento, observaciones, peso_kg, temperatura_c, recetas } = req.body;
@@ -80,7 +82,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/v1/historia/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { motivo, anamnesis, exploracion, diagnostico, tratamiento,
             observaciones, peso_kg, temperatura_c, recetas } = req.body;

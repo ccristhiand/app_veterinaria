@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -19,7 +21,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', authorize('admin'), async (req, res, next) => {
+router.post('/', authorize('admin'), auditMiddleware('servicios:creado', 'servicios'), async (req, res, next) => {
   try {
     const { nombre, categoria, precio, descripcion } = req.body;
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
@@ -31,7 +33,7 @@ router.post('/', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id', authorize('admin'), async (req, res, next) => {
+router.put('/:id', authorize('admin'), auditMiddleware('servicios:actualizado', 'servicios'), async (req, res, next) => {
   try {
     const { nombre, categoria, precio, descripcion, activo } = req.body;
     await req.db.query(
@@ -42,7 +44,7 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), auditMiddleware('servicios:eliminado', 'servicios'), async (req, res, next) => {
   try {
     await req.db.query('UPDATE servicios_catalogo SET activo=0 WHERE id=?', [req.params.id]);
     return res.json({ success: true, message: 'Servicio desactivado.' });

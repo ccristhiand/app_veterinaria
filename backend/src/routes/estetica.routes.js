@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -26,7 +28,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('estetica:creado', 'estetica'), async (req, res, next) => {
   try {
     const { mascota_id, cita_id, fecha, tipo_bano, incluye_corte, incluye_unas,
             incluye_dental, productos, precio, observaciones } = req.body;
@@ -45,7 +47,7 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('estetica:actualizado', 'estetica'), async (req, res, next) => {
   try {
     const { fecha, tipo_bano, incluye_corte, incluye_unas,
             incluye_dental, productos, precio, observaciones } = req.body;

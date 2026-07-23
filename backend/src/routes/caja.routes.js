@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -82,7 +84,7 @@ router.get('/cierres/:id', async (req, res, next) => {
 });
 
 // POST /api/v1/caja/cierres
-router.post('/cierres', async (req, res, next) => {
+router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res, next) => {
   try {
     const { fecha, turno='dia_completo', monto_inicial=0, conteo_fisico, observaciones, gastos=[], cerrar=false } = req.body;
     if (!fecha) return res.status(422).json({ success:false, message:'fecha requerida.' });
@@ -161,7 +163,7 @@ router.post('/cierres', async (req, res, next) => {
 });
 
 // PATCH /api/v1/caja/cierres/:id/cerrar
-router.patch('/cierres/:id/cerrar', authorize('admin'), async (req, res, next) => {
+router.patch('/cierres/:id/cerrar', authorize('admin'), auditMiddleware('caja:actualizado', 'caja'), async (req, res, next) => {
   try {
     const [c] = await req.db.query('SELECT id, estado FROM caja_cierres WHERE id=?', [req.params.id]);
     if (!c) return res.status(404).json({ success:false, message:'No encontrado.' });

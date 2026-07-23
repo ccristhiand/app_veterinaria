@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -15,7 +17,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // PUT /api/v1/empresa
-router.put('/', authorize('admin'), async (req, res, next) => {
+router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado', 'configuracion'), async (req, res, next) => {
   try {
     const {
       nombre, razon_social, ruc, direccion, distrito, ciudad,

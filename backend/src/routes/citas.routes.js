@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+
 
 const router = Router();
 router.use(authenticate);
@@ -49,7 +51,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/v1/citas
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next) => {
   try {
     const { mascota_id, veterinario_id, fecha_hora, duracion_min, motivo, notas } = req.body;
     if (!mascota_id || !veterinario_id || !fecha_hora || !motivo)
@@ -77,7 +79,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/v1/citas/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
     const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id } = req.body;
     await req.db.query(
@@ -92,7 +94,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // PATCH /api/v1/citas/:id/estado
-router.patch('/:id/estado', async (req, res, next) => {
+router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
     const { estado } = req.body;
     await req.db.query('UPDATE citas SET estado=? WHERE id=?', [estado, req.params.id]);
