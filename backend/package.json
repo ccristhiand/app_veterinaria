@@ -9,13 +9,17 @@
     "lint": "eslint src/"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.33.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "dompurify": "^3.4.12",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
     "express-validator": "^7.1.0",
     "helmet": "^7.1.0",
+    "jsdom": "^29.1.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.9.7",
