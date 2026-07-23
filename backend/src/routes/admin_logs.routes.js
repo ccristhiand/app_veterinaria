@@ -23,13 +23,13 @@ router.get('/', async (req, res) => {
     const params = [];
     let where    = 'WHERE 1=1';
 
-    if (tenant_id) { where += ' AND tenant_id = ?';    params.push(tenant_id); }
-    if (modulo)    { where += ' AND modulo = ?';        params.push(modulo); }
-    if (accion)    { where += ' AND accion LIKE ?';     params.push(`%${accion}%`); }
-    if (resultado) { where += ' AND resultado = ?';     params.push(resultado); }
-    if (usuario)   { where += ' AND usuario_nombre LIKE ?'; params.push(`%${usuario}%`); }
-    if (desde)     { where += ' AND created_at >= ?';   params.push(desde); }
-    if (hasta)     { where += ' AND created_at <= ?';   params.push(hasta+' 23:59:59'); }
+    if (tenant_id?.trim()) { where += ' AND tenant_id = ?';    params.push(tenant_id); }
+    if (modulo?.trim())    { where += ' AND modulo = ?';        params.push(modulo); }
+    if (accion?.trim())    { where += ' AND accion LIKE ?';     params.push(`%${accion}%`); }
+    if (resultado?.trim()) { where += ' AND resultado = ?';     params.push(resultado); }
+    if (usuario?.trim())   { where += ' AND usuario_nombre LIKE ?'; params.push(`%${usuario}%`); }
+    if (desde?.trim())     { where += ' AND created_at >= ?';   params.push(desde); }
+    if (hasta?.trim())     { where += ' AND created_at <= ?';   params.push(hasta+' 23:59:59'); }
 
     const [{ total }] = await masterQuery(
       `SELECT COUNT(*) AS total FROM tenant_logs ${where}`, params
