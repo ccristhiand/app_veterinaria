@@ -36,6 +36,7 @@ const carnetRoutes           = require('./routes/carnet.routes');
 const consentimientosRoutes  = require('./routes/consentimientos.routes');
 const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
+const feRoutes               = require('./routes/fe.routes');
 
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
@@ -138,6 +139,7 @@ app.use(`${API}/carnet`,           carnetRoutes);
 app.use(`${API}/consentimientos`,  consentimientosRoutes);
 app.use(`${API}/branding`,         brandingRoutes);
 app.use('/admin/api/permisos',     permisosAdminRoutes);
+app.use(`${API}/fe`,               feRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>
