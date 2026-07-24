@@ -47,7 +47,6 @@
   <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
     <button class="tab-btn active" id="tab-dashboard" onclick="mostrarTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" id="tab-lista" onclick="mostrarTab('lista')">📋 Documentos</button>
-    <button class="tab-btn" id="tab-anulados" onclick="mostrarTab('anulados')">🚫 Anulados</button>
   </div>
 
   <!-- ── TAB DASHBOARD ── -->
@@ -128,7 +127,7 @@
             <tr>
               <th>Número</th><th>Fecha</th><th>Cliente</th>
               <th class="hidden sm:table-cell">Mascota</th>
-              <th>Total</th><th>Estado</th><th>Acciones</th>
+              <th>Total</th><th>Estado</th><th>SUNAT</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tbody-facturas">
@@ -139,56 +138,9 @@
     </div>
   </div>
 
-  <!-- ── TAB ANULADOS ── -->
-  <div id="contenido-anulados" style="display:none">
-    <div class="vcard">
-      <div style="overflow-x:auto">
-        <table class="vtable">
-          <thead>
-            <tr>
-              <th>Número</th><th>Fecha</th><th>Cliente</th>
-              <th>Total</th><th>Motivo de anulación</th><th>Anulado por</th><th>Fecha anulación</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-anulados">
-            <tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
 </div><!-- /main-content -->
 
-<!-- ══ Modal Anular Factura ══════════════════════════════════════════ -->
-<div id="modal-anular" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:460px">
-    <div class="vmodal-head">
-      <h3>🚫 Anular documento</h3>
-      <button onclick="closeModal('modal-anular')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
-      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:1rem">
-        <p style="font-weight:700;font-size:.88rem;color:#be123c" id="anular-numero">—</p>
-        <p style="font-size:.78rem;color:#be123c;margin-top:.2rem" id="anular-info">—</p>
-      </div>
-      <input type="hidden" id="anular-id"/>
-      <div>
-        <label class="vlabel">Motivo de anulación *</label>
-        <textarea id="anular-obs" rows="3" class="vinput"
-          placeholder="Describe el motivo de anulación…"></textarea>
-      </div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">
-        ⚠️ Esta acción <strong>no se puede revertir</strong>. El documento quedará anulado permanentemente.
-      </div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-anular')" class="vbtn vbtn-ghost">Cancelar</button>
-      <button onclick="confirmarAnulacion()" class="vbtn"
-        style="background:#e11d48;color:#fff;font-weight:700">🚫 Confirmar anulación</button>
-    </div>
-  </div>
-</div>
+<!-- ══ Modal Nueva Factura ════════════════════════════════════════ -->
 <div id="modal-factura" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:700px">
     <div class="vmodal-head">
@@ -306,11 +258,10 @@
           <button onclick="addItem()" class="vbtn vbtn-primary" style="font-size:.78rem;padding:.4rem .9rem">＋ Agregar ítem</button>
         </div>
         <!-- Header de columnas -->
-        <div style="display:grid;grid-template-columns:1fr 70px 110px 90px 36px;gap:.5rem;padding:0 .2rem;margin-bottom:.3rem">
+        <div style="display:grid;grid-template-columns:1fr 70px 110px 36px;gap:.5rem;padding:0 .2rem;margin-bottom:.3rem">
           <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em">Descripción</p>
           <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:center">Cant.</p>
           <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:right">Precio unit.</p>
-          <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;text-align:right">Total</p>
           <p></p>
         </div>
         <div id="nf-items" style="display:flex;flex-direction:column;gap:.5rem"></div>
@@ -450,7 +401,6 @@
 <script>
 // ── Estado ────────────────────────────────────────────────────────
 let empresa     = {};
-const getSim = () => empresa.simbolo_moneda || window._sim || 'S/.';
 let propFacSel  = null;
 let itemN       = 0;
 let pagoN       = 0;
@@ -468,10 +418,6 @@ initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y docu
       empresa = (await res.json()).data || {};
       document.getElementById('nf-igv-pct').textContent = empresa.igv_porcentaje || 18;
       document.getElementById('tot-igv-label').textContent = `IGV (${empresa.igv_porcentaje||18}%):`;
-      // Aplicar símbolo de moneda globalmente
-      const sim = empresa.simbolo_moneda || 'S/.';
-      window._sim = sim; // guardar globalmente
-      document.querySelectorAll('[data-sim]').forEach(el => el.textContent = sim + ' 0.00');
     }
   } catch {}
 
@@ -509,73 +455,11 @@ async function getCatalogo() {
 
 // ── Tabs ──────────────────────────────────────────────────────────
 function mostrarTab(tab) {
-  ['dashboard','lista','anulados'].forEach(t => {
+  ['dashboard','lista'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
     document.getElementById(`contenido-${t}`).style.display = t===tab?'block':'none';
   });
-  if (tab==='lista')     cargarFacturas();
-  if (tab==='anulados')  cargarAnulados();
-}
-
-// ── Cargar anulados ───────────────────────────────────────────────
-async function cargarAnulados() {
-  const tbody = document.getElementById('tbody-anulados');
-  tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>`;
-  try {
-    const res  = await api('/facturas?estado=anulado&limit=100');
-    if (!res?.ok) return;
-    const rows = (await res.json()).data || [];
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">✅</span><p>Sin documentos anulados</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = rows.map(f => `<tr>
-      <td style="font-family:monospace;font-weight:700;color:#be123c">${esc(f.numero)}</td>
-      <td style="font-size:.8rem">${fDate(f.fecha)}</td>
-      <td>
-        <p style="font-weight:600;font-size:.85rem">${esc(f.propietario_nombre||f.cliente_nombre||'—')}</p>
-        ${(f.dni||f.cliente_dni)?`<p style="font-size:.7rem;color:var(--ink-faint)">DNI: ${esc(f.dni||f.cliente_dni)}</p>`:''}
-      </td>
-      <td style="font-weight:700;color:#374151">S/. ${parseFloat(f.total).toFixed(2)}</td>
-      <td style="font-size:.78rem;color:#be123c;max-width:200px">
-        ${esc(f.observaciones || '—')}
-      </td>
-      <td style="font-size:.78rem">${esc(f.anulado_por||'—')}</td>
-      <td style="font-size:.75rem;color:var(--ink-faint)">${f.updated_at?new Date(f.updated_at).toLocaleDateString('es-PE'):'—'}</td>
-    </tr>`).join('');
-  } catch {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`;
-  }
-}
-
-// ── Abrir modal anulación ─────────────────────────────────────────
-function abrirAnular(id, numero, cliente, total) {
-  document.getElementById('anular-id').value        = id;
-  document.getElementById('anular-numero').textContent = `🧾 ${numero}`;
-  document.getElementById('anular-info').textContent   = `${cliente} · S/. ${parseFloat(total).toFixed(2)}`;
-  document.getElementById('anular-obs').value           = '';
-  openModal('modal-anular');
-}
-
-// ── Confirmar anulación ───────────────────────────────────────────
-async function confirmarAnulacion() {
-  const id  = document.getElementById('anular-id').value;
-  const obs = document.getElementById('anular-obs').value.trim();
-  if (!obs) { toast('El motivo de anulación es obligatorio.','warning'); return; }
-
-  try {
-    const res  = await api(`/facturas/${id}/anular`, {
-      method: 'PATCH',
-      body  : { observaciones: obs },
-    });
-    if (!res) return;
-    const data = await res.json();
-    if (!res.ok) { toast(data.message||'Error al anular.','danger'); return; }
-    toast('🚫 Documento anulado correctamente.', 'success', 5000);
-    closeModal('modal-anular');
-    cargarFacturas();
-    cargarResumen();
-  } catch { toast('Error de conexión.','danger'); }
+  if (tab==='lista') cargarFacturas();
 }
 
 function setPeriodo(p) {
@@ -598,8 +482,8 @@ async function cargarResumen() {
     const res = await api(`/facturas/resumen?desde=${desde}&hasta=${hasta}`);
     if (!res||!res.ok) return;
     const d   = (await res.json()).data;
-    document.getElementById('stat-ingresos').textContent    = `${getSim()} ${parseFloat(d.totales.ingresos||0).toFixed(2)}`;
-    document.getElementById('stat-pendiente').textContent   = `${getSim()} ${parseFloat(d.totales.pendiente||0).toFixed(2)}`;
+    document.getElementById('stat-ingresos').textContent    = `S/. ${parseFloat(d.totales.ingresos||0).toFixed(2)}`;
+    document.getElementById('stat-pendiente').textContent   = `S/. ${parseFloat(d.totales.pendiente||0).toFixed(2)}`;
     document.getElementById('stat-total-docs').textContent  = d.totales.total_docs || 0;
     document.getElementById('stat-pagados').textContent     = `${d.totales.docs_pagados||0} doc. pagados`;
     document.getElementById('stat-pendientes-n').textContent= `${d.totales.docs_pendientes||0} pendientes`;
@@ -731,7 +615,6 @@ async function cargarFacturas() {
         <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
           <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
           ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
-          ${f.estado!=='anulado'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)})" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -875,7 +758,7 @@ function addItem(desc='', cant=1, pu=0) {
   const id=itemN++;
   const div=document.createElement('div');
   div.id=`item-${id}`;
-  div.style.cssText='display:grid;grid-template-columns:1fr 70px 110px 90px 36px;gap:.5rem;align-items:center;position:relative';
+  div.style.cssText='display:grid;grid-template-columns:1fr 70px 110px 36px;gap:.5rem;align-items:center;position:relative';
   div.innerHTML=`
     <div style="position:relative">
       <input type="text" placeholder="Busca servicio o escribe…" class="vinput" data-f="desc"
@@ -889,15 +772,8 @@ function addItem(desc='', cant=1, pu=0) {
     <input type="number" placeholder="0.00" min="0" step="0.50"
       class="vinput" data-f="pu" style="font-size:.8rem;text-align:right" value="${pu||''}"
       oninput="calcularTotales()"/>
-    <div data-f="total" style="font-size:.82rem;font-weight:700;color:#15803d;
-      text-align:right;padding:.5rem .3rem;min-width:80px">S/. 0.00</div>
     <button onclick="document.getElementById('item-${id}').remove();calcularTotales()"
-      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.2rem">✕</button>
-    <input type="hidden" data-f="inv-id" value=""/>
-    <input type="hidden" data-f="inv-stock" value=""/>
-    <input type="hidden" data-f="inv-unidad" value=""/>
-    </div>
-    <div data-f="stock-badge" style="grid-column:1/3;margin-top:-.25rem"></div>`;
+      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.2rem">✕</button>`;
   document.getElementById('nf-items').appendChild(div);
   div.querySelector('[data-f="pu"]').addEventListener('blur', calcularTotales);
 }
@@ -926,50 +802,21 @@ async function buscarItemAC(input, id) {
     const cat    = item.categoria || item._tipo;
     const precio = item.precio || item.precio_unitario || 0;
     const colores = catColors[cat] || '#f8faf8;color:#4b5f57';
-    const stock  = item._tipo==='inventario' ? parseFloat(item.cantidad||0) : null;
-    const stockLabel = stock !== null ? ` · 📦 ${stock} ${item.unidad||''}` : '';
-    const stockColor = stock !== null && stock <= 0 ? 'color:#e11d48' : stock !== null && stock <= (item.stock_minimo||0) ? 'color:#f59e0b' : '';
-    const invId  = item._tipo==='inventario' ? item.id : '';
-    return `<li onmousedown="selItemAC(event,${id},'${esc(item.nombre)}',${parseFloat(precio)},'${invId}',${stock !== null ? stock : 'null'},'${esc(item.unidad||'')}')">
+    const stock  = item._tipo==='inventario' ? ` · 📦 ${item.cantidad} ${item.unidad||''}` : '';
+    return `<li onmousedown="selItemAC(event,${id},'${esc(item.nombre)}',${parseFloat(precio)})">
       <span class="ac-cat-pill" style="background:${colores}">${cat}</span>
       <span style="flex:1;font-weight:600">${esc(item.nombre)}</span>
-      <span style="font-size:.7rem;color:var(--ink-faint)">S/. ${parseFloat(precio).toFixed(2)}<span style="${stockColor}">${stockLabel}</span></span>
+      <span style="font-size:.7rem;color:var(--ink-faint)">S/. ${parseFloat(precio).toFixed(2)}${stock}</span>
     </li>`;
   }).join('');
   ul.style.display='block';
 }
 
-function selItemAC(e, id, nombre, precio, invId='', stockDisp=null, unidad='') {
+function selItemAC(e, id, nombre, precio) {
   e.preventDefault();
   const div = document.getElementById(`item-${id}`);
   div.querySelector('[data-f="desc"]').value = nombre;
   div.querySelector('[data-f="pu"]').value   = precio;
-
-  // Guardar referencia al ítem de inventario y stock disponible
-  const hiddenInv = div.querySelector('[data-f="inv-id"]');
-  if (hiddenInv) hiddenInv.value = invId;
-
-  const hiddenStock = div.querySelector('[data-f="inv-stock"]');
-  if (hiddenStock) hiddenStock.value = stockDisp !== null ? stockDisp : '';
-
-  const hiddenUnidad = div.querySelector('[data-f="inv-unidad"]');
-  if (hiddenUnidad) hiddenUnidad.value = unidad;
-
-  // Mostrar badge de stock disponible si es producto de inventario
-  const stockBadge = div.querySelector('[data-f="stock-badge"]');
-  if (stockBadge) {
-    if (invId && stockDisp !== null) {
-      const color = stockDisp <= 0 ? '#e11d48' : stockDisp <= 5 ? '#f59e0b' : '#15803d';
-      const bg    = stockDisp <= 0 ? '#fff1f2' : stockDisp <= 5 ? '#fffbeb' : '#f0fdf4';
-      stockBadge.innerHTML = `<span style="font-size:.65rem;font-weight:700;padding:.15rem .45rem;
-        border-radius:.4rem;background:${bg};color:${color};border:1px solid ${color}30">
-        📦 Stock: ${stockDisp} ${unidad}
-      </span>`;
-    } else {
-      stockBadge.innerHTML = '';
-    }
-  }
-
   document.getElementById(`ac-${id}`).style.display='none';
   calcularTotales();
 }
@@ -990,13 +837,9 @@ function calcularTotales() {
   let totalConIGV   = 0;
 
   document.querySelectorAll('#nf-items > div').forEach(div => {
-    const cant      = parseFloat(div.querySelector('[data-f="cant"]')?.value) || 0;
-    const pu        = parseFloat(div.querySelector('[data-f="pu"]')?.value)   || 0;
-    const itemTotal = parseFloat((cant * pu).toFixed(2));
-    totalConIGV    += itemTotal;
-    // Actualizar columna total del ítem
-    const totalEl = div.querySelector('[data-f="total"]');
-    if (totalEl) totalEl.textContent = `${getSim()} ${itemTotal.toFixed(2)}`;
+    const cant = parseFloat(div.querySelector('[data-f="cant"]')?.value) || 0;
+    const pu   = parseFloat(div.querySelector('[data-f="pu"]')?.value)   || 0;
+    totalConIGV += cant * pu;
   });
 
   totalConIGV = parseFloat(totalConIGV.toFixed(2));
@@ -1015,9 +858,9 @@ function calcularTotales() {
     total    = parseFloat((subtotal + igv).toFixed(2));
   }
 
-  document.getElementById('tot-sub').textContent       = `${getSim()} ${subtotal.toFixed(2)}`;
-  document.getElementById('tot-igv').textContent       = `${getSim()} ${igv.toFixed(2)}`;
-  document.getElementById('tot-total').textContent     = `${getSim()} ${total.toFixed(2)}`;
+  document.getElementById('tot-sub').textContent       = `S/. ${subtotal.toFixed(2)}`;
+  document.getElementById('tot-igv').textContent       = `S/. ${igv.toFixed(2)}`;
+  document.getElementById('tot-total').textContent     = `S/. ${total.toFixed(2)}`;
   document.getElementById('tot-igv-label').textContent = `IGV (${empresa.igv_porcentaje||18}%):`;
 
   actualizarPagoRestante(total);
@@ -1056,7 +899,7 @@ function actualizarPagoRestante(totalOverride) {
     total = parseFloat(totalOverride) || 0;
   } else {
     const txt = document.getElementById('tot-total')?.textContent || 'S/. 0.00';
-    total = parseFloat(txt.replace(getSim()+' ', '')) || 0;
+    total = parseFloat(txt.replace('S/. ', '')) || 0;
   }
   let asignado = 0;
   document.querySelectorAll('#nf-pagos > div').forEach(div => {
@@ -1065,7 +908,7 @@ function actualizarPagoRestante(totalOverride) {
   });
   const restante = parseFloat((total - asignado).toFixed(2));
   const el = document.getElementById('pago-restante');
-  el.textContent = `${getSim()} ${restante.toFixed(2)}`;
+  el.textContent = `S/. ${restante.toFixed(2)}`;
   el.style.color = Math.abs(restante) < 0.01 ? '#15803d' : restante < 0 ? '#be123c' : '#b45309';
 }
 
@@ -1090,39 +933,13 @@ async function emitirFactura() {
   }
 
   const items=[]; let ok=true;
-  const erroresStock = [];
-
-  document.querySelectorAll('#nf-items > div[id^="item-"]').forEach(div=>{
-    const desc    = div.querySelector('[data-f="desc"]')?.value.trim();
-    const cant    = parseFloat(div.querySelector('[data-f="cant"]')?.value)||1;
-    const pu      = parseFloat(div.querySelector('[data-f="pu"]')?.value)||0;
-    const invId   = div.querySelector('[data-f="inv-id"]')?.value || null;
-    const invStock= div.querySelector('[data-f="inv-stock"]')?.value;
-    const invUnidad= div.querySelector('[data-f="inv-unidad"]')?.value || '';
-
+  document.querySelectorAll('#nf-items > div').forEach(div=>{
+    const desc=div.querySelector('[data-f="desc"]')?.value.trim();
+    const cant=parseFloat(div.querySelector('[data-f="cant"]')?.value)||1;
+    const pu  =parseFloat(div.querySelector('[data-f="pu"]')?.value)||0;
     if (!desc) { ok=false; return; }
-
-    // Validar stock solo si es producto de inventario
-    if (invId && invStock !== '' && invStock !== undefined) {
-      const stockDisp = parseFloat(invStock);
-      if (cant > stockDisp) {
-        erroresStock.push(`"${desc}": solicitado ${cant} ${invUnidad}, disponible ${stockDisp} ${invUnidad}`);
-        ok = false;
-      }
-    }
-
-    items.push({
-      descripcion  : desc,
-      cantidad     : cant,
-      precio_unit  : pu,
-      inventario_id: invId ? parseInt(invId) : null,
-    });
+    items.push({ descripcion:desc, cantidad:cant, precio_unit:pu });
   });
-
-  if (erroresStock.length) {
-    toast(`⚠️ Stock insuficiente:\n${erroresStock.join('\n')}`, 'warning', 8000);
-    return;
-  }
   if (!ok)          { toast('Completa la descripción de todos los ítems.','warning'); return; }
   if (!items.length){ toast('Agrega al menos un ítem.','warning'); return; }
 
@@ -1440,7 +1257,24 @@ function descargarPDF() {
   </head><body>
     ${contenido}
     <br/><div style="text-align:center"><button onclick="window.print()" style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
-  </body></html>`);
+  
+<!-- ══ Modal Resultado SUNAT ══════════════════════════════════════ -->
+<div id="modal-sunat" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3 id="sunat-modal-titulo">⚡ Resultado SUNAT</h3>
+      <button onclick="closeModal('modal-sunat')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="sunat-modal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT…</p></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
+      <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
+    </div>
+  </div>
+</div>
+</body></html>`);
   ventana.document.close();
   setTimeout(()=>ventana.print(),800);
 }
@@ -1453,7 +1287,7 @@ function abrirPagar(id, total) {
   pagarFilaN = 0;
   pagarTotalActual = parseFloat(total) || 0;
   document.getElementById('pagar-id').value          = id;
-  document.getElementById('pagar-total').textContent = `${getSim()} ${pagarTotalActual.toFixed(2)}`;
+  document.getElementById('pagar-total').textContent = `S/. ${pagarTotalActual.toFixed(2)}`;
   document.getElementById('pagar-filas').innerHTML   = '';
   document.getElementById('pagar-referencia').value  = '';
   addPagarFila();
@@ -1495,7 +1329,7 @@ function actualizarPagarRestante() {
   });
   const restante = parseFloat((pagarTotalActual - asignado).toFixed(2));
   const el = document.getElementById('pagar-restante-label');
-  el.textContent = `${getSim()} ${Math.max(restante,0).toFixed(2)}`;
+  el.textContent = `S/. ${Math.max(restante,0).toFixed(2)}`;
   el.style.color = Math.abs(restante) < 0.01 ? '#15803d' : '#b45309';
 }
 
@@ -1538,5 +1372,22 @@ async function confirmarPago() {
   } catch { toast('Error de conexión.', 'danger'); }
 }
 </script>
+
+<!-- ══ Modal Resultado SUNAT ══════════════════════════════════════ -->
+<div id="modal-sunat" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3 id="sunat-modal-titulo">⚡ Resultado SUNAT</h3>
+      <button onclick="closeModal('modal-sunat')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="sunat-modal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT…</p></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
+      <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
+    </div>
+  </div>
+</div>
 </body>
 </html>
