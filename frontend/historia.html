@@ -12,21 +12,6 @@
     /* ── Autocompletado inventario ──────────────────────────────── */
     .autocomplete-wrap { position: relative; }
     .autocomplete-list {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      background: #fff;
-      border: 1.5px solid var(--line);
-      border-radius: .85rem;
-      box-shadow: 0 8px 32px rgba(13,59,46,.12);
-      z-index: 1000;
-      max-height: 220px;
-      overflow-y: auto;
-      padding: .35rem;
-      /* Asegurar que no se salga en móvil */
-      max-width: calc(100vw - 2rem);
-    
       position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
       background: #fff; border: 1.5px solid var(--green-500);
       border-radius: .85rem; box-shadow: 0 8px 24px rgba(13,59,46,.12);
@@ -136,7 +121,7 @@
       <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
         <div class="search-wrap" style="flex:1">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input id="b-prop" type="text" placeholder="Ej: 45678912 · Juan García · 987654321" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
+          <input id="b-prop" type="text" placeholder="DNI, nombre del propietario, teléfono o nombre de mascota…" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
         </div>
         <button onclick="buscarPropH()" class="vbtn vbtn-primary">Buscar</button>
       </div>
@@ -553,9 +538,32 @@ async function buscarPropH() {
   cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
   document.getElementById('b-mascotas-section').style.display = 'none';
   try {
-    const res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=8');
-    if (!res) return;
-    const rows = (await res.json()).data||[];
+    // Buscar por propietario Y por mascota en paralelo
+    const [resProp, resMasc] = await Promise.all([
+      api('/propietarios?search='+encodeURIComponent(q)+'&limit=6'),
+      api('/mascotas?search='+encodeURIComponent(q)+'&limit=4'),
+    ]);
+    const propRows = resProp ? (await resProp.json()).data||[] : [];
+    const mascRows = resMasc ? (await resMasc.json()).data||[] : [];
+
+    // Si encontramos mascotas directamente, ir a esa mascota sin pasar por propietario
+    if (!propRows.length && mascRows.length === 1) {
+      cont.innerHTML = '';
+      closeModal('modal-buscar');
+      cargarHistoria(mascRows[0].id);
+      return;
+    }
+
+    // Agregar propietarios de mascotas encontradas
+    const propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id || m.id))];
+    const propFromMasc = [];
+    for (const pid of propIdsFromMasc) {
+      if (!propRows.find(p => p.id === pid)) {
+        const rp = await api('/propietarios/'+pid);
+        if (rp?.ok) { const d = (await rp.json()).data; if (d) propFromMasc.push(d); }
+      }
+    }
+    const rows = [...propRows, ...propFromMasc];
     cont.innerHTML = rows.length ? rows.map(p=>`
       <button onclick="selPropH(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
         style="display:flex;align-items:center;gap:.75rem;padding:.75rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
@@ -635,7 +643,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
     if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
-    const rh = await api('/historia?mascota_id='+id);
+    const rh = await api('/historia/mascota/'+id);
     if (!rh) return;
     const consultas = (await rh.json()).data||[];
     document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
@@ -650,7 +658,7 @@ async function cargarVacunas(id) {
   const cont = document.getElementById('vacunas-lista');
   cont.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div>';
   try {
-    const res  = await api('/vacunas?mascota_id='+id);
+    const res  = await api('/vacunas/mascota/'+id);
     if (!res) return;
     const rows = (await res.json()).data||[];
     if (!rows.length) {
@@ -839,7 +847,7 @@ async function cargarEstetica(id) {
   const cont = document.getElementById('estetica-lista');
   cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div>';
   try {
-    const res  = await api('/estetica?mascota_id='+id);
+    const res  = await api('/estetica/mascota/'+id);
     if (!res) return;
     const rows = (await res.json()).data || [];
 
@@ -1089,7 +1097,7 @@ async function abrirEditarVacuna(id) {
   document.getElementById('ev-id').value = id;
   openModal('modal-editar-vacuna');
   try {
-    const res  = await api(`/vacunas?mascota_id=${mascotaId}`);
+    const res  = await api(`/vacunas/mascota/${mascotaId}`);
     if (!res) return;
     const rows = (await res.json()).data || [];
     const v    = rows.find(x => x.id === id);
@@ -1136,7 +1144,7 @@ async function abrirEditarEstetica(id) {
   document.getElementById('ee-id').value = id;
   openModal('modal-editar-estetica');
   try {
-    const res  = await api(`/estetica?mascota_id=${mascotaId}`);
+    const res  = await api(`/estetica/mascota/${mascotaId}`);
     if (!res) return;
     const rows = (await res.json()).data || [];
     const s    = rows.find(x => x.id === id);
@@ -1210,16 +1218,10 @@ function attachAutocomplete(input, cats, onSelect) {
   input.parentElement.classList.add('autocomplete-wrap');
 
   let list = null;
-  let _touchOutside = null;
 
   function cerrar() {
     list?.remove();
     list = null;
-    // Remover listener de touch al cerrar
-    if (_touchOutside) {
-      document.removeEventListener('touchstart', _touchOutside);
-      _touchOutside = null;
-    }
   }
 
   input.addEventListener('input', async () => {
@@ -1253,37 +1255,20 @@ function attachAutocomplete(input, cats, onSelect) {
           </span>
           <span class="ac-hint">← seleccionar</span>`;
         li.addEventListener('mousedown', e => {
-          e.preventDefault();
+          e.preventDefault(); // evita que el input pierda foco antes de seleccionar
           input.value = item.nombre;
           cerrar();
           if (onSelect) onSelect(item);
         });
-        // Soporte táctil para móvil
-        li.addEventListener('touchstart', e => {
-          e.preventDefault();
-          input.value = item.nombre;
-          cerrar();
-          if (onSelect) onSelect(item);
-        }, { passive: false });
         list.appendChild(li);
       });
     }
 
     input.parentElement.appendChild(list);
-
-    // Agregar listener touch solo cuando el dropdown está abierto
-    if ('ontouchstart' in window) {
-      _touchOutside = (e) => {
-        if (list && !list.contains(e.target) && e.target !== input) {
-          cerrar();
-        }
-      };
-      document.addEventListener('touchstart', _touchOutside, { passive: true });
-    }
   });
 
   // Cerrar al perder foco (con delay para permitir click en la lista)
-  input.addEventListener('blur', () => setTimeout(cerrar, 200));
+  input.addEventListener('blur', () => setTimeout(cerrar, 180));
   // Cerrar con Escape
   input.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
 }

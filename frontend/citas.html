@@ -89,7 +89,7 @@
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
             <input id="buscar-prop-input" type="text"
-              placeholder="DNI, nombre o teléfono del propietario…"
+              placeholder="DNI, nombre del propietario o nombre de mascota…"
               class="vinput" onkeydown="if(event.key==='Enter')buscarProp()"/>
           </div>
           <button onclick="buscarProp()" class="vbtn vbtn-primary" style="flex-shrink:0">Buscar</button>
@@ -465,9 +465,24 @@ async function buscarProp() {
   cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
 
   try {
-    const res  = await api(`/propietarios?search=${encodeURIComponent(q)}&limit=8`);
-    if (!res) return;
-    const rows = (await res.json()).data || [];
+    // Buscar propietarios Y mascotas en paralelo
+    const [resProp, resMasc] = await Promise.all([
+      api(`/propietarios?search=${encodeURIComponent(q)}&limit=6`),
+      api(`/mascotas?search=${encodeURIComponent(q)}&limit=4`),
+    ]);
+    const propRows = resProp ? (await resProp.json()).data || [] : [];
+    const mascRows = resMasc ? (await resMasc.json()).data || [] : [];
+
+    // Propietarios desde mascotas encontradas (sin duplicados)
+    const propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id))];
+    const propFromMasc = [];
+    for (const pid of propIdsFromMasc) {
+      if (!propRows.find(p => p.id === pid)) {
+        const rp = await api(`/propietarios/${pid}`);
+        if (rp?.ok) { const d = (await rp.json()).data; propFromMasc.push(d); }
+      }
+    }
+    const rows = [...propRows, ...propFromMasc];
 
     cont.innerHTML = rows.length ? rows.map(p => `
       <button onclick="seleccionarProp(${p.id},'${esc(p.nombre)}','${esc(p.apellido)}',
@@ -548,7 +563,7 @@ async function seleccionarProp(id, nombre, apellido, dni, telefono) {
           </button>`).join('')
       : `<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">
           Este propietario no tiene mascotas.
-          <a href="mascotas" style="color:var(--green-600);font-weight:600">Registrar mascota</a>
+          <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar mascota</a>
          </div>`;
   } catch {
     document.getElementById('mascotas-lista').innerHTML =
@@ -638,7 +653,7 @@ function irAAtender() {
   sessionStorage.setItem('historia_mascota_id', citaAtenderData.mascotaId);
   sessionStorage.setItem('historia_cita_id',    citaAtenderData.id);
   sessionStorage.setItem('historia_motivo',     citaAtenderData.motivo);
-  window.location.href = 'historia';
+  window.location.href = 'historia.html';
 }
 
 // ── Editar cita ───────────────────────────────────────────────────

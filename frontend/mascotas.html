@@ -183,8 +183,9 @@
       <button onclick="closeModal('modal-det')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body" id="det-body"></div>
-    <div class="vmodal-foot">
+    <div class="vmodal-foot" style="flex-wrap:wrap;gap:.5rem">
       <button onclick="closeModal('modal-det')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button id="det-carnet-btn" class="vbtn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none">🪪 Carnet</button>
       <button id="det-historia-btn" class="vbtn vbtn-ghost">📋 Ver Historia</button>
       <button id="det-editar-btn"   class="vbtn vbtn-primary">✏️ Editar</button>
     </div>
@@ -242,14 +243,24 @@ async function cargar(search='') {
           ${m.peso_kg ? `<span>⚖️ ${m.peso_kg} kg</span>` : ''}
         </div>
         <!-- Botón editar directo en la card -->
-        <button onclick="event.stopPropagation();abrirModalEditar(${m.id})"
-          style="margin-top:.6rem;width:100%;background:none;border:1px solid var(--line);
-          border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;
-          color:var(--sky);cursor:pointer;font-family:inherit;transition:all .15s"
-          onmouseover="this.style.borderColor='var(--sky)';this.style.background='#f0f9ff'"
-          onmouseout="this.style.borderColor='var(--line)';this.style.background='none'">
-          ✏️ Editar
-        </button>
+        <div style="display:flex;gap:.4rem;margin-top:.6rem">
+          <button onclick="event.stopPropagation();abrirModalEditar(${m.id})"
+            style="flex:1;background:none;border:1px solid var(--line);
+            border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;
+            color:var(--sky);cursor:pointer;font-family:inherit;transition:all .15s"
+            onmouseover="this.style.borderColor='var(--sky)';this.style.background='#f0f9ff'"
+            onmouseout="this.style.borderColor='var(--line)';this.style.background='none'">
+            ✏️ Editar
+          </button>
+          <button onclick="event.stopPropagation();abrirCarnet(${m.id})"
+            style="flex:1;background:none;border:1px solid #ddd6fe;
+            border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;
+            color:#6d28d9;cursor:pointer;font-family:inherit;transition:all .15s"
+            onmouseover="this.style.borderColor='#8b5cf6';this.style.background='#f5f3ff'"
+            onmouseout="this.style.borderColor='#ddd6fe';this.style.background='none'">
+            🪪 Carnet
+          </button>
+        </div>
       </div>`).join('');
   } catch {
     grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
@@ -425,7 +436,7 @@ async function verDetalle(id) {
 
   document.getElementById('det-historia-btn').onclick = () => {
     sessionStorage.setItem('historia_mascota_id', id);
-    window.location.href = 'historia';
+    window.location.href = 'historia.html';
   };
   document.getElementById('det-editar-btn').onclick = () => {
     closeModal('modal-det');
@@ -512,6 +523,18 @@ async function verDetalle(id) {
     document.getElementById('det-body').innerHTML =
       '<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>';
   }
+}
+
+async function abrirCarnet(mascotaId) {
+  try {
+    const r = await api('/carnet/mascota/'+mascotaId);
+    if (!r?.ok) { toast('Error al obtener carnet.','danger'); return; }
+    const c = (await r.json()).data;
+    if (c?.token) {
+      const url = `${window.location.origin}/carnet-publico?token=${c.token}`;
+      window.open(url, '_blank');
+    }
+  } catch { toast('Error al abrir carnet.','danger'); }
 }
 
 function ib(label, val) {
