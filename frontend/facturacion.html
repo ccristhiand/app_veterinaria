@@ -98,17 +98,10 @@
 
   <!-- ── TAB LISTA ── -->
   <div id="contenido-lista" style="display:none">
-    <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+
+    <!-- Filtros -->
+    <div class="vcard vcard-pad" style="margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
       <div><label class="vlabel">Fecha</label><input type="date" id="f-fecha" class="vinput" style="width:auto"/></div>
-      <div>
-        <label class="vlabel">Estado</label>
-        <select id="f-estado" class="vinput" style="width:auto">
-          <option value="">Todos</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="pagado">Pagado</option>
-          <option value="anulado">Anulado</option>
-        </select>
-      </div>
       <div>
         <label class="vlabel">Tipo</label>
         <select id="f-tipo" class="vinput" style="width:auto">
@@ -120,18 +113,43 @@
       <button onclick="cargarFacturas()" class="vbtn vbtn-primary">Filtrar</button>
       <button onclick="limpiarFiltros()" class="vbtn vbtn-ghost">Limpiar</button>
     </div>
+
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1rem;overflow-x:auto">
+      <button class="tab-btn active" id="subtab-todos"      onclick="mostrarSubTab('todos')">📋 Todos</button>
+      <button class="tab-btn"        id="subtab-pendiente"  onclick="mostrarSubTab('pendiente')">⏳ Por cobrar</button>
+      <button class="tab-btn"        id="subtab-pagado"     onclick="mostrarSubTab('pagado')">✅ Pagados</button>
+      <button class="tab-btn"        id="subtab-emitido"    onclick="mostrarSubTab('emitido')">⚡ Emitidos SUNAT</button>
+      <button class="tab-btn"        id="subtab-nota"       onclick="mostrarSubTab('nota')">📋 Notas de Crédito</button>
+      <button class="tab-btn"        id="subtab-anulado"    onclick="mostrarSubTab('anulado')">❌ Anulados</button>
+    </div>
+
+    <!-- Toolbar emisión masiva (solo en tab pagados) -->
+    <div id="toolbar-masivo" style="display:none;margin-bottom:.75rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.85rem;padding:.65rem 1rem;display:none;align-items:center;gap:1rem;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="chk-select-all" onchange="toggleSeleccionarTodos(this.checked)" style="accent-color:var(--green-600);width:16px;height:16px"/>
+        Seleccionar todos
+      </label>
+      <span style="font-size:.82rem;color:#b45309" id="label-seleccionados">0 seleccionados</span>
+      <button onclick="emitirMasivo()" class="vbtn vbtn-primary" id="btn-emitir-masivo"
+        style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;font-size:.8rem;padding:.45rem .9rem"
+        disabled>
+        📤 Emitir seleccionados
+      </button>
+    </div>
+
     <div class="vcard">
       <div style="overflow-x:auto">
         <table class="vtable">
           <thead>
-            <tr>
+            <tr id="thead-facturas">
               <th>Número</th><th>Fecha</th><th>Cliente</th>
               <th class="hidden sm:table-cell">Mascota</th>
               <th>Total</th><th>Estado</th><th>SUNAT</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tbody-facturas">
-            <tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
+            <tr><td colspan="8"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -400,11 +418,13 @@
 
 <script>
 // ── Estado ────────────────────────────────────────────────────────
-let empresa     = {};
-let _feActivo   = false;
-let _anularId   = null;
-let _esSUNAT    = false;
-let _userRol    = '';
+let empresa       = {};
+let _feActivo     = false;
+let _anularId     = null;
+let _esSUNAT      = false;
+let _userRol      = '';
+let _rowsCache    = [];
+let _subTabActual = 'todos';
 
 function badgeSUNAT(f) {
   if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
@@ -564,8 +584,8 @@ initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y docu
 
   // Cargar rol del usuario
   try {
-    const u = getUser ? getUser() : null;
-    if (u) _userRol = u.rol || '';
+    const u = JSON.parse(localStorage.getItem('vet_user') || '{}');
+    _userRol = u.rol || '';
   } catch {}
 
   try {
@@ -600,7 +620,7 @@ function mostrarTab(tab) {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
     document.getElementById(`contenido-${t}`).style.display = t===tab?'block':'none';
   });
-  if (tab==='lista') cargarFacturas();
+  if (tab==='lista') { _subTabActual='todos'; cargarFacturas(); }
 }
 
 function setPeriodo(p) {
@@ -703,69 +723,166 @@ function renderTopServicios(data) {
 // ── Lista facturas ────────────────────────────────────────────────
 function limpiarFiltros() {
   document.getElementById('f-fecha').value  = fechaHoyInput();
-  document.getElementById('f-estado').value = '';
   document.getElementById('f-tipo').value   = '';
   cargarFacturas();
 }
 
 async function cargarFacturas() {
-  const fecha  = document.getElementById('f-fecha').value;
-  const estado = document.getElementById('f-estado').value;
-  const tipo   = document.getElementById('f-tipo').value;
-  let url = '/facturas?limit=50';
-  if (fecha)  url += `&fecha=${fecha}`;
-  if (estado) url += `&estado=${estado}`;
-  if (tipo)   url += `&tipo=${tipo}`;
+  const fecha = document.getElementById('f-fecha').value;
+  const tipo  = document.getElementById('f-tipo').value;
+  let url = '/facturas?limit=200';
+  if (fecha) url += `&fecha=${fecha}`;
+  if (tipo)  url += `&tipo=${tipo}`;
 
   const tbody = document.getElementById('tbody-facturas');
-  tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>`;
 
   try {
-    const res  = await api(url);
+    const res = await api(url);
     if (!res) return;
-    const rows = (await res.json()).data || [];
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="vempty"><span class="icon">🧾</span><p>Sin documentos</p></div></td></tr>`;
-      return;
+    _rowsCache = (await res.json()).data || [];
+    renderSubTab(_subTabActual);
+  } catch { tbody.innerHTML=`<tr><td colspan="8"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
+}
+
+function mostrarSubTab(tab) {
+  _subTabActual = tab;
+  document.querySelectorAll('[id^="subtab-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('subtab-' + tab)?.classList.add('active');
+  renderSubTab(tab);
+}
+
+function renderSubTab(tab) {
+  const tbody   = document.getElementById('tbody-facturas');
+  const thead   = document.getElementById('thead-facturas');
+  const toolbar = document.getElementById('toolbar-masivo');
+
+  let rows = _rowsCache;
+  if (tab === 'pendiente') rows = _rowsCache.filter(f => f.estado === 'pendiente');
+  else if (tab === 'pagado')  rows = _rowsCache.filter(f => f.estado === 'pagado' && !f.sunat_estado);
+  else if (tab === 'emitido') rows = _rowsCache.filter(f => f.sunat_estado === '0');
+  else if (tab === 'nota')    rows = _rowsCache.filter(f => f.sunat_estado === 'anulado_sunat');
+  else if (tab === 'anulado') rows = _rowsCache.filter(f => f.estado === 'anulado' && f.sunat_estado !== 'anulado_sunat');
+
+  if (tab === 'pagado' && _feActivo) {
+    toolbar.style.display = 'flex';
+    actualizarContadorSeleccion();
+  } else {
+    toolbar.style.display = 'none';
+  }
+
+  if (tab === 'pagado' && _feActivo) {
+    thead.innerHTML = `<tr>
+      <th style="width:36px"><input type="checkbox" id="chk-select-all" onchange="toggleSeleccionarTodos(this.checked)" style="accent-color:var(--green-600)"/></th>
+      <th>Número</th><th>Fecha</th><th>Cliente</th>
+      <th class="hidden sm:table-cell">Mascota</th>
+      <th>Total</th><th>Método</th><th>Acciones</th>
+    </tr>`;
+  } else {
+    thead.innerHTML = `<tr>
+      <th>Número</th><th>Fecha</th><th>Cliente</th>
+      <th class="hidden sm:table-cell">Mascota</th>
+      <th>Total</th><th>Estado</th><th>SUNAT</th><th>Acciones</th>
+    </tr>`;
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><span class="icon">🧾</span><p>Sin documentos en este tab</p></div></td></tr>`;
+    return;
+  }
+
+  const estadoBadge = {
+    pendiente: '<span style="background:#fffbeb;color:#b45309;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fde68a">⏳ Pendiente</span>',
+    pagado   : '<span style="background:#f0fdf4;color:#15803d;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ Pagado</span>',
+    anulado  : '<span style="background:#fff1f2;color:#be123c;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">❌ Anulado</span>',
+  };
+  const metodoBadge = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transfer.', yape:'📱 Yape', plin:'📱 Plin' };
+
+  tbody.innerHTML = rows.map(f => {
+    const chkCol = (tab === 'pagado' && _feActivo)
+      ? `<td><input type="checkbox" class="chk-factura" data-id="${f.id}" data-numero="${esc(f.numero)}" onchange="actualizarContadorSeleccion()" style="accent-color:var(--green-600);width:16px;height:16px"/></td>`
+      : '';
+
+    const acciones = `
+      <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
+      ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
+      ${_feActivo && f.estado==='pagado' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
+      ${_feActivo && f.sunat_estado && f.sunat_estado!=='0' && f.sunat_estado!=='anulado_sunat'?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#6366f1">🔄 Reintentar</button>`:''}
+      ${f.estado!=='anulado' && !f.sunat_estado?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},false)" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
+      ${f.sunat_estado==='0' && f.estado!=='anulado' && _userRol==='admin'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},true)" style="font-size:.72rem;color:#7c3aed;font-weight:700">📋 Nota Crédito</button>`:''}`;
+
+    if (tab === 'pagado' && _feActivo) {
+      return `<tr>
+        ${chkCol}
+        <td style="font-family:monospace;font-size:.75rem;font-weight:700">
+          <span style="font-size:.65rem;background:${f.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${f.tipo==='factura'?'#1d4ed8':'#15803d'};padding:.1rem .4rem;border-radius:.3rem;font-weight:700;margin-right:.3rem">${f.tipo==='factura'?'F':'B'}</span>
+          ${esc(f.numero)}
+        </td>
+        <td style="font-size:.8rem">${fDate(f.fecha)}</td>
+        <td><p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p><p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p></td>
+        <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
+        <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
+        <td style="font-size:.78rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago||'—'}</td>
+        <td><div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">${acciones}</div></td>
+      </tr>`;
     }
 
-    const estadoBadge = {
-      pendiente: '<span style="background:#fffbeb;color:#b45309;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fde68a">⏳ Pendiente</span>',
-      pagado   : '<span style="background:#f0fdf4;color:#15803d;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ Pagado</span>',
-      anulado  : '<span style="background:#fff1f2;color:#be123c;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">❌ Anulado</span>',
-    };
-    const metodoBadge = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transfer.', yape:'📱 Yape', plin:'📱 Plin' };
-
-    tbody.innerHTML = rows.map(f => `<tr>
+    return `<tr>
       <td style="font-family:monospace;font-size:.75rem;font-weight:700">
         <span style="font-size:.65rem;background:${f.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${f.tipo==='factura'?'#1d4ed8':'#15803d'};padding:.1rem .4rem;border-radius:.3rem;font-weight:700;margin-right:.3rem">${f.tipo==='factura'?'F':'B'}</span>
         ${esc(f.numero)}
       </td>
       <td style="font-size:.8rem">${fDate(f.fecha)}</td>
-      <td>
-        <p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p>
-        <p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p>
-      </td>
+      <td><p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p><p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p></td>
       <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
       <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
-      <td>
-        ${estadoBadge[f.estado]||f.estado}
-        ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
-      </td>
+      <td>${estadoBadge[f.estado]||f.estado}${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}</td>
       <td>${badgeSUNAT(f)}</td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
-          <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
-          ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
-          ${_feActivo && f.estado==='pagado' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
-          ${_feActivo && f.sunat_estado && f.sunat_estado!=='0' && f.sunat_estado!=='anulado_sunat'?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#6366f1">🔄 Reintentar</button>`:''}
-          ${f.estado!=='anulado' && !f.sunat_estado?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},false)" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
-          ${f.sunat_estado==='0' && f.estado!=='anulado' && _userRol==='admin'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},true)" style="font-size:.72rem;color:#7c3aed;font-weight:700">📋 Nota Crédito</button>`:''}
-        </div>
-      </td>
-    </tr>`).join('');
-  } catch { tbody.innerHTML=`<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
+      <td><div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">${acciones}</div></td>
+    </tr>`;
+  }).join('');
 }
+
+function limpiarFiltros() {
+  document.getElementById('f-fecha').value = fechaHoyInput();
+  document.getElementById('f-tipo').value  = '';
+  cargarFacturas();
+}
+
+function toggleSeleccionarTodos(checked) {
+  document.querySelectorAll('.chk-factura').forEach(c => c.checked = checked);
+  actualizarContadorSeleccion();
+}
+
+function actualizarContadorSeleccion() {
+  const n   = document.querySelectorAll('.chk-factura:checked').length;
+  const lbl = document.getElementById('label-seleccionados');
+  const btn = document.getElementById('btn-emitir-masivo');
+  if (lbl) lbl.textContent = n + ' seleccionado' + (n !== 1 ? 's' : '');
+  if (btn) { btn.disabled = n === 0; btn.textContent = `📤 Emitir seleccionados (${n})`; }
+}
+
+async function emitirMasivo() {
+  const checks = [...document.querySelectorAll('.chk-factura:checked')];
+  if (!checks.length) return;
+  const ids   = checks.map(c => ({ id: c.dataset.id, numero: c.dataset.numero }));
+  const total = ids.length;
+  let ok = 0, errores = 0;
+  const btn = document.getElementById('btn-emitir-masivo');
+  btn.disabled = true;
+  toast(`📤 Emitiendo ${total} documentos…`, 'info', total * 2000);
+  for (const doc of ids) {
+    try {
+      const res  = await api('/fe/emitir/' + doc.id, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) ok++; else errores++;
+    } catch { errores++; }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  toast(`✅ ${ok} emitidos${errores > 0 ? ` · ❌ ${errores} con error` : ''}`, ok > 0 ? 'success' : 'danger', 6000);
+  cargarFacturas(); cargarResumen();
+}
+
 
 // ══ NUEVA FACTURA ════════════════════════════════════════════════
 
