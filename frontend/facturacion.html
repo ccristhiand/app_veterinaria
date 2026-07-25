@@ -688,7 +688,7 @@ async function cargarFacturas() {
         ${estadoBadge[f.estado]||f.estado}
         ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
       </td>
-      // <td>${badgeSUNAT(f)}</td>
+      <td></td>
       <td>
         <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
           <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
