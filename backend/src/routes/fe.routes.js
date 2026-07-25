@@ -113,7 +113,7 @@ router.put('/config', authorize('admin'), async (req, res, next) => {
 });
 
 // ── POST /api/v1/fe/emitir/:facturaId — emitir a SUNAT ───────────
-router.post('/emitir/:facturaId', authorize('admin', 'veterinario', 'recepcionista'),
+router.post('/emitir/:facturaId', authorize('admin', 'recepcionista'),
   auditMiddleware('facturacion:emitir_sunat', 'facturacion'),
   async (req, res, next) => {
   try {
@@ -321,7 +321,7 @@ router.post('/anular/:facturaId', authorize('admin'),
 });
 
 // ── POST /api/v1/fe/reintentar/:facturaId — reintentar emisión ────
-router.post('/reintentar/:facturaId', authorize('admin', 'recepcionista'),
+router.post('/reintentar/:facturaId', authorize('admin'),
   async (req, res, next) => {
   try {
     // Limpiar estado de error y reenviar

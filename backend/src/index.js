@@ -37,11 +37,14 @@ const consentimientosRoutes  = require('./routes/consentimientos.routes');
 const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 const feRoutes               = require('./routes/fe.routes');
+const waRoutes               = require('./routes/wa.routes');
+const waCampanasRoutes       = require('./routes/wa-campanas.routes');
 
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
 const adminBackupRoutes  = require('./routes/admin_backup.routes');
+const adminFeRoutes      = require('./routes/admin_fe.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -103,6 +106,7 @@ app.get('/favicon.ico', async (req, res) => {
 // ── Panel admin SaaS (sin tenant middleware) ──────────────────────
 app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
+app.use('/admin/api/fe',      adminFeRoutes);
 app.use('/admin/api',         adminRoutes);
 
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
@@ -140,6 +144,8 @@ app.use(`${API}/consentimientos`,  consentimientosRoutes);
 app.use(`${API}/branding`,         brandingRoutes);
 app.use('/admin/api/permisos',     permisosAdminRoutes);
 app.use(`${API}/fe`,               feRoutes);
+app.use(`${API}/wa/campanas`,      waCampanasRoutes);
+app.use(`${API}/wa`,               waRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>
