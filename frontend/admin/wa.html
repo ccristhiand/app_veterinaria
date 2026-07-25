@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp — VetClinic SaaS Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155}
+    .main{margin-left:240px;padding:2rem;min-height:100vh}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:#0f172a;color:#e2e8f0}
+    .nav-item.active{background:linear-gradient(135deg,rgba(37,211,102,.15),rgba(18,140,126,.1));color:#4ade80;font-weight:700}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    table{width:100%;border-collapse:collapse}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
+    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.83rem;vertical-align:middle}
+    tr:hover td{background:#0f172a50}
+    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%}
+    input:focus,select:focus{border-color:#25d366}
+    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    .btn-primary{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit}
+    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
+    .badge-conectado   {background:#052e16;color:#4ade80;border:1px solid #166534}
+    .badge-desconectado{background:#1e293b;color:#475569;border:1px solid #334155}
+    .badge-error       {background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+    .badge-wa{font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;display:inline-block}
+    .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
+    .stat-val{font-size:1.5rem;font-weight:800;color:#f1f5f9;margin-top:.2rem}
+    .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:500px}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between}
+    .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .hidden{display:none!important}
+    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#25d366;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<aside class="sidebar">
+  <div style="padding:1.25rem 1.2rem;border-bottom:1px solid #334155;display:flex;align-items:center;gap:.75rem">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🐾</div>
+    <div><p style="font-weight:800;font-size:.92rem;color:#f1f5f9">VetClinic</p><p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.12em">SaaS Admin</p></div>
+  </div>
+  <nav style="padding:.75rem;flex:1">
+    <a href="index.html"    class="nav-item">📊 Dashboard</a>
+    <a href="clinicas.html" class="nav-item">🏥 Clínicas</a>
+    <a href="logs.html"     class="nav-item">📋 Logs</a>
+    <a href="backup.html"   class="nav-item">💾 Backups</a>
+    <a href="fe.html"       class="nav-item">⚡ Facturación FE</a>
+    <a href="wa.html"       class="nav-item active">💬 WhatsApp</a>
+  </nav>
+  <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
+    <p style="font-size:.82rem;font-weight:700;color:#f1f5f9" id="admin-nombre">Admin</p>
+    <button onclick="cerrarSesion()" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:.5rem;border-radius:.65rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600;margin-top:.5rem">🚪 Cerrar sesión</button>
+  </div>
+</aside>
+
+<main class="main">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <div>
+      <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">💬 WhatsApp — Control por clínica</h1>
+      <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Cuotas, estado de conexión y estadísticas</p>
+    </div>
+    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+  </div>
+
+  <!-- Stats globales -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+    <div class="stat-box"><div class="stat-lbl">Clínicas con WA</div><div class="stat-val" id="stat-activas">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Conectadas ahora</div><div class="stat-val" style="color:#4ade80" id="stat-conectadas">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Msgs enviados hoy</div><div class="stat-val" id="stat-msgs-hoy">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Total mes</div><div class="stat-val" id="stat-msgs-mes">—</div></div>
+  </div>
+
+  <!-- Tabla clínicas -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado WA por clínica</h2>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Clínica</th>
+            <th>WA</th>
+            <th>Conexión</th>
+            <th>Número</th>
+            <th>Mensajes mes</th>
+            <th>Cuota</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-wa">
+          <tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Config Cuota -->
+<div id="modal-cuota" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 style="font-weight:700;color:#f1f5f9" id="cuota-titulo">💬 Config WA</h3>
+      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cuota-tenant-id"/>
+      <!-- Toggle activo -->
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
+          <input type="checkbox" id="cuota-activo" style="accent-color:#25d366;width:16px;height:16px"/>
+          WhatsApp activo para esta clínica
+        </label>
+      </div>
+      <!-- Ilimitado -->
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
+          <input type="checkbox" id="cuota-ilimitado" style="accent-color:#25d366;width:16px;height:16px" onchange="toggleIlimitado()"/>
+          Mensajes ilimitados
+        </label>
+      </div>
+      <!-- Cuota -->
+      <div id="cuota-limite-box" class="grid2">
+        <div>
+          <label>Mensajes incluidos / mes</label>
+          <input id="cuota-incluidos" type="number" min="1" placeholder="100"/>
+        </div>
+        <div>
+          <label>Usados este mes</label>
+          <input id="cuota-usados" type="number" readonly style="opacity:.6"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button onclick="cerrarModal()" class="btn-ghost">Cancelar</button>
+      <button onclick="guardarCuota()" class="btn-primary">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin_shared.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = 'login.html';
+  const admin = getAdmin();
+  if (admin) document.getElementById('admin-nombre').textContent = admin.nombre || 'Admin';
+
+  let _tenantActual = null;
+
+  async function cargar() {
+    const tbody = document.getElementById('tbody-wa');
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+
+    try {
+      // Obtener todos los tenants con su config WA
+      const res  = await adminFetch('/tenants');
+      if (!res?.ok) return;
+      const tenants = (await res.json()).data || [];
+
+      let activas = 0, conectadas = 0;
+
+      const rows = await Promise.all(tenants.map(async t => {
+        // Obtener estado WA desde gateway via API interna
+        let waEstado = { estado: 'desconectado', numero: null };
+        let waCuota  = { activo: false, ilimitado: false, msgs_incluidos: 0, msgs_usados: 0 };
+        try {
+          const rw = await adminFetch(`/wa/${t.id}/config`);
+          if (rw?.ok) {
+            const d = (await rw.json()).data;
+            waCuota = d;
+            if (d.activo) activas++;
+          }
+        } catch {}
+        return { ...t, waEstado, waCuota };
+      }));
+
+      document.getElementById('stat-activas').textContent   = activas;
+      document.getElementById('stat-conectadas').textContent = conectadas;
+      document.getElementById('stat-msgs-hoy').textContent  = '—';
+      document.getElementById('stat-msgs-mes').textContent  = '—';
+
+      tbody.innerHTML = rows.map(t => {
+        const c = t.waCuota;
+        const usados = c.msgs_usados || 0;
+        const incl   = c.msgs_incluidos || 0;
+        const pct    = c.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100,100) : 0);
+        const color  = pct > 80 ? '#f87171' : '#4ade80';
+
+        return `<tr>
+          <td>
+            <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
+            <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
+          </td>
+          <td>${c.activo
+            ? '<span class="badge-wa badge-conectado">✅ Activo</span>'
+            : '<span class="badge-wa badge-desconectado">⏸️ Inactivo</span>'}</td>
+          <td><span class="badge-wa badge-desconectado">—</span></td>
+          <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">—</td>
+          <td style="font-size:.78rem">
+            ${c.ilimitado
+              ? '<span style="color:#4ade80;font-weight:700">∞ Ilimitado</span>'
+              : `<div style="display:flex;flex-direction:column;gap:.2rem">
+                  <span style="color:${color};font-weight:700">${usados}/${incl}</span>
+                  <div style="background:#334155;border-radius:999px;height:4px;overflow:hidden;width:80px">
+                    <div style="height:100%;width:${pct}%;background:${color};border-radius:999px"></div>
+                  </div>
+                </div>`}
+          </td>
+          <td style="font-size:.75rem;color:#94a3b8">${c.ilimitado ? '∞' : `${incl} msgs/mes`}</td>
+          <td>
+            <button onclick="abrirCuota(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
+              class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
+              ⚙️ Configurar
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar</td></tr>`;
+    }
+  }
+
+  async function abrirCuota(tenantId, nombre) {
+    _tenantActual = tenantId;
+    document.getElementById('cuota-titulo').textContent = `💬 WA — ${nombre}`;
+    try {
+      const res = await adminFetch(`/wa/${tenantId}/config`);
+      if (res?.ok) {
+        const d = (await res.json()).data;
+        document.getElementById('cuota-activo').checked   = !!d.activo;
+        document.getElementById('cuota-ilimitado').checked= !!d.ilimitado;
+        document.getElementById('cuota-incluidos').value  = d.msgs_incluidos || 100;
+        document.getElementById('cuota-usados').value     = d.msgs_usados || 0;
+        toggleIlimitado();
+      }
+    } catch {}
+    document.getElementById('modal-cuota').classList.remove('hidden');
+  }
+
+  function toggleIlimitado() {
+    const ilimitado = document.getElementById('cuota-ilimitado').checked;
+    document.getElementById('cuota-limite-box').style.opacity = ilimitado ? '.4' : '1';
+    document.getElementById('cuota-incluidos').disabled = ilimitado;
+  }
+
+  async function guardarCuota() {
+    const body = {
+      activo        : document.getElementById('cuota-activo').checked,
+      ilimitado     : document.getElementById('cuota-ilimitado').checked,
+      msgs_incluidos: parseInt(document.getElementById('cuota-incluidos').value) || 100,
+    };
+    try {
+      const res = await adminFetch(`/wa/${_tenantActual}/config`, { method: 'PUT', body });
+      const d   = await res.json();
+      if (!res?.ok) { alert(d.message || 'Error'); return; }
+      cerrarModal();
+      cargar();
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-cuota').classList.add('hidden');
+    _tenantActual = null;
+  }
+
+  cargar();
+</script>
+</body>
+</html>

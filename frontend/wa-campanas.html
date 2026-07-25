@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Campañas WhatsApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    .badge-estado { font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid }
+    .est-borrador   { background:#f8faf8;color:#64748b;border-color:#e2e8f0 }
+    .est-programada { background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe }
+    .est-enviando   { background:#f0fdf4;color:#15803d;border-color:#bbf7d0 }
+    .est-pausada    { background:#fffbeb;color:#b45309;border-color:#fde68a }
+    .est-completada { background:#f0fdf4;color:#15803d;border-color:#bbf7d0 }
+    .est-cancelada  { background:#fff1f2;color:#be123c;border-color:#fecdd3 }
+    .progress-bar { height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden }
+    .progress-fill { height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);transition:width .3s }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+  <div class="page-head">
+    <div>
+      <h2>📢 Campañas WhatsApp</h2>
+      <p>Envíos masivos segmentados a tus clientes</p>
+    </div>
+    <button onclick="abrirModalNueva()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
+  </div>
+
+  <!-- Lista de campañas -->
+  <div class="vcard" style="padding:0;overflow:hidden">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+      <h3 style="font-weight:700;font-size:.95rem">Todas las campañas</h3>
+      <button onclick="cargar()" class="vbtn vbtn-ghost" style="font-size:.78rem">🔄 Actualizar</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="vtable">
+        <thead>
+          <tr>
+            <th>Nombre</th><th>Segmento</th><th>Estado</th><th>Progreso</th><th>Programada</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-campanas">
+          <tr><td colspan="6"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Campaña -->
+<div id="modal-campana" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:580px">
+    <div class="vmodal-head">
+      <h3 id="campana-titulo">📢 Nueva campaña</h3>
+      <button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <label class="vlabel">Nombre de la campaña *</label>
+        <input id="c-nombre" type="text" class="vinput" placeholder="Ej: Campaña vacunas julio"/>
+      </div>
+      <!-- Segmento -->
+      <div>
+        <label class="vlabel">Segmento de destinatarios *</label>
+        <select id="c-segmento" class="vinput" onchange="onSegmentoChange()">
+          <option value="todos">👥 Todos los propietarios</option>
+          <option value="por_especie">🐕 Por especie de mascota</option>
+          <option value="vacunas_vencidas">💉 Vacunas vencidas o próximas</option>
+          <option value="citas_semana">📅 Con citas esta semana</option>
+          <option value="sin_citas_60d">😴 Sin citas en 60+ días (reactivo)</option>
+        </select>
+        <div id="segmento-especie" style="display:none;margin-top:.5rem">
+          <select id="c-especie" class="vinput">
+            <option value="perro">🐕 Perros</option>
+            <option value="gato">🐈 Gatos</option>
+            <option value="ave">🦜 Aves</option>
+            <option value="reptil">🦎 Reptiles</option>
+            <option value="roedor">🐹 Roedores</option>
+            <option value="otro">🐾 Otro</option>
+          </select>
+        </div>
+      </div>
+      <!-- Mensaje -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
+          <label class="vlabel" style="margin:0">Mensaje *</label>
+          <select id="c-plantilla" class="vinput" style="width:auto;font-size:.78rem" onchange="aplicarPlantillaCampana()">
+            <option value="">Usar plantilla…</option>
+          </select>
+        </div>
+        <textarea id="c-mensaje" rows="5" class="vinput" placeholder="Hola [nombre], queremos informarte…" oninput="actualizarPreviewCampana()"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">
+          <span style="font-size:.65rem;color:var(--ink-faint);margin-right:.2rem">Variables:</span>
+          <button onclick="insertarVarC('[nombre]')"   class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .45rem">[nombre]</button>
+          <button onclick="insertarVarC('[mascota]')"  class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .45rem">[mascota]</button>
+          <button onclick="insertarVarC('[clinica]')"  class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .45rem">[clinica]</button>
+        </div>
+      </div>
+      <!-- Programar -->
+      <div>
+        <label class="vlabel">Programar envío (opcional)</label>
+        <input id="c-programada" type="datetime-local" class="vinput"/>
+        <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.25rem">Si dejas vacío, podrás iniciarlo manualmente cuando quieras</p>
+      </div>
+      <!-- Preview -->
+      <div style="background:#e5ddd5;border-radius:.85rem;padding:1rem">
+        <p style="font-size:.65rem;font-weight:700;color:#667781;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.08em">Preview del mensaje</p>
+        <div style="background:#fff;border-radius:.75rem;padding:.65rem .85rem;font-size:.8rem;line-height:1.5;white-space:pre-wrap;word-break:break-word" id="c-preview">
+          El preview aparecerá aquí…
+        </div>
+      </div>
+      <!-- Info segmento -->
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.65rem .9rem;font-size:.78rem;color:#0369a1">
+        ℹ️ Solo se enviarán mensajes a propietarios con teléfono registrado · 1 mensaje cada 4 segundos
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-campana')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarCampana(false)" class="vbtn vbtn-ghost">💾 Guardar borrador</button>
+      <button onclick="guardarCampana(true)" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">
+        📢 Crear e iniciar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Progreso -->
+<div id="modal-progreso" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:440px">
+    <div class="vmodal-head">
+      <h3 id="prog-titulo">📊 Progreso de campaña</h3>
+      <button onclick="closeModal('modal-progreso')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;text-align:center">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem">
+          <p style="font-size:1.4rem;font-weight:800;color:#15803d" id="prog-enviados">0</p>
+          <p style="font-size:.65rem;color:#4b5f57;font-weight:700;text-transform:uppercase">Enviados</p>
+        </div>
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.85rem">
+          <p style="font-size:1.4rem;font-weight:800;color:#be123c" id="prog-fallidos">0</p>
+          <p style="font-size:.65rem;color:#be123c;font-weight:700;text-transform:uppercase">Fallidos</p>
+        </div>
+        <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.85rem;padding:.85rem">
+          <p style="font-size:1.4rem;font-weight:800" id="prog-total">0</p>
+          <p style="font-size:.65rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase">Total</p>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.3rem">
+          <span>Progreso</span>
+          <span id="prog-pct" style="font-weight:700">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="prog-barra" style="width:0%"></div>
+        </div>
+      </div>
+      <div id="prog-estado-box" style="text-align:center;padding:.5rem;font-size:.82rem;font-weight:600;border-radius:.75rem"></div>
+    </div>
+    <div class="vmodal-foot" id="prog-acciones" style="flex-wrap:wrap;gap:.5rem">
+      <button onclick="closeModal('modal-progreso')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _campanaProgresoCurrent = null;
+let _progresoInterval       = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage({ activePage:'whatsapp', title:'Campañas WA', subtitle:'Envíos masivos' });
+  cargar();
+  cargarPlantillasCampana();
+});
+
+async function cargar() {
+  const tbody = document.getElementById('tbody-campanas');
+  tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><div class="vspinner"></div></div></td></tr>';
+  try {
+    const res  = await api('/wa/campanas');
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span class="icon">📢</span><p>Sin campañas — crea la primera</p></div></td></tr>';
+      return;
+    }
+    const segLabels = { todos:'👥 Todos', por_especie:'🐕 Por especie', vacunas_vencidas:'💉 Vacunas', citas_semana:'📅 Esta semana', sin_citas_60d:'😴 Reactivo' };
+    tbody.innerHTML = rows.map(c => {
+      const pct  = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0;
+      const cls  = `est-${c.estado}`;
+      const acciones = [];
+      if (['borrador','pausada'].includes(c.estado)) acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'iniciar')" style="font-size:.72rem;color:#15803d;font-weight:700">▶️ Iniciar</button>`);
+      if (c.estado === 'enviando') acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'pausar')" style="font-size:.72rem;color:#b45309;font-weight:700">⏸️ Pausar</button>`);
+      if (['borrador','programada','enviando','pausada'].includes(c.estado)) acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'cancelar')" style="font-size:.72rem;color:#be123c">🚫 Cancelar</button>`);
+      acciones.push(`<button class="vlink" onclick="verProgreso(${c.id},'${esc(c.nombre)}')" style="font-size:.72rem;color:var(--sky)">📊 Progreso</button>`);
+      return `<tr>
+        <td>
+          <p style="font-weight:700;font-size:.85rem">${esc(c.nombre)}</p>
+          <p style="font-size:.68rem;color:var(--ink-faint)">${c.created_at ? new Date(c.created_at).toLocaleDateString('es-PE') : ''}</p>
+        </td>
+        <td style="font-size:.78rem">${segLabels[c.segmento]||c.segmento}</td>
+        <td><span class="badge-estado ${cls}">${c.estado.charAt(0).toUpperCase()+c.estado.slice(1)}</span></td>
+        <td style="min-width:140px">
+          <div style="display:flex;justify-content:space-between;font-size:.7rem;margin-bottom:.2rem">
+            <span>${c.enviados}/${c.total||'?'}</span>
+            <span style="font-weight:700">${pct}%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          ${c.fallidos > 0 ? `<p style="font-size:.65rem;color:#be123c;margin-top:.15rem">${c.fallidos} fallidos</p>` : ''}
+        </td>
+        <td style="font-size:.75rem;color:var(--ink-faint)">${c.programada_at ? new Date(c.programada_at).toLocaleString('es-PE') : '—'}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:.25rem;align-items:flex-start">
+            ${acciones.join('')}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span>😿</span><p>Error al cargar</p></div></td></tr>';
+  }
+}
+
+async function accionCampana(id, accion) {
+  const confirmar = accion === 'cancelar'
+    ? confirm('¿Cancelar esta campaña? Los mensajes pendientes no se enviarán.')
+    : true;
+  if (!confirmar) return;
+  try {
+    const res = await api(`/wa/campanas/${id}/${accion}`, { method: 'POST' });
+    const d   = await res.json();
+    if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
+    toast(`✅ ${d.message}`, 'success');
+    cargar();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+async function verProgreso(id, nombre) {
+  _campanaProgresoCurrent = id;
+  document.getElementById('prog-titulo').textContent = `📊 ${nombre}`;
+  openModal('modal-progreso');
+  await actualizarProgreso(id);
+  clearInterval(_progresoInterval);
+  _progresoInterval = setInterval(() => actualizarProgreso(id), 3000);
+}
+
+async function actualizarProgreso(id) {
+  try {
+    const res = await api(`/wa/campanas/${id}/progreso`);
+    if (!res?.ok) return;
+    const c   = (await res.json()).data;
+    document.getElementById('prog-enviados').textContent = c.enviados;
+    document.getElementById('prog-fallidos').textContent = c.fallidos;
+    document.getElementById('prog-total').textContent    = c.total || '?';
+    document.getElementById('prog-pct').textContent      = `${c.porcentaje}%`;
+    document.getElementById('prog-barra').style.width    = `${c.porcentaje}%`;
+
+    const estadoBox = document.getElementById('prog-estado-box');
+    const acciones  = document.getElementById('prog-acciones');
+    const estadoMap = {
+      borrador  : { bg:'#f8faf8', color:'#64748b', txt:'📝 Borrador' },
+      programada: { bg:'#eff6ff', color:'#1d4ed8', txt:'🕐 Programada' },
+      enviando  : { bg:'#f0fdf4', color:'#15803d', txt:'📤 Enviando mensajes…' },
+      pausada   : { bg:'#fffbeb', color:'#b45309', txt:'⏸️ Pausada' },
+      completada: { bg:'#f0fdf4', color:'#15803d', txt:'✅ Completada' },
+      cancelada : { bg:'#fff1f2', color:'#be123c', txt:'🚫 Cancelada' },
+    };
+    const est = estadoMap[c.estado] || estadoMap.borrador;
+    estadoBox.style.background = est.bg;
+    estadoBox.style.color      = est.color;
+    estadoBox.textContent      = est.txt;
+
+    // Acciones disponibles según estado
+    let btns = '<button onclick="closeModal(\'modal-progreso\')" class="vbtn vbtn-ghost">Cerrar</button>';
+    if (c.estado === 'enviando') btns += `<button onclick="accionCampana(${id},'pausar');closeModal('modal-progreso')" class="vbtn" style="background:#b45309;color:#fff;border:none">⏸️ Pausar</button>`;
+    if (c.estado === 'pausada')  btns += `<button onclick="accionCampana(${id},'iniciar');closeModal('modal-progreso')" class="vbtn vbtn-primary">▶️ Reanudar</button>`;
+    if (['completada','cancelada'].includes(c.estado)) clearInterval(_progresoInterval);
+    acciones.innerHTML = btns;
+  } catch(e) {}
+}
+
+// Cerrar polling al cerrar modal
+document.getElementById('modal-progreso').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-progreso') clearInterval(_progresoInterval);
+});
+
+function abrirModalNueva() {
+  document.getElementById('campana-titulo').textContent = '📢 Nueva campaña';
+  document.getElementById('c-nombre').value    = '';
+  document.getElementById('c-segmento').value  = 'todos';
+  document.getElementById('c-mensaje').value   = '';
+  document.getElementById('c-programada').value= '';
+  document.getElementById('c-preview').textContent = 'El preview aparecerá aquí…';
+  document.getElementById('segmento-especie').style.display = 'none';
+  openModal('modal-campana');
+}
+
+function onSegmentoChange() {
+  const val = document.getElementById('c-segmento').value;
+  document.getElementById('segmento-especie').style.display = val === 'por_especie' ? 'block' : 'none';
+}
+
+function actualizarPreviewCampana() {
+  const msg = document.getElementById('c-mensaje').value;
+  const preview = msg.replace(/\[nombre\]/gi,'Juan García').replace(/\[mascota\]/gi,'Max').replace(/\[clinica\]/gi,'VetClinic');
+  document.getElementById('c-preview').textContent = preview || 'El preview aparecerá aquí…';
+}
+
+function insertarVarC(variable) {
+  const ta  = document.getElementById('c-mensaje');
+  const pos = ta.selectionStart;
+  ta.value  = ta.value.substring(0, pos) + variable + ta.value.substring(pos);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = pos + variable.length;
+  actualizarPreviewCampana();
+}
+
+async function cargarPlantillasCampana() {
+  try {
+    const res  = await api('/wa/plantillas');
+    const rows = (await res.json()).data || [];
+    const sel  = document.getElementById('c-plantilla');
+    sel.innerHTML = '<option value="">Usar plantilla…</option>' +
+      rows.map(p => `<option value="${esc(p.contenido)}">${esc(p.nombre)}</option>`).join('');
+  } catch(e) {}
+}
+
+function aplicarPlantillaCampana() {
+  const val = document.getElementById('c-plantilla').value;
+  if (!val) return;
+  document.getElementById('c-mensaje').value = val;
+  actualizarPreviewCampana();
+}
+
+async function guardarCampana(iniciar) {
+  const nombre  = document.getElementById('c-nombre').value.trim();
+  const mensaje = document.getElementById('c-mensaje').value.trim();
+  if (!nombre || !mensaje) { toast('Nombre y mensaje son obligatorios.', 'warning'); return; }
+
+  const segmento       = document.getElementById('c-segmento').value;
+  const segmento_valor = segmento === 'por_especie' ? document.getElementById('c-especie').value : null;
+  const programada_at  = document.getElementById('c-programada').value || null;
+
+  try {
+    const res  = await api('/wa/campanas', {
+      method: 'POST',
+      body  : { nombre, mensaje, segmento, segmento_valor, programada_at },
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+
+    if (iniciar && !programada_at) {
+      await api(`/wa/campanas/${data.data.id}/iniciar`, { method: 'POST' });
+    }
+
+    toast(`✅ Campaña ${iniciar ? 'iniciada' : 'guardada'}`, 'success');
+    closeModal('modal-campana');
+    cargar();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+</script>
+</body>
+</html>
