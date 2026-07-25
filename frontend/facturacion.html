@@ -415,7 +415,7 @@ function badgeSUNAT(f) {
   if (f.sunat_estado === 'anulado_sunat') {
     return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado SUNAT</span>';
   }
-  return `<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" title="${esc(f.sunat_mensaje||'')}">❌ Error</span>`;
+  return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
 }
 
 async function emitirSUNAT(facturaId, numero) {
@@ -682,9 +682,14 @@ async function cargarFacturas() {
         ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
       </td>
       <td>
+      <td>${badgeSUNAT(f)}</td>
+      <td>
         <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
           <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
           ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
+          ${_feActivo && f.estado==='pagado' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
+          ${_feActivo && f.sunat_estado && f.sunat_estado!=='0' && f.sunat_estado!=='anulado_sunat'?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#6366f1">🔄 Reintentar</button>`:''}
+          ${f.estado!=='anulado'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)})" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -1327,24 +1332,7 @@ function descargarPDF() {
   </head><body>
     ${contenido}
     <br/><div style="text-align:center"><button onclick="window.print()" style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
-  
-<!-- ══ Modal Resultado SUNAT ══════════════════════════════════════ -->
-<div id="modal-sunat" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:480px">
-    <div class="vmodal-head">
-      <h3 id="sunat-modal-titulo">⚡ Resultado SUNAT</h3>
-      <button onclick="closeModal('modal-sunat')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body" id="sunat-modal-body" style="display:flex;flex-direction:column;gap:1rem">
-      <div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT…</p></div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
-      <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
-    </div>
-  </div>
-</div>
-</body></html>`);
+  </body></html>`);
   ventana.document.close();
   setTimeout(()=>ventana.print(),800);
 }
@@ -1442,22 +1430,5 @@ async function confirmarPago() {
   } catch { toast('Error de conexión.', 'danger'); }
 }
 </script>
-
-<!-- ══ Modal Resultado SUNAT ══════════════════════════════════════ -->
-<div id="modal-sunat" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:480px">
-    <div class="vmodal-head">
-      <h3 id="sunat-modal-titulo">⚡ Resultado SUNAT</h3>
-      <button onclick="closeModal('modal-sunat')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body" id="sunat-modal-body" style="display:flex;flex-direction:column;gap:1rem">
-      <div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT…</p></div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
-      <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
-    </div>
-  </div>
-</div>
 </body>
 </html>
