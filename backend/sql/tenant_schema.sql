@@ -200,6 +200,8 @@ CREATE TABLE IF NOT EXISTS empresa_config (
   fe_serie_boleta    VARCHAR(4)    NOT NULL DEFAULT 'B001',
   fe_serie_factura   VARCHAR(4)    NOT NULL DEFAULT 'F001',
   fe_serie_nota_cred VARCHAR(4)    NOT NULL DEFAULT 'BC01',
+  nubefact_ruta      VARCHAR(100)  NULL COMMENT 'UUID ruta Nubefact',
+  nubefact_token     TEXT          NULL COMMENT 'Token Nubefact encriptado AES-256',
   updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

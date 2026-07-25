@@ -1,35 +1,30 @@
 'use strict';
 
-const { Router }    = require('express');
+const { Router }      = require('express');
 const { masterQuery } = require('../config/masterDB');
-const { encrypt, decrypt, encryptIfNeeded } = require('../services/crypto.service');
-const mysql         = require('mysql2/promise');
-const router        = Router();
+const { encryptIfNeeded } = require('../services/crypto.service');
+const mysql           = require('mysql2/promise');
+const router          = Router();
 
-// Helper — conectar a la BD de un tenant
 async function getTenantConn(tenantId) {
   const [t] = await masterQuery(
     'SELECT db_host, db_port, db_user, db_pass, db_name FROM tenants WHERE id=?',
     [tenantId]
   );
   if (!t) throw Object.assign(new Error('Tenant no encontrado.'), { status: 404 });
-  const conn = await mysql.createConnection({
-    host    : t.db_host,
-    port    : t.db_port || 3306,
-    user    : t.db_user,
-    password: t.db_pass,
-    database: t.db_name,
+  return mysql.createConnection({
+    host: t.db_host, port: t.db_port || 3306,
+    user: t.db_user, password: t.db_pass, database: t.db_name,
   });
-  return conn;
 }
 
-// ── GET /admin/api/fe/resumen — todos los tenants con FE ──────────
+// ── GET /admin/api/fe/resumen ─────────────────────────────────────
 router.get('/resumen', async (req, res) => {
   try {
     const tenants = await masterQuery(
       `SELECT t.id, t.slug, t.subdominio, t.activo,
               tc.nombre_clinica,
-              tpf.docs_incluidos, tpf.docs_usados, tpf.mes_actual, tpf.precio_extra,
+              tpf.docs_incluidos, tpf.docs_usados, tpf.mes_actual,
               tde.total_mes, tde.aceptados_mes
        FROM tenants t
        LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
@@ -48,31 +43,27 @@ router.get('/resumen', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── GET /admin/api/fe/:tenant_id/config ───────────────────────────
+// ── GET /admin/api/fe/:tenant_id/config ──────────────────────────
 router.get('/:tenant_id/config', async (req, res) => {
   let conn;
   try {
     conn = await getTenantConn(req.params.tenant_id);
     const [[cfg]] = await conn.execute('SELECT * FROM empresa_config LIMIT 1');
     if (!cfg) return res.status(404).json({ success: false, message: 'Config no encontrada.' });
-
-    // No devolver credenciales — solo indicar si están configuradas
     return res.json({
       success: true,
       data: {
-        sunat_activo      : !!cfg.sunat_activo,
-        sunat_modo        : cfg.sunat_modo || 'beta',
-        ose_proveedor     : cfg.ose_proveedor || 'nubefact',
-        ubigeo            : cfg.ubigeo || null,
-        fe_serie_boleta   : cfg.fe_serie_boleta || 'B001',
-        fe_serie_factura  : cfg.fe_serie_factura || 'F001',
-        fe_serie_nota_cred: cfg.fe_serie_nota_cred || 'BC01',
-        ruc               : cfg.ruc || null,
-        razon_social      : cfg.razon_social || null,
-        nombre            : cfg.nombre || null,
-        tiene_api_key     : !!cfg.ose_api_key,
-        tiene_usuario_sol : !!cfg.sunat_usuario_sol,
-        tiene_clave_sol   : !!cfg.sunat_clave_sol,
+        sunat_activo       : !!cfg.sunat_activo,
+        sunat_modo         : cfg.sunat_modo || 'beta',
+        ubigeo             : cfg.ubigeo || null,
+        fe_serie_boleta    : cfg.fe_serie_boleta  || 'B001',
+        fe_serie_factura   : cfg.fe_serie_factura || 'F001',
+        fe_serie_nota_cred : cfg.fe_serie_nota_cred || 'BC01',
+        ruc                : cfg.ruc || null,
+        razon_social       : cfg.razon_social || null,
+        nombre             : cfg.nombre || null,
+        tiene_ruta         : !!cfg.nubefact_ruta,
+        tiene_token        : !!cfg.nubefact_token,
       },
     });
   } catch (err) {
@@ -80,41 +71,36 @@ router.get('/:tenant_id/config', async (req, res) => {
   } finally { await conn?.end(); }
 });
 
-// ── PUT /admin/api/fe/:tenant_id/config ───────────────────────────
+// ── PUT /admin/api/fe/:tenant_id/config ──────────────────────────
 router.put('/:tenant_id/config', async (req, res) => {
   let conn;
   try {
     const {
-      sunat_activo, sunat_modo, ose_proveedor,
-      ose_api_key, sunat_usuario_sol, sunat_clave_sol,
+      sunat_activo, sunat_modo,
+      nubefact_ruta, nubefact_token,
       ubigeo, fe_serie_boleta, fe_serie_factura, fe_serie_nota_cred,
     } = req.body;
 
     conn = await getTenantConn(req.params.tenant_id);
 
     const updates = {};
-    if (sunat_activo !== undefined) updates.sunat_activo = sunat_activo ? 1 : 0;
-    if (sunat_modo)        updates.sunat_modo         = sunat_modo;
-    if (ose_proveedor)     updates.ose_proveedor      = ose_proveedor;
-    if (ubigeo)            updates.ubigeo             = ubigeo;
-    if (fe_serie_boleta)   updates.fe_serie_boleta    = fe_serie_boleta;
-    if (fe_serie_factura)  updates.fe_serie_factura   = fe_serie_factura;
-    if (fe_serie_nota_cred) updates.fe_serie_nota_cred = fe_serie_nota_cred;
+    if (sunat_activo !== undefined) updates.sunat_activo      = sunat_activo ? 1 : 0;
+    if (sunat_modo)                 updates.sunat_modo        = sunat_modo;
+    if (ubigeo)                     updates.ubigeo            = ubigeo;
+    if (fe_serie_boleta)            updates.fe_serie_boleta   = fe_serie_boleta;
+    if (fe_serie_factura)           updates.fe_serie_factura  = fe_serie_factura;
+    if (fe_serie_nota_cred)         updates.fe_serie_nota_cred= fe_serie_nota_cred;
 
-    // Encriptar credenciales
-    if (ose_api_key)       updates.ose_api_key       = encryptIfNeeded(ose_api_key);
-    if (sunat_usuario_sol) updates.sunat_usuario_sol = encryptIfNeeded(sunat_usuario_sol);
-    if (sunat_clave_sol)   updates.sunat_clave_sol   = encryptIfNeeded(sunat_clave_sol);
+    // Encriptar credenciales Nubefact
+    if (nubefact_ruta)  updates.nubefact_ruta  = encryptIfNeeded(nubefact_ruta);
+    if (nubefact_token) updates.nubefact_token = encryptIfNeeded(nubefact_token);
 
     if (!Object.keys(updates).length) {
       return res.status(422).json({ success: false, message: 'Sin cambios.' });
     }
 
     const setCols = Object.keys(updates).map(k => `${k}=?`).join(',');
-    await conn.execute(
-      `UPDATE empresa_config SET ${setCols} WHERE id=1`,
-      Object.values(updates)
-    );
+    await conn.execute(`UPDATE empresa_config SET ${setCols} WHERE id=1`, Object.values(updates));
 
     return res.json({ success: true, message: 'Configuración FE guardada.' });
   } catch (err) {
@@ -122,20 +108,17 @@ router.put('/:tenant_id/config', async (req, res) => {
   } finally { await conn?.end(); }
 });
 
-// ── POST /admin/api/fe/:tenant_id/activar ─────────────────────────
+// ── POST /admin/api/fe/:tenant_id/activar ────────────────────────
 router.post('/:tenant_id/activar', async (req, res) => {
   let conn;
   try {
     conn = await getTenantConn(req.params.tenant_id);
     const [[cfg]] = await conn.execute(
-      'SELECT ose_api_key, ruc, sunat_activo FROM empresa_config LIMIT 1'
+      'SELECT nubefact_ruta, nubefact_token, ruc FROM empresa_config LIMIT 1'
     );
-    if (!cfg?.ose_api_key) {
-      return res.status(422).json({ success: false, message: 'Configura la API key de Nubefact antes de activar.' });
-    }
-    if (!cfg?.ruc) {
-      return res.status(422).json({ success: false, message: 'Configura el RUC de la empresa antes de activar.' });
-    }
+    if (!cfg?.nubefact_ruta)  return res.status(422).json({ success: false, message: 'Configura la Ruta de Nubefact antes de activar.' });
+    if (!cfg?.nubefact_token) return res.status(422).json({ success: false, message: 'Configura el Token de Nubefact antes de activar.' });
+    if (!cfg?.ruc)            return res.status(422).json({ success: false, message: 'Configura el RUC de la empresa antes de activar.' });
     await conn.execute('UPDATE empresa_config SET sunat_activo=1 WHERE id=1');
     return res.json({ success: true, message: 'Facturación electrónica activada.' });
   } catch (err) {
@@ -143,7 +126,7 @@ router.post('/:tenant_id/activar', async (req, res) => {
   } finally { await conn?.end(); }
 });
 
-// ── POST /admin/api/fe/:tenant_id/desactivar ──────────────────────
+// ── POST /admin/api/fe/:tenant_id/desactivar ─────────────────────
 router.post('/:tenant_id/desactivar', async (req, res) => {
   let conn;
   try {
@@ -155,65 +138,48 @@ router.post('/:tenant_id/desactivar', async (req, res) => {
   } finally { await conn?.end(); }
 });
 
-// ── GET /admin/api/fe/:tenant_id/stats ────────────────────────────
+// ── GET /admin/api/fe/:tenant_id/stats ───────────────────────────
 router.get('/:tenant_id/stats', async (req, res) => {
   try {
-    const mes = new Date().toISOString().slice(0, 7);
-
+    const mes   = new Date().toISOString().slice(0, 7);
     const stats = await masterQuery(
-      `SELECT
-         COUNT(*) AS total,
+      `SELECT COUNT(*) AS total,
          SUM(CASE WHEN sunat_estado='0' THEN 1 ELSE 0 END) AS aceptados,
          SUM(CASE WHEN sunat_estado='anulado_sunat' THEN 1 ELSE 0 END) AS anulados,
-         SUM(CASE WHEN sunat_estado IS NOT NULL AND sunat_estado != '0' AND sunat_estado != 'anulado_sunat' THEN 1 ELSE 0 END) AS con_error,
-         SUM(CASE WHEN sunat_estado='0' THEN monto ELSE 0 END) AS monto_aceptado
+         SUM(CASE WHEN sunat_estado IS NOT NULL AND sunat_estado!='0' AND sunat_estado!='anulado_sunat' THEN 1 ELSE 0 END) AS con_error
        FROM tenant_documentos_emitidos
        WHERE tenant_id=? AND fecha LIKE ?`,
       [req.params.tenant_id, `${mes}%`]
     );
-
     const plan = await masterQuery(
       'SELECT * FROM tenant_plan_fe WHERE tenant_id=?',
       [req.params.tenant_id]
     );
-
     const historial = await masterQuery(
-      `SELECT tipo, numero, fecha, monto, sunat_estado, created_at
+      `SELECT tipo, numero, fecha, monto, sunat_estado
        FROM tenant_documentos_emitidos
-       WHERE tenant_id=?
-       ORDER BY created_at DESC LIMIT 20`,
+       WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20`,
       [req.params.tenant_id]
     );
-
-    return res.json({
-      success: true,
-      data: {
-        stats   : stats[0] || {},
-        plan    : plan[0]  || {},
-        historial,
-      },
-    });
+    return res.json({ success: true, data: { stats: stats[0] || {}, plan: plan[0] || {}, historial } });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// ── PUT /admin/api/fe/:tenant_id/plan ─────────────────────────────
+// ── PUT /admin/api/fe/:tenant_id/plan ────────────────────────────
 router.put('/:tenant_id/plan', async (req, res) => {
   try {
     const { docs_incluidos, precio_extra } = req.body;
     await masterQuery(
       `INSERT INTO tenant_plan_fe (tenant_id, docs_incluidos, precio_extra)
        VALUES (?,?,?)
-       ON DUPLICATE KEY UPDATE
-         docs_incluidos=VALUES(docs_incluidos),
-         precio_extra=VALUES(precio_extra)`,
+       ON DUPLICATE KEY UPDATE docs_incluidos=VALUES(docs_incluidos), precio_extra=VALUES(precio_extra)`,
       [req.params.tenant_id, docs_incluidos || 50, precio_extra || 0.05]
     );
     return res.json({ success: true, message: 'Plan FE actualizado.' });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-
-// ── WA Config por tenant (admin) ──────────────────────────────
+// ── WA Config por tenant ──────────────────────────────────────────
 router.get('/:tenant_id/wa/config', async (req, res) => {
   try {
     const [cfg] = await masterQuery(
@@ -233,11 +199,6 @@ router.put('/:tenant_id/wa/config', async (req, res) => {
        ON DUPLICATE KEY UPDATE activo=VALUES(activo), ilimitado=VALUES(ilimitado), msgs_incluidos=VALUES(msgs_incluidos)`,
       [req.params.tenant_id, activo?1:0, ilimitado?1:0, msgs_incluidos||100]
     );
-    // Actualizar wa_sesiones si existe
-    await masterQuery(
-      'INSERT IGNORE INTO wa_sesiones (tenant_id) VALUES (?)',
-      [req.params.tenant_id]
-    ).catch(()=>{});
     return res.json({ success:true, message:'Config WA guardada.' });
   } catch(err) { res.status(500).json({ success:false, message:err.message }); }
 });

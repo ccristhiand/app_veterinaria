@@ -8,7 +8,7 @@
 const { Router }  = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
-const { encrypt, encryptIfNeeded } = require('../services/crypto.service');
+const { encryptIfNeeded } = require('../services/crypto.service');
 const { emitirComprobante, anularComprobante } = require('../services/nubefact.service');
 const { generarPayload, generarPayloadNotaCredito, generarPayloadBaja } = require('../services/sunat.service');
 const { masterQuery } = require('../config/masterDB');
@@ -19,9 +19,10 @@ router.use(authenticate);
 // ── Helpers ───────────────────────────────────────────────────────
 async function getConfigFE(db) {
   const [cfg] = await db.query('SELECT * FROM empresa_config LIMIT 1');
-  if (!cfg?.sunat_activo) throw Object.assign(new Error('Facturación electrónica no activada.'), { status: 422 });
-  if (!cfg.ose_api_key)   throw Object.assign(new Error('API key de Nubefact no configurada.'), { status: 422 });
-  if (!cfg.ruc)           throw Object.assign(new Error('RUC de la empresa no configurado.'), { status: 422 });
+  if (!cfg?.sunat_activo)    throw Object.assign(new Error('Facturación electrónica no activada.'), { status: 422 });
+  if (!cfg.nubefact_ruta)    throw Object.assign(new Error('Ruta de Nubefact no configurada. Configura desde el panel admin.'), { status: 422 });
+  if (!cfg.nubefact_token)   throw Object.assign(new Error('Token de Nubefact no configurado. Configura desde el panel admin.'), { status: 422 });
+  if (!cfg.ruc)              throw Object.assign(new Error('RUC de la empresa no configurado.'), { status: 422 });
   return cfg;
 }
 
@@ -64,9 +65,8 @@ router.get('/config', async (req, res, next) => {
         ubigeo           : cfg?.ubigeo || null,
         fe_serie_boleta  : cfg?.fe_serie_boleta || 'B001',
         fe_serie_factura : cfg?.fe_serie_factura || 'F001',
-        tiene_api_key    : !!cfg?.ose_api_key,
-        tiene_usuario_sol: !!cfg?.sunat_usuario_sol,
-        tiene_clave_sol  : !!cfg?.sunat_clave_sol,
+        tiene_ruta  : !!cfg?.nubefact_ruta,
+        tiene_token : !!cfg?.nubefact_token,
       },
     });
   } catch (err) { next(err); }
@@ -97,12 +97,9 @@ router.put('/config', authorize('admin'), async (req, res, next) => {
       fe_serie_nota_cred: fe_serie_nota_cred || 'BC01',
     };
 
-    if (ruc)            updates.ruc = ruc;
-    if (razon_social)   updates.razon_social = razon_social;
-    if (ubigeo)         updates.ubigeo = ubigeo;
-    if (ose_api_key)    updates.ose_api_key = encryptIfNeeded(ose_api_key);
-    if (sunat_usuario_sol) updates.sunat_usuario_sol = encryptIfNeeded(sunat_usuario_sol);
-    if (sunat_clave_sol)   updates.sunat_clave_sol   = encryptIfNeeded(sunat_clave_sol);
+    if (ruc)          updates.ruc          = ruc;
+    if (razon_social) updates.razon_social = razon_social;
+    if (ubigeo)       updates.ubigeo       = ubigeo;
 
     const setCols = Object.keys(updates).map(k => `${k}=?`).join(',');
     const vals    = [...Object.values(updates), 1];
