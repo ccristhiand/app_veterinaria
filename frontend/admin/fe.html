@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FE SUNAT — VetClinic SaaS Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    .main{margin-left:240px;padding:2rem;min-height:100vh}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:#0f172a;color:#e2e8f0}
+    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    table{width:100%;border-collapse:collapse}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
+    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.83rem;vertical-align:middle}
+    tr:hover td{background:#0f172a50}
+    input,select,textarea{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
+    input:focus,select:focus{border-color:#6366f1}
+    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
+    .btn-primary:hover{opacity:.88}
+    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
+    .btn-green{background:linear-gradient(135deg,#166534,#15803d);color:#fff;border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .btn-red{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b;z-index:1}
+    .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#1e293b}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+    .section-title{font-size:.65rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.12em;padding:.5rem 0;border-bottom:1px solid #334155;margin-bottom:.75rem}
+    .hidden{display:none!important}
+    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .badge-activo{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
+    .badge-inactivo{background:#1e293b;color:#475569;border:1px solid #334155;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
+    .badge-beta{background:#431407;color:#fb923c;border:1px solid #9a3412;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-prod{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
+    .stat-val{font-size:1.6rem;font-weight:800;color:#f1f5f9;margin-top:.25rem}
+    .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%)}
+      .sidebar.open{transform:translateX(0)}
+      .main{margin-left:0;padding:1rem}
+      .grid2,.grid3{grid-template-columns:1fr!important}
+      .hide-mobile{display:none!important}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div style="padding:1.25rem 1.2rem;border-bottom:1px solid #334155;display:flex;align-items:center;gap:.75rem">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🐾</div>
+    <div style="flex:1"><p style="font-weight:800;font-size:.92rem;color:#f1f5f9">VetClinic</p><p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.12em">SaaS Admin</p></div>
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.1rem;display:none" id="btn-close-sb">✕</button>
+  </div>
+  <nav style="padding:.75rem;flex:1">
+    <a href="index.html"    class="nav-item">📊 Dashboard</a>
+    <a href="clinicas.html" class="nav-item">🏥 Clínicas</a>
+    <a href="logs.html"     class="nav-item">📋 Logs de auditoría</a>
+    <a href="backup.html"   class="nav-item">💾 Backups</a>
+    <a href="fe.html"       class="nav-item active">⚡ Facturación Electrónica</a>
+  </nav>
+  <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
+    <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center" id="admin-avatar">A</div>
+      <div><p style="font-size:.82rem;font-weight:700;color:#f1f5f9" id="admin-nombre">Admin</p><p style="font-size:.65rem;color:#475569">Super Admin</p></div>
+    </div>
+    <button onclick="cerrarSesion()" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:.5rem;border-radius:.65rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600">🚪 Cerrar sesión</button>
+  </div>
+</aside>
+
+<div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
+
+<main class="main">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+      <div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">⚡ Facturación Electrónica</h1>
+        <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Configuración SUNAT — Nubefact OSE — por clínica</p>
+      </div>
+    </div>
+    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+  </div>
+
+  <!-- Stats globales -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem" class="grid-stats">
+    <div class="stat-box">
+      <div class="stat-lbl">Clínicas con FE</div>
+      <div class="stat-val" id="stat-fe-activas">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-lbl">Docs emitidos mes</div>
+      <div class="stat-val" style="color:#4ade80" id="stat-docs-mes">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-lbl">Aceptados SUNAT</div>
+      <div class="stat-val" style="color:#4ade80" id="stat-aceptados">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-lbl">Con errores</div>
+      <div class="stat-val" style="color:#f87171" id="stat-errores">—</div>
+    </div>
+  </div>
+
+  <!-- Tabla de clínicas -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado FE por clínica</h2>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Clínica</th>
+            <th>FE Estado</th>
+            <th>Modo</th>
+            <th class="hide-mobile">Docs mes</th>
+            <th class="hide-mobile">Incluidos plan</th>
+            <th class="hide-mobile">Credenciales</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-fe">
+          <tr><td colspan="7" style="text-align:center;padding:2.5rem;color:#475569">
+            <div class="spinner" style="margin:0 auto"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal Config FE -->
+<div id="modal-fe" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 style="font-weight:700;color:#f1f5f9" id="fe-modal-titulo">⚡ Config FE</h3>
+        <p style="font-size:.72rem;color:#475569;margin-top:.15rem" id="fe-modal-sub">Clínica</p>
+      </div>
+      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="fe-tenant-id"/>
+
+      <!-- Estado actual -->
+      <div id="fe-estado-actual" style="padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#0f172a;border:1px solid #334155"></div>
+
+      <!-- Stats del mes -->
+      <div class="grid3" id="fe-stats-grid" style="display:none">
+        <div class="stat-box"><div class="stat-lbl">Emitidos</div><div class="stat-val" id="fe-stat-total" style="font-size:1.2rem">0</div></div>
+        <div class="stat-box"><div class="stat-lbl" style="color:#4ade80">Aceptados</div><div class="stat-val" id="fe-stat-ok" style="font-size:1.2rem;color:#4ade80">0</div></div>
+        <div class="stat-box"><div class="stat-lbl" style="color:#f87171">Errores</div><div class="stat-val" id="fe-stat-err" style="font-size:1.2rem;color:#f87171">0</div></div>
+      </div>
+
+      <!-- Modo -->
+      <div>
+        <p class="section-title">⚙️ Configuración general</p>
+        <label style="margin-bottom:.5rem">Modo de operación</label>
+        <div style="display:flex;gap:.75rem;margin-bottom:.75rem">
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid #334155;border-radius:.8rem;color:#94a3b8">
+            <input type="radio" name="fe-modo" id="fe-modo-beta" value="beta" style="accent-color:#fb923c"/> 🧪 Beta
+          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid #334155;border-radius:.8rem;color:#94a3b8">
+            <input type="radio" name="fe-modo" id="fe-modo-prod" value="produccion" style="accent-color:#4ade80"/> 🚀 Producción
+          </label>
+        </div>
+        <p style="font-size:.68rem;color:#fb923c;background:#431407;padding:.5rem .75rem;border-radius:.6rem">⚠️ Beta: los docs van a Nubefact pero NO a SUNAT real. Usar para pruebas.</p>
+      </div>
+
+      <!-- Series y ubigeo -->
+      <div class="grid2">
+        <div>
+          <label>Ubigeo (6 dígitos)</label>
+          <input id="fe-ubigeo" type="text" maxlength="6" placeholder="150101"/>
+          <p style="font-size:.65rem;color:#475569;margin-top:.25rem">Lima: 150101 · Miraflores: 150122</p>
+        </div>
+        <div>
+          <label>Serie Nota de Crédito</label>
+          <input id="fe-serie-nc" type="text" placeholder="BC01"/>
+        </div>
+      </div>
+
+      <!-- Credenciales Nubefact -->
+      <div style="background:#1a1a2e;border:1px solid #431407;border-radius:.85rem;padding:1.1rem">
+        <p class="section-title" style="color:#fb923c;border-color:#431407">🔑 Credenciales Nubefact</p>
+        <div style="display:flex;flex-direction:column;gap:.85rem">
+          <div>
+            <label>API Key de Nubefact</label>
+            <input id="fe-api-key" type="password" placeholder="Dejar vacío para no cambiar"/>
+            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">Panel Nubefact → Mi cuenta → API token</p>
+          </div>
+          <div class="grid2">
+            <div>
+              <label>Usuario SOL</label>
+              <input id="fe-usuario-sol" type="text" placeholder="RUC + usuario SOL"/>
+            </div>
+            <div>
+              <label>Clave SOL</label>
+              <input id="fe-clave-sol" type="password" placeholder="Dejar vacío para no cambiar"/>
+            </div>
+          </div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
+          🔒 Las credenciales se encriptan con AES-256-GCM. Nunca se almacenan en texto plano ni se devuelven al frontend.
+        </div>
+      </div>
+
+      <!-- Plan FE -->
+      <div>
+        <p class="section-title">📊 Plan de documentos</p>
+        <div class="grid2">
+          <div>
+            <label>Docs incluidos / mes</label>
+            <input id="fe-docs-incluidos" type="number" min="1" placeholder="50"/>
+          </div>
+          <div>
+            <label>Precio doc extra (S/.)</label>
+            <input id="fe-precio-extra" type="number" step="0.01" min="0" placeholder="0.05"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Últimos documentos -->
+      <div id="fe-historial-wrap" style="display:none">
+        <p class="section-title">📋 Últimos documentos emitidos</p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Tipo</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="fe-historial-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot" style="flex-wrap:wrap;gap:.5rem">
+      <button onclick="cerrarModal()" class="btn-ghost">Cancelar</button>
+      <button onclick="toggleActivarFE()" id="btn-toggle-fe" class="btn-green">✅ Activar FE</button>
+      <button onclick="guardarConfigFE()" class="btn-primary">💾 Guardar configuración</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin_shared.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.href = 'login.html';
+
+  const admin = getAdmin();
+  if (admin) {
+    document.getElementById('admin-nombre').textContent = admin.nombre || admin.email;
+    document.getElementById('admin-avatar').textContent = (admin.nombre||'A').charAt(0).toUpperCase();
+  }
+
+  function toggleSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('sidebar-overlay');
+    const btn = document.getElementById('btn-close-sb');
+    const open = sb.classList.toggle('open');
+    ov.style.display  = open ? 'block' : 'none';
+    btn.style.display = open ? 'block' : 'none';
+  }
+  if (window.innerWidth <= 768) document.getElementById('btn-menu').style.display = 'block';
+
+  let _tenantActual = null;
+  let _feActualConfig = null;
+
+  // ── Cargar resumen ─────────────────────────────────────────────
+  async function cargar() {
+    const tbody = document.getElementById('tbody-fe');
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">
+      <div class="spinner" style="margin:0 auto"></div></td></tr>`;
+
+    try {
+      const res  = await adminFetch('/fe/resumen');
+      if (!res?.ok) return;
+      const rows = (await res.json()).data || [];
+
+      // Stats globales
+      const feActivas   = rows.filter(r => r.sunat_activo).length;
+      const totalDocs   = rows.reduce((a,r) => a + (parseInt(r.total_mes)||0), 0);
+      const aceptados   = rows.reduce((a,r) => a + (parseInt(r.aceptados_mes)||0), 0);
+
+      document.getElementById('stat-fe-activas').textContent = feActivas;
+      document.getElementById('stat-docs-mes').textContent   = totalDocs;
+      document.getElementById('stat-aceptados').textContent  = aceptados;
+      document.getElementById('stat-errores').textContent    = totalDocs - aceptados;
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(t => {
+        const docsUsados   = parseInt(t.docs_usados)   || 0;
+        const docsIncluidos= parseInt(t.docs_incluidos) || 50;
+        const pct          = Math.min((docsUsados / docsIncluidos) * 100, 100);
+        const colorBarra   = pct > 80 ? '#f87171' : pct > 60 ? '#fb923c' : '#4ade80';
+
+        return `<tr>
+          <td>
+            <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
+            <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
+          </td>
+          <td>
+            ${t.sunat_activo
+              ? '<span class="badge-activo">✅ Activa</span>'
+              : '<span class="badge-inactivo">⏸️ Inactiva</span>'}
+          </td>
+          <td>
+            ${t.sunat_modo === 'produccion'
+              ? '<span class="badge-prod">🚀 Producción</span>'
+              : t.sunat_activo
+                ? '<span class="badge-beta">🧪 Beta</span>'
+                : '<span style="color:#334155;font-size:.65rem">—</span>'}
+          </td>
+          <td class="hide-mobile">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.2rem">
+                <span style="color:#94a3b8">${docsUsados} / ${docsIncluidos}</span>
+                <span style="color:${colorBarra};font-weight:700">${pct.toFixed(0)}%</span>
+              </div>
+              <div style="background:#334155;border-radius:999px;height:5px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:999px;transition:width .3s"></div>
+              </div>
+            </div>
+          </td>
+          <td class="hide-mobile" style="color:#94a3b8;font-size:.78rem">${docsIncluidos} docs/mes</td>
+          <td class="hide-mobile">
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              ${t.tiene_api_key !== false ? '<span style="font-size:.65rem;color:#4ade80">🔑 API</span>' : '<span style="font-size:.65rem;color:#f87171">⚠️ Sin API</span>'}
+            </div>
+          </td>
+          <td>
+            <button onclick="abrirConfig(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
+              class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
+              ⚙️ Configurar
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+
+    } catch(e) {
+      console.error(e);
+      toast('Error al cargar datos FE.','error');
+    }
+  }
+
+  // ── Abrir modal config ─────────────────────────────────────────
+  async function abrirConfig(tenantId, nombre) {
+    _tenantActual   = tenantId;
+    _feActualConfig = null;
+
+    document.getElementById('fe-modal-titulo').textContent = `⚡ FE — ${nombre}`;
+    document.getElementById('fe-modal-sub').textContent    = 'Cargando configuración…';
+    document.getElementById('fe-estado-actual').innerHTML  = '<div class="spinner"></div>';
+    document.getElementById('fe-stats-grid').style.display = 'none';
+    document.getElementById('fe-historial-wrap').style.display = 'none';
+    document.getElementById('modal-fe').classList.remove('hidden');
+
+    try {
+      // Cargar config y stats en paralelo
+      const [resConfig, resStats] = await Promise.all([
+        adminFetch(`/fe/${tenantId}/config`),
+        adminFetch(`/fe/${tenantId}/stats`),
+      ]);
+
+      const cfg   = resConfig?.ok ? (await resConfig.json()).data  : null;
+      const stats = resStats?.ok  ? (await resStats.json()).data   : null;
+      _feActualConfig = cfg;
+
+      // Estado actual
+      const box = document.getElementById('fe-estado-actual');
+      if (cfg?.sunat_activo) {
+        box.style.background = '#052e16';
+        box.style.border     = '1px solid #166534';
+        box.innerHTML = `<span style="color:#4ade80;font-weight:700">✅ FE Activa</span>
+          <span style="color:#4ade80;font-size:.78rem;margin-left:.75rem">Modo: ${cfg.sunat_modo === 'produccion' ? '🚀 Producción' : '🧪 Beta'}</span>`;
+      } else {
+        box.style.background = '#0f172a';
+        box.style.border     = '1px solid #334155';
+        box.innerHTML = `<span style="color:#475569;font-weight:700">⏸️ FE Inactiva</span>`;
+      }
+
+      // Botón toggle
+      const btnToggle = document.getElementById('btn-toggle-fe');
+      if (cfg?.sunat_activo) {
+        btnToggle.textContent = '⏸️ Desactivar FE';
+        btnToggle.className   = 'btn-red';
+      } else {
+        btnToggle.textContent = '✅ Activar FE';
+        btnToggle.className   = 'btn-green';
+      }
+
+      // Llenar campos
+      document.getElementById('fe-ubigeo').value        = cfg?.ubigeo             || '';
+      document.getElementById('fe-serie-nc').value      = cfg?.fe_serie_nota_cred || 'BC01';
+      document.getElementById('fe-api-key').value       = '';
+      document.getElementById('fe-usuario-sol').value   = cfg?.tiene_usuario_sol ? '(configurado)' : '';
+      document.getElementById('fe-clave-sol').value     = '';
+      document.getElementById('fe-modo-beta').checked   = cfg?.sunat_modo !== 'produccion';
+      document.getElementById('fe-modo-prod').checked   = cfg?.sunat_modo === 'produccion';
+      document.getElementById('fe-modal-sub').textContent = cfg?.nombre || nombre;
+
+      // Stats
+      if (stats?.stats) {
+        document.getElementById('fe-stats-grid').style.display = 'grid';
+        document.getElementById('fe-stat-total').textContent   = stats.stats.total    || 0;
+        document.getElementById('fe-stat-ok').textContent      = stats.stats.aceptados || 0;
+        document.getElementById('fe-stat-err').textContent     = stats.stats.con_error || 0;
+        document.getElementById('fe-docs-incluidos').value     = stats.plan?.docs_incluidos || 50;
+        document.getElementById('fe-precio-extra').value       = stats.plan?.precio_extra   || 0.05;
+      }
+
+      // Historial
+      if (stats?.historial?.length) {
+        document.getElementById('fe-historial-wrap').style.display = 'block';
+        document.getElementById('fe-historial-tbody').innerHTML = stats.historial.map(h => {
+          const badge = h.sunat_estado === '0'
+            ? '<span class="badge-activo">✅</span>'
+            : h.sunat_estado === 'anulado_sunat'
+              ? '<span style="font-size:.65rem;color:#f87171">❌ Anulado</span>'
+              : `<span style="font-size:.65rem;color:#f87171">❌ ${esc(h.sunat_estado||'Error')}</span>`;
+          return `<tr>
+            <td style="font-family:monospace;font-size:.75rem">${esc(h.numero)}</td>
+            <td style="font-size:.75rem">${esc(h.tipo)}</td>
+            <td style="font-size:.75rem">${new Date(h.fecha).toLocaleDateString('es-PE')}</td>
+            <td style="font-size:.75rem">S/. ${parseFloat(h.monto).toFixed(2)}</td>
+            <td>${badge}</td>
+          </tr>`;
+        }).join('');
+      }
+
+    } catch(e) {
+      console.error(e);
+      toast('Error al cargar config FE.','error');
+    }
+  }
+
+  // ── Guardar config ─────────────────────────────────────────────
+  async function guardarConfigFE() {
+    const modo    = document.querySelector('input[name="fe-modo"]:checked')?.value || 'beta';
+    const apiKey  = document.getElementById('fe-api-key').value.trim();
+    const usuSol  = document.getElementById('fe-usuario-sol').value.trim();
+    const clavSol = document.getElementById('fe-clave-sol').value.trim();
+
+    const body = {
+      sunat_modo        : modo,
+      ubigeo            : document.getElementById('fe-ubigeo').value.trim()   || null,
+      fe_serie_nota_cred: document.getElementById('fe-serie-nc').value.trim() || 'BC01',
+    };
+
+    // Solo enviar credenciales si se llenaron
+    if (apiKey && apiKey !== '(configurado)')  body.ose_api_key       = apiKey;
+    if (usuSol && usuSol !== '(configurado)')  body.sunat_usuario_sol = usuSol;
+    if (clavSol) body.sunat_clave_sol = clavSol;
+
+    // Guardar config FE
+    const res  = await adminFetch(`/fe/${_tenantActual}/config`, { method:'PUT', body });
+    const data = await res.json();
+    if (!res?.ok) { toast(data.message || 'Error al guardar.','error'); return; }
+
+    // Guardar plan si cambió
+    const docsInc    = parseInt(document.getElementById('fe-docs-incluidos').value) || 50;
+    const precioExtra= parseFloat(document.getElementById('fe-precio-extra').value) || 0.05;
+    await adminFetch(`/fe/${_tenantActual}/plan`, {
+      method: 'PUT',
+      body  : { docs_incluidos: docsInc, precio_extra: precioExtra },
+    });
+
+    toast('✅ Configuración FE guardada correctamente','success');
+    // Limpiar campos sensibles
+    document.getElementById('fe-api-key').value  = '';
+    document.getElementById('fe-clave-sol').value = '';
+    cargar();
+  }
+
+  // ── Activar / Desactivar FE ────────────────────────────────────
+  async function toggleActivarFE() {
+    const activo = _feActualConfig?.sunat_activo;
+    const endpoint = activo ? 'desactivar' : 'activar';
+    const res  = await adminFetch(`/fe/${_tenantActual}/${endpoint}`, { method:'POST' });
+    const data = await res.json();
+    if (!res?.ok) { toast(data.message || 'Error.','error'); return; }
+    toast(activo ? '⏸️ FE desactivada' : '✅ FE activada','success');
+    cerrarModal();
+    cargar();
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-fe').classList.add('hidden');
+    _tenantActual   = null;
+    _feActualConfig = null;
+  }
+
+  cargar();
+</script>
+</body>
+</html>
