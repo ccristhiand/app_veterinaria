@@ -403,6 +403,8 @@
 let empresa     = {};
 let _feActivo   = false;
 let _anularId   = null;
+let _esSUNAT    = false;
+let _userRol    = '';
 
 function badgeSUNAT(f) {
   if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
@@ -472,12 +474,31 @@ async function confirmarEmisionSUNAT() {
   }
 }
 
-function abrirAnular(id, numero, cliente, total) {
+function abrirAnular(id, numero, cliente, total, esSUNAT) {
   _anularId = id;
+  _esSUNAT  = !!esSUNAT;
   document.getElementById('anular-numero').textContent  = numero;
   document.getElementById('anular-cliente').textContent = cliente;
   document.getElementById('anular-total').textContent   = 'S/. ' + parseFloat(total).toFixed(2);
   document.getElementById('anular-motivo').value        = '';
+
+  const titulo   = document.getElementById('anular-modal-titulo');
+  const aviso    = document.getElementById('anular-aviso');
+  const btnConfirmar = document.getElementById('btn-confirmar-anular');
+
+  if (esSUNAT) {
+    titulo.textContent  = '📋 Nota de Crédito Electrónica';
+    aviso.innerHTML     = '<strong>⚠️ Este documento ya fue enviado a SUNAT.</strong> Se generará una Nota de Crédito electrónica para anularlo. Esta acción es irreversible.';
+    aviso.style.cssText = 'background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#6d28d9';
+    btnConfirmar.textContent = '📋 Generar Nota de Crédito';
+    btnConfirmar.style.background = '#6d28d9';
+  } else {
+    titulo.textContent  = '🚫 Anular Documento';
+    aviso.innerHTML     = '⚠️ Esta acción anulará el documento en el sistema. Solo es posible porque aún no fue enviado a SUNAT.';
+    aviso.style.cssText = 'background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309';
+    btnConfirmar.textContent = '🚫 Confirmar anulación';
+    btnConfirmar.style.background = '#be123c';
+  }
   openModal('modal-anular');
 }
 
@@ -485,19 +506,27 @@ async function confirmarAnulacion() {
   const motivo = document.getElementById('anular-motivo').value.trim();
   if (!motivo) { toast('Ingresa el motivo de anulación.', 'warning'); return; }
   const btn = document.getElementById('btn-confirmar-anular');
-  btn.disabled = true; btn.textContent = 'Anulando…';
+  const textoOrig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Procesando…';
   try {
-    const res  = await api('/facturas/' + _anularId + '/anular', { method: 'PATCH', body: { observaciones: motivo } });
-    const data = await res.json();
+    let res, data;
+    if (_esSUNAT) {
+      // Documento emitido a SUNAT → Nota de Crédito / Baja
+      res  = await api('/fe/anular/' + _anularId, { method: 'POST', body: { motivo } });
+    } else {
+      // Documento NO emitido → solo anular en BD
+      res  = await api('/facturas/' + _anularId + '/anular', { method: 'PATCH', body: { observaciones: motivo } });
+    }
+    data = await res.json();
     if (res.ok) {
-      toast('✅ Documento anulado correctamente', 'success');
+      toast(_esSUNAT ? '✅ Nota de Crédito generada en SUNAT' : '✅ Documento anulado correctamente', 'success', 5000);
       closeModal('modal-anular');
       cargarFacturas(); cargarResumen();
     } else {
       toast(data.message || 'Error al anular.', 'danger');
     }
   } catch { toast('Error de conexión.', 'danger'); }
-  finally { btn.disabled = false; btn.textContent = '🚫 Confirmar anulación'; }
+  finally { btn.disabled = false; btn.textContent = textoOrig; }
 }
 let propFacSel  = null;
 let itemN       = 0;
@@ -532,6 +561,12 @@ initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y docu
       : '➕ Se sumará el IGV encima del precio ingresado';
     calcularTotales();
   });
+
+  // Cargar rol del usuario
+  try {
+    const u = getUser ? getUser() : null;
+    if (u) _userRol = u.rol || '';
+  } catch {}
 
   try {
     const resFe = await api('/fe/config');
@@ -724,7 +759,8 @@ async function cargarFacturas() {
           ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
           ${_feActivo && f.estado==='pagado' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
           ${_feActivo && f.sunat_estado && f.sunat_estado!=='0' && f.sunat_estado!=='anulado_sunat'?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#6366f1">🔄 Reintentar</button>`:''}
-          ${f.estado!=='anulado'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)})" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
+          ${f.estado!=='anulado' && !f.sunat_estado?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},false)" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
+          ${f.sunat_estado==='0' && f.estado!=='anulado' && _userRol==='admin'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},true)" style="font-size:.72rem;color:#7c3aed;font-weight:700">📋 Nota Crédito</button>`:''}
         </div>
       </td>
     </tr>`).join('');
@@ -1513,7 +1549,7 @@ async function confirmarPago() {
 <div id="modal-anular" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:440px">
     <div class="vmodal-head">
-      <h3>🚫 Anular Documento</h3>
+      <h3 id="anular-modal-titulo">🚫 Anular Documento</h3>
       <button onclick="closeModal('modal-anular')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
@@ -1522,8 +1558,8 @@ async function confirmarPago() {
         <p style="font-size:.78rem;color:#be123c;margin-top:.2rem">Cliente: <span id="anular-cliente">—</span></p>
         <p style="font-size:.78rem;color:#be123c">Total: <span id="anular-total">—</span></p>
       </div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">
-        ⚠️ Esta acción es irreversible. El documento quedará anulado en el sistema.
+      <div id="anular-aviso" style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">
+        ⚠️ Esta acción anulará el documento en el sistema.
       </div>
       <div>
         <label class="vlabel">Motivo de anulación *</label>
