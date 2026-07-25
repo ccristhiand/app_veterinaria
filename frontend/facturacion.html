@@ -1268,19 +1268,21 @@ async function verFactura(id) {
     }
     renderPDF(f, empresa);
 
-    // Generar QR si tiene cadena SUNAT
-    if (f.sunat_cdr) {
+    // Generar QR con el enlace PDF de Nubefact
+    if (f.enlace_pdf) {
       setTimeout(() => {
         const qrEl = document.getElementById('qr-preview');
         if (qrEl && typeof QRCode !== 'undefined') {
           qrEl.innerHTML = '';
           new QRCode(qrEl, {
-            text  : f.sunat_cdr,
-            width : 80,
-            height: 80,
+            text        : f.enlace_pdf,
+            width       : 90,
+            height      : 90,
+            colorDark   : '#166534',
+            colorLight  : '#ffffff',
           });
         }
-      }, 100);
+      }, 150);
     }
 
     // Mostrar links PDF/XML de SUNAT si existen
@@ -1412,11 +1414,10 @@ function renderPDF(f, emp) {
         ${emp.pie_documento?`<p>${esc(emp.pie_documento)}</p>`:''}
         <p>${esc(emp.nombre||'VetClinic')} · Gracias por su preferencia · ${fDate(f.fecha)}</p>
         <p style="font-family:monospace;letter-spacing:.05em">${esc(f.numero)}</p>
-        ${f.enlace_pdf?`<a href="${esc(f.enlace_pdf)}" target="_blank" style="font-size:.65rem;color:#6366f1;font-weight:700">📄 Ver PDF SUNAT</a>`:''}
       </div>
-      ${f.sunat_cdr ? `<div id="qr-preview-box" style="flex-shrink:0;text-align:center">
-        <div id="qr-preview" style="width:80px;height:80px"></div>
-        <p style="font-size:.55rem;color:#9ca3af;margin-top:.2rem">Código QR SUNAT</p>
+      ${f.enlace_pdf ? `<div id="qr-preview-box" style="flex-shrink:0;text-align:center">
+        <div id="qr-preview" style="width:90px;height:90px"></div>
+        <p style="font-size:.55rem;color:#9ca3af;margin-top:.25rem">Escanea para ver<br/>comprobante oficial</p>
       </div>` : ''}
     </div>`;
 }
