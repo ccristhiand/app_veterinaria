@@ -121,7 +121,7 @@
       <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
         <div class="search-wrap" style="flex:1">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input id="b-prop" type="text" placeholder="DNI, nombre del propietario, teléfono o nombre de mascota…" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
+          <input id="b-prop" type="text" placeholder="Ej: 45678912 · Juan García · 987654321" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
         </div>
         <button onclick="buscarPropH()" class="vbtn vbtn-primary">Buscar</button>
       </div>
@@ -538,32 +538,9 @@ async function buscarPropH() {
   cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
   document.getElementById('b-mascotas-section').style.display = 'none';
   try {
-    // Buscar por propietario Y por mascota en paralelo
-    const [resProp, resMasc] = await Promise.all([
-      api('/propietarios?search='+encodeURIComponent(q)+'&limit=6'),
-      api('/mascotas?search='+encodeURIComponent(q)+'&limit=4'),
-    ]);
-    const propRows = resProp ? (await resProp.json()).data||[] : [];
-    const mascRows = resMasc ? (await resMasc.json()).data||[] : [];
-
-    // Si encontramos mascotas directamente, ir a esa mascota sin pasar por propietario
-    if (!propRows.length && mascRows.length === 1) {
-      cont.innerHTML = '';
-      closeModal('modal-buscar');
-      cargarHistoria(mascRows[0].id);
-      return;
-    }
-
-    // Agregar propietarios de mascotas encontradas
-    const propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id || m.id))];
-    const propFromMasc = [];
-    for (const pid of propIdsFromMasc) {
-      if (!propRows.find(p => p.id === pid)) {
-        const rp = await api('/propietarios/'+pid);
-        if (rp?.ok) { const d = (await rp.json()).data; if (d) propFromMasc.push(d); }
-      }
-    }
-    const rows = [...propRows, ...propFromMasc];
+    const res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=8');
+    if (!res) return;
+    const rows = (await res.json()).data||[];
     cont.innerHTML = rows.length ? rows.map(p=>`
       <button onclick="selPropH(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
         style="display:flex;align-items:center;gap:.75rem;padding:.75rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
@@ -643,7 +620,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
     if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
-    const rh = await api('/historia/mascota/'+id);
+    const rh = await api('/historia?mascota_id='+id);
     if (!rh) return;
     const consultas = (await rh.json()).data||[];
     document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
@@ -1187,6 +1164,13 @@ async function guardarEditEstetica() {
     closeModal('modal-editar-estetica');
     cargarEstetica(mascotaId);
   } catch { toast('Error de conexión.','danger'); }
+}
+
+function fDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }) +
+    ' ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
 }
 
 function ib(label,val) { return '<div style="background:#f8faf8;border-radius:.9rem;padding:.7rem .9rem;border:1px solid var(--line)"><p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">'+label+'</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">'+esc(val||'—')+'</p></div>'; }
