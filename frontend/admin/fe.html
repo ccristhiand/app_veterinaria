@@ -178,22 +178,29 @@
       <!-- Credenciales Nubefact -->
       <div style="background:#1a1a2e;border:1px solid #431407;border-radius:.85rem;padding:1.1rem">
         <p class="section-title" style="color:#fb923c;border-color:#431407">🔑 Credenciales Nubefact</p>
+        <div style="background:#431407;border-radius:.65rem;padding:.65rem .9rem;margin-bottom:.85rem;font-size:.72rem;color:#fbbf24">
+          ℹ️ En tu cuenta Nubefact → menú <strong>API-Integración</strong> encontrarás los 2 datos que necesitas: la <strong>Ruta</strong> y el <strong>Token</strong>.
+        </div>
         <div style="display:flex;flex-direction:column;gap:.85rem">
           <div>
-            <label>API Key de Nubefact</label>
-            <input id="fe-api-key" type="password" placeholder="Dejar vacío para no cambiar"/>
-            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">Panel Nubefact → API-Integración → RUTA (UUID)</p>
+            <label>🔗 Ruta — UUID de tu cuenta Nubefact</label>
+            <input id="fe-api-key" type="text" placeholder="Ej: 98fb674b-dc41-47b0-a29f-0f681b02c769"/>
+            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
+              En Nubefact verás: https://api.nubefact.com/api/v1/<strong style="color:#fb923c">UUID-AQUI</strong> — copia solo el UUID final
+            </p>
           </div>
-          <div class="grid2">
-            <div>
-              <label>Token Nubefact</label>
-              <input id="fe-usuario-sol" type="password" placeholder="Token de autenticación Nubefact"/>
-            </div>
-            <div>
-              <label>Clave SOL SUNAT (opcional)</label>
-              <input id="fe-clave-sol" type="password" placeholder="Dejar vacío si no aplica"/>
-            </div>
+          <div>
+            <label>🔑 Token de autenticación Nubefact</label>
+            <input id="fe-usuario-sol" type="password" placeholder="Ej: e2d4a8a3c08a4b7b811d75ce453604fd..."/>
+            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
+              El TOKEN aparece debajo de la Ruta en la sección API-Integración de Nubefact
+            </p>
           </div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
+          🔒 Se encriptan con AES-256-GCM. Dejar vacío para no modificar el valor ya guardado.
+        </div>
+      </div>
         </div>
         <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
           🔒 Las credenciales se encriptan con AES-256-GCM. Nunca se almacenan en texto plano ni se devuelven al frontend.
@@ -448,7 +455,7 @@
     // Solo enviar credenciales si se llenaron
     if (apiKey && apiKey !== '(configurado)')  body.ose_api_key       = apiKey;
     if (usuSol && usuSol !== '(configurado)')  body.sunat_usuario_sol = usuSol;
-    if (clavSol) body.sunat_clave_sol = clavSol;
+    // clave_sol no se usa con Nubefact
 
     // Guardar config FE
     const res  = await adminFetch(`/fe/${_tenantActual}/config`, { method:'PUT', body });
@@ -466,7 +473,7 @@
     toast('✅ Configuración FE guardada correctamente','success');
     // Limpiar campos sensibles
     document.getElementById('fe-api-key').value  = '';
-    document.getElementById('fe-clave-sol').value = '';
+    
     cargar();
   }
 
