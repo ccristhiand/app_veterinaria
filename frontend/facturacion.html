@@ -5,8 +5,6 @@
   <title>VetClinic — Facturación</title>
   <script src="https://cdn.tailwindcss.com">
 // ── Facturación Electrónica ───────────────────────────────────────
-
-
 let _feActivo = false;
 
 (async () => {
@@ -20,10 +18,11 @@ let _feActivo = false;
 })();
 
 function badgeSUNAT(f) {
-  if (!_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
+  // Mostrar badge SUNAT siempre que haya estado, independiente de _feActivo
+  if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
   if (!f.sunat_estado) {
-    if (f.estado === 'anulado') return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
-    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f8faf8;color:var(--ink-soft);border:1px solid var(--line)">⏳ No emitido</span>';
+    if (f.estado === 'anulado' || f.estado === 'pendiente') return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
+    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f8faf8;color:var(--ink-soft);border:1px solid var(--line)">⏳ Pendiente</span>';
   }
   if (f.sunat_estado === '0') {
     return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Aceptado</span>';
@@ -31,7 +30,7 @@ function badgeSUNAT(f) {
   if (f.sunat_estado === 'anulado_sunat') {
     return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado</span>';
   }
-  return `<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" title="${esc(f.sunat_mensaje||'')}">❌ Error</span>`;
+  return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
 }
 
 async function emitirSUNAT(facturaId, numero) {
@@ -688,31 +687,18 @@ async function cargarFacturas() {
         ${estadoBadge[f.estado]||f.estado}
         ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
       </td>
-      <td></td>
+      <td>${badgeSUNAT(f)}</td>
       <td>
         <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
           <button class="vlink" onclick="verFactura(${f.id})" style="font-size:.72rem;color:var(--green-600);font-weight:600">👁️ Ver / PDF</button>
           ${f.estado==='pendiente'?`<button class="vlink" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>`:''}
-          ${_feActivo && f.estado!=='anulado' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
+          ${_feActivo && f.estado!=='anulado' && f.estado!=='pendiente' && !f.sunat_estado?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#b45309;font-weight:700">📤 SUNAT</button>`:''}
           ${_feActivo && f.sunat_estado && f.sunat_estado!=='0' && f.sunat_estado!=='anulado_sunat'?`<button class="vlink" onclick="emitirSUNAT(${f.id},'${esc(f.numero)}')" style="font-size:.72rem;color:#6366f1">🔄 Reintentar</button>`:''}
+          ${f.estado!=='anulado'?`<button class="vlink" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)})" style="font-size:.72rem;color:#be123c">🚫 Anular</button>`:''}
         </div>
       </td>
     </tr>`).join('');
-  } catch (err) {
-    console.error("Error al cargar facturas:", err);
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="8">
-                <div class="vempty">
-                    <span class="icon">😿</span>
-                    <p>Error al cargar.</p>
-                    <small style="color:red;">${err.message}</small>
-                </div>
-            </td>
-        </tr>
-    `;
-}
+  } catch { tbody.innerHTML=`<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
 }
 
 // ══ NUEVA FACTURA ════════════════════════════════════════════════
