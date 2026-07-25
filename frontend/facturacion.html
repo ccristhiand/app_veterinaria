@@ -4,16 +4,7 @@
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>VetClinic — Facturación</title>
   <script src="https://cdn.tailwindcss.com">
-// ── Facturación Electrónica ───────────────────────────────────────
-(async () => {
-  try {
-    const res = await api('/fe/config');
-    if (res?.ok) {
-      const cfg = (await res.json()).data;
-      _feActivo = !!cfg?.sunat_activo;
-    }
-  } catch {}
-})();
+// ── Facturación Electrónica ─────────────────────────────────────────
 
 
 
@@ -511,6 +502,15 @@ initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y docu
       : '➕ Se sumará el IGV encima del precio ingresado';
     calcularTotales();
   });
+
+  // Cargar config FE antes de renderizar facturas
+  try {
+    const resFe = await api('/fe/config');
+    if (resFe?.ok) {
+      const cfg = (await resFe.json()).data;
+      _feActivo = !!cfg?.sunat_activo;
+    }
+  } catch {}
 
   cargarResumen();
 })();
