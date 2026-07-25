@@ -696,7 +696,21 @@ async function cargarFacturas() {
         </div>
       </td>
     </tr>`).join('');
-  } catch { tbody.innerHTML=`<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div></td></tr>`; }
+  } catch (err) {
+    console.error("Error al cargar facturas:", err);
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8">
+                <div class="vempty">
+                    <span class="icon">😿</span>
+                    <p>Error al cargar.</p>
+                    <small style="color:red;">${err.message}</small>
+                </div>
+            </td>
+        </tr>
+    `;
+}
 }
 
 // ══ NUEVA FACTURA ════════════════════════════════════════════════
