@@ -31,7 +31,7 @@
     .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
     .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b;z-index:1}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
-    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#1e293b}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#1e293b;flex-wrap:wrap}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
     .section-title{font-size:.65rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.12em;padding:.5rem 0;border-bottom:1px solid #334155;margin-bottom:.75rem}
@@ -40,7 +40,7 @@
     .badge-activo{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
     .badge-inactivo{background:#1e293b;color:#475569;border:1px solid #334155;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
     .badge-beta{background:#431407;color:#fb923c;border:1px solid #9a3412;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-prod{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-prod{background:#052e16;color:#4ade80;border:1px solid #166634;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
     .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
     .stat-val{font-size:1.6rem;font-weight:800;color:#f1f5f9;margin-top:.25rem}
     .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
@@ -56,14 +56,10 @@
 </head>
 <body>
 
-<!-- Sidebar -->
 <aside class="sidebar" id="sidebar"></aside>
-
 <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
 
 <main class="main">
-
-  <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div style="display:flex;align-items:center;gap:1rem">
       <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
@@ -75,27 +71,13 @@
     <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
   </div>
 
-  <!-- Stats globales -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem" class="grid-stats">
-    <div class="stat-box">
-      <div class="stat-lbl">Clínicas con FE</div>
-      <div class="stat-val" id="stat-fe-activas">—</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-lbl">Docs emitidos mes</div>
-      <div class="stat-val" style="color:#4ade80" id="stat-docs-mes">—</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-lbl">Aceptados SUNAT</div>
-      <div class="stat-val" style="color:#4ade80" id="stat-aceptados">—</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-lbl">Con errores</div>
-      <div class="stat-val" style="color:#f87171" id="stat-errores">—</div>
-    </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+    <div class="stat-box"><div class="stat-lbl">Clínicas con FE</div><div class="stat-val" id="stat-fe-activas">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Docs emitidos mes</div><div class="stat-val" style="color:#4ade80" id="stat-docs-mes">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Aceptados SUNAT</div><div class="stat-val" style="color:#4ade80" id="stat-aceptados">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Con errores</div><div class="stat-val" style="color:#f87171" id="stat-errores">—</div></div>
   </div>
 
-  <!-- Tabla de clínicas -->
   <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155">
       <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado FE por clínica</h2>
@@ -104,12 +86,10 @@
       <table>
         <thead>
           <tr>
-            <th>Clínica</th>
-            <th>FE Estado</th>
-            <th>Modo</th>
+            <th>Clínica</th><th>FE</th><th>Modo</th>
             <th class="hide-mobile">Docs mes</th>
-            <th class="hide-mobile">Incluidos plan</th>
-            <th class="hide-mobile">Credenciales</th>
+            <th class="hide-mobile">Plan</th>
+            <th class="hide-mobile">Config</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -121,7 +101,6 @@
       </table>
     </div>
   </div>
-
 </main>
 
 <!-- Modal Config FE -->
@@ -134,13 +113,14 @@
       </div>
       <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
     </div>
+
     <div class="modal-body">
       <input type="hidden" id="fe-tenant-id"/>
 
-      <!-- Estado actual -->
+      <!-- Estado -->
       <div id="fe-estado-actual" style="padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#0f172a;border:1px solid #334155"></div>
 
-      <!-- Stats del mes -->
+      <!-- Stats -->
       <div class="grid3" id="fe-stats-grid" style="display:none">
         <div class="stat-box"><div class="stat-lbl">Emitidos</div><div class="stat-val" id="fe-stat-total" style="font-size:1.2rem">0</div></div>
         <div class="stat-box"><div class="stat-lbl" style="color:#4ade80">Aceptados</div><div class="stat-val" id="fe-stat-ok" style="font-size:1.2rem;color:#4ade80">0</div></div>
@@ -159,7 +139,7 @@
             <input type="radio" name="fe-modo" id="fe-modo-prod" value="produccion" style="accent-color:#4ade80"/> 🚀 Producción
           </label>
         </div>
-        <p style="font-size:.68rem;color:#fb923c;background:#431407;padding:.5rem .75rem;border-radius:.6rem">⚠️ Beta: los docs van a Nubefact pero NO a SUNAT real. Usar para pruebas.</p>
+        <p style="font-size:.68rem;color:#fb923c;background:#431407;padding:.5rem .75rem;border-radius:.6rem">⚠️ Beta: los docs van a Nubefact pero NO a SUNAT real.</p>
       </div>
 
       <!-- Series y ubigeo -->
@@ -179,31 +159,26 @@
       <div style="background:#1a1a2e;border:1px solid #431407;border-radius:.85rem;padding:1.1rem">
         <p class="section-title" style="color:#fb923c;border-color:#431407">🔑 Credenciales Nubefact</p>
         <div style="background:#431407;border-radius:.65rem;padding:.65rem .9rem;margin-bottom:.85rem;font-size:.72rem;color:#fbbf24">
-          ℹ️ En tu cuenta Nubefact → menú <strong>API-Integración</strong> encontrarás los 2 datos que necesitas: la <strong>Ruta</strong> y el <strong>Token</strong>.
+          ℹ️ En tu cuenta Nubefact → menú <strong>API-Integración</strong> encontrarás la <strong>Ruta</strong> y el <strong>Token</strong>.
         </div>
         <div style="display:flex;flex-direction:column;gap:.85rem">
           <div>
-            <label>🔗 Ruta — UUID de tu cuenta Nubefact</label>
+            <label>🔗 Ruta — UUID de tu cuenta</label>
             <input id="fe-api-key" type="text" placeholder="Ej: 98fb674b-dc41-47b0-a29f-0f681b02c769"/>
             <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
-              En Nubefact verás: https://api.nubefact.com/api/v1/<strong style="color:#fb923c">UUID-AQUI</strong> — copia solo el UUID final
+              En Nubefact verás: https://api.nubefact.com/api/v1/<strong style="color:#fb923c">ESTE-UUID</strong> — copia solo el UUID
             </p>
           </div>
           <div>
-            <label>🔑 Token de autenticación Nubefact</label>
-            <input id="fe-usuario-sol" type="password" placeholder="Ej: e2d4a8a3c08a4b7b811d75ce453604fd..."/>
+            <label>🔑 Token de autenticación</label>
+            <input id="fe-usuario-sol" type="password" placeholder="Dejar vacío para no modificar"/>
             <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
-              El TOKEN aparece debajo de la Ruta en la sección API-Integración de Nubefact
+              El TOKEN aparece debajo de la Ruta en API-Integración de Nubefact
             </p>
           </div>
         </div>
         <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
-          🔒 Se encriptan con AES-256-GCM. Dejar vacío para no modificar el valor ya guardado.
-        </div>
-      </div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
-          🔒 Las credenciales se encriptan con AES-256-GCM. Nunca se almacenan en texto plano ni se devuelven al frontend.
+          🔒 Se encriptan con AES-256-GCM. Dejar vacío para no modificar el valor guardado.
         </div>
       </div>
 
@@ -222,26 +197,19 @@
         </div>
       </div>
 
-      <!-- Últimos documentos -->
+      <!-- Historial -->
       <div id="fe-historial-wrap" style="display:none">
         <p class="section-title">📋 Últimos documentos emitidos</p>
         <div style="overflow-x:auto">
           <table>
-            <thead>
-              <tr>
-                <th>Número</th>
-                <th>Tipo</th>
-                <th>Fecha</th>
-                <th>Monto</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Número</th><th>Tipo</th><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead>
             <tbody id="fe-historial-tbody"></tbody>
           </table>
         </div>
       </div>
-    </div>
-    <div class="modal-foot" style="flex-wrap:wrap;gap:.5rem">
+    </div><!-- /modal-body -->
+
+    <div class="modal-foot">
       <button onclick="cerrarModal()" class="btn-ghost">Cancelar</button>
       <button onclick="toggleActivarFE()" id="btn-toggle-fe" class="btn-green">✅ Activar FE</button>
       <button onclick="guardarConfigFE()" class="btn-primary">💾 Guardar configuración</button>
@@ -253,165 +221,123 @@
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
   renderSidebar('fe');
-
-  function toggleSidebar() {
-    const sb  = document.getElementById('sidebar');
-    const ov  = document.getElementById('sidebar-overlay');
-    const btn = document.getElementById('btn-close-sb');
-    const open = sb.classList.toggle('open');
-    ov.style.display  = open ? 'block' : 'none';
-    btn.style.display = open ? 'block' : 'none';
-  }
   if (window.innerWidth <= 768) document.getElementById('btn-menu').style.display = 'block';
 
-  let _tenantActual = null;
+  let _tenantActual   = null;
   let _feActualConfig = null;
 
-  // ── Cargar resumen ─────────────────────────────────────────────
   async function cargar() {
     const tbody = document.getElementById('tbody-fe');
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">
-      <div class="spinner" style="margin:0 auto"></div></td></tr>`;
-
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
     try {
       const res  = await adminFetch('/fe/resumen');
       if (!res?.ok) return;
       const rows = (await res.json()).data || [];
 
-      // Stats globales
-      const feActivas   = rows.filter(r => r.sunat_activo).length;
-      const totalDocs   = rows.reduce((a,r) => a + (parseInt(r.total_mes)||0), 0);
-      const aceptados   = rows.reduce((a,r) => a + (parseInt(r.aceptados_mes)||0), 0);
-
+      const feActivas = rows.filter(r => r.sunat_activo).length;
+      const totalDocs = rows.reduce((a,r) => a + (parseInt(r.total_mes)||0), 0);
+      const aceptados = rows.reduce((a,r) => a + (parseInt(r.aceptados_mes)||0), 0);
       document.getElementById('stat-fe-activas').textContent = feActivas;
       document.getElementById('stat-docs-mes').textContent   = totalDocs;
       document.getElementById('stat-aceptados').textContent  = aceptados;
       document.getElementById('stat-errores').textContent    = totalDocs - aceptados;
 
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas</td></tr>';
         return;
       }
 
       tbody.innerHTML = rows.map(t => {
-        const docsUsados   = parseInt(t.docs_usados)   || 0;
-        const docsIncluidos= parseInt(t.docs_incluidos) || 50;
-        const pct          = Math.min((docsUsados / docsIncluidos) * 100, 100);
-        const colorBarra   = pct > 80 ? '#f87171' : pct > 60 ? '#fb923c' : '#4ade80';
-
+        const docsUsados    = parseInt(t.docs_usados)    || 0;
+        const docsIncluidos = parseInt(t.docs_incluidos) || 50;
+        const pct           = Math.min((docsUsados / docsIncluidos) * 100, 100);
+        const colorBarra    = pct > 80 ? '#f87171' : pct > 60 ? '#fb923c' : '#4ade80';
         return `<tr>
           <td>
             <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
             <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
           </td>
-          <td>
-            ${t.sunat_activo
-              ? '<span class="badge-activo">✅ Activa</span>'
-              : '<span class="badge-inactivo">⏸️ Inactiva</span>'}
-          </td>
-          <td>
-            ${t.sunat_modo === 'produccion'
-              ? '<span class="badge-prod">🚀 Producción</span>'
-              : t.sunat_activo
-                ? '<span class="badge-beta">🧪 Beta</span>'
-                : '<span style="color:#334155;font-size:.65rem">—</span>'}
-          </td>
+          <td>${t.sunat_activo ? '<span class="badge-activo">✅ Activa</span>' : '<span class="badge-inactivo">⏸️ Inactiva</span>'}</td>
+          <td>${t.sunat_modo === 'produccion' ? '<span class="badge-prod">🚀 Prod</span>' : t.sunat_activo ? '<span class="badge-beta">🧪 Beta</span>' : '<span style="color:#334155;font-size:.65rem">—</span>'}</td>
           <td class="hide-mobile">
-            <div>
-              <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.2rem">
-                <span style="color:#94a3b8">${docsUsados} / ${docsIncluidos}</span>
-                <span style="color:${colorBarra};font-weight:700">${pct.toFixed(0)}%</span>
-              </div>
-              <div style="background:#334155;border-radius:999px;height:5px;overflow:hidden">
-                <div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:999px;transition:width .3s"></div>
-              </div>
+            <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.2rem">
+              <span style="color:#94a3b8">${docsUsados}/${docsIncluidos}</span>
+              <span style="color:${colorBarra};font-weight:700">${pct.toFixed(0)}%</span>
+            </div>
+            <div style="background:#334155;border-radius:999px;height:5px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:999px"></div>
             </div>
           </td>
           <td class="hide-mobile" style="color:#94a3b8;font-size:.78rem">${docsIncluidos} docs/mes</td>
-          <td class="hide-mobile">
-            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-              ${t.tiene_api_key !== false ? '<span style="font-size:.65rem;color:#4ade80">🔑 API</span>' : '<span style="font-size:.65rem;color:#f87171">⚠️ Sin API</span>'}
-            </div>
-          </td>
+          <td class="hide-mobile">${t.tiene_api_key ? '<span style="font-size:.65rem;color:#4ade80">🔑 Configurado</span>' : '<span style="font-size:.65rem;color:#f87171">⚠️ Sin config</span>'}</td>
           <td>
-            <button onclick="abrirConfig(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
-              class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
+            <button onclick="abrirConfig(${t.id},'${esc(t.nombre_clinica||t.slug)}')" class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
               ⚙️ Configurar
             </button>
           </td>
         </tr>`;
       }).join('');
-
-    } catch(e) {
-      console.error(e);
-      toast('Error al cargar datos FE.','error');
-    }
+    } catch(e) { console.error(e); toast('Error al cargar.','error'); }
   }
 
-  // ── Abrir modal config ─────────────────────────────────────────
   async function abrirConfig(tenantId, nombre) {
     _tenantActual   = tenantId;
     _feActualConfig = null;
 
     document.getElementById('fe-modal-titulo').textContent = `⚡ FE — ${nombre}`;
-    document.getElementById('fe-modal-sub').textContent    = 'Cargando configuración…';
+    document.getElementById('fe-modal-sub').textContent    = 'Cargando…';
     document.getElementById('fe-estado-actual').innerHTML  = '<div class="spinner"></div>';
     document.getElementById('fe-stats-grid').style.display = 'none';
     document.getElementById('fe-historial-wrap').style.display = 'none';
     document.getElementById('modal-fe').classList.remove('hidden');
 
     try {
-      // Cargar config y stats en paralelo
       const [resConfig, resStats] = await Promise.all([
         adminFetch(`/fe/${tenantId}/config`),
         adminFetch(`/fe/${tenantId}/stats`),
       ]);
 
-      const cfg   = resConfig?.ok ? (await resConfig.json()).data  : null;
-      const stats = resStats?.ok  ? (await resStats.json()).data   : null;
+      const cfg   = resConfig?.ok ? (await resConfig.json()).data : null;
+      const stats = resStats?.ok  ? (await resStats.json()).data  : null;
       _feActualConfig = cfg;
 
-      // Estado actual
+      // Estado
       const box = document.getElementById('fe-estado-actual');
       if (cfg?.sunat_activo) {
-        box.style.background = '#052e16';
-        box.style.border     = '1px solid #166534';
-        box.innerHTML = `<span style="color:#4ade80;font-weight:700">✅ FE Activa</span>
-          <span style="color:#4ade80;font-size:.78rem;margin-left:.75rem">Modo: ${cfg.sunat_modo === 'produccion' ? '🚀 Producción' : '🧪 Beta'}</span>`;
+        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#052e16;border:1px solid #166534';
+        box.innerHTML = `<span style="color:#4ade80;font-weight:700">✅ FE Activa</span> <span style="color:#4ade80;font-size:.78rem;margin-left:.75rem">Modo: ${cfg.sunat_modo === 'produccion' ? '🚀 Producción' : '🧪 Beta'}</span>`;
       } else {
-        box.style.background = '#0f172a';
-        box.style.border     = '1px solid #334155';
-        box.innerHTML = `<span style="color:#475569;font-weight:700">⏸️ FE Inactiva</span>`;
+        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#0f172a;border:1px solid #334155';
+        box.innerHTML = '<span style="color:#475569;font-weight:700">⏸️ FE Inactiva</span>';
       }
 
-      // Botón toggle
-      const btnToggle = document.getElementById('btn-toggle-fe');
+      // Toggle button
+      const btn = document.getElementById('btn-toggle-fe');
       if (cfg?.sunat_activo) {
-        btnToggle.textContent = '⏸️ Desactivar FE';
-        btnToggle.className   = 'btn-red';
+        btn.textContent = '⏸️ Desactivar FE';
+        btn.className   = 'btn-red';
       } else {
-        btnToggle.textContent = '✅ Activar FE';
-        btnToggle.className   = 'btn-green';
+        btn.textContent = '✅ Activar FE';
+        btn.className   = 'btn-green';
       }
 
-      // Llenar campos
+      // Campos
       document.getElementById('fe-ubigeo').value        = cfg?.ubigeo             || '';
       document.getElementById('fe-serie-nc').value      = cfg?.fe_serie_nota_cred || 'BC01';
-      document.getElementById('fe-api-key').value       = '';
-      document.getElementById('fe-usuario-sol').value   = cfg?.tiene_usuario_sol ? '(configurado)' : '';
-      document.getElementById('fe-clave-sol').value     = '';
+      document.getElementById('fe-api-key').value       = cfg?.tiene_api_key      ? '(configurado — dejar vacío para no cambiar)' : '';
+      document.getElementById('fe-usuario-sol').value   = cfg?.tiene_usuario_sol  ? '' : '';
       document.getElementById('fe-modo-beta').checked   = cfg?.sunat_modo !== 'produccion';
       document.getElementById('fe-modo-prod').checked   = cfg?.sunat_modo === 'produccion';
       document.getElementById('fe-modal-sub').textContent = cfg?.nombre || nombre;
 
       // Stats
       if (stats?.stats) {
-        document.getElementById('fe-stats-grid').style.display = 'grid';
-        document.getElementById('fe-stat-total').textContent   = stats.stats.total    || 0;
-        document.getElementById('fe-stat-ok').textContent      = stats.stats.aceptados || 0;
-        document.getElementById('fe-stat-err').textContent     = stats.stats.con_error || 0;
-        document.getElementById('fe-docs-incluidos').value     = stats.plan?.docs_incluidos || 50;
-        document.getElementById('fe-precio-extra').value       = stats.plan?.precio_extra   || 0.05;
+        document.getElementById('fe-stats-grid').style.display    = 'grid';
+        document.getElementById('fe-stat-total').textContent      = stats.stats.total     || 0;
+        document.getElementById('fe-stat-ok').textContent         = stats.stats.aceptados || 0;
+        document.getElementById('fe-stat-err').textContent        = stats.stats.con_error || 0;
+        document.getElementById('fe-docs-incluidos').value        = stats.plan?.docs_incluidos || 50;
+        document.getElementById('fe-precio-extra').value          = stats.plan?.precio_extra   || 0.05;
       }
 
       // Historial
@@ -420,9 +346,7 @@
         document.getElementById('fe-historial-tbody').innerHTML = stats.historial.map(h => {
           const badge = h.sunat_estado === '0'
             ? '<span class="badge-activo">✅</span>'
-            : h.sunat_estado === 'anulado_sunat'
-              ? '<span style="font-size:.65rem;color:#f87171">❌ Anulado</span>'
-              : `<span style="font-size:.65rem;color:#f87171">❌ ${esc(h.sunat_estado||'Error')}</span>`;
+            : `<span style="font-size:.65rem;color:#f87171">❌ ${esc(h.sunat_estado||'Error')}</span>`;
           return `<tr>
             <td style="font-family:monospace;font-size:.75rem">${esc(h.numero)}</td>
             <td style="font-size:.75rem">${esc(h.tipo)}</td>
@@ -432,19 +356,13 @@
           </tr>`;
         }).join('');
       }
-
-    } catch(e) {
-      console.error(e);
-      toast('Error al cargar config FE.','error');
-    }
+    } catch(e) { console.error(e); toast('Error al cargar config FE.','error'); }
   }
 
-  // ── Guardar config ─────────────────────────────────────────────
   async function guardarConfigFE() {
-    const modo    = document.querySelector('input[name="fe-modo"]:checked')?.value || 'beta';
-    const apiKey  = document.getElementById('fe-api-key').value.trim();
-    const usuSol  = document.getElementById('fe-usuario-sol').value.trim();
-    const clavSol = document.getElementById('fe-clave-sol').value.trim();
+    const modo   = document.querySelector('input[name="fe-modo"]:checked')?.value || 'beta';
+    const apiKey = document.getElementById('fe-api-key').value.trim();
+    const token  = document.getElementById('fe-usuario-sol').value.trim();
 
     const body = {
       sunat_modo        : modo,
@@ -452,34 +370,28 @@
       fe_serie_nota_cred: document.getElementById('fe-serie-nc').value.trim() || 'BC01',
     };
 
-    // Solo enviar credenciales si se llenaron
-    if (apiKey && apiKey !== '(configurado)')  body.ose_api_key       = apiKey;
-    if (usuSol && usuSol !== '(configurado)')  body.sunat_usuario_sol = usuSol;
-    // clave_sol no se usa con Nubefact
+    // Solo enviar si no es el placeholder
+    if (apiKey && !apiKey.includes('(configurado')) body.ose_api_key       = apiKey;
+    if (token)                                       body.sunat_usuario_sol = token;
 
-    // Guardar config FE
     const res  = await adminFetch(`/fe/${_tenantActual}/config`, { method:'PUT', body });
     const data = await res.json();
     if (!res?.ok) { toast(data.message || 'Error al guardar.','error'); return; }
 
-    // Guardar plan si cambió
-    const docsInc    = parseInt(document.getElementById('fe-docs-incluidos').value) || 50;
-    const precioExtra= parseFloat(document.getElementById('fe-precio-extra').value) || 0.05;
-    await adminFetch(`/fe/${_tenantActual}/plan`, {
-      method: 'PUT',
-      body  : { docs_incluidos: docsInc, precio_extra: precioExtra },
-    });
+    // Plan
+    const docsInc     = parseInt(document.getElementById('fe-docs-incluidos').value) || 50;
+    const precioExtra = parseFloat(document.getElementById('fe-precio-extra').value) || 0.05;
+    await adminFetch(`/fe/${_tenantActual}/plan`, { method:'PUT', body:{ docs_incluidos:docsInc, precio_extra:precioExtra } });
 
-    toast('✅ Configuración FE guardada correctamente','success');
-    // Limpiar campos sensibles
-    document.getElementById('fe-api-key').value  = '';
-    
+    toast('✅ Configuración FE guardada','success');
+    document.getElementById('fe-api-key').value    = '';
+    document.getElementById('fe-usuario-sol').value = '';
+    cerrarModal();
     cargar();
   }
 
-  // ── Activar / Desactivar FE ────────────────────────────────────
   async function toggleActivarFE() {
-    const activo = _feActualConfig?.sunat_activo;
+    const activo   = _feActualConfig?.sunat_activo;
     const endpoint = activo ? 'desactivar' : 'activar';
     const res  = await adminFetch(`/fe/${_tenantActual}/${endpoint}`, { method:'POST' });
     const data = await res.json();
@@ -493,6 +405,13 @@
     document.getElementById('modal-fe').classList.add('hidden');
     _tenantActual   = null;
     _feActualConfig = null;
+  }
+
+  function toggleSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('sidebar-overlay');
+    const open = sb.classList.toggle('open');
+    ov.style.display = open ? 'block' : 'none';
   }
 
   cargar();
