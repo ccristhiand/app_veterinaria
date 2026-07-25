@@ -678,7 +678,7 @@ async function cargarFacturas() {
       <td style="font-size:.8rem">${fDate(f.fecha)}</td>
       <td>
         <p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p>
-        <p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni ? 'DNI: ' + esc(f.cliente_dni) : ''}</p>
+        <p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p>
       </td>
       <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
       <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
@@ -1134,7 +1134,7 @@ function renderPDF(f, emp) {
           <div>
             <p style="font-size:.6rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Cliente</p>
             <p style="font-weight:700">${esc(f.propietario_nombre)}</p>
-            ${f.cliente_dni?`<p style="color:#4b5f57">DNI: ${esc(f.cliente_dni)}</p>`:''}
+            ${f.dni?`<p style="color:#4b5f57">DNI: ${esc(f.dni)}</p>`:''}
           </div>
           <div>
             ${f.telefono?`<p style="color:#4b5f57;margin-top:.3rem">📞 ${esc(f.telefono)}</p>`:''}
