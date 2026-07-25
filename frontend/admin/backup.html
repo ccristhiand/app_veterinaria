@@ -58,26 +58,7 @@
 <body>
 
 <!-- Sidebar -->
-<aside class="sidebar" id="sidebar">
-  <div style="padding:1.25rem 1.2rem;border-bottom:1px solid #334155;display:flex;align-items:center;gap:.75rem">
-    <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🐾</div>
-    <div style="flex:1"><p style="font-weight:800;font-size:.92rem;color:#f1f5f9">VetClinic</p><p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.12em">SaaS Admin</p></div>
-    <button onclick="toggleSidebar()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.1rem;display:none" id="btn-close-sb">✕</button>
-  </div>
-  <nav style="padding:.75rem;flex:1">
-    <a href="index.html"    class="nav-item"        >📊 Dashboard</a>
-    <a href="clinicas.html" class="nav-item"         >🏥 Clínicas</a>
-    <a href="logs.html"     class="nav-item"         >📋 Logs de auditoría</a>
-    <a href="backup.html"   class="nav-item active"  >💾 Backups</a>
-  </nav>
-  <div style="padding:1rem 1.2rem;border-top:1px solid #334155">
-    <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.75rem">
-      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center" id="admin-avatar">A</div>
-      <div><p style="font-size:.82rem;font-weight:700;color:#f1f5f9" id="admin-nombre">Admin</p><p style="font-size:.65rem;color:#475569">Super Admin</p></div>
-    </div>
-    <button onclick="cerrarSesion()" style="width:100%;background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:.5rem;border-radius:.65rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600">🚪 Cerrar sesión</button>
-  </div>
-</aside>
+<aside class="sidebar" id="sidebar"></aside>
 
 <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
 
@@ -220,12 +201,7 @@
 <script src="admin_shared.js"></script>
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
-
-  const admin = getAdmin();
-  if (admin) {
-    document.getElementById('admin-nombre').textContent = admin.nombre || admin.email;
-    document.getElementById('admin-avatar').textContent = (admin.nombre||'A').charAt(0).toUpperCase();
-  }
+  renderSidebar('backup');
 
   function toggleSidebar() {
     const sb  = document.getElementById('sidebar');
