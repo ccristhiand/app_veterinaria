@@ -5,8 +5,6 @@
   <title>VetClinic — Facturación</title>
   <script src="https://cdn.tailwindcss.com">
 // ── Facturación Electrónica ───────────────────────────────────────
-let _feActivo = false;
-
 (async () => {
   try {
     const res = await api('/fe/config');
@@ -17,21 +15,7 @@ let _feActivo = false;
   } catch {}
 })();
 
-function badgeSUNAT(f) {
-  // Mostrar badge SUNAT siempre que haya estado, independiente de _feActivo
-  if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
-  if (!f.sunat_estado) {
-    if (f.estado === 'anulado' || f.estado === 'pendiente') return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
-    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f8faf8;color:var(--ink-soft);border:1px solid var(--line)">⏳ Pendiente</span>';
-  }
-  if (f.sunat_estado === '0') {
-    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Aceptado</span>';
-  }
-  if (f.sunat_estado === 'anulado_sunat') {
-    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado</span>';
-  }
-  return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
-}
+
 
 async function emitirSUNAT(facturaId, numero) {
   if (!confirm(`¿Emitir ${numero} a SUNAT?`)) return;
@@ -477,6 +461,23 @@ async function emitirSUNAT(facturaId, numero) {
 <script>
 // ── Estado ────────────────────────────────────────────────────────
 let empresa     = {};
+let _feActivo   = false;
+
+// Badge SUNAT — definido globalmente para que esté disponible en cargarFacturas
+function badgeSUNAT(f) {
+  if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
+  if (!f.sunat_estado) {
+    if (f.estado === 'anulado' || f.estado === 'pendiente') return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
+    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f8faf8;color:var(--ink-soft);border:1px solid var(--line)">⏳ Pendiente</span>';
+  }
+  if (f.sunat_estado === '0') {
+    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Aceptado</span>';
+  }
+  if (f.sunat_estado === 'anulado_sunat') {
+    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado</span>';
+  }
+  return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
+}
 let propFacSel  = null;
 let itemN       = 0;
 let pagoN       = 0;
