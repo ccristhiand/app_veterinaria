@@ -402,6 +402,7 @@
 // ── Estado ────────────────────────────────────────────────────────
 let empresa     = {};
 let _feActivo   = false;
+let _anularId   = null;
 
 function badgeSUNAT(f) {
   if (!f.sunat_estado && !_feActivo) return '<span style="font-size:.65rem;color:var(--ink-faint)">—</span>';
@@ -418,7 +419,6 @@ function badgeSUNAT(f) {
   return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
 }
 
-// Abrir modal de confirmación antes de emitir
 function emitirSUNAT(facturaId, numero) {
   document.getElementById('sunat-confirm-numero').textContent = numero;
   document.getElementById('sunat-confirm-id').value = facturaId;
@@ -429,60 +429,75 @@ async function confirmarEmisionSUNAT() {
   const facturaId = document.getElementById('sunat-confirm-id').value;
   const numero    = document.getElementById('sunat-confirm-numero').textContent;
   closeModal('modal-sunat-confirm');
-
   openModal('modal-sunat');
   document.getElementById('sunat-modal-titulo').textContent = '⚡ Emitiendo ' + numero + '…';
   document.getElementById('sunat-pdf-link').style.display   = 'none';
   document.getElementById('sunat-modal-body').innerHTML =
     '<div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT vía Nubefact…</p></div>';
-
   try {
     const res  = await api('/fe/emitir/' + facturaId, { method: 'POST' });
     const data = await res.json();
-
     if (res.ok && data.success) {
       document.getElementById('sunat-modal-titulo').textContent = '✅ Documento Aceptado';
       document.getElementById('sunat-modal-body').innerHTML =
         '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:1.25rem;text-align:center">' +
-          '<p style="font-size:2.5rem;margin-bottom:.5rem">✅</p>' +
-          '<p style="font-weight:800;font-size:1.1rem;color:#15803d">' + esc(data.data && data.data.numero ? data.data.numero : numero) + '</p>' +
-          '<p style="font-size:.82rem;color:#15803d;margin-top:.35rem">Aceptado por SUNAT correctamente</p>' +
+        '<p style="font-size:2.5rem;margin-bottom:.5rem">✅</p>' +
+        '<p style="font-weight:800;font-size:1.1rem;color:#15803d">' + esc(data.data?.numero || numero) + '</p>' +
+        '<p style="font-size:.82rem;color:#15803d;margin-top:.35rem">Aceptado por SUNAT</p>' +
         '</div>' +
-        (data.data && data.data.hash ?
-          '<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.85rem 1rem">' +
-            '<p style="font-size:.65rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem">Hash CDR</p>' +
-            '<p style="font-family:monospace;font-size:.72rem;word-break:break-all;color:#15803d">' + esc(data.data.hash) + '</p>' +
-          '</div>' : '');
-
-      if (data.data && data.data.enlace_pdf) {
+        (data.data?.hash ? '<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.85rem 1rem"><p style="font-size:.65rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;margin-bottom:.35rem">Hash CDR</p><p style="font-family:monospace;font-size:.72rem;word-break:break-all;color:#15803d">' + esc(data.data.hash) + '</p></div>' : '');
+      if (data.data?.enlace_pdf) {
         const link = document.getElementById('sunat-pdf-link');
         link.href = data.data.enlace_pdf;
         link.style.display = 'inline-flex';
       }
       toast('✅ Documento aceptado por SUNAT', 'success', 5000);
-      cargarFacturas();
-      cargarResumen();
-
+      cargarFacturas(); cargarResumen();
     } else {
       document.getElementById('sunat-modal-titulo').textContent = '❌ Error SUNAT';
       document.getElementById('sunat-modal-body').innerHTML =
         '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:1.1rem">' +
-          '<p style="font-weight:700;color:#be123c;margin-bottom:.5rem">❌ Error al enviar a SUNAT</p>' +
-          '<p style="font-size:.82rem;color:#be123c">' + esc(data.message || 'Error desconocido') + '</p>' +
-          (data.codigo ? '<p style="font-size:.72rem;color:#be123c;margin-top:.35rem;font-family:monospace;background:#fff1f2;padding:.3rem .5rem;border-radius:.4rem">Código: ' + esc(data.codigo) + '</p>' : '') +
-        '</div>' +
-        '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">' +
-          '💡 Usa el botón 🔄 Reintentar para volver a intentarlo.' +
+        '<p style="font-weight:700;color:#be123c;margin-bottom:.5rem">❌ Error al enviar a SUNAT</p>' +
+        '<p style="font-size:.82rem;color:#be123c">' + esc(data.message || 'Error desconocido') + '</p>' +
+        (data.codigo ? '<p style="font-size:.72rem;color:#be123c;margin-top:.35rem;font-family:monospace">Código: ' + esc(String(data.codigo)) + '</p>' : '') +
         '</div>';
       cargarFacturas();
     }
   } catch(e) {
     document.getElementById('sunat-modal-body').innerHTML =
       '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:1.1rem">' +
-        '<p style="color:#be123c;font-weight:700">❌ Error de conexión</p>' +
-        '<p style="font-size:.78rem;color:#be123c;margin-top:.3rem">' + esc(e.message) + '</p>' +
+      '<p style="color:#be123c;font-weight:700">❌ Error de conexión</p>' +
+      '<p style="font-size:.78rem;color:#be123c;margin-top:.3rem">' + esc(e.message) + '</p>' +
       '</div>';
   }
+}
+
+function abrirAnular(id, numero, cliente, total) {
+  _anularId = id;
+  document.getElementById('anular-numero').textContent  = numero;
+  document.getElementById('anular-cliente').textContent = cliente;
+  document.getElementById('anular-total').textContent   = 'S/. ' + parseFloat(total).toFixed(2);
+  document.getElementById('anular-motivo').value        = '';
+  openModal('modal-anular');
+}
+
+async function confirmarAnulacion() {
+  const motivo = document.getElementById('anular-motivo').value.trim();
+  if (!motivo) { toast('Ingresa el motivo de anulación.', 'warning'); return; }
+  const btn = document.getElementById('btn-confirmar-anular');
+  btn.disabled = true; btn.textContent = 'Anulando…';
+  try {
+    const res  = await api('/facturas/' + _anularId + '/anular', { method: 'PATCH', body: { observaciones: motivo } });
+    const data = await res.json();
+    if (res.ok) {
+      toast('✅ Documento anulado correctamente', 'success');
+      closeModal('modal-anular');
+      cargarFacturas(); cargarResumen();
+    } else {
+      toast(data.message || 'Error al anular.', 'danger');
+    }
+  } catch { toast('Error de conexión.', 'danger'); }
+  finally { btn.disabled = false; btn.textContent = '🚫 Confirmar anulación'; }
 }
 let propFacSel  = null;
 let itemN       = 0;
@@ -702,7 +717,6 @@ async function cargarFacturas() {
         ${estadoBadge[f.estado]||f.estado}
         ${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}
       </td>
-      <td>
       <td>${badgeSUNAT(f)}</td>
       <td>
         <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
@@ -1353,50 +1367,7 @@ function descargarPDF() {
   </head><body>
     ${contenido}
     <br/><div style="text-align:center"><button onclick="window.print()" style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
-  
-<!-- ══ Modal Confirmar Emisión SUNAT ════════════════════════════ -->
-<div id="modal-sunat-confirm" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:420px">
-    <div class="vmodal-head">
-      <h3>📤 Emitir a SUNAT</h3>
-      <button onclick="closeModal('modal-sunat-confirm')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body">
-      <input type="hidden" id="sunat-confirm-id"/>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.85rem;padding:1.1rem">
-        <p style="font-weight:700;font-size:.95rem;color:#b45309">📄 <span id="sunat-confirm-numero">—</span></p>
-        <p style="font-size:.78rem;color:#b45309;margin-top:.35rem">Este documento será enviado a SUNAT a través de Nubefact OSE. Una vez aceptado, solo puede anularse mediante nota de crédito electrónica.</p>
-      </div>
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#0369a1">
-        ℹ️ Asegúrate que los datos del cliente y los montos sean correctos antes de emitir.
-      </div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-sunat-confirm')" class="vbtn vbtn-ghost">Cancelar</button>
-      <button onclick="confirmarEmisionSUNAT()" class="vbtn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;font-weight:700">
-        📤 Confirmar emisión
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ Modal Resultado SUNAT ══════════════════════════════════════ -->
-<div id="modal-sunat" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:480px">
-    <div class="vmodal-head">
-      <h3 id="sunat-modal-titulo">⚡ Resultado SUNAT</h3>
-      <button onclick="closeModal('modal-sunat')" class="vmodal-close">✕</button>
-    </div>
-    <div class="vmodal-body" id="sunat-modal-body" style="display:flex;flex-direction:column;gap:1rem">
-      <div class="vempty"><div class="vspinner"></div><p>Enviando a SUNAT…</p></div>
-    </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
-      <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
-    </div>
-  </div>
-</div>
-</body></html>`);
+  </body></html>`);
   ventana.document.close();
   setTimeout(()=>ventana.print(),800);
 }
@@ -1506,7 +1477,7 @@ async function confirmarPago() {
       <input type="hidden" id="sunat-confirm-id"/>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.85rem;padding:1.1rem">
         <p style="font-weight:700;font-size:.95rem;color:#b45309">📄 <span id="sunat-confirm-numero">—</span></p>
-        <p style="font-size:.78rem;color:#b45309;margin-top:.35rem">Este documento será enviado a SUNAT a través de Nubefact OSE. Una vez aceptado, solo puede anularse mediante nota de crédito electrónica.</p>
+        <p style="font-size:.78rem;color:#b45309;margin-top:.35rem">Este documento será enviado a SUNAT vía Nubefact OSE. Una vez aceptado, solo puede anularse mediante nota de crédito electrónica.</p>
       </div>
       <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#0369a1">
         ℹ️ Asegúrate que los datos del cliente y los montos sean correctos antes de emitir.
@@ -1534,6 +1505,37 @@ async function confirmarPago() {
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-sunat')" class="vbtn vbtn-ghost">Cerrar</button>
       <a id="sunat-pdf-link" href="#" target="_blank" class="vbtn vbtn-primary" style="display:none">📄 Ver PDF SUNAT</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Anular Documento ════════════════════════════════════ -->
+<div id="modal-anular" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:440px">
+    <div class="vmodal-head">
+      <h3>🚫 Anular Documento</h3>
+      <button onclick="closeModal('modal-anular')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:1rem">
+        <p style="font-weight:700;font-size:.88rem;color:#be123c">📄 <span id="anular-numero">—</span></p>
+        <p style="font-size:.78rem;color:#be123c;margin-top:.2rem">Cliente: <span id="anular-cliente">—</span></p>
+        <p style="font-size:.78rem;color:#be123c">Total: <span id="anular-total">—</span></p>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#b45309">
+        ⚠️ Esta acción es irreversible. El documento quedará anulado en el sistema.
+      </div>
+      <div>
+        <label class="vlabel">Motivo de anulación *</label>
+        <textarea id="anular-motivo" rows="3" class="vinput" placeholder="Ej: Error en los datos del cliente, duplicado, etc."></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-anular')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="btn-confirmar-anular" onclick="confirmarAnulacion()" class="vbtn"
+        style="background:#be123c;color:#fff;border:none;font-weight:700">
+        🚫 Confirmar anulación
+      </button>
     </div>
   </div>
 </div>
