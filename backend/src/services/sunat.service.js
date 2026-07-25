@@ -1,34 +1,32 @@
 'use strict';
 
 /**
- * VetClinic SaaS — Generador de documentos SUNAT (Nubefact JSON)
- * Nubefact acepta JSON directamente — no necesitamos generar XML
- * Nubefact se encarga de generar y firmar el XML UBL 2.1
+ * VetClinic SaaS — Generador de payload para Nubefact
+ * Campos según documentación Nubefact v2.9
  */
 
 const { decrypt } = require('./crypto.service');
 
-// Tipo de comprobante Nubefact
-const TIPOS = {
-  boleta  : 2,
-  factura : 1,
-  nota_credito: 7,
-  nota_debito : 8,
-};
+// Tipos de comprobante
+const TIPOS = { boleta: 2, factura: 1, nota_credito: 3, nota_debito: 4 };
 
 // Tipo de documento de identidad
-const TIPO_DOC = {
-  DNI    : 1,
-  RUC    : 6,
-  CE     : 4,
-  pasaporte: 7,
-};
+const TIPO_DOC = { DNI: 1, RUC: 6, CE: 4, pasaporte: 7 };
+
+// Formatear fecha DD-MM-YYYY (formato Nubefact)
+function formatFecha(fecha) {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
 
 /**
- * Genera el payload JSON para Nubefact
- * a partir de una factura de la BD
+ * Genera el payload JSON para Nubefact — Boletas y Facturas
  */
-function generarPayload(factura, items, config) {
+function generarPayload(factura, items, cfg) {
   const esBoleta  = factura.tipo === 'boleta';
   const esFactura = factura.tipo === 'factura';
 
@@ -37,157 +35,188 @@ function generarPayload(factura, items, config) {
   const numero = parseInt(numeroStr, 10);
 
   // Datos del cliente
-  let tipoDocCliente, numDocCliente, razonSocialCliente, direccionCliente;
+  let clienteTipoDoc, clienteNumDoc, clienteDenom, clienteDir;
 
   if (esFactura) {
-    // Factura: requiere RUC del cliente
-    tipoDocCliente    = 6; // RUC
-    numDocCliente     = factura.cliente_ruc;
-    razonSocialCliente= factura.cliente_razon_social;
-    direccionCliente  = factura.cliente_direccion_fiscal || '';
+    clienteTipoDoc = 6; // RUC
+    clienteNumDoc  = factura.cliente_ruc;
+    clienteDenom   = factura.cliente_razon_social;
+    clienteDir     = factura.cliente_direccion_fiscal || '';
   } else {
-    // Boleta: DNI del cliente o consumidor final
+    // Boleta
     if (factura.dni && factura.dni.length === 8) {
-      tipoDocCliente    = 1; // DNI
-      numDocCliente     = factura.dni;
-      razonSocialCliente= factura.propietario_nombre;
+      clienteTipoDoc = 1; // DNI
+      clienteNumDoc  = factura.dni;
+      clienteDenom   = factura.propietario_nombre || 'CONSUMIDOR FINAL';
     } else {
-      // Consumidor final (sin documento)
-      tipoDocCliente    = 0;
-      numDocCliente     = '00000000';
-      razonSocialCliente= factura.propietario_nombre || 'CONSUMIDOR FINAL';
+      clienteTipoDoc = '-'; // Varios / consumidor final
+      clienteNumDoc  = '-';
+      clienteDenom   = factura.propietario_nombre || 'CONSUMIDOR FINAL';
     }
-    direccionCliente = factura.propietario_dir || '';
+    clienteDir = factura.propietario_dir || '';
   }
 
-  // Items del comprobante
-  const lineas = items.map((item, idx) => {
-    const cantidad   = parseFloat(item.cantidad)   || 1;
-    const precioUnit = parseFloat(item.precio_unit) || 0;
-    // Precio unitario sin IGV
-    const precioSinIgv = parseFloat((precioUnit / 1.18).toFixed(10));
-    const igvUnit      = parseFloat((precioUnit - precioSinIgv).toFixed(10));
-    const subtotalSinIgv = parseFloat((precioSinIgv * cantidad).toFixed(2));
-    const igvTotal       = parseFloat((igvUnit * cantidad).toFixed(2));
+  // Items
+  const itemsPayload = items.map((item, idx) => {
+    const cantidad    = parseFloat(item.cantidad)   || 1;
+    const precioUnit  = parseFloat(item.precio_unit) || 0;
+    const valorUnit   = parseFloat((precioUnit / 1.18).toFixed(10));
+    const igvUnit     = parseFloat((precioUnit - valorUnit).toFixed(10));
+    const subtotal    = parseFloat((valorUnit * cantidad).toFixed(2));
+    const igvTotal    = parseFloat((igvUnit * cantidad).toFixed(2));
+    const total       = parseFloat((precioUnit * cantidad).toFixed(2));
 
     return {
-      unidad_de_medida      : 'NIU',  // Nubefact standard
-      codigo                : String(item.inventario_id || (idx + 1)).padStart(4, '0'),
-      descripcion           : item.descripcion,
-      cantidad              : cantidad,
-      valor_unitario        : precioSinIgv,
-      precio_unitario       : precioUnit,
-      descuento             : 0,
-      subtotal              : subtotalSinIgv,
-      tipo_de_igv           : 1,  // 1=gravado operación onerosa
-      igv                   : igvTotal,
-      total                 : parseFloat(item.subtotal || (precioUnit * cantidad)).toFixed(2),
+      unidad_de_medida     : 'ZZ',  // ZZ = servicio
+      codigo               : String(item.inventario_id || (idx + 1)).padStart(4, '0'),
+      descripcion          : item.descripcion,
+      cantidad,
+      valor_unitario       : valorUnit,
+      precio_unitario      : precioUnit,
+      descuento            : '',
+      subtotal,
+      tipo_de_igv          : 1,
+      igv                  : igvTotal,
+      total,
       anticipo_regularizacion: false,
-      anticipo_documento_serie: '',
-      anticipo_documento_numero: 0,
+      anticipo_documento_serie : '',
+      anticipo_documento_numero: '',
     };
   });
 
-  // Totales
   const totalSinIgv = parseFloat(factura.subtotal);
   const totalIgv    = parseFloat(factura.igv);
   const total       = parseFloat(factura.total);
 
-  const payload = {
-    operacion              : 'generar_comprobante',
-    tipo_de_comprobante    : TIPOS[factura.tipo] || 2,
-    serie,
-    numero,
-    sunat_transaction      : 1,
-    client_id              : decrypt(config.ose_api_key),
-    // Emisor
-    ruc                    : config.ruc,
-    razon_social           : config.razon_social,
-    direccion              : config.direccion,
-    ubigeo                 : config.ubigeo || '150101',
-    email_emisor           : config.email || '',
-    // Receptor
-    tipo_de_documento_del_cliente: tipoDocCliente,
-    numero_de_documento_del_cliente: numDocCliente,
-    apellidos_y_nombres_o_razon_social: razonSocialCliente,
-    direccion_del_cliente  : direccionCliente,
-    email                  : factura.propietario_email || '',
-    // Documento
-    fecha_de_emision       : factura.fecha,
-    moneda                 : 'PEN',
-    porcentaje_de_igv      : 18.00,
-    // Totales
-    total_gravada          : totalSinIgv,
-    total_igv              : totalIgv,
-    total                  : total,
-    // Forma de pago
-    tipo_de_cambio         : '',
-    medio_de_pago          : getMedioPago(factura.metodo_pago),
-    // Items
-    items                  : lineas,
-    // Opcionales
-    observaciones          : factura.notas || '',
-    // Para modo beta
-    ...(config.modo === 'beta' && {
-      enviar_automaticamente_a_la_sunat: true,
-      enviar_automaticamente_al_cliente : false,
-    }),
-  };
+  // Desencriptar credenciales
+  const rutaDecrypted  = decrypt(cfg.ose_api_key);      // UUID de la ruta
+  const tokenDecrypted = decrypt(cfg.sunat_usuario_sol); // Token de autenticación
 
-  return payload;
+  return {
+    config: {
+      ruta : rutaDecrypted,
+      token: tokenDecrypted,
+    },
+    payload: {
+      operacion              : 'generar_comprobante',
+      tipo_de_comprobante    : TIPOS[factura.tipo] || 2,
+      serie,
+      numero,
+      sunat_transaction      : 1,
+      cliente_tipo_de_documento   : clienteTipoDoc,
+      cliente_numero_de_documento : clienteNumDoc,
+      cliente_denominacion        : clienteDenom,
+      cliente_direccion           : clienteDir,
+      cliente_email               : factura.propietario_email || '',
+      fecha_de_emision            : formatFecha(factura.fecha),
+      fecha_de_vencimiento        : '',
+      moneda                      : 1, // 1 = Soles
+      tipo_de_cambio              : '',
+      porcentaje_de_igv           : 18.00,
+      descuento_global            : '',
+      total_descuento             : '',
+      total_anticipo              : '',
+      total_gravada               : totalSinIgv,
+      total_inafecta              : '',
+      total_exonerada             : '',
+      total_igv                   : totalIgv,
+      total_gratuita              : '',
+      total_otros_cargos          : '',
+      total,
+      detraccion                  : false,
+      observaciones               : factura.notas || '',
+      enviar_automaticamente_a_la_sunat: true,
+      enviar_automaticamente_al_cliente: false,
+      medio_de_pago               : getMedioPago(factura.metodo_pago),
+      cancelado                   : factura.estado === 'pagado',
+      formato_de_pdf              : 'A4',
+      items                       : itemsPayload,
+    },
+  };
 }
 
 /**
- * Genera payload para Nota de Crédito
+ * Genera payload para Nota de Crédito (anulación de factura)
  */
-function generarPayloadNotaCredito(facturaOriginal, motivo, config) {
+function generarPayloadNotaCredito(facturaOriginal, motivo, cfg, serieNota, numeroNota) {
   const [serieOrig, numOrig] = facturaOriginal.numero.split('-');
-  const serieNota = config.fe_serie_nota_cred || 'BC01';
+  const rutaDecrypted  = decrypt(cfg.ose_api_key);
+  const tokenDecrypted = decrypt(cfg.sunat_usuario_sol);
 
   return {
-    operacion              : 'generar_comprobante',
-    tipo_de_comprobante    : 7, // nota de crédito
-    serie                  : serieNota,
-    numero                 : 1, // el backend debe manejar el correlativo
-    tipo_de_nota_de_credito: 1, // 1=anulación de la operación
-    motivo_o_sustento_nc   : motivo || 'ANULACIÓN DE OPERACIÓN',
-    // Referencia al comprobante original
-    tipo_de_documento_de_referencia : TIPOS[facturaOriginal.tipo],
-    serie_de_referencia    : serieOrig,
-    numero_de_referencia   : parseInt(numOrig, 10),
-    fecha_de_referencia    : facturaOriginal.fecha,
-    // Mismos datos del comprobante original
-    ruc                    : config.ruc,
-    razon_social           : config.razon_social,
-    direccion              : config.direccion,
-    ubigeo                 : config.ubigeo || '150101',
-    client_id              : decrypt(config.ose_api_key),
-    tipo_de_documento_del_cliente: facturaOriginal.tipo === 'factura' ? 6 : 1,
-    numero_de_documento_del_cliente: facturaOriginal.tipo === 'factura'
-      ? facturaOriginal.cliente_ruc
-      : (facturaOriginal.dni || '00000000'),
-    apellidos_y_nombres_o_razon_social: facturaOriginal.tipo === 'factura'
-      ? facturaOriginal.cliente_razon_social
-      : facturaOriginal.propietario_nombre,
-    fecha_de_emision       : new Date().toISOString().split('T')[0],
-    moneda                 : 'PEN',
-    porcentaje_de_igv      : 18.00,
-    total_gravada          : parseFloat(facturaOriginal.subtotal),
-    total_igv              : parseFloat(facturaOriginal.igv),
-    total                  : parseFloat(facturaOriginal.total),
-    items                  : [], // Nubefact no requiere items en NC de anulación total
+    config: { ruta: rutaDecrypted, token: tokenDecrypted },
+    payload: {
+      operacion                      : 'generar_comprobante',
+      tipo_de_comprobante            : 3, // Nota de crédito
+      serie                          : serieNota,
+      numero                         : numeroNota,
+      sunat_transaction              : 1,
+      documento_que_se_modifica_tipo : TIPOS[facturaOriginal.tipo] || 2,
+      documento_que_se_modifica_serie: serieOrig,
+      documento_que_se_modifica_numero: parseInt(numOrig, 10),
+      tipo_de_nota_de_credito        : 1, // Anulación de la operación
+      cliente_tipo_de_documento      : facturaOriginal.tipo === 'factura' ? 6 : '-',
+      cliente_numero_de_documento    : facturaOriginal.tipo === 'factura' ? facturaOriginal.cliente_ruc : '-',
+      cliente_denominacion           : facturaOriginal.tipo === 'factura' ? facturaOriginal.cliente_razon_social : (facturaOriginal.propietario_nombre || 'CONSUMIDOR FINAL'),
+      cliente_direccion              : '',
+      fecha_de_emision               : formatFecha(new Date()),
+      moneda                         : 1,
+      porcentaje_de_igv              : 18.00,
+      total_gravada                  : parseFloat(facturaOriginal.subtotal),
+      total_igv                      : parseFloat(facturaOriginal.igv),
+      total                          : parseFloat(facturaOriginal.total),
+      observaciones                  : motivo || 'ANULACION DE OPERACION',
+      enviar_automaticamente_a_la_sunat: true,
+      enviar_automaticamente_al_cliente: false,
+      items: [{
+        unidad_de_medida     : 'ZZ',
+        codigo               : '0001',
+        descripcion          : motivo || 'ANULACION DE OPERACION',
+        cantidad             : 1,
+        valor_unitario       : parseFloat(facturaOriginal.subtotal),
+        precio_unitario      : parseFloat(facturaOriginal.total),
+        descuento            : '',
+        subtotal             : parseFloat(facturaOriginal.subtotal),
+        tipo_de_igv          : 1,
+        igv                  : parseFloat(facturaOriginal.igv),
+        total                : parseFloat(facturaOriginal.total),
+        anticipo_regularizacion: false,
+        anticipo_documento_serie : '',
+        anticipo_documento_numero: '',
+      }],
+    },
+  };
+}
+
+/**
+ * Genera payload para Comunicación de Baja (anulación de boleta)
+ */
+function generarPayloadBaja(facturaOriginal, motivo, cfg) {
+  const [serie, numero] = facturaOriginal.numero.split('-');
+  const rutaDecrypted  = decrypt(cfg.ose_api_key);
+  const tokenDecrypted = decrypt(cfg.sunat_usuario_sol);
+
+  return {
+    config: { ruta: rutaDecrypted, token: tokenDecrypted },
+    payload: {
+      operacion          : 'generar_anulacion',
+      tipo_de_comprobante: 2,
+      serie,
+      numero             : parseInt(numero, 10),
+      motivo             : (motivo || 'ERROR EN EMISION').toUpperCase(),
+    },
   };
 }
 
 function getMedioPago(metodo) {
   const map = {
-    efectivo      : 'Efectivo',
-    tarjeta       : 'Tarjeta',
-    transferencia : 'Transferencia',
-    yape          : 'Yape',
-    plin          : 'Plin',
+    efectivo      : 'EFECTIVO',
+    tarjeta       : 'TARJETA',
+    transferencia : 'TRANSFERENCIA',
+    yape          : 'YAPE',
+    plin          : 'PLIN',
   };
-  return map[metodo] || 'Contado';
+  return map[metodo] || 'CONTADO';
 }
 
-module.exports = { generarPayload, generarPayloadNotaCredito, TIPOS };
+module.exports = { generarPayload, generarPayloadNotaCredito, generarPayloadBaja, TIPOS };

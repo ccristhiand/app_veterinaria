@@ -8,9 +8,9 @@
 const { Router }  = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
-const { decrypt, encrypt, encryptIfNeeded } = require('../services/crypto.service');
-const { emitirComprobante, emitirNotaCredito, comunicacionBaja } = require('../services/nubefact.service');
-const { generarPayload, generarPayloadNotaCredito } = require('../services/sunat.service');
+const { encrypt, encryptIfNeeded } = require('../services/crypto.service');
+const { emitirComprobante, anularComprobante } = require('../services/nubefact.service');
+const { generarPayload, generarPayloadNotaCredito, generarPayloadBaja } = require('../services/sunat.service');
 const { masterQuery } = require('../config/masterDB');
 
 const router = Router();
@@ -172,14 +172,11 @@ router.post('/emitir/:facturaId', authorize('admin', 'recepcionista'),
       [req.params.facturaId]
     );
 
-    // Generar payload para Nubefact
-    const payload = generarPayload(factura, items, cfg);
+    // Generar payload para Nubefact (incluye config con ruta y token)
+    const { config: nubefactConfig, payload } = generarPayload(factura, items, cfg);
 
     // Emitir a Nubefact
-    const respuesta = await emitirComprobante(
-      { apiKey: decrypt(cfg.ose_api_key), modo: cfg.sunat_modo, ruc: cfg.ruc },
-      payload
-    );
+    const respuesta = await emitirComprobante(nubefactConfig, payload);
 
     if (respuesta.success) {
       const d = respuesta.data;
@@ -271,18 +268,16 @@ router.post('/anular/:facturaId', authorize('admin'),
 
     if (factura.tipo === 'factura') {
       // Factura → Nota de Crédito
-      const payload = generarPayloadNotaCredito(factura, motivo, cfg);
-      respuesta = await emitirNotaCredito(nubefactConfig, payload);
+      const { config: nubefactConfig, payload } = generarPayloadNotaCredito(
+        factura, motivo, cfg,
+        cfg.fe_serie_nota_cred || 'BC01',
+        1 // TODO: correlativo notas
+      );
+      respuesta = await anularComprobante(nubefactConfig, payload);
     } else {
       // Boleta → Comunicación de Baja
-      const [serie, numero] = factura.numero.split('-');
-      respuesta = await comunicacionBaja(nubefactConfig, {
-        tipo_de_comprobante: 2,
-        serie,
-        numero: parseInt(numero, 10),
-        motivo : motivo.toUpperCase(),
-        fecha  : factura.fecha,
-      });
+      const { config: nubefactConfig, payload: payloadBaja } = generarPayloadBaja(factura, motivo, cfg);
+      respuesta = await anularComprobante(nubefactConfig, payloadBaja);
     }
 
     if (respuesta.success) {

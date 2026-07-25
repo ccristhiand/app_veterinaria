@@ -2,25 +2,23 @@
 
 /**
  * VetClinic SaaS — Cliente Nubefact OSE
- * URL formato: https://api.nubefact.com/api/v1/{token}
- * El token va en la URL, no como header
+ * Documentación v2.9 — https://www.nubefact.com
+ * 
+ * Autenticación:
+ *   URL  (RUTA): https://api.nubefact.com/api/v1/{uuid-ruta}
+ *   TOKEN: Header Authorization: {token}
  */
 
 const https = require('https');
 
-// Base URLs sin token — el token se agrega como parte del path
-const NUBEFACT_BASE = {
-  beta      : 'https://api.nubefact.com/api/v1',
-  produccion: 'https://api.nubefact.com/api/v1',
-};
-
 /**
- * Hace una petición a Nubefact
- * URL final: https://api.nubefact.com/api/v1/{apiKey}
+ * Petición POST a Nubefact
+ * @param {string} ruta  - UUID de la ruta (ej: 98fb674b-dc41-47b0-a29f-0f681b02c769)
+ * @param {string} token - Token de autenticación
+ * @param {object} payload - JSON a enviar
  */
-function nubefactRequest(apiKey, modo, payload) {
-  const base = NUBEFACT_BASE[modo] || NUBEFACT_BASE.beta;
-  const url  = `${base}/${apiKey}`;
+function nubefactPost(ruta, token, payload) {
+  const url  = `https://api.nubefact.com/api/v1/${ruta}`;
   const body = JSON.stringify(payload);
 
   return new Promise((resolve, reject) => {
@@ -32,6 +30,7 @@ function nubefactRequest(apiKey, modo, payload) {
       headers : {
         'Content-Type'  : 'application/json',
         'Content-Length': Buffer.byteLength(body),
+        'Authorization' : token,
       },
     };
 
@@ -41,18 +40,18 @@ function nubefactRequest(apiKey, modo, payload) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (res.statusCode === 200) {
             resolve({ success: true, data: parsed });
           } else {
             resolve({
               success: false,
-              codigo : parsed.errors?.[0]?.code || String(res.statusCode),
-              mensaje: parsed.errors?.[0]?.message || parsed.message || 'Error desconocido',
+              codigo : parsed.codigo || String(res.statusCode),
+              mensaje: parsed.errors || parsed.message || 'Error desconocido',
               raw    : parsed,
             });
           }
         } catch {
-          reject(new Error(`Respuesta inválida de Nubefact: ${data.substring(0, 200)}`));
+          reject(new Error(`Respuesta inválida de Nubefact: ${data.substring(0, 300)}`));
         }
       });
     });
@@ -70,44 +69,27 @@ function nubefactRequest(apiKey, modo, payload) {
 /**
  * Emite un comprobante (boleta o factura)
  */
-async function emitirComprobante(config, documento) {
-  const payload = {
-    operacion          : 'generar_comprobante',
-    tipo_de_comprobante: documento.tipo_de_comprobante,
-    serie              : documento.serie,
-    numero             : documento.numero,
-    sunat_transaction  : 1,
-    ...documento,
-  };
-  // Quitar client_id del payload — ya va en la URL
-  delete payload.client_id;
-
-  return nubefactRequest(config.apiKey, config.modo, payload);
+async function emitirComprobante(config, payload) {
+  return nubefactPost(config.ruta, config.token, payload);
 }
 
 /**
- * Emite una Nota de Crédito
+ * Anula un comprobante (nota de crédito o comunicación de baja)
  */
-async function emitirNotaCredito(config, nota) {
-  return emitirComprobante(config, {
-    ...nota,
-    tipo_de_comprobante: 7,
+async function anularComprobante(config, payload) {
+  return nubefactPost(config.ruta, config.token, payload);
+}
+
+/**
+ * Consulta el estado de un comprobante
+ */
+async function consultarComprobante(config, tipo, serie, numero) {
+  return nubefactPost(config.ruta, config.token, {
+    operacion          : 'consultar_comprobante',
+    tipo_de_comprobante: tipo,
+    serie,
+    numero,
   });
 }
 
-/**
- * Comunicación de Baja (anulación de boleta)
- */
-async function comunicacionBaja(config, datos) {
-  const payload = {
-    operacion          : 'generar_comunicacion_de_baja',
-    tipo_de_comprobante: datos.tipo_de_comprobante,
-    serie              : datos.serie,
-    numero             : datos.numero,
-    motivo_baja        : datos.motivo || 'ERROR EN EMISION',
-    fecha_de_generacion: datos.fecha,
-  };
-  return nubefactRequest(config.apiKey, config.modo, payload);
-}
-
-module.exports = { emitirComprobante, emitirNotaCredito, comunicacionBaja };
+module.exports = { emitirComprobante, anularComprobante, consultarComprobante };
