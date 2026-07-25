@@ -1,7 +1,5 @@
 'use strict';
-
 require('dotenv').config();
-
 const http       = require('http');
 const express    = require('express');
 const cors       = require('cors');
@@ -9,12 +7,10 @@ const helmet     = require('helmet');
 const morgan     = require('morgan');
 const rateLimit  = require('express-rate-limit');
 const { Server } = require('socket.io');
-
 const logger                = require('./config/logger');
 const { testMasterConnection } = require('./config/masterDB');
 const { initSocket }        = require('./sockets');
 const { resolveTenant }     = require('./middlewares/tenant.middleware');
-
 // ── Rutas ────────────────────────────────────────────────────────
 const authRoutes        = require('./routes/auth.routes');
 const tenantRoutes      = require('./routes/tenant.routes');
@@ -37,24 +33,21 @@ const consentimientosRoutes  = require('./routes/consentimientos.routes');
 const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 const feRoutes               = require('./routes/fe.routes');
+// WA — descomentar cuando los archivos estén subidos al servidor
 const waRoutes               = require('./routes/wa.routes');
 const waCampanasRoutes       = require('./routes/wa-campanas.routes');
-
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
 const adminBackupRoutes  = require('./routes/admin_backup.routes');
 const adminFeRoutes      = require('./routes/admin_fe.routes');
-
 const app    = express();
 const server = http.createServer(app);
-
 // ── CORS dinámico por tenant ──────────────────────────────────────
 const corsOptions = {
   origin: true,
   credentials: true,
 };
-
 // ── Socket.io ────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'], credentials: true },
@@ -62,7 +55,6 @@ const io = new Server(server, {
 });
 app.set('io', io);
 initSocket(io);
-
 // ── Middlewares globales ─────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
@@ -71,7 +63,6 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev', { stream: { write: msg => logger.http(msg.trim()) } }));
 }
-
 // Rate limit global
 app.use(rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
@@ -80,12 +71,10 @@ app.use(rateLimit({
   message: { success: false, message: 'Demasiadas peticiones.' },
   keyGenerator: (req) => `${req.hostname}:${req.ip}`,
 }));
-
 // ── Healthcheck (sin tenant) ──────────────────────────────────────
 app.get('/health', (_req, res) =>
   res.json({ status: 'ok', uptime: process.uptime(), version: '2.0.0' })
 );
-
 // ── Favicon dinámico por tenant ───────────────────────────────────
 app.get('/favicon.ico', async (req, res) => {
   try {
@@ -102,13 +91,11 @@ app.get('/favicon.ico', async (req, res) => {
     res.status(204).end();
   } catch { res.status(204).end(); }
 });
-
 // ── Panel admin SaaS (sin tenant middleware) ──────────────────────
 app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
 app.use('/admin/api/fe',      adminFeRoutes);
 app.use('/admin/api',         adminRoutes);
-
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -118,10 +105,8 @@ app.use('/api/v1/auth/login', rateLimit({
   message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
   keyGenerator: (req) => req.ip,
 }));
-
 // ── Resolver tenant para todas las rutas de la API ────────────────
 app.use('/api', resolveTenant);
-
 const API = '/api/v1';
 app.use(`${API}/auth`,             authRoutes);
 app.use(`${API}/tenant`,           tenantRoutes);
@@ -144,14 +129,13 @@ app.use(`${API}/consentimientos`,  consentimientosRoutes);
 app.use(`${API}/branding`,         brandingRoutes);
 app.use('/admin/api/permisos',     permisosAdminRoutes);
 app.use(`${API}/fe`,               feRoutes);
+// WA — descomentar cuando los archivos estén subidos al servidor
 app.use(`${API}/wa/campanas`,      waCampanasRoutes);
 app.use(`${API}/wa`,               waRoutes);
-
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>
   res.status(404).json({ success: false, message: 'Ruta no encontrada.' })
 );
-
 // ── Error handler ─────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   logger.error(err);
@@ -160,17 +144,14 @@ app.use((err, _req, res, _next) => {
     ? 'Error interno del servidor.' : err.message;
   res.status(status).json({ success: false, message });
 });
-
 // ── Boot ──────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '4000', 10);
-
 (async () => {
   try {
     await testMasterConnection();
     server.listen(PORT, () => {
       logger.info(`🚀 VetClinic SaaS en http://localhost:${PORT}`);
       logger.info(`🌐 Modo multitenant activo`);
-
       // Iniciar scheduler de backups automáticos
       try {
         const { iniciarBackupScheduler } = require('./jobs/backup.scheduler');
@@ -184,5 +165,4 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     process.exit(1);
   }
 })();
-
 module.exports = { app, server, io };
