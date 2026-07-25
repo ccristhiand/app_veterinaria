@@ -3,8 +3,6 @@
 const { Router } = require('express');
 
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
-
 
 const router = Router();
 router.use(authenticate);
@@ -79,6 +77,7 @@ router.get('/', async (req, res, next) => {
       SELECT f.id, f.numero, f.tipo, f.fecha, f.subtotal, f.igv, f.total,
              f.estado, f.metodo_pago, f.created_at, f.updated_at,
              f.observaciones, f.anulado_por,
+             f.sunat_estado, f.sunat_mensaje, f.enlace_pdf, f.enlace_xml, f.sunat_enviado_at,
              CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
              CONCAT(p.nombre,' ',p.apellido) AS cliente_nombre,
              p.dni AS cliente_dni,
@@ -141,7 +140,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ── POST /api/v1/facturas — crear ─────────────────────────────────
-router.post('/', auditMiddleware('facturacion:creado', 'facturacion'), async (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
     const {
       tipo = 'boleta',
@@ -330,7 +329,7 @@ router.post('/', auditMiddleware('facturacion:creado', 'facturacion'), async (re
 
 // ── PATCH /api/v1/facturas/:id/pagar ─────────────────────────────
 // Registrar pago(s) en una factura pendiente
-router.patch('/:id/pagar', auditMiddleware('facturacion:actualizado', 'facturacion'), async (req, res, next) => {
+router.patch('/:id/pagar', async (req, res, next) => {
   try {
     const { pagos = [], metodo_pago } = req.body;
 
