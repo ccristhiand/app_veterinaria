@@ -97,6 +97,7 @@
     <div style="display:flex;gap:.5rem;border-bottom:2px solid var(--line)">
       <button id="tab-consultas" onclick="mostrarTab('consultas')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:700;color:var(--green-600);border-bottom:3px solid var(--green-500);margin-bottom:-2px;transition:all .15s">📋 Consultas</button>
       <button id="tab-vacunas" onclick="mostrarTab('vacunas')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:var(--ink-faint);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s">💉 Vacunas</button>
+      <button id="tab-desparasitaciones" onclick="mostrarTab('desparasitaciones')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:var(--ink-faint);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s">🐛 Desparasitaciones</button>
       <button id="tab-estetica" onclick="mostrarTab('estetica')" style="padding:.6rem 1.2rem;border:none;background:none;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:var(--ink-faint);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s">✂️ Estética</button>
     </div>
 
@@ -105,6 +106,9 @@
     </div>
     <div id="contenido-vacunas" style="display:none">
       <div id="vacunas-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div></div>
+    </div>
+    <div id="contenido-desparasitaciones" style="display:none">
+      <div id="desparasitaciones-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando desparasitaciones…</p></div></div>
     </div>
     <div id="contenido-estetica" style="display:none">
       <div id="estetica-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div></div>
@@ -213,6 +217,34 @@
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-vacuna')" class="vbtn vbtn-ghost">Cancelar</button>
       <button onclick="guardarVacuna()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit">💉 Guardar Vacuna</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Registrar Desparasitación -->
+<div id="modal-desparasitacion" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head"><h3>🐛 Registrar Desparasitación</h3><button onclick="closeModal('modal-desparasitacion')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <label class="vlabel">Tipo *</label>
+        <select id="d-tipo" class="vinput">
+          <option value="interna">🔵 Interna (oral/inyectable)</option>
+          <option value="externa">🟢 Externa (pipeta/collar/spray)</option>
+          <option value="interna_externa">🔷 Interna + Externa</option>
+        </select>
+      </div>
+      <div><label class="vlabel">Producto / Nombre comercial *</label><input id="d-producto" type="text" class="vinput" placeholder="Nexgard, Bravecto, Drontal, Milbemax…"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div><label class="vlabel">Dosis</label><input id="d-dosis" type="text" class="vinput" placeholder="1 comprimido, 0.5ml…"/></div>
+        <div><label class="vlabel">Fecha de aplicación *</label><input id="d-fecha" type="date" class="vinput"/></div>
+      </div>
+      <div><label class="vlabel">Próxima desparasitación</label><input id="d-proxima" type="date" class="vinput"/></div>
+      <div><label class="vlabel">Notas</label><textarea id="d-notas" rows="2" class="vinput" placeholder="Observaciones, reacciones, indicaciones…"></textarea></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-desparasitacion')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Guardar</button>
     </div>
   </div>
 </div>
@@ -459,23 +491,24 @@ if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBanne
 if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
 
 function mostrarTab(tab) {
-  const tabs = ['consultas','vacunas','estetica'];
+  const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
   tabs.forEach(t => {
     const btn = document.getElementById('tab-'+t);
     if (!btn) return;
     const isActive = t === tab;
-    // color activo: consultas=verde, vacunas=violeta, estetica=rosa
-    const activeColor = { consultas:'#059669', vacunas:'#6d28d9', estetica:'#db2777' };
-    const activeBorder = { consultas:'#10b981', vacunas:'#8b5cf6', estetica:'#ec4899' };
-    btn.style.color            = isActive ? activeColor[t]  : 'var(--ink-faint)';
+    const activeColor  = { consultas:'#059669', vacunas:'#6d28d9', desparasitaciones:'#047857', estetica:'#db2777' };
+    const activeBorder = { consultas:'#10b981', vacunas:'#8b5cf6', desparasitaciones:'#10b981',  estetica:'#ec4899' };
+    btn.style.color             = isActive ? activeColor[t]  : 'var(--ink-faint)';
     btn.style.borderBottomColor = isActive ? activeBorder[t] : 'transparent';
-    btn.style.fontWeight       = isActive ? '700' : '600';
+    btn.style.fontWeight        = isActive ? '700' : '600';
   });
-  document.getElementById('contenido-consultas').style.display = tab==='consultas' ? 'block' : 'none';
-  document.getElementById('contenido-vacunas').style.display   = tab==='vacunas'   ? 'block' : 'none';
-  document.getElementById('contenido-estetica').style.display  = tab==='estetica'  ? 'block' : 'none';
-  if (tab==='vacunas'  && mascotaId) cargarVacunas(mascotaId);
-  if (tab==='estetica' && mascotaId) cargarEstetica(mascotaId);
+  document.getElementById('contenido-consultas').style.display         = tab==='consultas'         ? 'block' : 'none';
+  document.getElementById('contenido-vacunas').style.display           = tab==='vacunas'           ? 'block' : 'none';
+  document.getElementById('contenido-desparasitaciones').style.display = tab==='desparasitaciones' ? 'block' : 'none';
+  document.getElementById('contenido-estetica').style.display          = tab==='estetica'          ? 'block' : 'none';
+  if (tab==='vacunas'           && mascotaId) cargarVacunas(mascotaId);
+  if (tab==='desparasitaciones' && mascotaId) cargarDesparasitaciones(mascotaId);
+  if (tab==='estetica'          && mascotaId) cargarEstetica(mascotaId);
 }
 
 function mostrarBannerCita() {
@@ -701,6 +734,100 @@ async function guardarVacuna() {
     document.getElementById('v-fecha').value=fechaHoyInput();
     mostrarTab('vacunas');
   } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── DESPARASITACIONES ─────────────────────────────────────────
+async function cargarDesparasitaciones(id) {
+  const cont = document.getElementById('desparasitaciones-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando desparasitaciones…</p></div>';
+  try {
+    const res  = await api('/desparasitaciones?mascota_id='+id);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      cont.innerHTML = `<div class="vcard" style="padding:2.5rem;text-align:center">
+        <span style="font-size:2.5rem;display:block;margin-bottom:.8rem">🐛</span>
+        <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin desparasitaciones registradas para esta mascota.</p>
+        <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Registrar Desparasitación</button>
+      </div>`;
+      return;
+    }
+    const tipoLabel = { interna:'🔵 Interna', externa:'🟢 Externa', interna_externa:'🔷 Int+Ext' };
+    const tipoColor = { interna:'#eff6ff', externa:'#f0fdf4', interna_externa:'#f0fdf4' };
+    cont.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+      <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.55rem 1.1rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Nueva desparasitación</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.7rem">` +
+    rows.map(d => {
+      const hoy     = new Date();
+      const proxima = d.proxima_dosis ? new Date(d.proxima_dosis+'T12:00:00') : null;
+      const dias    = proxima ? Math.ceil((proxima-hoy)/(1000*60*60*24)) : null;
+      const vencida = dias !== null && dias < 0;
+      const prox30  = dias !== null && dias >= 0 && dias <= 30;
+      return `<div class="vcard vcard-pad" style="${vencida?'border-color:#fecdd3;background:#fff1f2':prox30?'border-color:#fde68a;background:#fffbeb':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+              <span style="font-size:1.2rem">🐛</span>
+              <h4 style="font-weight:700;font-size:.95rem">${esc(d.producto)}</h4>
+              <span style="background:${tipoColor[d.tipo]||'#f0fdf4'};color:#047857;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #a7f3d0">${tipoLabel[d.tipo]||d.tipo}</span>
+              ${vencida ? '<span style="background:#fff1f2;color:#be123c;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fecdd3">🔴 VENCIDA</span>' : ''}
+              ${prox30 && !vencida ? '<span style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fde68a">⚠️ Próxima</span>' : ''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+              <span>📅 Aplicada: <strong>${fDate(d.fecha_aplicacion)}</strong></span>
+              ${d.dosis ? '<span>💊 '+esc(d.dosis)+'</span>' : ''}
+              <span>🩺 Dr(a). ${esc(d.veterinario_nombre||'—')}</span>
+            </div>
+            ${d.notas ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.35rem">📝 '+esc(d.notas)+'</p>' : ''}
+          </div>
+          ${d.proxima_dosis ? `<div style="text-align:right;flex-shrink:0">
+            <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Próxima</p>
+            <p style="font-weight:700;font-size:.88rem;margin-top:.2rem;color:${vencida?'#be123c':prox30?'#b45309':'var(--ink)'}">${fDate(d.proxima_dosis)}</p>
+            ${dias !== null ? '<p style="font-size:.7rem;color:'+(vencida?'#be123c':prox30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>' : ''}
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+  } catch(e) {
+    cont.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error al cargar desparasitaciones.</p></div>';
+  }
+}
+
+function abrirModalDesparasitacion() {
+  document.getElementById('d-tipo').value    = 'interna';
+  document.getElementById('d-producto').value= '';
+  document.getElementById('d-dosis').value   = '';
+  document.getElementById('d-fecha').value   = fechaHoyInput();
+  document.getElementById('d-proxima').value = '';
+  document.getElementById('d-notas').value   = '';
+  openModal('modal-desparasitacion');
+}
+
+async function guardarDesparasitacion() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+  const producto = document.getElementById('d-producto').value.trim();
+  const fecha    = document.getElementById('d-fecha').value;
+  if (!producto) { toast('El nombre del producto es obligatorio.','warning'); return; }
+  if (!fecha)    { toast('La fecha de aplicación es obligatoria.','warning'); return; }
+  const body = {
+    mascota_id      : mascotaId,
+    tipo            : document.getElementById('d-tipo').value,
+    producto,
+    dosis           : document.getElementById('d-dosis').value.trim() || null,
+    fecha_aplicacion: fecha,
+    proxima_dosis   : document.getElementById('d-proxima').value || null,
+    notas           : document.getElementById('d-notas').value.trim() || null,
+  };
+  try {
+    const res  = await api('/desparasitaciones', { method:'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
+    toast('🐛 Desparasitación registrada correctamente', 'success');
+    closeModal('modal-desparasitacion');
+    mostrarTab('desparasitaciones');
+  } catch { toast('Error de conexión.', 'danger'); }
 }
 
 function renderTimeline(consultas) {

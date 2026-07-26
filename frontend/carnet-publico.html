@@ -98,6 +98,19 @@
         </div>
       </div>
 
+      <!-- Desparasitaciones -->
+      <div class="card" id="seccion-desparasitaciones" style="display:none">
+        <div class="section-head"><p class="section-title">🐛 Historial de desparasitaciones</p></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Producto</th><th>Tipo</th><th>Dosis</th><th>Fecha</th><th>Próxima</th><th>Estado</th></tr></thead>
+            <tbody id="tabla-desparasitaciones">
+              <tr><td colspan="6" style="text-align:center;padding:2rem;color:#9ca3af">Sin desparasitaciones registradas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Historial de citas -->
       <div id="historial-citas-box" class="card" style="display:none">
         <div class="section-head"><p class="section-title">🩺 Historial de consultas</p></div>
@@ -128,8 +141,16 @@
     const API = _isLocalCarnet ? 'http://localhost:4000/api/v1' : `https://api.${_baseDomainCarnet}/api/v1`;
     const host = window.location.hostname;
 
-    const fDate = iso => new Date(iso+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
-    const fDateTime = iso => new Date(iso).toLocaleString('es-PE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const fDate = iso => {
+      if (!iso) return '—';
+      // Las fechas DATE de MySQL pueden venir como objeto Date o string
+      const str = (iso instanceof Date) ? iso.toISOString().split('T')[0] : String(iso).split('T')[0];
+      return new Date(str + 'T12:00:00').toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+    };
+    const fDateTime = iso => {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    };
     const esc = s => String(s??'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
     async function cargar() {
@@ -155,7 +176,7 @@
         if (logoUrl) {
           document.getElementById('clinica-logo-wrap').innerHTML =
             `<img src="${logoUrl}" alt="${nombreClinica}"
-               style="max-height:40px;max-width:100px;object-fit:contain;border-radius:.4rem"/>"`;
+               style="max-height:40px;max-width:100px;object-fit:contain;border-radius:.4rem"/>`;
         } else {
           document.getElementById('clinica-logo-wrap').textContent = '🐾';
         }
@@ -208,6 +229,34 @@
               <td style="color:#6b7280">${esc(v.fabricante||'—')}</td>
               <td>${fDate(v.fecha_aplicacion)}</td>
               <td>${prox ? fDate(v.proxima_dosis) : '—'}</td>
+              <td>${badge}</td>
+            </tr>`;
+          }).join('');
+        }
+
+        // Desparasitaciones
+        const despaEl = document.getElementById('seccion-desparasitaciones');
+        const despaTablaEl = document.getElementById('tabla-desparasitaciones');
+        if (desparasitaciones?.length && despaEl && despaTablaEl) {
+          despaEl.style.display = 'block';
+          const hoy = new Date();
+          const tipoLabel = { interna:'🔵 Interna', externa:'🟢 Externa', interna_externa:'🔷 Int+Ext' };
+          despaTablaEl.innerHTML = desparasitaciones.map(d => {
+            const prox  = d.proxima_dosis ? new Date(d.proxima_dosis+'T12:00:00') : null;
+            const dias  = prox ? Math.ceil((prox-hoy)/(1000*60*60*24)) : null;
+            const venc  = dias !== null && dias < 0;
+            const prox30= dias !== null && dias >= 0 && dias <= 30;
+            let badge = '';
+            if (!prox)    badge = '<span class="badge badge-ok">Sin refuerzo</span>';
+            else if (venc)   badge = '<span class="badge badge-venc">⚠️ Vencida</span>';
+            else if (prox30) badge = '<span class="badge badge-prox">⏳ Próxima</span>';
+            else             badge = '<span class="badge badge-ok">✅ Al día</span>';
+            return `<tr>
+              <td style="font-weight:600">${esc(d.producto)}</td>
+              <td style="color:#6b7280">${tipoLabel[d.tipo]||d.tipo}</td>
+              <td>${esc(d.dosis||'—')}</td>
+              <td>${fDate(d.fecha_aplicacion)}</td>
+              <td>${prox ? fDate(d.proxima_dosis) : '—'}</td>
               <td>${badge}</td>
             </tr>`;
           }).join('');

@@ -3,17 +3,21 @@
 const { Router } = require('express');
 const crypto     = require('crypto');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
-
 
 const router = Router();
 
+// Helper para formatear fechas DATE de MySQL (vienen como objetos Date)
+function formatDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    return val.toISOString().split('T')[0];
+  }
+  return String(val).split('T')[0];
+}
+
 // ── GET PÚBLICO /api/v1/carnet/:token ────────────────────────────
-// Sin autenticación — acceso público para el propietario
 router.get('/:token', async (req, res, next) => {
   try {
-    // Necesitamos un pool genérico — el token identifica al tenant
-    // En multitenant, el tenant viene del header X-Tenant-Host
     const [carnet] = await req.db.query(
       `SELECT c.*, m.nombre AS mascota_nombre, m.especie, m.raza,
               m.sexo, m.fecha_nacimiento, m.peso_kg, m.color, m.microchip,
@@ -28,12 +32,13 @@ router.get('/:token', async (req, res, next) => {
 
     if (!carnet) return res.status(404).json({ success:false, message:'Carnet no encontrado o desactivado.' });
 
-    // Branding del tenant
+    // Formatear fecha_nacimiento
+    if (carnet.fecha_nacimiento) carnet.fecha_nacimiento = formatDate(carnet.fecha_nacimiento);
+
     const [branding] = await req.db.query(
       'SELECT nombre, logo_url, color_primario, color_acento FROM empresa_config LIMIT 1'
     ).catch(() => [null]);
 
-    // También intentar desde tenant_config en vet_master
     const { masterQuery } = require('../config/masterDB');
     const host = req.headers['x-tenant-host'] || req.hostname || '';
     const [tenantBranding] = await masterQuery(
@@ -49,12 +54,32 @@ router.get('/:token', async (req, res, next) => {
       color_acento  : tenantBranding?.color_acento   || branding?.color_acento  || '#15803d',
     };
 
-    // Vacunas
-    const vacunas = await req.db.query(
+    // Vacunas — formatear fechas DATE
+    const vacunasRaw = await req.db.query(
       `SELECT nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas
        FROM vacunas WHERE mascota_id = ?
        ORDER BY fecha_aplicacion DESC`, [carnet.mascota_id]
     );
+    const vacunas = vacunasRaw.map(v => ({
+      ...v,
+      fecha_aplicacion: formatDate(v.fecha_aplicacion),
+      proxima_dosis   : formatDate(v.proxima_dosis),
+    }));
+
+    // Desparasitaciones — formatear fechas DATE
+    const despaRaw = await req.db.query(
+      `SELECT d.tipo, d.producto, d.dosis, d.fecha_aplicacion, d.proxima_dosis, d.notas,
+              u.nombre AS veterinario_nombre
+       FROM desparasitaciones d
+       JOIN usuarios u ON u.id = d.veterinario_id
+       WHERE d.mascota_id = ?
+       ORDER BY d.fecha_aplicacion DESC`, [carnet.mascota_id]
+    ).catch(() => []);
+    const desparasitaciones = despaRaw.map(d => ({
+      ...d,
+      fecha_aplicacion: formatDate(d.fecha_aplicacion),
+      proxima_dosis   : formatDate(d.proxima_dosis),
+    }));
 
     // Próximas citas
     const citas = await req.db.query(
@@ -64,7 +89,7 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY c.fecha_hora ASC LIMIT 3`, [carnet.mascota_id]
     );
 
-    // Historial de citas pasadas con historia clínica y recetas (últimas 10)
+    // Historial de citas con historia clínica
     const citas_historial_raw = await req.db.query(
       `SELECT c.id AS cita_id, c.fecha_hora, c.motivo AS motivo_cita, c.estado,
               u.nombre AS veterinario,
@@ -83,7 +108,6 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY c.fecha_hora DESC LIMIT 10`, [carnet.mascota_id]
     );
 
-    // También cargar historias clínicas sin cita vinculada
     const historias_sin_cita = await req.db.query(
       `SELECT h.id AS historia_id, h.fecha AS fecha_hora, h.motivo AS motivo_cita,
               h.diagnostico, h.tratamiento, h.observaciones, h.peso_kg, h.temperatura_c,
@@ -94,7 +118,6 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY h.fecha DESC LIMIT 5`, [carnet.mascota_id]
     );
 
-    // Cargar recetas para cada historia clínica
     const citas_historial = await Promise.all(
       citas_historial_raw.map(async c => {
         if (!c.historia_id) return { ...c, recetas: [] };
@@ -106,7 +129,6 @@ router.get('/:token', async (req, res, next) => {
       })
     );
 
-    // Cargar recetas para historias sin cita
     const historias_con_recetas = await Promise.all(
       historias_sin_cita.map(async h => {
         const recetas = await req.db.query(
@@ -117,7 +139,7 @@ router.get('/:token', async (req, res, next) => {
       })
     );
 
-    // Historial de baños/estética (últimos 10)
+    // Baños/estética
     const banos = await req.db.query(
       `SELECT s.fecha, s.tipo_bano, s.incluye_corte, s.incluye_unas,
               s.incluye_dental, s.productos, s.observaciones, s.precio,
@@ -126,8 +148,8 @@ router.get('/:token', async (req, res, next) => {
        WHERE s.mascota_id = ?
        ORDER BY s.fecha DESC LIMIT 10`, [carnet.mascota_id]
     );
+    const banosFormateados = banos.map(b => ({ ...b, fecha: formatDate(b.fecha) }));
 
-    // Última consulta
     const [ultimaConsulta] = await req.db.query(
       `SELECT h.fecha, h.diagnostico, h.tratamiento, u.nombre AS veterinario
        FROM historia_clinica h JOIN usuarios u ON u.id = h.veterinario_id
@@ -135,27 +157,34 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY h.fecha DESC LIMIT 1`, [carnet.mascota_id]
     );
 
-    // Incrementar vistas
     await req.db.query('UPDATE carnets_digitales SET vistas=vistas+1 WHERE token=?', [req.params.token]);
 
     return res.json({
       success: true,
-      data: { carnet, vacunas, citas, citas_historial, historias_sin_cita: historias_con_recetas, banos, ultima_consulta: ultimaConsulta || null, branding: clinicaBranding },
+      data: {
+        carnet,
+        vacunas,
+        desparasitaciones,
+        citas,
+        citas_historial,
+        historias_sin_cita: historias_con_recetas,
+        banos              : banosFormateados,
+        ultima_consulta    : ultimaConsulta || null,
+        branding           : clinicaBranding,
+      },
     });
   } catch(err) { next(err); }
 });
 
-// ── Rutas protegidas (requieren login) ───────────────────────────
+// ── Rutas protegidas ─────────────────────────────────────────
 router.use(authenticate);
 
-// GET /api/v1/carnet/mascota/:id — obtener o crear carnet de una mascota
 router.get('/mascota/:id', async (req, res, next) => {
   try {
     let [carnet] = await req.db.query(
       'SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]
     );
     if (!carnet) {
-      // Crear token único
       const token = crypto.randomBytes(24).toString('hex');
       await req.db.query(
         'INSERT INTO carnets_digitales (mascota_id, token) VALUES (?,?)',
@@ -167,7 +196,6 @@ router.get('/mascota/:id', async (req, res, next) => {
   } catch(err) { next(err); }
 });
 
-// PATCH /api/v1/carnet/mascota/:id/toggle — activar/desactivar carnet
 router.patch('/mascota/:id/toggle', authorize('admin'), async (req, res, next) => {
   try {
     const [carnet] = await req.db.query('SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]);
@@ -178,7 +206,6 @@ router.patch('/mascota/:id/toggle', authorize('admin'), async (req, res, next) =
   } catch(err) { next(err); }
 });
 
-// POST /api/v1/carnet/mascota/:id/regenerar — nuevo token
 router.post('/mascota/:id/regenerar', authorize('admin'), async (req, res, next) => {
   try {
     const token = crypto.randomBytes(24).toString('hex');

@@ -242,6 +242,56 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
   }
 }
 
+// ── Recordatorios de DESPARASITACIONES ───────────────────────
+async function procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica) {
+  const dias1 = cfg.recordatorio_vacunas_dias || 7;
+  const dias2 = cfg.recordatorio_vacunas_dias2;
+  const rangos = [dias1];
+  if (dias2) rangos.push(dias2);
+
+  for (const dias of rangos) {
+    const [desp] = await conn.execute(
+      `SELECT d.id, d.tipo, d.producto, d.proxima_dosis,
+              m.nombre AS mascota,
+              CONCAT(p.nombre,' ',p.apellido) AS propietario,
+              p.telefono
+       FROM desparasitaciones d
+       JOIN mascotas m ON m.id = d.mascota_id
+       JOIN propietarios p ON p.id = m.propietario_id
+       WHERE d.notificado = 0
+         AND d.proxima_dosis BETWEEN CURDATE() + INTERVAL ? DAY - INTERVAL 1 DAY
+                                 AND CURDATE() + INTERVAL ? DAY + INTERVAL 1 DAY
+         AND p.telefono IS NOT NULL`,
+      [dias, dias]
+    ).catch(() => [[]]);
+
+    const rows = desp || [];
+    console.log(`[WA Desparasitaciones] ${tenant.slug}: ${rows.length} recordatorios a ${dias} días`);
+
+    for (const d of rows) {
+      if (!d.telefono) continue;
+      try {
+        const tipoLabel = { interna: 'interna', externa: 'externa', interna_externa: 'interna y externa' };
+        const msg = `🐛 Hola ${d.propietario}, recuerda que *${d.mascota}* tiene pendiente su desparasitación ${tipoLabel[d.tipo]||''} con *${d.producto}*. Contáctanos en *${clinica}* para coordinar.`;
+
+        await callGateway('POST', '/wa/enviar', {
+          tenantId  : tenant.id,
+          telefono  : d.telefono,
+          mensaje   : msg,
+          tipo      : 'recordatorio_vacuna',
+          codigoPais: cfg.codigo_pais || '+51',
+        });
+
+        await conn.execute('UPDATE desparasitaciones SET notificado=1 WHERE id=?', [d.id]);
+        console.log(`[WA Desparasitaciones] ✅ ${tenant.slug} → ${d.telefono}`);
+      } catch (e) {
+        console.error(`[WA Desparasitaciones] ❌ ${tenant.slug}: ${e.message}`);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
 // ── Proceso principal ─────────────────────────────────────────
 async function procesarRecordatorios() {
   console.log(`[WA Recordatorios] Iniciando ciclo: ${new Date().toLocaleString('es-PE')}`);
@@ -277,6 +327,10 @@ async function procesarRecordatorios() {
         }
         if (cfg.recordatorio_vacunas_activo) {
           await procesarRecordatoriosVacunas(tenant, conn, cfg, clinica);
+        }
+        // Desparasitaciones — usa mismos días que vacunas
+        if (cfg.recordatorio_vacunas_activo) {
+          await procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica);
         }
       } catch (e) {
         console.error(`[WA Recordatorios] Error ${tenant.slug}: ${e.message}`);
