@@ -363,7 +363,7 @@ let _waEstado     = 'desconectado';
 let _propWASel    = null;
 let _plantillaEdit = null;
 let _qrInterval   = null;
-let _socket       = null;
+let _waSocket = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'WhatsApp', subtitle:'Mensajería y recordatorios' });
@@ -380,18 +380,18 @@ function iniciarSocket() {
   try {
     // Reutiliza la misma conexión Socket.io del API principal
     const WA_SOCKET_URL = window.location.protocol + '//' + window.location.hostname;
-    _socket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
+    _waSocket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
 
-    _socket.on('connect', () => {
+    _waSocket.on('connect', () => {
       const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
-      _socket.emit('wa:suscribir', user.tenant_id || '');
+      _waSocket.emit('wa:suscribir', user.tenant_id || '');
     });
 
-    _socket.on('wa:qr', (data) => {
+    _waSocket.on('wa:qr', (data) => {
       mostrarQR(data.qr);
     });
 
-    _socket.on('wa:conectado', (data) => {
+    _waSocket.on('wa:conectado', (data) => {
       _waEstado = 'conectado';
       actualizarBadgeEstado('conectado', data.numero);
       closeModal('modal-qr');
@@ -400,7 +400,7 @@ function iniciarSocket() {
       cargarEstado();
     });
 
-    _socket.on('wa:desconectado', () => {
+    _waSocket.on('wa:desconectado', () => {
       _waEstado = 'desconectado';
       actualizarBadgeEstado('desconectado');
       cargarEstado();
