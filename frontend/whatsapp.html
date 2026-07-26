@@ -58,9 +58,7 @@
       <div class="wa-stat" id="stat-cuota-box"><div class="val" id="stat-cuota">—</div><div class="lbl">Cuota disponible</div></div>
       <div class="wa-stat"><div class="val" id="stat-campanas">0</div><div class="lbl">Campañas activas</div></div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 340px;gap:1.3rem;align-items:start">
-      <!-- Estado conexión -->
       <div class="vcard vcard-pad">
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin-bottom:1rem">📱 Estado de conexión</h3>
         <div id="wa-estado-box" style="text-align:center;padding:2rem">
@@ -68,23 +66,15 @@
           <p style="margin-top:.75rem;color:var(--ink-faint);font-size:.82rem">Verificando conexión…</p>
         </div>
       </div>
-      <!-- Accesos rápidos -->
       <div style="display:flex;flex-direction:column;gap:1rem">
         <div class="vcard vcard-pad">
           <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.85rem">⚡ Acciones rápidas</h3>
           <div style="display:flex;flex-direction:column;gap:.5rem">
-            <button onclick="mostrarTab('enviar')" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none;justify-content:flex-start;gap:.6rem">
-              📤 Enviar mensaje manual
-            </button>
-            <button onclick="window.location.href='wa-campanas'" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">
-              📢 Nueva campaña masiva
-            </button>
-            <button onclick="mostrarTab('plantillas')" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">
-              📝 Gestionar plantillas
-            </button>
+            <button onclick="mostrarTab('enviar')" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none;justify-content:flex-start;gap:.6rem">📤 Enviar mensaje manual</button>
+            <button onclick="window.location.href='wa-campanas'" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📢 Nueva campaña masiva</button>
+            <button onclick="mostrarTab('plantillas')" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📝 Gestionar plantillas</button>
           </div>
         </div>
-        <!-- Recordatorios activos -->
         <div class="vcard vcard-pad">
           <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.75rem">🔔 Recordatorios</h3>
           <div id="recordatorios-estado" style="display:flex;flex-direction:column;gap:.4rem;font-size:.8rem">
@@ -98,16 +88,13 @@
   <!-- ── TAB ENVIAR ── -->
   <div id="contenido-enviar" style="display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;align-items:start">
-      <!-- Formulario -->
       <div class="vcard vcard-pad">
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin-bottom:1rem">📤 Nuevo mensaje</h3>
         <div style="margin-bottom:1rem">
           <label class="vlabel">Destinatario</label>
           <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
             <div class="search-wrap" style="flex:1">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               <input id="wa-prop-q" type="text" class="vinput" placeholder="Buscar propietario…" onkeydown="if(event.key==='Enter')buscarPropWA()"/>
             </div>
             <button onclick="buscarPropWA()" class="vbtn vbtn-primary">Buscar</button>
@@ -140,16 +127,13 @@
           <span id="btn-enviar-wa-txt">📤 Enviar mensaje</span>
         </button>
       </div>
-      <!-- Preview -->
       <div>
         <div class="vcard" style="padding:0;overflow:hidden">
           <div style="padding:.75rem 1rem;background:#128c7e;color:#fff;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:.5rem">
             <span class="wa-pulse"></span> Preview del mensaje
           </div>
           <div style="background:#e5ddd5;min-height:200px;padding:1rem;display:flex;flex-direction:column;justify-content:flex-end">
-            <div id="wa-preview-msg" style="background:#fff;border-radius:.85rem .85rem .85rem .1rem;padding:.75rem 1rem;max-width:85%;box-shadow:0 1px 2px rgba(0,0,0,.15);font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word">
-              El preview aparecerá aquí…
-            </div>
+            <div id="wa-preview-msg" style="background:#fff;border-radius:.85rem .85rem .85rem .1rem;padding:.75rem 1rem;max-width:85%;box-shadow:0 1px 2px rgba(0,0,0,.15);font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word">El preview aparecerá aquí…</div>
             <p style="font-size:.6rem;color:#667781;text-align:right;margin-top:.25rem" id="wa-preview-hora">—</p>
           </div>
         </div>
@@ -196,14 +180,8 @@
               📅 Recordatorio de citas
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
-              <div>
-                <label class="vlabel" style="font-size:.65rem">1° aviso (horas antes)</label>
-                <input id="cfg-citas-h1" type="number" min="1" max="72" class="vinput" placeholder="24"/>
-              </div>
-              <div>
-                <label class="vlabel" style="font-size:.65rem">2° aviso (horas antes, opcional)</label>
-                <input id="cfg-citas-h2" type="number" min="1" max="24" class="vinput" placeholder="2"/>
-              </div>
+              <div><label class="vlabel" style="font-size:.65rem">1° aviso (horas antes)</label><input id="cfg-citas-h1" type="number" min="1" max="72" class="vinput" placeholder="24"/></div>
+              <div><label class="vlabel" style="font-size:.65rem">2° aviso (horas antes, opcional)</label><input id="cfg-citas-h2" type="number" min="1" max="24" class="vinput" placeholder="2"/></div>
             </div>
           </div>
           <div style="border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem">
@@ -212,14 +190,8 @@
               💉 Recordatorio de vacunas
             </label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
-              <div>
-                <label class="vlabel" style="font-size:.65rem">1° aviso (días antes)</label>
-                <input id="cfg-vacunas-d1" type="number" min="1" max="30" class="vinput" placeholder="7"/>
-              </div>
-              <div>
-                <label class="vlabel" style="font-size:.65rem">2° aviso (días antes, opcional)</label>
-                <input id="cfg-vacunas-d2" type="number" min="1" max="7" class="vinput" placeholder="1"/>
-              </div>
+              <div><label class="vlabel" style="font-size:.65rem">1° aviso (días antes)</label><input id="cfg-vacunas-d1" type="number" min="1" max="30" class="vinput" placeholder="7"/></div>
+              <div><label class="vlabel" style="font-size:.65rem">2° aviso (días antes, opcional)</label><input id="cfg-vacunas-d2" type="number" min="1" max="7" class="vinput" placeholder="1"/></div>
             </div>
           </div>
           <div style="border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem">
@@ -263,14 +235,8 @@
     <div class="vcard" style="padding:0">
       <div style="overflow-x:auto">
         <table class="vtable">
-          <thead>
-            <tr>
-              <th>Fecha</th><th>Tipo</th><th>Destinatario</th><th>Teléfono</th><th>Estado</th><th>Mensaje</th>
-            </tr>
-          </thead>
-          <tbody id="log-tbody">
-            <tr><td colspan="6"><div class="vempty"><div class="vspinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Destinatario</th><th>Teléfono</th><th>Estado</th><th>Mensaje</th></tr></thead>
+          <tbody id="log-tbody"><tr><td colspan="6"><div class="vempty"><div class="vspinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -280,39 +246,26 @@
 <!-- Modal QR -->
 <div id="modal-qr" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:420px">
-    <div class="vmodal-head">
-      <h3>📱 Escanear QR de WhatsApp</h3>
-      <button onclick="closeModal('modal-qr')" class="vmodal-close">✕</button>
-    </div>
+    <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="closeModal('modal-qr')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="text-align:center;padding:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem 1rem;font-size:.82rem;color:#15803d;width:100%">
         📱 Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo → Escanea el QR
       </div>
-      <div id="qr-container" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;border:2px solid var(--line);border-radius:1rem;background:#fff">
-        <div class="vspinner"></div>
-      </div>
+      <div id="qr-container" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;border:2px solid var(--line);border-radius:1rem;background:#fff"><div class="vspinner"></div></div>
       <p id="qr-status" style="font-size:.78rem;color:var(--ink-faint)">Generando QR…</p>
       <button onclick="refrescarQR()" class="vbtn vbtn-ghost" style="font-size:.78rem">🔄 Refrescar QR</button>
     </div>
-    <div class="vmodal-foot">
-      <button onclick="closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button>
-    </div>
+    <div class="vmodal-foot"><button onclick="closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button></div>
   </div>
 </div>
 
 <!-- Modal Plantilla -->
 <div id="modal-plantilla" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:520px">
-    <div class="vmodal-head">
-      <h3 id="plantilla-modal-titulo">📝 Nueva plantilla</h3>
-      <button onclick="closeModal('modal-plantilla')" class="vmodal-close">✕</button>
-    </div>
+    <div class="vmodal-head"><h3 id="plantilla-modal-titulo">📝 Nueva plantilla</h3><button onclick="closeModal('modal-plantilla')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="plantilla-id"/>
-      <div>
-        <label class="vlabel">Nombre *</label>
-        <input id="plantilla-nombre" type="text" class="vinput" placeholder="Ej: Recordatorio post-consulta"/>
-      </div>
+      <div><label class="vlabel">Nombre *</label><input id="plantilla-nombre" type="text" class="vinput" placeholder="Ej: Recordatorio post-consulta"/></div>
       <div>
         <label class="vlabel">Tipo</label>
         <select id="plantilla-tipo" class="vinput">
@@ -345,18 +298,12 @@
   </div>
 </div>
 
-<!-- Modal Confirmación Desconexión — reemplaza confirm() nativo -->
+<!-- Modal Confirmación Desconexión -->
 <div id="modal-confirm-desconectar" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:400px">
-    <div class="vmodal-head">
-      <h3>🔌 Desconectar WhatsApp</h3>
-      <button onclick="closeModal('modal-confirm-desconectar')" class="vmodal-close">✕</button>
-    </div>
+    <div class="vmodal-head"><h3>🔌 Desconectar WhatsApp</h3><button onclick="closeModal('modal-confirm-desconectar')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body">
-      <p style="font-size:.88rem;color:var(--ink-soft);line-height:1.6">
-        ¿Estás seguro de que deseas desconectar WhatsApp?<br/>
-        Se cerrará la sesión y se eliminarán los archivos locales de autenticación.
-      </p>
+      <p style="font-size:.88rem;color:var(--ink-soft);line-height:1.6">¿Estás seguro de que deseas desconectar WhatsApp?<br/>Se cerrará la sesión y se eliminarán los archivos locales de autenticación.</p>
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-confirm-desconectar')" class="vbtn vbtn-ghost">Cancelar</button>
@@ -366,11 +313,11 @@
 </div>
 
 <script>
-let _waEstado     = 'desconectado';
-let _propWASel    = null;
+let _waEstado      = 'desconectado';
+let _propWASel     = null;
 let _plantillaEdit = null;
-let _qrInterval   = null;
-let _socket       = null;
+let _qrInterval    = null;
+let _waSocket      = null;  // ← _waSocket (no _socket) para no chocar con layout.js
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'WhatsApp', subtitle:'Mensajería y recordatorios' });
@@ -380,25 +327,16 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarPlantillasSelect();
 });
 
-// ── Socket WA ─────────────────────────────────────────────────
-// CORREGIDO: el WebSocket conecta al API principal (puerto 4000 / dominio base)
-// NO al gateway (puerto 5000) que no está expuesto públicamente por Nginx
 function iniciarSocket() {
   try {
-    // Reutiliza la misma conexión Socket.io del API principal
     const WA_SOCKET_URL = window.location.protocol + '//' + window.location.hostname;
-    _socket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
-
-    _socket.on('connect', () => {
+    _waSocket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
+    _waSocket.on('connect', () => {
       const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
-      _socket.emit('wa:suscribir', user.tenant_id || '');
+      _waSocket.emit('wa:suscribir', user.tenant_id || '');
     });
-
-    _socket.on('wa:qr', (data) => {
-      mostrarQR(data.qr);
-    });
-
-    _socket.on('wa:conectado', (data) => {
+    _waSocket.on('wa:qr', (data) => { mostrarQR(data.qr); });
+    _waSocket.on('wa:conectado', (data) => {
       _waEstado = 'conectado';
       actualizarBadgeEstado('conectado', data.numero);
       closeModal('modal-qr');
@@ -406,24 +344,20 @@ function iniciarSocket() {
       toast(`✅ WhatsApp conectado: ${data.numero}`, 'success', 5000);
       cargarEstado();
     });
-
-    _socket.on('wa:desconectado', () => {
+    _waSocket.on('wa:desconectado', () => {
       _waEstado = 'desconectado';
       actualizarBadgeEstado('desconectado');
       cargarEstado();
     });
-  } catch(e) {
-    console.warn('[WA Socket]', e.message);
-  }
+  } catch(e) { console.warn('[WA Socket]', e.message); }
 }
 
-// ── Estado ────────────────────────────────────────────────────
 async function cargarEstado() {
   try {
-    const res  = await api('/wa/estado');
+    const res = await api('/wa/estado');
     if (!res?.ok) return;
-    const d    = (await res.json()).data;
-    _waEstado  = d.estado || 'desconectado';
+    const d   = (await res.json()).data;
+    _waEstado = d.estado || 'desconectado';
     actualizarBadgeEstado(d.estado, d.numero);
     renderEstadoBox(d);
     renderRecordatoriosEstado();
@@ -434,15 +368,14 @@ function actualizarBadgeEstado(estado, numero = null) {
   const badge = document.getElementById('wa-badge-header');
   const btn   = document.getElementById('btn-conectar');
   const map = {
-    conectado   : { cls:'badge-conectado',   txt:`🟢 Conectado${numero?' · '+numero:''}` },
-    conectando  : { cls:'badge-conectando',  txt:'🟡 Conectando…' },
-    desconectado: { cls:'badge-desconectado',txt:'⚪ Desconectado' },
-    error       : { cls:'badge-error',       txt:'🔴 Error' },
+    conectado   : { cls:'badge-conectado',    txt:`🟢 Conectado${numero?' · '+numero:''}` },
+    conectando  : { cls:'badge-conectando',   txt:'🟡 Conectando…' },
+    desconectado: { cls:'badge-desconectado', txt:'⚪ Desconectado' },
+    error       : { cls:'badge-error',        txt:'🔴 Error' },
   };
   const { cls, txt } = map[estado] || map.desconectado;
   badge.className = `badge-wa ${cls}`;
   badge.textContent = txt;
-
   if (estado === 'conectado') {
     btn.textContent = '🔌 Desconectar';
     btn.onclick     = pedirConfirmacionDesconectar;
@@ -457,33 +390,28 @@ function actualizarBadgeEstado(estado, numero = null) {
 function renderEstadoBox(d) {
   const box = document.getElementById('wa-estado-box');
   if (d.estado === 'conectado') {
-    box.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:1rem">
-        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;font-size:2rem">📱</div>
-        <div style="text-align:center">
-          <p style="font-weight:800;font-size:1.1rem;color:#15803d">Conectado</p>
-          <p style="font-size:.82rem;color:var(--ink-soft);font-family:monospace;margin-top:.25rem">${esc(d.numero||'—')}</p>
-          ${d.ultima_conexion ? `<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">Desde: ${new Date(d.ultima_conexion).toLocaleString('es-PE')}</p>` : ''}
-        </div>
-        <span class="wa-pulse" style="width:14px;height:14px"></span>
-      </div>`;
+    box.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:1rem">
+      <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;font-size:2rem">📱</div>
+      <div style="text-align:center">
+        <p style="font-weight:800;font-size:1.1rem;color:#15803d">Conectado</p>
+        <p style="font-size:.82rem;color:var(--ink-soft);font-family:monospace;margin-top:.25rem">${esc(d.numero||'—')}</p>
+        ${d.ultima_conexion ? `<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">Desde: ${new Date(d.ultima_conexion).toLocaleString('es-PE')}</p>` : ''}
+      </div>
+      <span class="wa-pulse" style="width:14px;height:14px"></span>
+    </div>`;
   } else if (d.estado === 'conectando') {
-    box.innerHTML = `
-      <div style="text-align:center;padding:1.5rem">
-        <div class="vspinner" style="margin:0 auto 1rem"></div>
-        <p style="font-weight:700;color:#b45309">Conectando a WhatsApp…</p>
-        <p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem">Espera el QR para escanear</p>
-      </div>`;
+    box.innerHTML = `<div style="text-align:center;padding:1.5rem">
+      <div class="vspinner" style="margin:0 auto 1rem"></div>
+      <p style="font-weight:700;color:#b45309">Conectando a WhatsApp…</p>
+      <p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem">Espera el QR para escanear</p>
+    </div>`;
   } else {
-    box.innerHTML = `
-      <div style="text-align:center;padding:1.5rem">
-        <p style="font-size:3rem;margin-bottom:.75rem">📵</p>
-        <p style="font-weight:700;color:var(--ink-soft)">Sin conexión</p>
-        <p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem;max-width:260px;margin-inline:auto">Conecta tu WhatsApp para enviar mensajes y recordatorios automáticos</p>
-        <button onclick="conectarWA()" style="margin-top:1rem;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.75rem;cursor:pointer;font-weight:700;font-family:inherit">
-          📱 Conectar ahora
-        </button>
-      </div>`;
+    box.innerHTML = `<div style="text-align:center;padding:1.5rem">
+      <p style="font-size:3rem;margin-bottom:.75rem">📵</p>
+      <p style="font-weight:700;color:var(--ink-soft)">Sin conexión</p>
+      <p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem;max-width:260px;margin-inline:auto">Conecta tu WhatsApp para enviar mensajes y recordatorios automáticos</p>
+      <button onclick="conectarWA()" style="margin-top:1rem;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.75rem;cursor:pointer;font-weight:700;font-family:inherit">📱 Conectar ahora</button>
+    </div>`;
   }
 }
 
@@ -519,25 +447,18 @@ async function renderRecordatoriosEstado() {
 
 async function cargarStats() {
   try {
-    const [resLog, resCfg] = await Promise.all([
-      api('/wa/log?limit=200'),
-      api('/wa/config'),
-    ]);
+    const [resLog, resCfg] = await Promise.all([api('/wa/log?limit=200'), api('/wa/config')]);
     if (resLog?.ok) {
       const logs = (await resLog.json()).data || [];
       const hoy  = new Date().toISOString().split('T')[0];
-      document.getElementById('stat-enviados-hoy').textContent =
-        logs.filter(l => l.estado==='enviado' && l.created_at?.startsWith(hoy)).length;
-      document.getElementById('stat-enviados-mes').textContent =
-        logs.filter(l => l.estado==='enviado').length;
+      document.getElementById('stat-enviados-hoy').textContent = logs.filter(l => l.estado==='enviado' && l.created_at?.startsWith(hoy)).length;
+      document.getElementById('stat-enviados-mes').textContent = logs.filter(l => l.estado==='enviado').length;
     }
     if (resCfg?.ok) {
       const { cuota } = (await resCfg.json()).data;
       const el = document.getElementById('stat-cuota');
-      if (cuota.ilimitado) {
-        el.textContent = '∞';
-        el.style.color = '#15803d';
-      } else {
+      if (cuota.ilimitado) { el.textContent = '∞'; el.style.color = '#15803d'; }
+      else {
         const rest = (cuota.msgs_incluidos || 0) - (cuota.msgs_usados || 0);
         el.textContent = rest;
         el.style.color = rest < 10 ? '#be123c' : '#15803d';
@@ -547,7 +468,6 @@ async function cargarStats() {
   } catch(e) {}
 }
 
-// ── Conectar / Desconectar ────────────────────────────────────
 async function conectarWA() {
   try {
     actualizarBadgeEstado('conectando');
@@ -560,10 +480,7 @@ async function conectarWA() {
   } catch(e) { toast('Error al conectar.', 'danger'); actualizarBadgeEstado('desconectado'); }
 }
 
-// CORREGIDO: reemplaza confirm() nativo por modal personalizado
-function pedirConfirmacionDesconectar() {
-  openModal('modal-confirm-desconectar');
-}
+function pedirConfirmacionDesconectar() { openModal('modal-confirm-desconectar'); }
 
 async function confirmarDesconectar() {
   closeModal('modal-confirm-desconectar');
@@ -580,35 +497,21 @@ async function confirmarDesconectar() {
 async function refrescarQR() {
   try {
     const res = await api('/wa/qr');
-    if (!res?.ok) {
-      document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…';
-      setTimeout(refrescarQR, 3000);
-      return;
-    }
+    if (!res?.ok) { document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…'; setTimeout(refrescarQR, 3000); return; }
     const { data } = await res.json();
     mostrarQR(data.qr);
-  } catch(e) {
-    setTimeout(refrescarQR, 3000);
-  }
+  } catch(e) { setTimeout(refrescarQR, 3000); }
 }
 
 function mostrarQR(qrData) {
   const cont = document.getElementById('qr-container');
   cont.innerHTML = '';
-  new QRCode(cont, {
-    text        : qrData,
-    width       : 200,
-    height      : 200,
-    colorDark   : '#128c7e',
-    colorLight  : '#ffffff',
-    correctLevel: QRCode.CorrectLevel.H,
-  });
+  new QRCode(cont, { text:qrData, width:200, height:200, colorDark:'#128c7e', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.H });
   document.getElementById('qr-status').textContent = 'Escanea con tu WhatsApp';
 }
 
-// ── Enviar mensaje ────────────────────────────────────────────
 async function buscarPropWA() {
-  const q    = document.getElementById('wa-prop-q').value.trim();
+  const q = document.getElementById('wa-prop-q').value.trim();
   if (!q) return;
   const cont = document.getElementById('wa-prop-resultados');
   cont.innerHTML = '<div style="font-size:.75rem;color:var(--ink-faint);padding:.3rem">Buscando…</div>';
@@ -636,8 +539,8 @@ function selPropWA(id, nombre, telefono, mascotas) {
   document.getElementById('wa-prop-resultados').innerHTML = '';
   document.getElementById('wa-prop-q').value = '';
   document.getElementById('wa-prop-sel').style.display = 'flex';
-  document.getElementById('wa-prop-nombre').textContent  = nombre;
-  document.getElementById('wa-prop-tel').textContent     = telefono ? `📞 ${telefono}` : '⚠️ Sin teléfono registrado';
+  document.getElementById('wa-prop-nombre').textContent = nombre;
+  document.getElementById('wa-prop-tel').textContent    = telefono ? `📞 ${telefono}` : '⚠️ Sin teléfono registrado';
   actualizarPreviewMensaje();
 }
 
@@ -669,15 +572,10 @@ function actualizarPreviewMensaje() {
   const msg     = document.getElementById('wa-mensaje').value;
   const nombre  = _propWASel?.nombre  || '[nombre]';
   const mascota = _propWASel?.mascotas?.[0]?.nombre || '[mascota]';
-  const preview = msg
-    .replace(/\[nombre\]/gi,  nombre)
-    .replace(/\[mascota\]/gi, mascota)
-    .replace(/\[clinica\]/gi, '[clínica]');
+  const preview = msg.replace(/\[nombre\]/gi, nombre).replace(/\[mascota\]/gi, mascota).replace(/\[clinica\]/gi, '[clínica]');
   document.getElementById('wa-preview-msg').textContent = preview || 'El preview aparecerá aquí…';
   document.getElementById('wa-chars').textContent = `${msg.length} caracteres`;
-  const now = new Date();
-  document.getElementById('wa-preview-hora').textContent =
-    now.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('wa-preview-hora').textContent = new Date().toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
 }
 
 async function enviarMensajeWA() {
@@ -686,16 +584,11 @@ async function enviarMensajeWA() {
   const mensaje = document.getElementById('wa-mensaje').value.trim();
   if (!mensaje) { toast('Escribe un mensaje.', 'warning'); return; }
   if (_waEstado !== 'conectado') { toast('WhatsApp no está conectado.', 'warning'); return; }
-
   const btn = document.getElementById('btn-enviar-wa-txt');
   btn.textContent = 'Enviando…';
   document.getElementById('btn-enviar-wa').disabled = true;
-
   try {
-    const res  = await api('/wa/enviar', {
-      method: 'POST',
-      body  : { telefono: _propWASel.telefono, mensaje, propietario_id: _propWASel.id },
-    });
+    const res  = await api('/wa/enviar', { method:'POST', body:{ telefono:_propWASel.telefono, mensaje, propietario_id:_propWASel.id } });
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al enviar.', 'danger'); return; }
     toast(`✅ Mensaje enviado a ${_propWASel.nombre}`, 'success');
@@ -711,7 +604,6 @@ async function enviarMensajeWA() {
   }
 }
 
-// ── Tabs ──────────────────────────────────────────────────────
 function mostrarTab(tab) {
   ['inicio','enviar','plantillas','config','log'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
@@ -722,17 +614,13 @@ function mostrarTab(tab) {
   if (tab === 'log')        cargarLog();
 }
 
-// ── Plantillas ────────────────────────────────────────────────
 async function cargarPlantillas() {
   const grid = document.getElementById('plantillas-grid');
   grid.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
   try {
     const res  = await api('/wa/plantillas');
     const rows = (await res.json()).data || [];
-    if (!rows.length) {
-      grid.innerHTML = '<div class="vempty"><span class="icon">📝</span><p>Sin plantillas — crea la primera</p></div>';
-      return;
-    }
+    if (!rows.length) { grid.innerHTML = '<div class="vempty"><span class="icon">📝</span><p>Sin plantillas — crea la primera</p></div>'; return; }
     const tipoIcons = { recordatorio_cita:'📅', recordatorio_vacuna:'💉', manual:'✏️', campana:'📢', otro:'💬' };
     grid.innerHTML = rows.map(p => `
       <div class="plantilla-card">
@@ -741,9 +629,7 @@ async function cargarPlantillas() {
             <span>${tipoIcons[p.tipo]||'💬'}</span>
             <p style="font-weight:700;font-size:.88rem">${esc(p.nombre)}</p>
           </div>
-          <div style="display:flex;gap:.3rem">
-            <button onclick="editarPlantilla(${JSON.stringify(p).replace(/"/g,'&quot;')})" class="vlink" style="font-size:.72rem;color:var(--sky)">✏️</button>
-          </div>
+          <button onclick="editarPlantilla(${JSON.stringify(p).replace(/"/g,'&quot;')})" class="vlink" style="font-size:.72rem;color:var(--sky)">✏️</button>
         </div>
         <p style="font-size:.75rem;color:var(--ink-soft);line-height:1.5;background:#f8faf8;padding:.5rem .7rem;border-radius:.6rem">${esc(p.contenido)}</p>
         <div style="display:flex;justify-content:space-between;margin-top:.6rem;align-items:center">
@@ -751,28 +637,23 @@ async function cargarPlantillas() {
           <button onclick="usarPlantilla('${esc(p.contenido)}')" style="font-size:.72rem;color:#25d366;font-weight:700;background:none;border:none;cursor:pointer">Usar →</button>
         </div>
       </div>`).join('');
-  } catch(e) {
-    grid.innerHTML = '<div class="vempty"><span>😿</span><p>Error al cargar</p></div>';
-  }
+  } catch(e) { grid.innerHTML = '<div class="vempty"><span>😿</span><p>Error al cargar</p></div>'; }
 }
 
 function abrirModalPlantilla() {
   _plantillaEdit = null;
   document.getElementById('plantilla-modal-titulo').textContent = '📝 Nueva plantilla';
-  document.getElementById('plantilla-id').value       = '';
-  document.getElementById('plantilla-nombre').value   = '';
-  document.getElementById('plantilla-tipo').value     = 'manual';
-  document.getElementById('plantilla-contenido').value= '';
+  ['plantilla-id','plantilla-nombre','plantilla-contenido'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('plantilla-tipo').value = 'manual';
   openModal('modal-plantilla');
 }
 
 function editarPlantilla(p) {
-  _plantillaEdit = p;
   document.getElementById('plantilla-modal-titulo').textContent = '✏️ Editar plantilla';
-  document.getElementById('plantilla-id').value       = p.id;
-  document.getElementById('plantilla-nombre').value   = p.nombre;
-  document.getElementById('plantilla-tipo').value     = p.tipo;
-  document.getElementById('plantilla-contenido').value= p.contenido;
+  document.getElementById('plantilla-id').value        = p.id;
+  document.getElementById('plantilla-nombre').value    = p.nombre;
+  document.getElementById('plantilla-tipo').value      = p.tipo;
+  document.getElementById('plantilla-contenido').value = p.contenido;
   openModal('modal-plantilla');
 }
 
@@ -785,24 +666,21 @@ function usarPlantilla(contenido) {
 function insertarVar(variable) {
   const ta  = document.getElementById('plantilla-contenido');
   const pos = ta.selectionStart;
-  const val = ta.value;
-  ta.value  = val.substring(0, pos) + variable + val.substring(pos);
+  ta.value  = ta.value.substring(0, pos) + variable + ta.value.substring(pos);
   ta.focus();
   ta.selectionStart = ta.selectionEnd = pos + variable.length;
 }
 
 async function guardarPlantilla() {
-  const nombre   = document.getElementById('plantilla-nombre').value.trim();
-  const tipo     = document.getElementById('plantilla-tipo').value;
-  const contenido= document.getElementById('plantilla-contenido').value.trim();
+  const nombre    = document.getElementById('plantilla-nombre').value.trim();
+  const tipo      = document.getElementById('plantilla-tipo').value;
+  const contenido = document.getElementById('plantilla-contenido').value.trim();
   if (!nombre || !contenido) { toast('Nombre y contenido son obligatorios.', 'warning'); return; }
-
   const id     = document.getElementById('plantilla-id').value;
   const url    = id ? `/wa/plantillas/${id}` : '/wa/plantillas';
   const method = id ? 'PUT' : 'POST';
-
   try {
-    const res = await api(url, { method, body: { nombre, tipo, contenido, activo: 1 } });
+    const res = await api(url, { method, body:{ nombre, tipo, contenido, activo:1 } });
     const d   = await res.json();
     if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
     toast('✅ Plantilla guardada', 'success');
@@ -812,38 +690,37 @@ async function guardarPlantilla() {
   } catch(e) { toast('Error de conexión.', 'danger'); }
 }
 
-// ── Config ────────────────────────────────────────────────────
 async function cargarConfig() {
   try {
     const res = await api('/wa/config');
     if (!res?.ok) return;
     const { config } = (await res.json()).data;
-    document.getElementById('cfg-activo').checked          = !!config.activo;
-    document.getElementById('cfg-codigo-pais').value       = config.codigo_pais || '+51';
-    document.getElementById('cfg-citas-activo').checked    = !!config.recordatorio_citas_activo;
-    document.getElementById('cfg-citas-h1').value          = config.recordatorio_citas_horas || 24;
-    document.getElementById('cfg-citas-h2').value          = config.recordatorio_citas_horas2 || '';
-    document.getElementById('cfg-vacunas-activo').checked  = !!config.recordatorio_vacunas_activo;
-    document.getElementById('cfg-vacunas-d1').value        = config.recordatorio_vacunas_dias || 7;
-    document.getElementById('cfg-vacunas-d2').value        = config.recordatorio_vacunas_dias2 || '';
-    document.getElementById('cfg-desparasitaciones-activo').checked = !!config.recordatorio_desparasitaciones_activo;
+    document.getElementById('cfg-activo').checked                        = !!config.activo;
+    document.getElementById('cfg-codigo-pais').value                     = config.codigo_pais || '+51';
+    document.getElementById('cfg-citas-activo').checked                  = !!config.recordatorio_citas_activo;
+    document.getElementById('cfg-citas-h1').value                        = config.recordatorio_citas_horas || 24;
+    document.getElementById('cfg-citas-h2').value                        = config.recordatorio_citas_horas2 || '';
+    document.getElementById('cfg-vacunas-activo').checked                = !!config.recordatorio_vacunas_activo;
+    document.getElementById('cfg-vacunas-d1').value                      = config.recordatorio_vacunas_dias || 7;
+    document.getElementById('cfg-vacunas-d2').value                      = config.recordatorio_vacunas_dias2 || '';
+    document.getElementById('cfg-desparasitaciones-activo').checked      = !!config.recordatorio_desparasitaciones_activo;
   } catch(e) {}
 }
 
 async function guardarConfig() {
   const body = {
-    activo                     : document.getElementById('cfg-activo').checked,
-    codigo_pais                : document.getElementById('cfg-codigo-pais').value.trim() || '+51',
-    recordatorio_citas_activo  : document.getElementById('cfg-citas-activo').checked,
-    recordatorio_citas_horas   : parseInt(document.getElementById('cfg-citas-h1').value) || 24,
-    recordatorio_citas_horas2  : parseInt(document.getElementById('cfg-citas-h2').value) || null,
-    recordatorio_vacunas_activo: document.getElementById('cfg-vacunas-activo').checked,
-    recordatorio_vacunas_dias  : parseInt(document.getElementById('cfg-vacunas-d1').value) || 7,
-    recordatorio_vacunas_dias2 : parseInt(document.getElementById('cfg-vacunas-d2').value) || null,
+    activo                               : document.getElementById('cfg-activo').checked,
+    codigo_pais                          : document.getElementById('cfg-codigo-pais').value.trim() || '+51',
+    recordatorio_citas_activo            : document.getElementById('cfg-citas-activo').checked,
+    recordatorio_citas_horas             : parseInt(document.getElementById('cfg-citas-h1').value) || 24,
+    recordatorio_citas_horas2            : parseInt(document.getElementById('cfg-citas-h2').value) || null,
+    recordatorio_vacunas_activo          : document.getElementById('cfg-vacunas-activo').checked,
+    recordatorio_vacunas_dias            : parseInt(document.getElementById('cfg-vacunas-d1').value) || 7,
+    recordatorio_vacunas_dias2           : parseInt(document.getElementById('cfg-vacunas-d2').value) || null,
     recordatorio_desparasitaciones_activo: document.getElementById('cfg-desparasitaciones-activo').checked,
   };
   try {
-    const res = await api('/wa/config', { method: 'PUT', body });
+    const res = await api('/wa/config', { method:'PUT', body });
     const d   = await res.json();
     if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
     toast('✅ Configuración guardada', 'success');
@@ -851,7 +728,6 @@ async function guardarConfig() {
   } catch(e) { toast('Error de conexión.', 'danger'); }
 }
 
-// ── Log ───────────────────────────────────────────────────────
 async function cargarLog() {
   const tipo   = document.getElementById('log-tipo').value;
   const estado = document.getElementById('log-estado').value;
@@ -863,10 +739,7 @@ async function cargarLog() {
   try {
     const res  = await api(url);
     const rows = (await res.json()).data || [];
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span>📭</span><p>Sin mensajes</p></div></td></tr>';
-      return;
-    }
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span>📭</span><p>Sin mensajes</p></div></td></tr>'; return; }
     const tipoLabels = { manual:'✏️ Manual', recordatorio_cita:'📅 Cita', recordatorio_vacuna:'💉 Vacuna', campana:'📢 Campaña' };
     tbody.innerHTML = rows.map(r => `<tr>
       <td style="font-size:.75rem;white-space:nowrap">${new Date(r.created_at).toLocaleString('es-PE')}</td>
@@ -878,9 +751,7 @@ async function cargarLog() {
         : '<span style="background:#fff1f2;color:#be123c;font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;border:1px solid #fecdd3">❌ Fallido</span>'}</td>
       <td style="font-size:.72rem;color:var(--ink-faint);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.mensaje)}">${esc(r.mensaje)}</td>
     </tr>`).join('');
-  } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span>😿</span><p>Error</p></div></td></tr>';
-  }
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="6"><div class="vempty"><span>😿</span><p>Error</p></div></td></tr>'; }
 }
 
 document.getElementById('wa-mensaje').addEventListener('input', actualizarPreviewMensaje);
