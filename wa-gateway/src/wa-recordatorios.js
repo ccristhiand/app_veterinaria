@@ -91,12 +91,13 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
   const horas1 = cfg.recordatorio_citas_horas || 24;
   const horas2 = cfg.recordatorio_citas_horas2;
 
-  // Buscar citas en el rango de horas configurado
   const rangos = [horas1];
   if (horas2) rangos.push(horas2);
 
   for (const horas of rangos) {
-    const citas = await conn.execute(
+    // CORREGIDO: el anti-duplicado ahora filtra por telefono+tipo en el log
+    // en lugar de comparar c.id con propietario_id (que era incorrecto)
+    const [citas] = await conn.execute(
       `SELECT c.id, c.fecha_hora, c.motivo,
               m.nombre AS mascota,
               CONCAT(p.nombre,' ',p.apellido) AS propietario,
@@ -110,32 +111,31 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
          AND p.telefono IS NOT NULL
          AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 30 MINUTE
                               AND NOW() + INTERVAL ? HOUR + INTERVAL 30 MINUTE
-         AND c.id NOT IN (
-           SELECT propietario_id FROM wa_mensajes_log
-           WHERE tipo='recordatorio_cita'
-             AND created_at > NOW() - INTERVAL 1 DAY
-             AND estado='enviado'
+         AND p.telefono NOT IN (
+           SELECT DISTINCT telefono FROM wa_mensajes_log
+           WHERE tipo = 'recordatorio_cita'
+             AND estado = 'enviado'
+             AND enviado_at > NOW() - INTERVAL 1 DAY
          )`,
       [horas, horas]
     );
 
-    const rows = citas[0] || [];
-    console.log(`[WA Citas] ${tenant.slug}: ${rows.length} recordatorios a ${horas}h`);
+    console.log(`[WA Citas] ${tenant.slug}: ${citas.length} recordatorios a ${horas}h`);
 
-    for (const cita of rows) {
+    for (const cita of citas) {
       if (!cita.telefono) continue;
       try {
-        const [plantilla] = await conn.execute(
+        const [[plantilla]] = await conn.execute(
           "SELECT contenido FROM wa_plantillas WHERE tipo='recordatorio_cita' AND activo=1 LIMIT 1"
         );
         const msg = rellenarPlantilla(
-          plantilla[0]?.contenido || '🐾 Hola [nombre], recuerda tu cita para [mascota] el [fecha] a las [hora] en [clinica].',
+          plantilla?.contenido || '🐾 Hola [nombre], recuerda tu cita para [mascota] el [fecha] a las [hora] en [clinica].',
           {
             nombre  : cita.propietario,
             mascota : cita.mascota,
             fecha   : fDate(cita.fecha_hora),
             hora    : fHora(cita.fecha_hora),
-            clinica : clinica,
+            clinica,
           }
         );
 
@@ -152,7 +152,6 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
       } catch (e) {
         console.error(`[WA Citas] ❌ ${tenant.slug} → ${cita.telefono}: ${e.message}`);
       }
-      // Esperar entre mensajes para no saturar
       await new Promise(r => setTimeout(r, 2000));
     }
   }
@@ -167,7 +166,7 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
   if (dias2) rangos.push(dias2);
 
   for (const dias of rangos) {
-    const vacunas = await conn.execute(
+    const [vacunas] = await conn.execute(
       `SELECT v.id, v.nombre, v.proxima_dosis,
               m.nombre AS mascota,
               CONCAT(p.nombre,' ',p.apellido) AS propietario,
@@ -182,22 +181,21 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
       [dias, dias]
     );
 
-    const rows = vacunas[0] || [];
-    console.log(`[WA Vacunas] ${tenant.slug}: ${rows.length} recordatorios a ${dias} días`);
+    console.log(`[WA Vacunas] ${tenant.slug}: ${vacunas.length} recordatorios a ${dias} días`);
 
-    for (const vac of rows) {
+    for (const vac of vacunas) {
       if (!vac.telefono) continue;
       try {
-        const [plantilla] = await conn.execute(
+        const [[plantilla]] = await conn.execute(
           "SELECT contenido FROM wa_plantillas WHERE tipo='recordatorio_vacuna' AND activo=1 LIMIT 1"
         );
         const msg = rellenarPlantilla(
-          plantilla[0]?.contenido || '💉 Hola [nombre], [mascota] tiene pendiente su vacuna [vacuna]. ¡Agenda tu cita en [clinica]!',
+          plantilla?.contenido || '💉 Hola [nombre], [mascota] tiene pendiente su vacuna [vacuna]. ¡Agenda tu cita en [clinica]!',
           {
             nombre  : vac.propietario,
             mascota : vac.mascota,
             vacuna  : vac.nombre,
-            clinica : clinica,
+            clinica,
           }
         );
 
@@ -225,7 +223,6 @@ async function procesarRecordatorios() {
   console.log(`[WA Recordatorios] Iniciando ciclo: ${new Date().toLocaleString('es-PE')}`);
 
   try {
-    // Obtener tenants con WA activo y conectado
     const tenants = await masterQuery(
       `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
               tc.nombre_clinica, tc.telefono AS tel_clinica
@@ -241,7 +238,6 @@ async function procesarRecordatorios() {
       try {
         conn = await getTenantConn(tenant);
 
-        // Obtener config WA del tenant
         const [[cfg]] = await conn.execute('SELECT * FROM wa_config LIMIT 1');
         if (!cfg?.activo) continue;
 
@@ -266,11 +262,10 @@ async function procesarRecordatorios() {
   console.log(`[WA Recordatorios] Ciclo completado`);
 }
 
-// ── Scheduler ─────────────────────────────────────────────────
-// Cada 30 minutos
+// ── Scheduler — cada 30 minutos ───────────────────────────────
 const INTERVALO = 30 * 60 * 1000;
 
-procesarRecordatorios(); // Ejecutar al arrancar
+procesarRecordatorios();
 setInterval(procesarRecordatorios, INTERVALO);
 
 console.log(`[WA Recordatorios] ✅ Activo — cada 30 minutos`);

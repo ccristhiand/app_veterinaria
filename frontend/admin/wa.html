@@ -24,6 +24,7 @@
     .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
     .badge-conectado   {background:#052e16;color:#4ade80;border:1px solid #166534}
     .badge-desconectado{background:#1e293b;color:#475569;border:1px solid #334155}
+    .badge-conectando  {background:#451a03;color:#fb923c;border:1px solid #9a3412}
     .badge-error       {background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
     .badge-wa{font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;display:inline-block}
     .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
@@ -54,10 +55,10 @@
 
   <!-- Stats globales -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
-    <div class="stat-box"><div class="stat-lbl">Clínicas con WA</div><div class="stat-val" id="stat-activas">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Clínicas con WA activo</div><div class="stat-val" id="stat-activas">—</div></div>
     <div class="stat-box"><div class="stat-lbl">Conectadas ahora</div><div class="stat-val" style="color:#4ade80" id="stat-conectadas">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Msgs enviados hoy</div><div class="stat-val" id="stat-msgs-hoy">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Total mes</div><div class="stat-val" id="stat-msgs-mes">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Msgs usados este mes</div><div class="stat-val" id="stat-msgs-mes">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Total cuota asignada</div><div class="stat-val" id="stat-cuota-total">—</div></div>
   </div>
 
   <!-- Tabla clínicas -->
@@ -70,7 +71,7 @@
         <thead>
           <tr>
             <th>Clínica</th>
-            <th>WA</th>
+            <th>WA activo</th>
             <th>Conexión</th>
             <th>Número</th>
             <th>Mensajes mes</th>
@@ -95,21 +96,18 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="cuota-tenant-id"/>
-      <!-- Toggle activo -->
       <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
         <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
           <input type="checkbox" id="cuota-activo" style="accent-color:#25d366;width:16px;height:16px"/>
           WhatsApp activo para esta clínica
         </label>
       </div>
-      <!-- Ilimitado -->
       <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
         <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
           <input type="checkbox" id="cuota-ilimitado" style="accent-color:#25d366;width:16px;height:16px" onchange="toggleIlimitado()"/>
           Mensajes ilimitados
         </label>
       </div>
-      <!-- Cuota -->
       <div id="cuota-limite-box" class="grid2">
         <div>
           <label>Mensajes incluidos / mes</label>
@@ -132,49 +130,80 @@
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
   renderSidebar('wa');
-  const admin = getAdmin();
-  if (admin) document.getElementById('admin-nombre').textContent = admin.nombre || 'Admin';
+
+  // CORREGIDO: verificar que el elemento existe antes de asignar textContent
+  const adminEl = document.getElementById('admin-nombre');
+  if (adminEl) {
+    const admin = getAdmin();
+    if (admin) adminEl.textContent = admin.nombre || 'Admin';
+  }
 
   let _tenantActual = null;
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
   async function cargar() {
     const tbody = document.getElementById('tbody-wa');
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
 
     try {
-      // Obtener todos los tenants con su config WA
-      const res  = await adminFetch('/tenants');
-      if (!res?.ok) return;
-      const tenants = (await res.json()).data || [];
+      // CORREGIDO: usar /estado-global que devuelve todo en una sola llamada
+      // en lugar de hacer N llamadas a /wa/:id/config por cada tenant
+      const [resTenants, resEstado] = await Promise.all([
+        adminFetch('/tenants'),
+        adminFetch('/wa/estado-global'),
+      ]);
 
-      let activas = 0, conectadas = 0;
+      if (!resTenants?.ok) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar tenants</td></tr>`;
+        return;
+      }
 
-      const rows = await Promise.all(tenants.map(async t => {
-        // Obtener estado WA desde gateway via API interna
-        let waEstado = { estado: 'desconectado', numero: null };
-        let waCuota  = { activo: false, ilimitado: false, msgs_incluidos: 0, msgs_usados: 0 };
-        try {
-          const rw = await adminFetch(`/wa/${t.id}/config`);
-          if (rw?.ok) {
-            const d = (await rw.json()).data;
-            waCuota = d;
-            if (d.activo) activas++;
-          }
-        } catch {}
-        return { ...t, waEstado, waCuota };
-      }));
+      const tenants     = (await resTenants.json()).data || [];
+      const estadoWA    = resEstado?.ok ? (await resEstado.json()).data || [] : [];
 
-      document.getElementById('stat-activas').textContent   = activas;
+      // Mapear estado WA por tenant_id para acceso O(1)
+      const estadoMap = {};
+      for (const s of estadoWA) {
+        estadoMap[s.tenant_id] = s;
+      }
+
+      // Calcular stats globales
+      let activas = 0, conectadas = 0, msgsTotal = 0, cuotaTotal = 0;
+      for (const s of estadoWA) {
+        if (s.activo) activas++;
+        if (s.estado === 'conectado') conectadas++;
+        msgsTotal  += s.msgs_usados   || 0;
+        cuotaTotal += s.ilimitado ? 0 : (s.msgs_incluidos || 0);
+      }
+
+      document.getElementById('stat-activas').textContent    = activas;
       document.getElementById('stat-conectadas').textContent = conectadas;
-      document.getElementById('stat-msgs-hoy').textContent  = '—';
-      document.getElementById('stat-msgs-mes').textContent  = '—';
+      document.getElementById('stat-msgs-mes').textContent   = msgsTotal;
+      document.getElementById('stat-cuota-total').textContent= cuotaTotal || '∞';
 
-      tbody.innerHTML = rows.map(t => {
-        const c = t.waCuota;
-        const usados = c.msgs_usados || 0;
-        const incl   = c.msgs_incluidos || 0;
-        const pct    = c.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100,100) : 0);
+      if (!tenants.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = tenants.map(t => {
+        const wa  = estadoMap[t.id] || {};
+        const c   = { activo: wa.activo, ilimitado: wa.ilimitado, msgs_incluidos: wa.msgs_incluidos || 0, msgs_usados: wa.msgs_usados || 0 };
+        const usados = c.msgs_usados;
+        const incl   = c.msgs_incluidos;
+        const pct    = c.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100, 100) : 0);
         const color  = pct > 80 ? '#f87171' : '#4ade80';
+
+        const estadoBadge = {
+          conectado   : '<span class="badge-wa badge-conectado">🟢 Conectado</span>',
+          conectando  : '<span class="badge-wa badge-conectando">🟡 Conectando…</span>',
+          desconectado: '<span class="badge-wa badge-desconectado">⚪ Desconectado</span>',
+          error       : '<span class="badge-wa badge-error">🔴 Error</span>',
+        };
 
         return `<tr>
           <td>
@@ -184,8 +213,8 @@
           <td>${c.activo
             ? '<span class="badge-wa badge-conectado">✅ Activo</span>'
             : '<span class="badge-wa badge-desconectado">⏸️ Inactivo</span>'}</td>
-          <td><span class="badge-wa badge-desconectado">—</span></td>
-          <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">—</td>
+          <td>${estadoBadge[wa.estado] || estadoBadge.desconectado}</td>
+          <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">${esc(wa.numero_wa || '—')}</td>
           <td style="font-size:.78rem">
             ${c.ilimitado
               ? '<span style="color:#4ade80;font-weight:700">∞ Ilimitado</span>'
@@ -196,7 +225,7 @@
                   </div>
                 </div>`}
           </td>
-          <td style="font-size:.75rem;color:#94a3b8">${c.ilimitado ? '∞' : `${incl} msgs/mes`}</td>
+          <td style="font-size:.75rem;color:#94a3b8">${c.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
           <td>
             <button onclick="abrirCuota(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
               class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
@@ -205,33 +234,42 @@
           </td>
         </tr>`;
       }).join('');
+
     } catch(e) {
       console.error(e);
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar: ${esc(e.message)}</td></tr>`;
     }
   }
 
   async function abrirCuota(tenantId, nombre) {
     _tenantActual = tenantId;
-    document.getElementById('cuota-titulo').textContent = `💬 WA — ${nombre}`;
+    document.getElementById('cuota-titulo').textContent  = `💬 WA — ${nombre}`;
+    document.getElementById('cuota-tenant-id').value     = tenantId;
+    document.getElementById('cuota-activo').checked      = false;
+    document.getElementById('cuota-ilimitado').checked   = false;
+    document.getElementById('cuota-incluidos').value     = 100;
+    document.getElementById('cuota-usados').value        = 0;
+    document.getElementById('modal-cuota').classList.remove('hidden');
+
     try {
       const res = await adminFetch(`/wa/${tenantId}/config`);
       if (res?.ok) {
         const d = (await res.json()).data;
-        document.getElementById('cuota-activo').checked   = !!d.activo;
-        document.getElementById('cuota-ilimitado').checked= !!d.ilimitado;
-        document.getElementById('cuota-incluidos').value  = d.msgs_incluidos || 100;
-        document.getElementById('cuota-usados').value     = d.msgs_usados || 0;
+        document.getElementById('cuota-activo').checked    = !!d.activo;
+        document.getElementById('cuota-ilimitado').checked = !!d.ilimitado;
+        document.getElementById('cuota-incluidos').value   = d.msgs_incluidos || 100;
+        document.getElementById('cuota-usados').value      = d.msgs_usados    || 0;
         toggleIlimitado();
       }
-    } catch {}
-    document.getElementById('modal-cuota').classList.remove('hidden');
+    } catch(e) {
+      console.warn('No se pudo cargar config WA:', e.message);
+    }
   }
 
   function toggleIlimitado() {
     const ilimitado = document.getElementById('cuota-ilimitado').checked;
-    document.getElementById('cuota-limite-box').style.opacity = ilimitado ? '.4' : '1';
-    document.getElementById('cuota-incluidos').disabled = ilimitado;
+    document.getElementById('cuota-limite-box').style.opacity  = ilimitado ? '.4' : '1';
+    document.getElementById('cuota-incluidos').disabled        = ilimitado;
   }
 
   async function guardarCuota() {
@@ -242,8 +280,11 @@
     };
     try {
       const res = await adminFetch(`/wa/${_tenantActual}/config`, { method: 'PUT', body });
-      const d   = await res.json();
-      if (!res?.ok) { alert(d.message || 'Error'); return; }
+      if (!res?.ok) {
+        const d = await res.json();
+        alert(d.message || 'Error al guardar');
+        return;
+      }
       cerrarModal();
       cargar();
     } catch(e) { alert('Error: ' + e.message); }

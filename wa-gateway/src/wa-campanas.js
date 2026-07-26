@@ -12,7 +12,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5000';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
-const DELAY_MS     = 4000; // 4 segundos entre mensajes
+const DELAY_MS     = 4000;
 
 const masterPool = mysql.createPool({
   host    : process.env.MASTER_DB_HOST,
@@ -148,7 +148,6 @@ async function procesarCampanas() {
        WHERE estado='programada' AND programada_at <= NOW()`
     );
 
-    // Obtener campañas activas (enviando o reanudadas)
     const campanas = await masterQuery(
       `SELECT wc.*, t.id AS tenant_id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
                tc.nombre_clinica, twacc.codigo_pais, twacc.activo AS wa_activo
@@ -157,10 +156,11 @@ async function procesarCampanas() {
        LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
        LEFT JOIN wa_sesiones ws ON ws.tenant_id = t.id
        LEFT JOIN wa_config_global wcg ON wcg.tenant_id = t.id
+       LEFT JOIN wa_config twacc ON 1=1
        WHERE wc.estado = 'enviando'
          AND ws.estado = 'conectado'
          AND wcg.activo = 1
-       LIMIT 5` // procesar hasta 5 campañas simultáneas
+       LIMIT 5`
     );
 
     for (const campana of campanas) {
@@ -172,59 +172,55 @@ async function procesarCampanas() {
 }
 
 async function procesarCampana(campana) {
-  console.log(`[WA Campanas] Procesando: "${campana.nombre}" (${campana.tenant_nombre})`);
+  console.log(`[WA Campanas] Procesando: "${campana.nombre}" (${campana.slug})`);
   let conn;
 
   try {
     conn = await getTenantConn(campana);
 
-    // Obtener contactos pendientes desde donde quedó (usando último id procesado)
-    const contactosPendientes = await conn.execute(
+    const [contactosPendientes] = await conn.execute(
       `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre
        FROM wa_campana_contactos wcc
        WHERE wcc.campana_id = ? AND wcc.estado = 'pendiente'
        ORDER BY wcc.id ASC
-       LIMIT 50`, // procesar de a 50 por ciclo
+       LIMIT 50`,
       [campana.id]
     );
 
-    const contactos = contactosPendientes[0] || [];
-
-    // Si no hay contactos pendientes pero la campaña dice enviando
-    // → verificar si hay que cargarlos primero
-    if (!contactos.length) {
+    if (!contactosPendientes.length) {
       const [[total]] = await conn.execute(
         'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?',
         [campana.id]
       );
       if (!total?.n) {
-        // Primera vez — cargar contactos
         await cargarContactosCampana(campana, conn);
         return;
       } else {
-        // Todos enviados — completar
         await masterQuery(
-          'UPDATE wa_campanas SET estado=?, completada_at=NOW() WHERE id=?',
-          ['completada', campana.id]
+          "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
+          [campana.id]
         );
         console.log(`[WA Campanas] ✅ Completada: "${campana.nombre}"`);
         return;
       }
     }
 
-    for (const contacto of contactos) {
-      // Verificar si la campaña fue pausada o cancelada
-      const [estadoActual] = await masterQuery(
+    for (const contacto of contactosPendientes) {
+      // CORREGIDO: verificar estado actual de la campaña antes de cada envío
+      // usando la fila del array correctamente
+      const estadoRows = await masterQuery(
         'SELECT estado FROM wa_campanas WHERE id=?', [campana.id]
       );
-      if (!estadoActual || !['enviando'].includes(estadoActual.estado)) {
-        console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada/cancelada`);
+      const estadoActual = estadoRows[0];
+
+      if (!estadoActual || estadoActual.estado !== 'enviando') {
+        console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada/cancelada — deteniendo`);
         break;
       }
 
       const msg = rellenarPlantilla(campana.mensaje, {
         nombre  : contacto.nombre,
-        mascota : '', // se puede enriquecer
+        mascota : '',
         clinica : campana.nombre_clinica || 'VetClinic',
       });
 
@@ -237,10 +233,9 @@ async function procesarCampana(campana) {
           codigoPais: campana.codigo_pais || '+51',
         });
 
-        // Marcar como enviado
         await conn.execute(
-          'UPDATE wa_campana_contactos SET estado=?, enviado_at=NOW() WHERE id=?',
-          ['enviado', contacto.id]
+          "UPDATE wa_campana_contactos SET estado='enviado', enviado_at=NOW() WHERE id=?",
+          [contacto.id]
         );
         await masterQuery(
           'UPDATE wa_campanas SET enviados=enviados+1 WHERE id=?',
@@ -251,7 +246,7 @@ async function procesarCampana(campana) {
       } catch (e) {
         await conn.execute(
           'UPDATE wa_campana_contactos SET estado=?, error=? WHERE id=?',
-          ['fallido', e.message, contacto.id]
+          ['fallido', e.message.substring(0, 255), contacto.id]
         );
         await masterQuery(
           'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?',
@@ -260,7 +255,6 @@ async function procesarCampana(campana) {
         console.error(`[WA Campanas] ❌ → ${contacto.telefono}: ${e.message}`);
       }
 
-      // Esperar 4 segundos entre mensajes (anti-ban)
       await new Promise(r => setTimeout(r, DELAY_MS));
     }
   } catch (e) {
@@ -279,10 +273,10 @@ async function cargarContactosCampana(campana, conn) {
       "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
       [campana.id]
     );
+    console.log(`[WA Campanas] ⚠️  Sin contactos para campaña ${campana.id}`);
     return;
   }
 
-  // Insertar contactos en wa_campana_contactos
   for (const c of contactos) {
     await conn.execute(
       'INSERT IGNORE INTO wa_campana_contactos (campana_id, propietario_id, telefono, nombre) VALUES (?,?,?,?)',
@@ -290,7 +284,6 @@ async function cargarContactosCampana(campana, conn) {
     );
   }
 
-  // Actualizar total
   await masterQuery(
     'UPDATE wa_campanas SET total=? WHERE id=?',
     [contactos.length, campana.id]

@@ -63,7 +63,6 @@
         <label class="vlabel">Nombre de la campaña *</label>
         <input id="c-nombre" type="text" class="vinput" placeholder="Ej: Campaña vacunas julio"/>
       </div>
-      <!-- Segmento -->
       <div>
         <label class="vlabel">Segmento de destinatarios *</label>
         <select id="c-segmento" class="vinput" onchange="onSegmentoChange()">
@@ -84,7 +83,6 @@
           </select>
         </div>
       </div>
-      <!-- Mensaje -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
           <label class="vlabel" style="margin:0">Mensaje *</label>
@@ -100,20 +98,17 @@
           <button onclick="insertarVarC('[clinica]')"  class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .45rem">[clinica]</button>
         </div>
       </div>
-      <!-- Programar -->
       <div>
         <label class="vlabel">Programar envío (opcional)</label>
         <input id="c-programada" type="datetime-local" class="vinput"/>
         <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.25rem">Si dejas vacío, podrás iniciarlo manualmente cuando quieras</p>
       </div>
-      <!-- Preview -->
       <div style="background:#e5ddd5;border-radius:.85rem;padding:1rem">
         <p style="font-size:.65rem;font-weight:700;color:#667781;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.08em">Preview del mensaje</p>
         <div style="background:#fff;border-radius:.75rem;padding:.65rem .85rem;font-size:.8rem;line-height:1.5;white-space:pre-wrap;word-break:break-word" id="c-preview">
           El preview aparecerá aquí…
         </div>
       </div>
-      <!-- Info segmento -->
       <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.65rem .9rem;font-size:.78rem;color:#0369a1">
         ℹ️ Solo se enviarán mensajes a propietarios con teléfono registrado · 1 mensaje cada 4 segundos
       </div>
@@ -133,7 +128,7 @@
   <div class="vmodal" style="max-width:440px">
     <div class="vmodal-head">
       <h3 id="prog-titulo">📊 Progreso de campaña</h3>
-      <button onclick="closeModal('modal-progreso')" class="vmodal-close">✕</button>
+      <button onclick="cerrarModalProgreso()" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;text-align:center">
@@ -162,7 +157,27 @@
       <div id="prog-estado-box" style="text-align:center;padding:.5rem;font-size:.82rem;font-weight:600;border-radius:.75rem"></div>
     </div>
     <div class="vmodal-foot" id="prog-acciones" style="flex-wrap:wrap;gap:.5rem">
-      <button onclick="closeModal('modal-progreso')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="cerrarModalProgreso()" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmación Cancelar Campaña — reemplaza confirm() nativo -->
+<div id="modal-confirm-cancelar" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:400px">
+    <div class="vmodal-head">
+      <h3>🚫 Cancelar campaña</h3>
+      <button onclick="closeModal('modal-confirm-cancelar')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <p style="font-size:.88rem;color:var(--ink-soft);line-height:1.6">
+        ¿Estás seguro de que deseas cancelar esta campaña?<br/>
+        Los mensajes pendientes <strong>no se enviarán</strong>.
+      </p>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-confirm-cancelar')" class="vbtn vbtn-ghost">No, mantener</button>
+      <button onclick="confirmarCancelar()" class="vbtn" style="background:#dc2626;color:#fff;border:none">🚫 Sí, cancelar campaña</button>
     </div>
   </div>
 </div>
@@ -170,6 +185,7 @@
 <script>
 let _campanaProgresoCurrent = null;
 let _progresoInterval       = null;
+let _campanaACancelar       = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'Campañas WA', subtitle:'Envíos masivos' });
@@ -194,7 +210,7 @@ async function cargar() {
       const acciones = [];
       if (['borrador','pausada'].includes(c.estado)) acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'iniciar')" style="font-size:.72rem;color:#15803d;font-weight:700">▶️ Iniciar</button>`);
       if (c.estado === 'enviando') acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'pausar')" style="font-size:.72rem;color:#b45309;font-weight:700">⏸️ Pausar</button>`);
-      if (['borrador','programada','enviando','pausada'].includes(c.estado)) acciones.push(`<button class="vlink" onclick="accionCampana(${c.id},'cancelar')" style="font-size:.72rem;color:#be123c">🚫 Cancelar</button>`);
+      if (['borrador','programada','enviando','pausada'].includes(c.estado)) acciones.push(`<button class="vlink" onclick="pedirCancelar(${c.id})" style="font-size:.72rem;color:#be123c">🚫 Cancelar</button>`);
       acciones.push(`<button class="vlink" onclick="verProgreso(${c.id},'${esc(c.nombre)}')" style="font-size:.72rem;color:var(--sky)">📊 Progreso</button>`);
       return `<tr>
         <td>
@@ -224,11 +240,20 @@ async function cargar() {
   }
 }
 
+// CORREGIDO: cancelar usa modal en lugar de confirm() nativo
+function pedirCancelar(id) {
+  _campanaACancelar = id;
+  openModal('modal-confirm-cancelar');
+}
+
+async function confirmarCancelar() {
+  closeModal('modal-confirm-cancelar');
+  if (!_campanaACancelar) return;
+  await accionCampana(_campanaACancelar, 'cancelar');
+  _campanaACancelar = null;
+}
+
 async function accionCampana(id, accion) {
-  const confirmar = accion === 'cancelar'
-    ? confirm('¿Cancelar esta campaña? Los mensajes pendientes no se enviarán.')
-    : true;
-  if (!confirmar) return;
   try {
     const res = await api(`/wa/campanas/${id}/${accion}`, { method: 'POST' });
     const d   = await res.json();
@@ -236,6 +261,11 @@ async function accionCampana(id, accion) {
     toast(`✅ ${d.message}`, 'success');
     cargar();
   } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+function cerrarModalProgreso() {
+  clearInterval(_progresoInterval);
+  closeModal('modal-progreso');
 }
 
 async function verProgreso(id, nombre) {
@@ -273,19 +303,13 @@ async function actualizarProgreso(id) {
     estadoBox.style.color      = est.color;
     estadoBox.textContent      = est.txt;
 
-    // Acciones disponibles según estado
-    let btns = '<button onclick="closeModal(\'modal-progreso\')" class="vbtn vbtn-ghost">Cerrar</button>';
-    if (c.estado === 'enviando') btns += `<button onclick="accionCampana(${id},'pausar');closeModal('modal-progreso')" class="vbtn" style="background:#b45309;color:#fff;border:none">⏸️ Pausar</button>`;
-    if (c.estado === 'pausada')  btns += `<button onclick="accionCampana(${id},'iniciar');closeModal('modal-progreso')" class="vbtn vbtn-primary">▶️ Reanudar</button>`;
+    let btns = '<button onclick="cerrarModalProgreso()" class="vbtn vbtn-ghost">Cerrar</button>';
+    if (c.estado === 'enviando') btns += `<button onclick="accionCampana(${id},'pausar');cerrarModalProgreso()" class="vbtn" style="background:#b45309;color:#fff;border:none">⏸️ Pausar</button>`;
+    if (c.estado === 'pausada')  btns += `<button onclick="accionCampana(${id},'iniciar');cerrarModalProgreso()" class="vbtn vbtn-primary">▶️ Reanudar</button>`;
     if (['completada','cancelada'].includes(c.estado)) clearInterval(_progresoInterval);
     acciones.innerHTML = btns;
   } catch(e) {}
 }
-
-// Cerrar polling al cerrar modal
-document.getElementById('modal-progreso').addEventListener('click', (e) => {
-  if (e.target.id === 'modal-progreso') clearInterval(_progresoInterval);
-});
 
 function abrirModalNueva() {
   document.getElementById('campana-titulo').textContent = '📢 Nueva campaña';
