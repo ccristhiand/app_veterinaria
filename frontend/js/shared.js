@@ -290,19 +290,52 @@ function fechaHoraAhoraInput() {
 // ── Utilities ────────────────────────────────────────────────────
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+// ── Zona horaria dinámica del tenant ─────────────────────────────
+function getTZ() {
+  return _branding?.zona_horaria || 'America/Lima';
+}
+
+function getLocale() {
+  const pais = _branding?.pais || 'Peru';
+  const locales = {
+    'Peru'      : 'es-PE',
+    'Colombia'  : 'es-CO',
+    'Mexico'    : 'es-MX',
+    'Chile'     : 'es-CL',
+    'Argentina' : 'es-AR',
+    'Ecuador'   : 'es-EC',
+    'Bolivia'   : 'es-BO',
+    'Paraguay'  : 'es-PY',
+    'Uruguay'   : 'es-UY',
+    'Venezuela' : 'es-VE',
+    'Panama'    : 'es-PA',
+    'Guatemala' : 'es-GT',
+  };
+  return locales[pais] || 'es-PE';
+}
+
 function fDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+  return new Date(iso).toLocaleDateString(getLocale(), {
+    day:'2-digit', month:'short', year:'numeric',
+    timeZone: getTZ(),
+  });
 }
 
 function fDateTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-PE', { dateStyle:'short', timeStyle:'short' });
+  return new Date(iso).toLocaleString(getLocale(), {
+    dateStyle:'short', timeStyle:'short',
+    timeZone: getTZ(),
+  });
 }
 
 function fTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
+  return new Date(iso).toLocaleTimeString(getLocale(), {
+    hour:'2-digit', minute:'2-digit',
+    timeZone: getTZ(),
+  });
 }
 
 function badgeEstado(estado) {

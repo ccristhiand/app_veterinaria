@@ -181,6 +181,50 @@
         </div>
       </div>
 
+      <!-- Sección: Regional -->
+      <p class="section-title">🌎 Configuración regional</p>
+      <div class="grid2">
+        <div>
+          <label>Zona horaria</label>
+          <select id="m-zona-horaria">
+            <option value="America/Lima">🇵🇪 América/Lima (Perú, Ecuador)</option>
+            <option value="America/Bogota">🇨🇴 América/Bogotá (Colombia)</option>
+            <option value="America/Mexico_City">🇲🇽 América/Ciudad_de_México</option>
+            <option value="America/Santiago">🇨🇱 América/Santiago (Chile)</option>
+            <option value="America/Argentina/Buenos_Aires">🇦🇷 América/Buenos_Aires</option>
+            <option value="America/Caracas">🇻🇪 América/Caracas (Venezuela)</option>
+            <option value="America/La_Paz">🇧🇴 América/La_Paz (Bolivia)</option>
+            <option value="America/Asuncion">🇵🇾 América/Asunción (Paraguay)</option>
+            <option value="America/Montevideo">🇺🇾 América/Montevideo (Uruguay)</option>
+            <option value="America/Panama">🇵🇦 América/Panamá</option>
+            <option value="America/Guatemala">🇬🇹 América/Guatemala</option>
+            <option value="America/Guayaquil">🇪🇨 América/Guayaquil (Ecuador)</option>
+            <option value="America/New_York">🇺🇸 América/Nueva_York (ET)</option>
+            <option value="America/Chicago">🇺🇸 América/Chicago (CT)</option>
+            <option value="America/Denver">🇺🇸 América/Denver (MT)</option>
+            <option value="America/Los_Angeles">🇺🇸 América/Los_Ángeles (PT)</option>
+            <option value="Europe/Madrid">🇪🇸 Europa/Madrid</option>
+          </select>
+        </div>
+        <div>
+          <label>País</label>
+          <select id="m-pais">
+            <option value="Peru">🇵🇪 Perú</option>
+            <option value="Colombia">🇨🇴 Colombia</option>
+            <option value="Mexico">🇲🇽 México</option>
+            <option value="Chile">🇨🇱 Chile</option>
+            <option value="Argentina">🇦🇷 Argentina</option>
+            <option value="Venezuela">🇻🇪 Venezuela</option>
+            <option value="Bolivia">🇧🇴 Bolivia</option>
+            <option value="Paraguay">🇵🇾 Paraguay</option>
+            <option value="Uruguay">🇺🇾 Uruguay</option>
+            <option value="Panama">🇵🇦 Panamá</option>
+            <option value="Guatemala">🇬🇹 Guatemala</option>
+            <option value="Ecuador">🇪🇨 Ecuador</option>
+          </select>
+        </div>
+      </div>
+
       <!-- Sección: Facturación -->
       <p class="section-title">💰 Facturación</p>
       <div class="grid3">
@@ -340,6 +384,8 @@
     document.getElementById('m-plan').value         = 'pro';
     document.getElementById('m-max-usuarios').value = '5';
     document.getElementById('m-trial').value        = '';
+    document.getElementById('m-zona-horaria').value = 'America/Lima';
+    document.getElementById('m-pais').value         = 'Peru';
     document.getElementById('m-moneda').value       = 'PEN';
     document.getElementById('m-simbolo').value      = 'S/.';
     document.getElementById('m-igv').value          = '18';
@@ -378,6 +424,8 @@
     document.getElementById('m-max-usuarios').value   = c.max_usuarios   || 5;
     document.getElementById('m-trial').value          = c.trial_hasta?.split('T')[0] || '';
     document.getElementById('m-activo').value         = c.activo ? '1' : '0';
+    document.getElementById('m-zona-horaria').value   = c.zona_horaria   || 'America/Lima';
+    document.getElementById('m-pais').value           = c.pais           || 'Peru';
     document.getElementById('m-moneda').value         = c.moneda         || 'PEN';
     document.getElementById('m-simbolo').value        = c.simbolo_moneda || 'S/.';
     document.getElementById('m-igv').value            = c.igv_porcentaje || '18';
@@ -428,6 +476,8 @@
       max_usuarios          : parseInt(document.getElementById('m-max-usuarios').value) || 5,
       trial_hasta           : document.getElementById('m-trial').value || null,
       activo                : editandoId ? parseInt(document.getElementById('m-activo').value) : 1,
+      zona_horaria          : document.getElementById('m-zona-horaria').value || 'America/Lima',
+      pais                  : document.getElementById('m-pais').value || 'Peru',
       moneda                : document.getElementById('m-moneda').value,
       simbolo_moneda        : document.getElementById('m-simbolo').value.trim() || 'S/.',
       igv_porcentaje        : parseFloat(document.getElementById('m-igv').value) || 18,
