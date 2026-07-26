@@ -134,10 +134,7 @@
 
   let _tenantActual = null;
 
-  function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+  // esc() viene de admin_shared.js — no redeclarar aquí
 
   async function cargar() {
     const tbody = document.getElementById('tbody-wa');
