@@ -42,6 +42,7 @@ const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
 const adminBackupRoutes  = require('./routes/admin_backup.routes');
 const adminFeRoutes      = require('./routes/admin_fe.routes');
+const adminWaRoutes      = require('./routes/admin_wa.routes');
 const app    = express();
 const server = http.createServer(app);
 // ── CORS dinámico por tenant ──────────────────────────────────────
@@ -96,6 +97,7 @@ app.get('/favicon.ico', async (req, res) => {
 app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
 app.use('/admin/api/fe',      adminFeRoutes);
+app.use('/admin/api/wa',      adminWaRoutes);   // ← antes de /admin/api
 app.use('/admin/api',         adminRoutes);
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({

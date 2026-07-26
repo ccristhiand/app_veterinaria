@@ -171,9 +171,17 @@
         const headerEl = document.getElementById('carnet-header');
         if (headerEl) headerEl.style.background = `linear-gradient(135deg,${colorPrimario},${colorAcento})`;
 
+        // Favicon dinámico según branding del tenant
+        const faviconEl = document.querySelector('link[rel="icon"]');
+        if (faviconEl && logoUrl) {
+          faviconEl.href = logoUrl;
+        }
+
+        // Título dinámico con nombre del tenant
+        document.title = `${m.mascota_nombre || 'Mascota'} — Carnet Digital · ${nombreClinica}`;
+
         // Logo y nombre de la clínica
         document.getElementById('clinica-nombre').textContent = nombreClinica;
-        document.title = `${m.mascota_nombre||''} — Carnet Digital · ${nombreClinica}`;
         if (logoUrl) {
           document.getElementById('clinica-logo-wrap').innerHTML =
             `<img src="${logoUrl}" alt="${nombreClinica}"
@@ -328,7 +336,7 @@
 
         document.getElementById('loading').style.display   = 'none';
         document.getElementById('contenido').style.display = 'block';
-        document.title = `${m.mascota_nombre} — Carnet Digital VetClinic`;
+        // titulo ya seteado arriba
 
       } catch {
         document.getElementById('loading').style.display   = 'none';
