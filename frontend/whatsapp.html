@@ -222,6 +222,13 @@
               </div>
             </div>
           </div>
+          <div style="border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem">
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.84rem;font-weight:600">
+              <input type="checkbox" id="cfg-desparasitaciones-activo" style="accent-color:#25d366;width:15px;height:15px"/>
+              🐛 Recordatorio de desparasitaciones
+            </label>
+            <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.4rem">Usa los mismos días configurados en vacunas</p>
+          </div>
         </div>
       </div>
     </div>
@@ -363,7 +370,7 @@ let _waEstado     = 'desconectado';
 let _propWASel    = null;
 let _plantillaEdit = null;
 let _qrInterval   = null;
-let _waSocket = null;
+let _socket       = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'WhatsApp', subtitle:'Mensajería y recordatorios' });
@@ -380,18 +387,18 @@ function iniciarSocket() {
   try {
     // Reutiliza la misma conexión Socket.io del API principal
     const WA_SOCKET_URL = window.location.protocol + '//' + window.location.hostname;
-    _waSocket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
+    _socket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
 
-    _waSocket.on('connect', () => {
+    _socket.on('connect', () => {
       const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
-      _waSocket.emit('wa:suscribir', user.tenant_id || '');
+      _socket.emit('wa:suscribir', user.tenant_id || '');
     });
 
-    _waSocket.on('wa:qr', (data) => {
+    _socket.on('wa:qr', (data) => {
       mostrarQR(data.qr);
     });
 
-    _waSocket.on('wa:conectado', (data) => {
+    _socket.on('wa:conectado', (data) => {
       _waEstado = 'conectado';
       actualizarBadgeEstado('conectado', data.numero);
       closeModal('modal-qr');
@@ -400,7 +407,7 @@ function iniciarSocket() {
       cargarEstado();
     });
 
-    _waSocket.on('wa:desconectado', () => {
+    _socket.on('wa:desconectado', () => {
       _waEstado = 'desconectado';
       actualizarBadgeEstado('desconectado');
       cargarEstado();
@@ -497,6 +504,12 @@ async function renderRecordatoriosEstado() {
         <span>💉 Recordatorio vacunas</span>
         <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_vacunas_activo?'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
           ${config.recordatorio_vacunas_activo ? `✅ ${config.recordatorio_vacunas_dias} días antes` : '⏸️ Desactivado'}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>🐛 Recordatorio desparasitaciones</span>
+        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_desparasitaciones_activo?'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
+          ${config.recordatorio_desparasitaciones_activo ? '✅ Activo' : '⏸️ Desactivado'}
         </span>
       </div>`;
   } catch(e) {
@@ -813,6 +826,7 @@ async function cargarConfig() {
     document.getElementById('cfg-vacunas-activo').checked  = !!config.recordatorio_vacunas_activo;
     document.getElementById('cfg-vacunas-d1').value        = config.recordatorio_vacunas_dias || 7;
     document.getElementById('cfg-vacunas-d2').value        = config.recordatorio_vacunas_dias2 || '';
+    document.getElementById('cfg-desparasitaciones-activo').checked = !!config.recordatorio_desparasitaciones_activo;
   } catch(e) {}
 }
 
@@ -826,6 +840,7 @@ async function guardarConfig() {
     recordatorio_vacunas_activo: document.getElementById('cfg-vacunas-activo').checked,
     recordatorio_vacunas_dias  : parseInt(document.getElementById('cfg-vacunas-d1').value) || 7,
     recordatorio_vacunas_dias2 : parseInt(document.getElementById('cfg-vacunas-d2').value) || null,
+    recordatorio_desparasitaciones_activo: document.getElementById('cfg-desparasitaciones-activo').checked,
   };
   try {
     const res = await api('/wa/config', { method: 'PUT', body });

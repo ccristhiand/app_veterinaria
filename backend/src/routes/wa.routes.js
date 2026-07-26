@@ -100,13 +100,15 @@ router.put('/config', authorize('admin'), async (req, res, next) => {
       activo, codigo_pais,
       recordatorio_citas_activo, recordatorio_citas_horas, recordatorio_citas_horas2,
       recordatorio_vacunas_activo, recordatorio_vacunas_dias, recordatorio_vacunas_dias2,
+      recordatorio_desparasitaciones_activo,
     } = req.body;
 
     await req.db.query(
       `UPDATE wa_config SET
          activo=?, codigo_pais=?,
          recordatorio_citas_activo=?, recordatorio_citas_horas=?, recordatorio_citas_horas2=?,
-         recordatorio_vacunas_activo=?, recordatorio_vacunas_dias=?, recordatorio_vacunas_dias2=?
+         recordatorio_vacunas_activo=?, recordatorio_vacunas_dias=?, recordatorio_vacunas_dias2=?,
+         recordatorio_desparasitaciones_activo=?
        WHERE id=1`,
       [
         activo ? 1 : 0,
@@ -117,6 +119,7 @@ router.put('/config', authorize('admin'), async (req, res, next) => {
         recordatorio_vacunas_activo ? 1 : 0,
         recordatorio_vacunas_dias || 7,
         recordatorio_vacunas_dias2 || null,
+        recordatorio_desparasitaciones_activo ? 1 : 0,
       ]
     );
     return res.json({ success: true, message: 'Configuración WA guardada.' });
@@ -244,4 +247,4 @@ router.get('/log', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-module.exports = router; 
+module.exports = router;

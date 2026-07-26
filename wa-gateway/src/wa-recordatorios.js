@@ -329,7 +329,7 @@ async function procesarRecordatorios() {
           await procesarRecordatoriosVacunas(tenant, conn, cfg, clinica);
         }
         // Desparasitaciones — usa mismos días que vacunas
-        if (cfg.recordatorio_vacunas_activo) {
+        if (cfg.recordatorio_desparasitaciones_activo) {
           await procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica);
         }
       } catch (e) {
