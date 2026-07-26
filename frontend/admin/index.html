@@ -2,10 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <title>VetClinic</title>
+  <title>VetClinic SaaS Admin</title>
   <script>
-    if (localStorage.getItem('vet_access') && localStorage.getItem('vet_user')) {
-      window.location.replace('dashboard.html');
+    // CORREGIDO: usar admin_token (no vet_access que es del tenant)
+    if (localStorage.getItem('admin_token')) {
+      window.location.replace('indexv2.html');
     } else {
       window.location.replace('login.html');
     }
