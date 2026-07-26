@@ -6,16 +6,53 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 const router = Router();
 
-// Helper para formatear fechas DATE de MySQL (vienen como objetos Date)
+// Helper para formatear fechas DATE de MySQL
 function formatDate(val) {
   if (!val) return null;
-  if (val instanceof Date) {
-    return val.toISOString().split('T')[0];
-  }
+  if (val instanceof Date) return val.toISOString().split('T')[0];
   return String(val).split('T')[0];
 }
 
-// ── GET PÚBLICO /api/v1/carnet/:token ────────────────────────────
+// ── Rutas PROTEGIDAS primero (evitan ser capturadas por /:token) ──
+router.get('/mascota/:id', authenticate, async (req, res, next) => {
+  try {
+    let [carnet] = await req.db.query(
+      'SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]
+    );
+    if (!carnet) {
+      const token = crypto.randomBytes(24).toString('hex');
+      await req.db.query(
+        'INSERT INTO carnets_digitales (mascota_id, token) VALUES (?,?)',
+        [req.params.id, token]
+      );
+      [carnet] = await req.db.query('SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]);
+    }
+    return res.json({ success:true, data:carnet });
+  } catch(err) { next(err); }
+});
+
+router.patch('/mascota/:id/toggle', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const [carnet] = await req.db.query('SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]);
+    if (!carnet) return res.status(404).json({ success:false, message:'Carnet no encontrado.' });
+    const nuevo = carnet.activo ? 0 : 1;
+    await req.db.query('UPDATE carnets_digitales SET activo=? WHERE mascota_id=?', [nuevo, req.params.id]);
+    return res.json({ success:true, data:{ activo:nuevo }, message: nuevo ? 'Carnet activado.' : 'Carnet desactivado.' });
+  } catch(err) { next(err); }
+});
+
+router.post('/mascota/:id/regenerar', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    await req.db.query(
+      'UPDATE carnets_digitales SET token=?, vistas=0 WHERE mascota_id=?',
+      [token, req.params.id]
+    );
+    return res.json({ success:true, data:{ token }, message:'Token regenerado.' });
+  } catch(err) { next(err); }
+});
+
+// ── GET PÚBLICO /api/v1/carnet/:token — al final para no capturar /mascota/* ──
 router.get('/:token', async (req, res, next) => {
   try {
     const [carnet] = await req.db.query(
@@ -32,7 +69,6 @@ router.get('/:token', async (req, res, next) => {
 
     if (!carnet) return res.status(404).json({ success:false, message:'Carnet no encontrado o desactivado.' });
 
-    // Formatear fecha_nacimiento
     if (carnet.fecha_nacimiento) carnet.fecha_nacimiento = formatDate(carnet.fecha_nacimiento);
 
     const [branding] = await req.db.query(
@@ -54,7 +90,7 @@ router.get('/:token', async (req, res, next) => {
       color_acento  : tenantBranding?.color_acento   || branding?.color_acento  || '#15803d',
     };
 
-    // Vacunas — formatear fechas DATE
+    // Vacunas
     const vacunasRaw = await req.db.query(
       `SELECT nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas
        FROM vacunas WHERE mascota_id = ?
@@ -66,7 +102,7 @@ router.get('/:token', async (req, res, next) => {
       proxima_dosis   : formatDate(v.proxima_dosis),
     }));
 
-    // Desparasitaciones — formatear fechas DATE
+    // Desparasitaciones
     const despaRaw = await req.db.query(
       `SELECT d.tipo, d.producto, d.dosis, d.fecha_aplicacion, d.proxima_dosis, d.notas,
               u.nombre AS veterinario_nombre
@@ -89,7 +125,7 @@ router.get('/:token', async (req, res, next) => {
        ORDER BY c.fecha_hora ASC LIMIT 3`, [carnet.mascota_id]
     );
 
-    // Historial de citas con historia clínica
+    // Historial de citas
     const citas_historial_raw = await req.db.query(
       `SELECT c.id AS cita_id, c.fecha_hora, c.motivo AS motivo_cita, c.estado,
               u.nombre AS veterinario,
@@ -140,7 +176,7 @@ router.get('/:token', async (req, res, next) => {
     );
 
     // Baños/estética
-    const banos = await req.db.query(
+    const banosRaw = await req.db.query(
       `SELECT s.fecha, s.tipo_bano, s.incluye_corte, s.incluye_unas,
               s.incluye_dental, s.productos, s.observaciones, s.precio,
               u.nombre AS atendido_por
@@ -148,7 +184,7 @@ router.get('/:token', async (req, res, next) => {
        WHERE s.mascota_id = ?
        ORDER BY s.fecha DESC LIMIT 10`, [carnet.mascota_id]
     );
-    const banosFormateados = banos.map(b => ({ ...b, fecha: formatDate(b.fecha) }));
+    const banos = banosRaw.map(b => ({ ...b, fecha: formatDate(b.fecha) }));
 
     const [ultimaConsulta] = await req.db.query(
       `SELECT h.fecha, h.diagnostico, h.tratamiento, u.nombre AS veterinario
@@ -168,52 +204,11 @@ router.get('/:token', async (req, res, next) => {
         citas,
         citas_historial,
         historias_sin_cita: historias_con_recetas,
-        banos              : banosFormateados,
-        ultima_consulta    : ultimaConsulta || null,
-        branding           : clinicaBranding,
+        banos,
+        ultima_consulta: ultimaConsulta || null,
+        branding       : clinicaBranding,
       },
     });
-  } catch(err) { next(err); }
-});
-
-// ── Rutas protegidas ─────────────────────────────────────────
-router.use(authenticate);
-
-router.get('/mascota/:id', async (req, res, next) => {
-  try {
-    let [carnet] = await req.db.query(
-      'SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]
-    );
-    if (!carnet) {
-      const token = crypto.randomBytes(24).toString('hex');
-      await req.db.query(
-        'INSERT INTO carnets_digitales (mascota_id, token) VALUES (?,?)',
-        [req.params.id, token]
-      );
-      [carnet] = await req.db.query('SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]);
-    }
-    return res.json({ success:true, data:carnet });
-  } catch(err) { next(err); }
-});
-
-router.patch('/mascota/:id/toggle', authorize('admin'), async (req, res, next) => {
-  try {
-    const [carnet] = await req.db.query('SELECT * FROM carnets_digitales WHERE mascota_id=?', [req.params.id]);
-    if (!carnet) return res.status(404).json({ success:false, message:'Carnet no encontrado.' });
-    const nuevo = carnet.activo ? 0 : 1;
-    await req.db.query('UPDATE carnets_digitales SET activo=? WHERE mascota_id=?', [nuevo, req.params.id]);
-    return res.json({ success:true, data:{ activo:nuevo }, message: nuevo ? 'Carnet activado.' : 'Carnet desactivado.' });
-  } catch(err) { next(err); }
-});
-
-router.post('/mascota/:id/regenerar', authorize('admin'), async (req, res, next) => {
-  try {
-    const token = crypto.randomBytes(24).toString('hex');
-    await req.db.query(
-      'UPDATE carnets_digitales SET token=?, vistas=0 WHERE mascota_id=?',
-      [token, req.params.id]
-    );
-    return res.json({ success:true, data:{ token }, message:'Token regenerado.' });
   } catch(err) { next(err); }
 });
 

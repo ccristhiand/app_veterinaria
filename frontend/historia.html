@@ -760,7 +760,7 @@ async function cargarDesparasitaciones(id) {
     <div style="display:flex;flex-direction:column;gap:.7rem">` +
     rows.map(d => {
       const hoy     = new Date();
-      const proxima = d.proxima_dosis ? new Date(d.proxima_dosis+'T12:00:00') : null;
+      const proxima = d.proxima_dosis ? new Date(String(d.proxima_dosis).split('T')[0]+'T12:00:00') : null;
       const dias    = proxima ? Math.ceil((proxima-hoy)/(1000*60*60*24)) : null;
       const vencida = dias !== null && dias < 0;
       const prox30  = dias !== null && dias >= 0 && dias <= 30;
