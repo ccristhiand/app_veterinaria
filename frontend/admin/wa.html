@@ -7,7 +7,7 @@
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155}
+    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
     .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
     .nav-item:hover{background:#0f172a;color:#e2e8f0}
@@ -126,17 +126,11 @@
   </div>
 </div>
 
+<!-- ✅ admin_shared.js DEBE ir antes del script propio -->
 <script src="admin_shared.js"></script>
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
   renderSidebar('wa');
-
-  // CORREGIDO: verificar que el elemento existe antes de asignar textContent
-  const adminEl = document.getElementById('admin-nombre');
-  if (adminEl) {
-    const admin = getAdmin();
-    if (admin) adminEl.textContent = admin.nombre || 'Admin';
-  }
 
   let _tenantActual = null;
 
@@ -150,8 +144,6 @@
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
 
     try {
-      // CORREGIDO: usar /estado-global que devuelve todo en una sola llamada
-      // en lugar de hacer N llamadas a /wa/:id/config por cada tenant
       const [resTenants, resEstado] = await Promise.all([
         adminFetch('/tenants'),
         adminFetch('/wa/estado-global'),
@@ -162,61 +154,58 @@
         return;
       }
 
-      const tenants     = (await resTenants.json()).data || [];
-      const estadoWA    = resEstado?.ok ? (await resEstado.json()).data || [] : [];
+      const tenants  = (await resTenants.json()).data || [];
+      const estadoWA = resEstado?.ok ? (await resEstado.json()).data || [] : [];
 
-      // Mapear estado WA por tenant_id para acceso O(1)
+      // Mapear estado WA por tenant_id
       const estadoMap = {};
-      for (const s of estadoWA) {
-        estadoMap[s.tenant_id] = s;
-      }
+      for (const s of estadoWA) estadoMap[s.tenant_id] = s;
 
-      // Calcular stats globales
+      // Stats globales
       let activas = 0, conectadas = 0, msgsTotal = 0, cuotaTotal = 0;
       for (const s of estadoWA) {
         if (s.activo) activas++;
         if (s.estado === 'conectado') conectadas++;
-        msgsTotal  += s.msgs_usados   || 0;
+        msgsTotal  += s.msgs_usados    || 0;
         cuotaTotal += s.ilimitado ? 0 : (s.msgs_incluidos || 0);
       }
 
-      document.getElementById('stat-activas').textContent    = activas;
-      document.getElementById('stat-conectadas').textContent = conectadas;
-      document.getElementById('stat-msgs-mes').textContent   = msgsTotal;
-      document.getElementById('stat-cuota-total').textContent= cuotaTotal || '∞';
+      document.getElementById('stat-activas').textContent     = activas;
+      document.getElementById('stat-conectadas').textContent  = conectadas;
+      document.getElementById('stat-msgs-mes').textContent    = msgsTotal;
+      document.getElementById('stat-cuota-total').textContent = cuotaTotal || '∞';
 
       if (!tenants.length) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = tenants.map(t => {
-        const wa  = estadoMap[t.id] || {};
-        const c   = { activo: wa.activo, ilimitado: wa.ilimitado, msgs_incluidos: wa.msgs_incluidos || 0, msgs_usados: wa.msgs_usados || 0 };
-        const usados = c.msgs_usados;
-        const incl   = c.msgs_incluidos;
-        const pct    = c.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100, 100) : 0);
-        const color  = pct > 80 ? '#f87171' : '#4ade80';
+      const estadoBadge = {
+        conectado   : '<span class="badge-wa badge-conectado">🟢 Conectado</span>',
+        conectando  : '<span class="badge-wa badge-conectando">🟡 Conectando…</span>',
+        desconectado: '<span class="badge-wa badge-desconectado">⚪ Desconectado</span>',
+        error       : '<span class="badge-wa badge-error">🔴 Error</span>',
+      };
 
-        const estadoBadge = {
-          conectado   : '<span class="badge-wa badge-conectado">🟢 Conectado</span>',
-          conectando  : '<span class="badge-wa badge-conectando">🟡 Conectando…</span>',
-          desconectado: '<span class="badge-wa badge-desconectado">⚪ Desconectado</span>',
-          error       : '<span class="badge-wa badge-error">🔴 Error</span>',
-        };
+      tbody.innerHTML = tenants.map(t => {
+        const wa     = estadoMap[t.id] || {};
+        const usados = wa.msgs_usados    || 0;
+        const incl   = wa.msgs_incluidos || 0;
+        const pct    = wa.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100, 100) : 0);
+        const color  = pct > 80 ? '#f87171' : '#4ade80';
 
         return `<tr>
           <td>
             <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
             <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
           </td>
-          <td>${c.activo
+          <td>${wa.activo
             ? '<span class="badge-wa badge-conectado">✅ Activo</span>'
             : '<span class="badge-wa badge-desconectado">⏸️ Inactivo</span>'}</td>
           <td>${estadoBadge[wa.estado] || estadoBadge.desconectado}</td>
           <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">${esc(wa.numero_wa || '—')}</td>
           <td style="font-size:.78rem">
-            ${c.ilimitado
+            ${wa.ilimitado
               ? '<span style="color:#4ade80;font-weight:700">∞ Ilimitado</span>'
               : `<div style="display:flex;flex-direction:column;gap:.2rem">
                   <span style="color:${color};font-weight:700">${usados}/${incl}</span>
@@ -225,7 +214,7 @@
                   </div>
                 </div>`}
           </td>
-          <td style="font-size:.75rem;color:#94a3b8">${c.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
+          <td style="font-size:.75rem;color:#94a3b8">${wa.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
           <td>
             <button onclick="abrirCuota(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
               class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
@@ -237,7 +226,7 @@
 
     } catch(e) {
       console.error(e);
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -261,15 +250,13 @@
         document.getElementById('cuota-usados').value      = d.msgs_usados    || 0;
         toggleIlimitado();
       }
-    } catch(e) {
-      console.warn('No se pudo cargar config WA:', e.message);
-    }
+    } catch(e) { console.warn('Error cargando config WA:', e.message); }
   }
 
   function toggleIlimitado() {
-    const ilimitado = document.getElementById('cuota-ilimitado').checked;
-    document.getElementById('cuota-limite-box').style.opacity  = ilimitado ? '.4' : '1';
-    document.getElementById('cuota-incluidos').disabled        = ilimitado;
+    const il = document.getElementById('cuota-ilimitado').checked;
+    document.getElementById('cuota-limite-box').style.opacity = il ? '.4' : '1';
+    document.getElementById('cuota-incluidos').disabled = il;
   }
 
   async function guardarCuota() {
@@ -280,14 +267,11 @@
     };
     try {
       const res = await adminFetch(`/wa/${_tenantActual}/config`, { method: 'PUT', body });
-      if (!res?.ok) {
-        const d = await res.json();
-        alert(d.message || 'Error al guardar');
-        return;
-      }
+      if (!res?.ok) { const d = await res.json(); toast(d.message || 'Error al guardar', 'error'); return; }
+      toast('✅ Configuración WA guardada', 'success');
       cerrarModal();
       cargar();
-    } catch(e) { alert('Error: ' + e.message); }
+    } catch(e) { toast('Error: ' + e.message, 'error'); }
   }
 
   function cerrarModal() {
