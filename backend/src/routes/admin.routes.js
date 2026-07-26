@@ -217,7 +217,7 @@ router.put('/tenants/:id', async (req, res) => {
       logo_url, favicon_url, color_primario, color_sidebar, color_acento,
       plan, activo, trial_hasta, max_usuarios, moneda, simbolo_moneda, igv_porcentaje,
       modulo_estetica, modulo_facturacion, modulo_inventario, modulo_vacunas,
-      modulo_consentimientos, modulo_carnet,
+      modulo_consentimientos, modulo_carnet, zona_horaria, pais,
     } = req.body;
 
     await masterQuery(
@@ -232,7 +232,8 @@ router.put('/tenants/:id', async (req, res) => {
          color_primario=?, color_sidebar=?, color_acento=?,
          max_usuarios=?, moneda=?, simbolo_moneda=?, igv_porcentaje=?,
          modulo_estetica=?, modulo_facturacion=?, modulo_inventario=?,
-         modulo_vacunas=?, modulo_consentimientos=?, modulo_carnet=?
+         modulo_vacunas=?, modulo_consentimientos=?, modulo_carnet=?,
+         zona_horaria=?, pais=?
        WHERE tenant_id=?`,
       [
         nombre_clinica||'VetClinic', ruc||null, razon_social||null,
@@ -242,6 +243,7 @@ router.put('/tenants/:id', async (req, res) => {
         max_usuarios||5, moneda||'PEN', simbolo_moneda||'S/.', igv_porcentaje||18,
         modulo_estetica?1:0, modulo_facturacion?1:0, modulo_inventario?1:0,
         modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0,
+        zona_horaria||'America/Lima', pais||'Peru',
         req.params.id
       ]
     );
@@ -326,13 +328,61 @@ router.post('/tenants/:id/reactivar', async (req, res) => {
 // ── GET /admin/api/stats ──────────────────────────────────────────
 router.get('/stats', async (req, res) => {
   try {
-    const [total]   = await masterQuery('SELECT COUNT(*) AS n FROM tenants');
-    const [activos] = await masterQuery('SELECT COUNT(*) AS n FROM tenants WHERE activo=1');
-    const porPlan   = await masterQuery('SELECT plan, COUNT(*) AS n FROM tenants GROUP BY plan');
-    const poolStats = getPoolStats();
+    const [total]      = await masterQuery('SELECT COUNT(*) AS n FROM tenants');
+    const [activos]    = await masterQuery('SELECT COUNT(*) AS n FROM tenants WHERE activo=1');
+    const [suspendidos]= await masterQuery('SELECT COUNT(*) AS n FROM tenants WHERE activo=0');
+    const porPlan      = await masterQuery('SELECT plan, COUNT(*) AS n FROM tenants GROUP BY plan');
+    const poolStats    = getPoolStats();
+
+    // Próximos a vencer en trial (próximos 7 días)
+    const proximosVencer = await masterQuery(
+      `SELECT t.id, t.slug, tc.nombre_clinica, t.trial_hasta, t.plan
+       FROM tenants t
+       LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
+       WHERE t.activo = 1
+         AND t.trial_hasta IS NOT NULL
+         AND t.trial_hasta BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
+       ORDER BY t.trial_hasta ASC`
+    );
+
+    // Último backup por tenant
+    const ultimosBackups = await masterQuery(
+      `SELECT tenant_id, MAX(created_at) AS ultimo, COUNT(*) AS total,
+              SUM(CASE WHEN estado='exitoso' THEN 1 ELSE 0 END) AS exitosos
+       FROM tenant_backups
+       WHERE created_at >= NOW() - INTERVAL 24 HOUR
+       GROUP BY tenant_id`
+    );
+
+    // WA conectadas
+    const [waConectadas] = await masterQuery(
+      "SELECT COUNT(*) AS n FROM wa_sesiones WHERE estado='conectado'"
+    );
+
+    // Actividad reciente por clínica (logs últimas 24h)
+    const actividadHoy = await masterQuery(
+      `SELECT tenant_nombre, COUNT(*) AS acciones,
+              SUM(CASE WHEN resultado='error' THEN 1 ELSE 0 END) AS errores
+       FROM tenant_logs
+       WHERE created_at >= NOW() - INTERVAL 24 HOUR
+       GROUP BY tenant_nombre
+       ORDER BY acciones DESC
+       LIMIT 10`
+    );
+
     return res.json({
       success: true,
-      data: { total_tenants: total.n, activos: activos.n, por_plan: porPlan, pools_activos: poolStats.length },
+      data: {
+        total_tenants  : total.n,
+        activos        : activos.n,
+        suspendidos    : suspendidos.n,
+        por_plan       : porPlan,
+        pools_activos  : poolStats.length,
+        proximos_vencer: proximosVencer,
+        backups_hoy    : ultimosBackups.length,
+        wa_conectadas  : waConectadas.n,
+        actividad_hoy  : actividadHoy,
+      },
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });

@@ -43,10 +43,12 @@ function toast(msg, tipo = 'success', ms = 3500) {
 }
 
 function setNavActive(page) { document.querySelectorAll('.nav-item').forEach(el => { el.classList.toggle('active', el.dataset.page === page); }); }
-const esc    = s => String(s ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const fDate  = iso => iso ? new Date(iso).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }) : '—';
-const fNum   = n => Number(n||0).toLocaleString('es-PE');
-const fMoney = n => 'S/. '+Number(n||0).toFixed(2);
+const esc      = s => String(s ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const ADMIN_TZ = 'America/Lima'; // Zona horaria del panel admin
+const fDate    = iso => iso ? new Date(iso).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone: ADMIN_TZ }) : '—';
+const fDateTime= iso => iso ? new Date(iso).toLocaleString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: ADMIN_TZ }) : '—';
+const fNum     = n => Number(n||0).toLocaleString('es-PE');
+const fMoney   = n => 'S/. '+Number(n||0).toFixed(2);
 function badgePlan(plan) { const map = { basic:{label:'Basic',bg:'#1e3a5f',color:'#93c5fd'}, pro:{label:'Pro',bg:'#3b0764',color:'#d8b4fe'}, enterprise:{label:'Enterprise',bg:'#451a03',color:'#fed7aa'} }; const p = map[plan] || {label:plan,bg:'#1e293b',color:'#94a3b8'}; return `<span style="background:${p.bg};color:${p.color};font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px">${p.label}</span>`; }
 function badgeActivo(activo) { return activo ? '<span style="background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px">✅ Activo</span>' : '<span style="background:#450a0a;color:#f87171;border:1px solid #7f1d1d;font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px">❌ Inactivo</span>'; }
 
@@ -66,6 +68,13 @@ const _ADMIN_NAV = [
  * Llamar con la página activa: renderSidebar('dashboard')
  */
 function renderSidebar(paginaActiva) {
+  // Favicon dinámico para el panel admin
+  if (!document.querySelector('link[rel="icon"]')) {
+    const favicon = document.createElement('link');
+    favicon.rel  = 'icon';
+    favicon.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>";
+    document.head.appendChild(favicon);
+  }
   const admin = getAdmin();
   const nombre  = admin?.nombre || admin?.email || 'Admin';
   const inicial = nombre.charAt(0).toUpperCase();

@@ -209,9 +209,8 @@
       }
 
       tbody.innerHTML = data.map((log, i) => {
-        const fecha = new Date(log.created_at);
-        const fechaStr = fecha.toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
-        const horaStr  = fecha.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        const fechaStr = fDate(log.created_at);
+        const horaStr  = new Date(log.created_at).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: ADMIN_TZ });
         const moduloIcons = {
           autenticacion:'🔐', mascotas:'🐾', propietarios:'👥', citas:'📅',
           historia_clinica:'📋', facturacion:'💰', inventario:'📦', vacunas:'💉',
@@ -249,7 +248,7 @@
     const log = window._logsData?.[idx];
     if (!log) return;
     document.getElementById('log-titulo').textContent = `📋 ${log.accion}`;
-    const fecha = new Date(log.created_at).toLocaleString('es-PE');
+    const fecha = fDateTime(log.created_at);
     document.getElementById('log-body').innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
         ${[

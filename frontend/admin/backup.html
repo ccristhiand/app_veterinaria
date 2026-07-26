@@ -245,7 +245,7 @@
       }
 
       tbody.innerHTML = stats.map(s => {
-        const ultimoStr = s.ultimo_exitoso ? new Date(s.ultimo_exitoso).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+        const ultimoStr = s.ultimo_exitoso ? fDateTime(s.ultimo_exitoso) : '—';
         const horasDesde = s.ultimo_exitoso ? Math.floor((Date.now() - new Date(s.ultimo_exitoso)) / 3600000) : 999;
         const estadoColor = horasDesde < 25 ? '#4ade80' : horasDesde < 49 ? '#fb923c' : '#f87171';
         const estadoLabel = horasDesde < 25 ? '✅ Al día' : horasDesde < 49 ? '⚠️ Ayer' : '❌ Atrasado';
@@ -315,7 +315,7 @@
       }
 
       tbody.innerHTML = data.map(b => {
-        const fecha = new Date(b.created_at).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        const fecha = fDateTime(b.created_at);
         return `<tr>
           <td style="white-space:nowrap;font-size:.78rem">${fecha}</td>
           <td style="font-weight:600">${esc(b.tenant_nombre||'—')}</td>
