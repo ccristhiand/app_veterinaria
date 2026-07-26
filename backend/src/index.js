@@ -33,7 +33,6 @@ const consentimientosRoutes  = require('./routes/consentimientos.routes');
 const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 const feRoutes               = require('./routes/fe.routes');
-// WA — descomentar cuando los archivos estén subidos al servidor
 const waRoutes               = require('./routes/wa.routes');
 const waCampanasRoutes       = require('./routes/wa-campanas.routes');
 // Panel admin SaaS
@@ -41,6 +40,7 @@ const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
 const adminBackupRoutes  = require('./routes/admin_backup.routes');
 const adminFeRoutes      = require('./routes/admin_fe.routes');
+const adminWaRoutes      = require('./routes/admin_wa.routes');   // ← NUEVO
 const app    = express();
 const server = http.createServer(app);
 // ── CORS dinámico por tenant ──────────────────────────────────────
@@ -95,6 +95,7 @@ app.get('/favicon.ico', async (req, res) => {
 app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
 app.use('/admin/api/fe',      adminFeRoutes);
+app.use('/admin/api/wa',      adminWaRoutes);      // ← NUEVO (antes de /admin/api)
 app.use('/admin/api',         adminRoutes);
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({
@@ -129,7 +130,6 @@ app.use(`${API}/consentimientos`,  consentimientosRoutes);
 app.use(`${API}/branding`,         brandingRoutes);
 app.use('/admin/api/permisos',     permisosAdminRoutes);
 app.use(`${API}/fe`,               feRoutes);
-// WA — descomentar cuando los archivos estén subidos al servidor
 app.use(`${API}/wa/campanas`,      waCampanasRoutes);
 app.use(`${API}/wa`,               waRoutes);
 // ── 404 ───────────────────────────────────────────────────────────
@@ -152,7 +152,6 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     server.listen(PORT, () => {
       logger.info(`🚀 VetClinic SaaS en http://localhost:${PORT}`);
       logger.info(`🌐 Modo multitenant activo`);
-      // Iniciar scheduler de backups automáticos
       try {
         const { iniciarBackupScheduler } = require('./jobs/backup.scheduler');
         iniciarBackupScheduler();
