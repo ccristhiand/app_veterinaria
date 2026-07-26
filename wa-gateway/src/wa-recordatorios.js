@@ -2,7 +2,6 @@
 
 /**
  * VetClinic SaaS — Cron de Recordatorios WhatsApp
- * Se ejecuta dentro del wa-gateway o como proceso separado
  * Revisa cada 30 minutos citas y vacunas pendientes
  */
 
@@ -11,7 +10,7 @@ const http  = require('http');
 const path  = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5000';
+const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5001';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 
 const masterPool = mysql.createPool({
@@ -28,13 +27,36 @@ async function masterQuery(sql, params = []) {
   return rows;
 }
 
+// Convierte zona horaria IANA a offset MySQL (+HH:MM)
+function getTimezoneOffset(ianaZone) {
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaZone || 'America/Lima',
+      timeZoneName: 'shortOffset',
+    });
+    const parts = formatter.formatToParts(now);
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-5';
+    const match = offsetPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!match) return '-05:00';
+    const sign    = match[1];
+    const hours   = match[2].padStart(2, '0');
+    const minutes = (match[3] || '00').padStart(2, '0');
+    return `${sign}${hours}:${minutes}`;
+  } catch {
+    return '-05:00';
+  }
+}
+
 async function getTenantConn(t) {
+  const tzOffset = getTimezoneOffset(t.zona_horaria || 'America/Lima');
   return mysql.createConnection({
     host    : t.db_host,
     port    : t.db_port || 3306,
     user    : t.db_user,
     password: t.db_pass,
     database: t.db_name,
+    timezone: tzOffset,
   });
 }
 
@@ -44,7 +66,7 @@ function callGateway(method, path, body = null) {
     const url     = new URL(WA_GATEWAY + path);
     const options = {
       hostname: url.hostname,
-      port    : url.port || 5000,
+      port    : url.port || 5001,
       path    : url.pathname,
       method,
       headers: {
@@ -78,25 +100,28 @@ function rellenarPlantilla(plantilla, vars) {
     .replace(/\[telefono\]/gi, vars.telefono || '');
 }
 
-function fDate(d) {
-  return new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' });
+function fDate(d, tz) {
+  return new Date(d).toLocaleDateString('es-PE', {
+    day:'2-digit', month:'long', year:'numeric',
+    timeZone: tz || 'America/Lima',
+  });
 }
 
-function fHora(d) {
-  return new Date(d).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
+function fHora(d, tz) {
+  return new Date(d).toLocaleTimeString('es-PE', {
+    hour:'2-digit', minute:'2-digit',
+    timeZone: tz || 'America/Lima',
+  });
 }
 
 // ── Recordatorios de CITAS ────────────────────────────────────
 async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
   const horas1 = cfg.recordatorio_citas_horas || 24;
   const horas2 = cfg.recordatorio_citas_horas2;
-
   const rangos = [horas1];
   if (horas2) rangos.push(horas2);
 
   for (const horas of rangos) {
-    // CORREGIDO: el anti-duplicado ahora filtra por telefono+tipo en el log
-    // en lugar de comparar c.id con propietario_id (que era incorrecto)
     const [citas] = await conn.execute(
       `SELECT c.id, c.fecha_hora, c.motivo,
               m.nombre AS mascota,
@@ -128,13 +153,14 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
         const [[plantilla]] = await conn.execute(
           "SELECT contenido FROM wa_plantillas WHERE tipo='recordatorio_cita' AND activo=1 LIMIT 1"
         );
+        const tz  = tenant.zona_horaria || 'America/Lima';
         const msg = rellenarPlantilla(
           plantilla?.contenido || '🐾 Hola [nombre], recuerda tu cita para [mascota] el [fecha] a las [hora] en [clinica].',
           {
             nombre  : cita.propietario,
             mascota : cita.mascota,
-            fecha   : fDate(cita.fecha_hora),
-            hora    : fHora(cita.fecha_hora),
+            fecha   : fDate(cita.fecha_hora, tz),
+            hora    : fHora(cita.fecha_hora, tz),
             clinica,
           }
         );
@@ -161,7 +187,6 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
 async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
   const dias1 = cfg.recordatorio_vacunas_dias || 7;
   const dias2 = cfg.recordatorio_vacunas_dias2;
-
   const rangos = [dias1];
   if (dias2) rangos.push(dias2);
 
@@ -207,7 +232,6 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
           codigoPais: cfg.codigo_pais || '+51',
         });
 
-        // Marcar como notificado
         await conn.execute('UPDATE vacunas SET notificado=1 WHERE id=?', [vac.id]);
         console.log(`[WA Vacunas] ✅ ${tenant.slug} → ${vac.telefono}`);
       } catch (e) {
@@ -218,14 +242,14 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
   }
 }
 
-// ── Proceso principal de recordatorios ───────────────────────
+// ── Proceso principal ─────────────────────────────────────────
 async function procesarRecordatorios() {
   console.log(`[WA Recordatorios] Iniciando ciclo: ${new Date().toLocaleString('es-PE')}`);
 
   try {
     const tenants = await masterQuery(
       `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
-              tc.nombre_clinica, tc.telefono AS tel_clinica
+              tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria
        FROM tenants t
        JOIN tenant_config tc ON tc.tenant_id = t.id
        JOIN wa_sesiones ws ON ws.tenant_id = t.id
@@ -233,13 +257,18 @@ async function procesarRecordatorios() {
        WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
     );
 
+    console.log(`[WA Recordatorios] Tenants activos con WA: ${tenants.length}`);
+
     for (const tenant of tenants) {
       let conn;
       try {
         conn = await getTenantConn(tenant);
 
         const [[cfg]] = await conn.execute('SELECT * FROM wa_config LIMIT 1');
-        if (!cfg?.activo) continue;
+        if (!cfg?.activo) {
+          console.log(`[WA Recordatorios] ${tenant.slug}: WA inactivo en config tenant`);
+          continue;
+        }
 
         const clinica = tenant.nombre_clinica || 'VetClinic';
 
