@@ -8,15 +8,16 @@
 const MODULOS_POR_PLAN = {
   basic: [
     'dashboard','citas','propietarios','mascotas','historia','servicios',
+    'whatsapp',
   ],
   pro: [
     'dashboard','citas','propietarios','mascotas','historia',
-    'inventario','reportes','servicios',
+    'inventario','reportes','servicios','whatsapp',
   ],
   enterprise: [
     'dashboard','citas','propietarios','mascotas','historia',
     'inventario','facturacion','caja','reportes','servicios',
-    'consentimientos','usuarios','configuracion',
+    'consentimientos','usuarios','configuracion','whatsapp',
   ],
 };
 
@@ -35,6 +36,7 @@ const TODOS_LOS_LINKS = [
   { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos',roles:['admin','veterinario'] },
   { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios',       roles:['admin'] },
   { id:'configuracion',  icon:'⚙️', label:'Configuración',    href:'configuracion',  roles:['admin'] },
+  { id:'whatsapp',       icon:'💬', label:'WhatsApp',         href:'whatsapp',       roles:['admin'] },
 ];
 
 function renderShell({ activePage, title, subtitle }) {
