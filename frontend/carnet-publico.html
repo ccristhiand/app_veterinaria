@@ -46,7 +46,7 @@
 
       <!-- Header mascota -->
       <div class="card">
-        <div style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.25rem">
+        <div id="carnet-header" style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.25rem">
           <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:1rem;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0" id="especie-icon">🐾</div>
           <div style="flex:1">
             <h1 id="mascota-nombre" style="font-family:'Playfair Display',serif;font-size:1.6rem;margin:0"></h1>
@@ -159,7 +159,7 @@
         const res = await fetch(`${API}/carnet/${token}`, { headers:{ 'X-Tenant-Host': host } });
         if (!res.ok) throw new Error('no encontrado');
         const { data } = await res.json();
-        const { carnet: m, vacunas, citas, citas_historial, historias_sin_cita, banos, ultima_consulta, branding } = data;
+        const { carnet: m, vacunas, desparasitaciones, citas, citas_historial, historias_sin_cita, banos, ultima_consulta, branding } = data;
 
         // Aplicar branding del tenant
         const colorPrimario = branding?.color_primario || '#166534';
@@ -167,9 +167,9 @@
         const nombreClinica = branding?.nombre_clinica  || 'VetClinic';
         const logoUrl       = branding?.logo_url        || null;
 
-        // Actualizar header con colores del tenant
-        document.querySelector('[style*="linear-gradient(135deg,#166534"]').style.background =
-          `linear-gradient(135deg,${colorPrimario},${colorAcento})`;
+        // Actualizar header con colores del tenant — usando ID en lugar de querySelector frágil
+        const headerEl = document.getElementById('carnet-header');
+        if (headerEl) headerEl.style.background = `linear-gradient(135deg,${colorPrimario},${colorAcento})`;
 
         // Logo y nombre de la clínica
         document.getElementById('clinica-nombre').textContent = nombreClinica;
