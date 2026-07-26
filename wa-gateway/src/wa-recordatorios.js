@@ -28,24 +28,29 @@ async function masterQuery(sql, params = []) {
 }
 
 // Convierte zona horaria IANA a offset MySQL (+HH:MM)
+// Mapa de zonas horarias a offsets MySQL
+const TZ_OFFSETS = {
+  'America/Lima'                       : '-05:00',
+  'America/Bogota'                     : '-05:00',
+  'America/Guayaquil'                  : '-05:00',
+  'America/Mexico_City'                : '-06:00',
+  'America/Santiago'                   : '-04:00',
+  'America/Argentina/Buenos_Aires'     : '-03:00',
+  'America/Caracas'                    : '-04:00',
+  'America/La_Paz'                     : '-04:00',
+  'America/Asuncion'                   : '-04:00',
+  'America/Montevideo'                 : '-03:00',
+  'America/Panama'                     : '-05:00',
+  'America/Guatemala'                  : '-06:00',
+  'America/New_York'                   : '-05:00',
+  'America/Chicago'                    : '-06:00',
+  'America/Denver'                     : '-07:00',
+  'America/Los_Angeles'                : '-08:00',
+  'Europe/Madrid'                      : '+01:00',
+};
+
 function getTimezoneOffset(ianaZone) {
-  try {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: ianaZone || 'America/Lima',
-      timeZoneName: 'shortOffset',
-    });
-    const parts = formatter.formatToParts(now);
-    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-5';
-    const match = offsetPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
-    if (!match) return '-05:00';
-    const sign    = match[1];
-    const hours   = match[2].padStart(2, '0');
-    const minutes = (match[3] || '00').padStart(2, '0');
-    return `${sign}${hours}:${minutes}`;
-  } catch {
-    return '-05:00';
-  }
+  return TZ_OFFSETS[ianaZone] || '-05:00';
 }
 
 async function getTenantConn(t) {
