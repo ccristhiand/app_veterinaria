@@ -2,7 +2,7 @@
 
 /**
  * VetClinic SaaS — Procesador de Campañas WA
- * Pausa/reanuda, envía a 1 msg cada 4 segundos
+ * Las campañas viven en la BD de cada tenant, NO en vet_master
  */
 
 const mysql = require('mysql2/promise');
@@ -10,7 +10,7 @@ const http  = require('http');
 const path  = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5000';
+const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5001';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 const DELAY_MS     = 4000;
 
@@ -40,7 +40,7 @@ function callGateway(method, path, body = null) {
     const bodyStr = body ? JSON.stringify(body) : null;
     const url = new URL(WA_GATEWAY + path);
     const options = {
-      hostname: url.hostname, port: url.port || 5000, path: url.pathname, method,
+      hostname: url.hostname, port: url.port || 5001, path: url.pathname, method,
       headers: {
         'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY,
         ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
@@ -79,7 +79,6 @@ async function obtenerContactosCampana(conn, campana) {
              WHERE p.telefono IS NOT NULL AND p.telefono != ''
              GROUP BY p.id`;
       break;
-
     case 'por_especie':
       sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
@@ -89,19 +88,15 @@ async function obtenerContactosCampana(conn, campana) {
              GROUP BY p.id`;
       params.push(campana.segmento_valor || 'perro');
       break;
-
     case 'vacunas_vencidas':
       sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
              FROM propietarios p
              JOIN mascotas m ON m.propietario_id = p.id
              JOIN vacunas v ON v.mascota_id = m.id
-             WHERE p.telefono IS NOT NULL
-               AND v.proxima_dosis <= CURDATE()
-               AND v.notificado = 0
+             WHERE p.telefono IS NOT NULL AND v.proxima_dosis <= CURDATE() AND v.notificado = 0
              GROUP BY p.id`;
       break;
-
     case 'citas_semana':
       sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
@@ -113,7 +108,6 @@ async function obtenerContactosCampana(conn, campana) {
                AND c.estado IN ('pendiente','confirmada')
              GROUP BY p.id`;
       break;
-
     case 'sin_citas_60d':
       sql = `SELECT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
@@ -121,14 +115,12 @@ async function obtenerContactosCampana(conn, campana) {
              LEFT JOIN mascotas m ON m.propietario_id = p.id
              WHERE p.telefono IS NOT NULL
                AND p.id NOT IN (
-                 SELECT DISTINCT m2.propietario_id
-                 FROM citas c2
+                 SELECT DISTINCT m2.propietario_id FROM citas c2
                  JOIN mascotas m2 ON m2.id = c2.mascota_id
                  WHERE c2.fecha_hora >= NOW() - INTERVAL 60 DAY
                )
              GROUP BY p.id`;
       break;
-
     default:
       sql = `SELECT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre, p.telefono, '' AS mascotas
              FROM propietarios p WHERE p.telefono IS NOT NULL`;
@@ -138,90 +130,95 @@ async function obtenerContactosCampana(conn, campana) {
   return rows;
 }
 
-// ── Procesar campañas programadas / en espera ─────────────────
+// ── Procesar campañas ─────────────────────────────────────────
 async function procesarCampanas() {
   try {
-    // Activar campañas programadas cuya hora llegó
-    await masterQuery(
-      `UPDATE wa_campanas
-       SET estado='enviando', iniciada_at=NOW()
-       WHERE estado='programada' AND programada_at <= NOW()`
+    // Obtener tenants con WA conectado
+    const tenants = await masterQuery(
+      `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
+              tc.nombre_clinica
+       FROM tenants t
+       JOIN tenant_config tc ON tc.tenant_id = t.id
+       JOIN wa_sesiones ws ON ws.tenant_id = t.id
+       JOIN wa_config_global wcg ON wcg.tenant_id = t.id
+       WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
     );
 
-    const campanas = await masterQuery(
-      `SELECT wc.*, t.id AS tenant_id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
-               tc.nombre_clinica, twacc.codigo_pais, twacc.activo AS wa_activo
-       FROM wa_campanas wc
-       JOIN tenants t ON t.id = wc.tenant_id
-       LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
-       LEFT JOIN wa_sesiones ws ON ws.tenant_id = t.id
-       LEFT JOIN wa_config_global wcg ON wcg.tenant_id = t.id
-       LEFT JOIN wa_config twacc ON 1=1
-       WHERE wc.estado = 'enviando'
-         AND ws.estado = 'conectado'
-         AND wcg.activo = 1
-       LIMIT 5`
-    );
+    for (const tenant of tenants) {
+      let conn;
+      try {
+        conn = await getTenantConn(tenant);
 
-    for (const campana of campanas) {
-      await procesarCampana(campana);
+        // Activar campañas programadas cuya hora llegó
+        await conn.execute(
+          `UPDATE wa_campanas SET estado='enviando', iniciada_at=NOW()
+           WHERE estado='programada' AND programada_at <= NOW()`
+        );
+
+        // Obtener campañas activas del tenant
+        const [campanas] = await conn.execute(
+          `SELECT *, ? AS tenant_id, ? AS slug, ? AS nombre_clinica
+           FROM wa_campanas WHERE estado='enviando' LIMIT 3`,
+          [tenant.id, tenant.slug, tenant.nombre_clinica]
+        );
+
+        for (const campana of campanas) {
+          campana.db_host = tenant.db_host;
+          campana.db_port = tenant.db_port;
+          campana.db_user = tenant.db_user;
+          campana.db_pass = tenant.db_pass;
+          campana.db_name = tenant.db_name;
+          await procesarCampana(campana, conn);
+        }
+      } catch (e) {
+        console.error(`[WA Campanas] Error tenant ${tenant.slug}: ${e.message}`);
+      } finally {
+        await conn?.end();
+      }
     }
   } catch (e) {
-    console.error('[WA Campanas] Error:', e.message);
+    console.error('[WA Campanas] Error general:', e.message);
   }
 }
 
-async function procesarCampana(campana) {
+async function procesarCampana(campana, conn) {
   console.log(`[WA Campanas] Procesando: "${campana.nombre}" (${campana.slug})`);
-  let conn;
 
   try {
-    conn = await getTenantConn(campana);
-
     const [contactosPendientes] = await conn.execute(
-      `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre
-       FROM wa_campana_contactos wcc
-       WHERE wcc.campana_id = ? AND wcc.estado = 'pendiente'
-       ORDER BY wcc.id ASC
-       LIMIT 50`,
+      `SELECT id, propietario_id, telefono, nombre FROM wa_campana_contactos
+       WHERE campana_id=? AND estado='pendiente' ORDER BY id ASC LIMIT 50`,
       [campana.id]
     );
 
     if (!contactosPendientes.length) {
       const [[total]] = await conn.execute(
-        'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?',
-        [campana.id]
+        'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?', [campana.id]
       );
       if (!total?.n) {
         await cargarContactosCampana(campana, conn);
-        return;
       } else {
-        await masterQuery(
-          "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
-          [campana.id]
+        await conn.execute(
+          "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?", [campana.id]
         );
         console.log(`[WA Campanas] ✅ Completada: "${campana.nombre}"`);
-        return;
       }
+      return;
     }
 
     for (const contacto of contactosPendientes) {
-      // CORREGIDO: verificar estado actual de la campaña antes de cada envío
-      // usando la fila del array correctamente
-      const estadoRows = await masterQuery(
+      // Verificar si fue pausada/cancelada
+      const [[estadoActual]] = await conn.execute(
         'SELECT estado FROM wa_campanas WHERE id=?', [campana.id]
       );
-      const estadoActual = estadoRows[0];
-
       if (!estadoActual || estadoActual.estado !== 'enviando') {
-        console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada/cancelada — deteniendo`);
+        console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada — deteniendo`);
         break;
       }
 
       const msg = rellenarPlantilla(campana.mensaje, {
-        nombre  : contacto.nombre,
-        mascota : '',
-        clinica : campana.nombre_clinica || 'VetClinic',
+        nombre : contacto.nombre,
+        clinica: campana.nombre_clinica || 'VetClinic',
       });
 
       try {
@@ -230,27 +227,23 @@ async function procesarCampana(campana) {
           telefono  : contacto.telefono,
           mensaje   : msg,
           tipo      : 'campana',
-          codigoPais: campana.codigo_pais || '+51',
+          codigoPais: '+51',
         });
-
         await conn.execute(
           "UPDATE wa_campana_contactos SET estado='enviado', enviado_at=NOW() WHERE id=?",
           [contacto.id]
         );
-        await masterQuery(
-          'UPDATE wa_campanas SET enviados=enviados+1 WHERE id=?',
-          [campana.id]
+        await conn.execute(
+          'UPDATE wa_campanas SET enviados=enviados+1 WHERE id=?', [campana.id]
         );
-
         console.log(`[WA Campanas] ✅ → ${contacto.telefono}`);
       } catch (e) {
         await conn.execute(
           'UPDATE wa_campana_contactos SET estado=?, error=? WHERE id=?',
           ['fallido', e.message.substring(0, 255), contacto.id]
         );
-        await masterQuery(
-          'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?',
-          [campana.id]
+        await conn.execute(
+          'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?', [campana.id]
         );
         console.error(`[WA Campanas] ❌ → ${contacto.telefono}: ${e.message}`);
       }
@@ -259,19 +252,16 @@ async function procesarCampana(campana) {
     }
   } catch (e) {
     console.error(`[WA Campanas] Error campaña ${campana.id}: ${e.message}`);
-  } finally {
-    await conn?.end();
   }
 }
 
 async function cargarContactosCampana(campana, conn) {
-  console.log(`[WA Campanas] Cargando contactos para: "${campana.nombre}"`);
+  console.log(`[WA Campanas] Cargando contactos: "${campana.nombre}"`);
   const contactos = await obtenerContactosCampana(conn, campana);
 
   if (!contactos.length) {
-    await masterQuery(
-      "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
-      [campana.id]
+    await conn.execute(
+      "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?", [campana.id]
     );
     console.log(`[WA Campanas] ⚠️  Sin contactos para campaña ${campana.id}`);
     return;
@@ -284,15 +274,13 @@ async function cargarContactosCampana(campana, conn) {
     );
   }
 
-  await masterQuery(
-    'UPDATE wa_campanas SET total=? WHERE id=?',
-    [contactos.length, campana.id]
+  await conn.execute(
+    'UPDATE wa_campanas SET total=? WHERE id=?', [contactos.length, campana.id]
   );
 
   console.log(`[WA Campanas] ${contactos.length} contactos cargados`);
 }
 
-// Scheduler — cada 10 segundos
 setInterval(procesarCampanas, 10000);
 procesarCampanas();
 
