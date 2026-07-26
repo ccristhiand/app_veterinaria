@@ -20,6 +20,7 @@ router.get('/', async (req, res, next) => {
          tc.modulo_estetica, tc.modulo_facturacion,
          tc.modulo_inventario, tc.modulo_vacunas,
          tc.modulo_consentimientos, tc.modulo_carnet,
+         tc.zona_horaria, tc.pais,
          t.plan, t.activo
        FROM tenants t
        JOIN tenant_config tc ON tc.tenant_id = t.id
@@ -95,6 +96,8 @@ function defaultBranding() {
     modulo_vacunas       : 1,
     modulo_consentimientos: 1,
     modulo_carnet        : 1,
+    zona_horaria         : 'America/Lima',
+    pais                 : 'Peru',
     plan                 : 'basic',
     activo               : 1,
   };

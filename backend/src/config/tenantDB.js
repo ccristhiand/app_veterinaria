@@ -6,6 +6,27 @@ const logger = require('./logger');
 // Cache de pools: { dbName: pool }
 const poolCache = new Map();
 
+// Convierte zona horaria IANA a offset MySQL (+HH:MM)
+function getTimezoneOffset(ianaZone) {
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaZone || 'America/Lima',
+      timeZoneName: 'shortOffset',
+    });
+    const parts = formatter.formatToParts(now);
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT+0';
+    const match = offsetPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!match) return '+00:00';
+    const sign    = match[1];
+    const hours   = match[2].padStart(2, '0');
+    const minutes = (match[3] || '00').padStart(2, '0');
+    return `${sign}${hours}:${minutes}`;
+  } catch {
+    return '+00:00';
+  }
+}
+
 /**
  * Obtiene (o crea) un pool de conexiones para un tenant específico.
  * Usa caché para no crear pools nuevos en cada request.
@@ -19,6 +40,9 @@ function getPoolForTenant(tenant) {
 
   logger.info(`🔗 Creando pool para tenant: ${tenant.slug} (${key})`);
 
+  const tzOffset = getTimezoneOffset(tenant.zona_horaria || 'America/Lima');
+  logger.info(`🕐 Timezone para ${tenant.slug}: ${tenant.zona_horaria || 'America/Lima'} → ${tzOffset}`);
+
   const pool = mysql.createPool({
     host    : tenant.db_host || process.env.DB_HOST || 'localhost',
     port    : tenant.db_port || parseInt(process.env.DB_PORT || '3306'),
@@ -28,8 +52,7 @@ function getPoolForTenant(tenant) {
     waitForConnections: true,
     connectionLimit   : 10,
     queueLimit        : 50,
-    timezone          : 'Z',
-    // Reconexión automática
+    timezone          : tzOffset,
     enableKeepAlive   : true,
     keepAliveInitialDelay: 30000,
   });
