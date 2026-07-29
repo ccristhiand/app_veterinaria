@@ -29,6 +29,13 @@
     <div><h2>🏦 Cierre de Caja</h2><p>Control de ingresos y conteo de efectivo</p></div>
     <button onclick="imprimirComprobante()" class="vbtn vbtn-ghost">🖨️ Imprimir</button>
   </div>
+  <!-- Banner sede activa -->
+  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
+    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:#15803d">
+    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
+  </div>
+
 
   <!-- Tabs -->
   <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
@@ -236,7 +243,7 @@
         <table class="vtable">
           <thead>
             <tr>
-              <th>Fecha</th><th>Turno</th><th>Efectivo sistema</th>
+              <th>Fecha</th><th>Turno</th><th class="hidden lg:table-cell">Sede</th><th>Efectivo sistema</th>
               <th>Conteo físico</th><th>Diferencia</th>
               <th>Gastos</th><th>Realizado por</th><th>Estado</th><th></th>
             </tr>
@@ -276,6 +283,17 @@ const getSim = () => _empresaCaja.simbolo_moneda || 'S/.';
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'caja', title:'Cierre de Caja', subtitle:'Control de efectivo' });
+
+  // ── Mostrar sede activa en el banner ──────────────────────────
+  var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  if (_userSede.sede_nombre) {
+    var _bannerEl = document.getElementById('banner-sede');
+    if (_bannerEl) {
+      _bannerEl.style.display = 'block';
+      document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
+    }
+  }
+
   // Cargar config de empresa para símbolo moneda
   api('/empresa').then(res => {
     if (res?.ok) res.json().then(d => {
@@ -486,6 +504,7 @@ async function cargarHistorial() {
       return `<tr>
         <td style="font-weight:600">${fDate(c.fecha)}</td>
         <td style="font-size:.78rem;text-transform:capitalize">${c.turno.replace('_',' ')}</td>
+        <td class="hidden lg:table-cell" style="font-size:.74rem;color:var(--ink-soft)">${c.sede_nombre ? '🏥 '+esc(c.sede_nombre) : '—'}</td>
         <td style="font-weight:600;color:#15803d">S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</td>
         <td style="font-weight:600">S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</td>
         <td style="font-weight:700;color:${difColor}">${difTxt}</td>

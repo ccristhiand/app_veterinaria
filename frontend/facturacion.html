@@ -43,6 +43,13 @@
     <div><h2>🧾 Facturación</h2><p>Boletas, facturas y dashboard de caja</p></div>
     <button onclick="abrirNuevaFactura()" class="vbtn vbtn-primary">＋ Nueva Boleta / Factura</button>
   </div>
+  <!-- Banner sede activa -->
+  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
+    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:#15803d">
+    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
+  </div>
+
 
   <!-- Tabs -->
   <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
@@ -146,6 +153,7 @@
             <tr id="thead-facturas">
               <th>Número</th><th>Fecha</th><th>Cliente</th>
               <th class="hidden sm:table-cell">Mascota</th>
+              <th class="hidden lg:table-cell">Sede</th>
               <th>Total</th><th>Estado</th><th>SUNAT</th><th>Acciones</th>
             </tr>
           </thead>
@@ -559,6 +567,17 @@ let _catalogoCache = null; // servicios + inventario
 
 // ── Init ──────────────────────────────────────────────────────────
 initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y documentos' });
+
+  // ── Mostrar sede activa en el banner ──────────────────────────
+  var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  if (_userSede.sede_nombre) {
+    var _bannerEl = document.getElementById('banner-sede');
+    if (_bannerEl) {
+      _bannerEl.style.display = 'block';
+      document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
+    }
+  }
+
 
 (async () => {
   try {

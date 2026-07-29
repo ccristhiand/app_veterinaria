@@ -23,6 +23,13 @@
       <button onclick="abrirNuevo()" class="vbtn vbtn-primary">＋ Nuevo Ítem</button>
     </div>
   </div>
+  <!-- Banner sede activa -->
+  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
+    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:#15803d">
+    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
+  </div>
+
 
   <!-- Stats -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem" id="stats-inv"></div>
@@ -65,6 +72,7 @@
             <th>Mínimo</th>
             <th>Precio unit.</th>
             <th>Proveedor</th>
+            <th class="hidden lg:table-cell">Sede</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -225,6 +233,17 @@ let itemsMasiva    = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'inventario', title:'Inventario', subtitle:'Control de stock' });
+
+  // ── Mostrar sede activa en el banner ──────────────────────────
+  var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  if (_userSede.sede_nombre) {
+    var _bannerEl = document.getElementById('banner-sede');
+    if (_bannerEl) {
+      _bannerEl.style.display = 'block';
+      document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
+    }
+  }
+
   cargar();
 
   const socket = getSocket();
@@ -347,6 +366,7 @@ function filtrar() {
       <td style="color:var(--ink-soft);font-size:.85rem">${minimo.toFixed(2)} ${esc(i.unidad||'')}</td>
       <td style="font-size:.85rem">${i.precio_unitario ? `S/. ${parseFloat(i.precio_unitario).toFixed(2)}` : '—'}</td>
       <td style="font-size:.82rem;color:var(--ink-soft)">${esc(i.proveedor||'—')}</td>
+      <td class="hidden lg:table-cell" style="font-size:.74rem;color:var(--ink-soft)">${i.sede_nombre ? '🏥 '+esc(i.sede_nombre) : '—'}</td>
       <td>
         ${esBajo
           ? '<span style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">⚠️ Bajo stock</span>'
