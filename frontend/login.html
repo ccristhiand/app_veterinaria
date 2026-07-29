@@ -10,7 +10,6 @@
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Inter',sans-serif; min-height:100vh; display:flex; }
 
-    /* ── Panel izquierdo (branding) ── */
     .left-panel {
       width:50%; display:flex; flex-direction:column; justify-content:space-between;
       padding:3rem; position:relative; overflow:hidden;
@@ -61,7 +60,6 @@
     .testimonial p { color:rgba(255,255,255,.9); font-size:.85rem; line-height:1.6; font-style:italic; }
     .testimonial span { color:rgba(255,255,255,.55); font-size:.72rem; margin-top:.5rem; display:block; }
 
-    /* ── Panel derecho (formulario) ── */
     .right-panel {
       width:50%; display:flex; align-items:center; justify-content:center;
       padding:2rem; background:#f8fafc;
@@ -100,7 +98,7 @@
     .btn-login:disabled { opacity:.7; cursor:not-allowed; transform:none; }
 
     .error-box {
-      display:none; margin-bottom:1.25rem; padding:.85rem 1rem;
+      margin-bottom:1.25rem; padding:.85rem 1rem;
       border-radius:.85rem; font-size:.83rem; border:1.5px solid;
       display:flex; align-items:flex-start; gap:.6rem;
     }
@@ -123,7 +121,6 @@
 
   <!-- ── Panel izquierdo ── -->
   <div class="left-panel" id="left-panel">
-    <!-- Header con logo + nombre -->
     <div style="display:flex;align-items:center;gap:.9rem;position:relative;z-index:1">
       <div class="brand-logo" id="brand-logo">🐾</div>
       <div>
@@ -132,7 +129,6 @@
       </div>
     </div>
 
-    <!-- Hero text -->
     <div style="position:relative;z-index:1">
       <h1 class="hero-title" id="brand-hero">
         Gestión veterinaria<br/>
@@ -143,7 +139,6 @@
         Sistema integral para clínicas veterinarias. Historiales clínicos, citas, facturación y más en un solo lugar.
       </p>
 
-      <!-- Stats -->
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-val">∞</div>
@@ -159,14 +154,12 @@
         </div>
       </div>
 
-      <!-- Testimonio / tagline de la clínica -->
       <div class="testimonial" id="testimonial-box">
         <p id="testimonial-text">"Cuidamos a cada paciente como si fuera nuestro."</p>
         <span id="testimonial-autor">— Tu clínica veterinaria</span>
       </div>
     </div>
 
-    <!-- Footer -->
     <div style="position:relative;z-index:1">
       <p style="font-size:.7rem;color:rgba(255,255,255,.35)">
         Powered by VetClinic SaaS · Sistema seguro y encriptado
@@ -178,7 +171,6 @@
   <div class="right-panel">
     <div class="form-card fade-up">
 
-      <!-- Logo mobile -->
       <div style="display:none;text-align:center;margin-bottom:1.5rem" id="mobile-brand">
         <div style="width:52px;height:52px;border-radius:1rem;background:var(--brand-primary,#10b981);
           display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto .75rem">
@@ -241,28 +233,24 @@
   </div>
 
 <script>
-  const _isLocalLogin = window.location.hostname === 'localhost' ||
-                       window.location.hostname.endsWith('.test') ||
-                       window.location.hostname === '127.0.0.1';
+  const _isLocalLogin    = window.location.hostname === 'localhost' ||
+                           window.location.hostname.endsWith('.test') ||
+                           window.location.hostname === '127.0.0.1';
   const _baseDomainLogin = window.location.hostname.split('.').slice(-2).join('.');
-  const API = _isLocalLogin
+  const API  = _isLocalLogin
     ? 'http://localhost:4000/api/v1'
     : `https://api.${_baseDomainLogin}/api/v1`;
   const HOST = window.location.hostname;
 
-  // ── Cargar branding del tenant ──────────────────────────────────
+  // ── Cargar branding ───────────────────────────────────────────
   async function cargarBranding() {
     try {
-      const res = await fetch(`${API}/branding`, {
-        headers: { 'X-Tenant-Host': HOST }
-      });
+      const res = await fetch(`${API}/branding`, { headers: { 'X-Tenant-Host': HOST } });
       if (!res.ok) return;
       const b = (await res.json()).data;
       if (!b) return;
 
-      // Solo nombre y logo — sin tocar colores
       const nombre = b.nombre_clinica || 'VetClinic';
-
       const nameEl = document.getElementById('brand-name');
       if (nameEl) nameEl.textContent = nombre;
       const mobileEl = document.getElementById('mobile-brand-name');
@@ -285,31 +273,10 @@
 
       if (b.favicon_url) {
         let link = document.querySelector("link[rel~='icon']");
-        if (!link) { link=document.createElement('link'); link.rel='icon'; document.head.appendChild(link); }
+        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
         link.href = b.favicon_url;
       }
-
     } catch(e) { console.error('[Branding error]', e); }
-  }
-
-  setTimeout(cargarBranding, 100);
-
-
-  function ajustarColor(hex, amt) {
-    try {
-      const n = parseInt((hex||'#10b981').replace('#',''), 16);
-      const r = Math.min(255,Math.max(0,(n>>16)+amt));
-      const g = Math.min(255,Math.max(0,((n>>8)&0xff)+amt));
-      const b = Math.min(255,Math.max(0,(n&0xff)+amt));
-      return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
-    } catch { return hex; }
-  }
-
-  function hexToRgba(hex, a) {
-    try {
-      const n = parseInt((hex||'#10b981').replace('#',''),16);
-      return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
-    } catch { return hex; }
   }
 
   // ── Verificar si ya está logueado ─────────────────────────────
@@ -321,7 +288,6 @@
     }
   } catch(e) { localStorage.clear(); }
 
-  // Mostrar mensaje de suspensión si fue redirigido forzosamente
   window.addEventListener('DOMContentLoaded', () => {
     cargarBranding();
     const suspMsg = localStorage.getItem('vet_suspension_msg');
@@ -332,7 +298,7 @@
   });
 
   // ── Login ──────────────────────────────────────────────────────
-  document.addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   async function doLogin() {
     const email    = document.getElementById('login-email').value.trim();
@@ -343,20 +309,18 @@
     hideError();
     if (!email || !password) { showError('Completa todos los campos.'); return; }
 
-    btn.disabled = true;
+    btn.disabled        = true;
     btnText.textContent = 'Verificando…';
 
     try {
       const res  = await fetch(`${API}/auth/login`, {
         method : 'POST',
-        headers: {
-          'Content-Type'  : 'application/json',
-          'X-Tenant-Host' : HOST,
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Host': HOST },
+        body   : JSON.stringify({ email, password }),
       });
       const data = await res.json();
 
+      // ── Errores HTTP ───────────────────────────────────────────
       if (!res.ok) {
         if (data.code === 'TENANT_SUSPENDED') {
           showError(data.message || 'Esta clínica ha sido suspendida.', 'suspension');
@@ -368,17 +332,18 @@
         return;
       }
 
+      // ── PRIMERO: verificar must_change_password ────────────────
+      // Esto va ANTES de intentar leer data.data
+      if (data.must_change_password) {
+        localStorage.setItem('vet_temp_token', data.temp_token);
+        localStorage.setItem('vet_temp_user',  JSON.stringify(data.user));
+        btnText.textContent = '🔐 Redirigiendo…';
+        setTimeout(() => window.location.href = 'cambiar-password', 500);
+        return;
+      }
+
+      // ── Login normal ───────────────────────────────────────────
       const { accessToken, refreshToken, user } = data.data;
-
-        // Primer login — debe cambiar password
-        if (data.must_change_password) {
-          localStorage.setItem('vet_temp_token', data.temp_token);
-          localStorage.setItem('vet_temp_user',  JSON.stringify(data.user));
-          btnText.textContent = 'Redirigiendo…';
-          setTimeout(() => window.location.href = 'cambiar-password', 500);
-          return;
-        }
-
       localStorage.setItem('vet_access',  accessToken);
       localStorage.setItem('vet_refresh', refreshToken);
       localStorage.setItem('vet_user',    JSON.stringify(user));
@@ -389,8 +354,9 @@
     } catch {
       showError('No se pudo conectar al servidor.');
     } finally {
-      if (btn.disabled && document.getElementById('btn-text').textContent !== '✅ Accediendo…') {
-        btn.disabled = false;
+      const txt = document.getElementById('btn-text').textContent;
+      if (btn.disabled && txt !== '✅ Accediendo…' && txt !== '🔐 Redirigiendo…') {
+        btn.disabled        = false;
         btnText.textContent = 'Iniciar Sesión';
       }
     }
@@ -405,21 +371,18 @@
     const box    = document.getElementById('error-box');
     const msgEl  = document.getElementById('error-msg');
     const iconEl = document.getElementById('error-icon');
-
     msgEl.innerHTML = msg;
     box.classList.remove('hidden');
-
     if (tipo === 'suspension') {
-      box.style.cssText = 'display:flex;background:#fff7ed;border-color:#fed7aa;color:#9a3412;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border-width:1.5px;align-items:flex-start;gap:.6rem';
+      box.style.cssText = 'display:flex;background:#fff7ed;border-color:#fed7aa;color:#9a3412;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border:1.5px solid;align-items:flex-start;gap:.6rem';
       iconEl.textContent = '🚫';
     } else if (tipo === 'warning') {
-      box.style.cssText = 'display:flex;background:#fffbeb;border-color:#fde68a;color:#92400e;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border-width:1.5px;align-items:flex-start;gap:.6rem';
+      box.style.cssText = 'display:flex;background:#fffbeb;border-color:#fde68a;color:#92400e;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border:1.5px solid;align-items:flex-start;gap:.6rem';
       iconEl.textContent = '⏰';
     } else {
-      box.style.cssText = 'display:flex;background:#fef2f2;border-color:#fecaca;color:#dc2626;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border-width:1.5px;align-items:flex-start;gap:.6rem';
+      box.style.cssText = 'display:flex;background:#fef2f2;border-color:#fecaca;color:#dc2626;margin-bottom:1.25rem;padding:.85rem 1rem;border-radius:.85rem;font-size:.83rem;border:1.5px solid;align-items:flex-start;gap:.6rem';
       iconEl.textContent = '⚠️';
     }
-
     box.classList.add('shake');
     setTimeout(() => box.classList.remove('shake'), 400);
     document.getElementById('btn-login').disabled = false;
