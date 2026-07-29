@@ -111,7 +111,7 @@ app.use('/admin/api',         adminRoutes);
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max     : 10,
+  max     : 10000,
   standardHeaders: true,
   legacyHeaders  : false,
   message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
