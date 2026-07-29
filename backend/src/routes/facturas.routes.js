@@ -15,13 +15,9 @@ function getSedeFiltro(req) {
 }
 
 // Construye el fragmento SQL para filtrar por sede
-// Incluye sede_id IS NULL para datos legacy (antes de multi-sedes)
 function sedeSQL(sedeId, col = 'sede_id') {
   if (!sedeId) return { sql: '', params: [] };
-  return {
-    sql   : `AND (${col} = ? OR ${col} IS NULL)`,
-    params: [sedeId],
-  };
+  return { sql: `AND ${col} = ?`, params: [sedeId] };
 }
 
 // ── GET /api/v1/facturas/resumen ──────────────────────────────────

@@ -16,14 +16,10 @@ function getSedeFiltro(req) {
   return user.sede_id || header || null;
 }
 
-// Incluye sede_id IS NULL para datos legacy (registros antes de multi-sedes)
 function sedeSQL(sedeId, col) {
   col = col || 'sede_id';
   if (!sedeId) return { sql: '', params: [] };
-  return {
-    sql   : 'AND (' + col + ' = ? OR ' + col + ' IS NULL)',
-    params: [sedeId],
-  };
+  return { sql: 'AND ' + col + ' = ?', params: [sedeId] };
 }
 
 // GET /api/v1/caja/resumen-dia
@@ -33,7 +29,7 @@ router.get('/resumen-dia', async (req, res, next) => {
     const dia    = fecha || new Date().toISOString().split('T')[0];
     const sedeId = getSedeFiltro(req);
     const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
-    const sf = sff; const sp = spf;
+    const { sql: sf,  params: sp  } = sedeSQL(sedeId, 'sede_id');
 
     const [totales] = await req.db.query(
       `SELECT
@@ -55,7 +51,7 @@ router.get('/resumen-dia', async (req, res, next) => {
        FROM caja_cierres
        WHERE fecha = ? AND turno = ? ${sedeId ? 'AND sede_id = ?' : ''}
        ORDER BY created_at DESC LIMIT 1`,
-      [dia, turno || 'dia_completo', ...sp]
+      [dia, turno || 'dia_completo', ...(sedeId ? [sedeId] : [])]
     );
 
     const [pendientes] = await req.db.query(
@@ -137,7 +133,6 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
     const sedeId = req.user.sede_id ||
                    (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
     const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
-    const sf = sff; const sp = spf;
 
     const [totales] = await req.db.query(
       `SELECT
