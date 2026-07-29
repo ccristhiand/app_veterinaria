@@ -133,6 +133,7 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
     const sedeId = req.user.sede_id ||
                    (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
     const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
+    const sp = sedeId ? [sedeId] : [];
 
     const [totales] = await req.db.query(
       `SELECT
