@@ -14,8 +14,14 @@ router.use(authenticate);
 // ── GET /api/v1/usuarios/me — perfil del usuario autenticado ──────
 router.get('/me', async (req, res, next) => {
   try {
+    // CAMBIO: incluir sede_id + nombre de sede en el perfil
     const [user] = await req.db.query(
-      'SELECT id, nombre, email, rol, activo, must_change_password, last_password_change, created_at FROM usuarios WHERE id=?',
+      `SELECT u.id, u.nombre, u.email, u.rol, u.activo, u.must_change_password,
+              u.last_password_change, u.created_at, u.sede_id,
+              s.nombre AS sede_nombre, s.ciudad AS sede_ciudad
+       FROM usuarios u
+       LEFT JOIN sedes s ON s.id = u.sede_id
+       WHERE u.id = ?`,
       [req.user.id]
     );
     return res.json({ success: true, data: user });
@@ -26,11 +32,16 @@ router.get('/me', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const { rol, activo } = req.query;
-    let sql = 'SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE 1=1';
+    // CAMBIO: incluir sede en el listado
+    let sql = `SELECT u.id, u.nombre, u.email, u.rol, u.activo, u.created_at,
+                      u.sede_id, s.nombre AS sede_nombre
+               FROM usuarios u
+               LEFT JOIN sedes s ON s.id = u.sede_id
+               WHERE 1=1`;
     const params = [];
-    if (rol !== undefined)    { sql += ' AND rol = ?';    params.push(rol); }
-    if (activo !== undefined) { sql += ' AND activo = ?'; params.push(activo === 'false' ? 0 : 1); }
-    sql += ' ORDER BY nombre';
+    if (rol !== undefined)    { sql += ' AND u.rol = ?';    params.push(rol); }
+    if (activo !== undefined) { sql += ' AND u.activo = ?'; params.push(activo === 'false' ? 0 : 1); }
+    sql += ' ORDER BY u.nombre';
     const rows = await req.db.query(sql, params);
     return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
@@ -39,21 +50,16 @@ router.get('/', async (req, res, next) => {
 // ── GET /api/v1/usuarios/limite — info de límite de usuarios ──────
 router.get('/limite', async (req, res, next) => {
   try {
-    // Contar usuarios activos
     const [conteo] = await req.db.query(
       'SELECT COUNT(*) AS total FROM usuarios WHERE activo = 1'
     );
-
-    // Obtener límite del tenant desde vet_master
     const [config] = await masterQuery(
       'SELECT max_usuarios FROM tenant_config WHERE tenant_id = ?',
       [req.tenant.id]
     );
-
     const total      = conteo?.total || 0;
     const max        = config?.max_usuarios || 5;
     const disponible = Math.max(0, max - total);
-
     return res.json({
       success: true,
       data: {
@@ -69,8 +75,13 @@ router.get('/limite', async (req, res, next) => {
 // ── GET /api/v1/usuarios/:id ──────────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
+    // CAMBIO: incluir sede en el detalle
     const [user] = await req.db.query(
-      'SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE id = ?',
+      `SELECT u.id, u.nombre, u.email, u.rol, u.activo, u.created_at,
+              u.sede_id, s.nombre AS sede_nombre
+       FROM usuarios u
+       LEFT JOIN sedes s ON s.id = u.sede_id
+       WHERE u.id = ?`,
       [req.params.id]
     );
     if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
@@ -81,7 +92,8 @@ router.get('/:id', async (req, res, next) => {
 // ── POST /api/v1/usuarios — crear (solo admin) ────────────────────
 router.post('/', authorize('admin'), async (req, res, next) => {
   try {
-    const { nombre, email, password, rol = 'recepcionista' } = req.body;
+    // CAMBIO: recibir sede_id
+    const { nombre, email, password, rol = 'recepcionista', sede_id = null } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
@@ -90,6 +102,14 @@ router.post('/', authorize('admin'), async (req, res, next) => {
 
     const rolesValidos = ['admin','veterinario','recepcionista'];
     if (!rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
+
+    // Validar que la sede existe (si se proporciona)
+    if (sede_id) {
+      const [sedeExiste] = await req.db.query(
+        'SELECT id FROM sedes WHERE id = ? AND activo = 1', [sede_id]
+      );
+      if (!sedeExiste) return res.status(422).json({ success:false, message:'La sede seleccionada no existe o está inactiva.' });
+    }
 
     // ── Verificar límite de usuarios ──────────────────────────────
     const [conteo] = await req.db.query(
@@ -116,9 +136,10 @@ router.post('/', authorize('admin'), async (req, res, next) => {
     if (existe) return res.status(422).json({ success:false, message:'Ya existe un usuario con ese email.' });
 
     const hash   = await bcrypt.hash(password, 10);
+    // CAMBIO: insertar sede_id
     const result = await req.db.query(
-      'INSERT INTO usuarios (nombre, email, password, rol, activo, must_change_password) VALUES (?,?,?,?,1,1)',
-      [nombre.trim(), email.trim().toLowerCase(), hash, rol]
+      'INSERT INTO usuarios (nombre, email, password, rol, sede_id, activo, must_change_password) VALUES (?,?,?,?,?,1,1)',
+      [nombre.trim(), email.trim().toLowerCase(), hash, rol, sede_id || null]
     );
 
     return res.status(201).json({
@@ -132,13 +153,22 @@ router.post('/', authorize('admin'), async (req, res, next) => {
 // ── PUT /api/v1/usuarios/:id — editar (solo admin) ────────────────
 router.put('/:id', authorize('admin'), async (req, res, next) => {
   try {
-    const { nombre, email, rol, password } = req.body;
+    // CAMBIO: recibir sede_id
+    const { nombre, email, rol, password, sede_id = null } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
 
     const rolesValidos = ['admin','veterinario','recepcionista'];
     if (rol && !rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
+
+    // Validar que la sede existe (si se proporciona)
+    if (sede_id) {
+      const [sedeExiste] = await req.db.query(
+        'SELECT id FROM sedes WHERE id = ? AND activo = 1', [sede_id]
+      );
+      if (!sedeExiste) return res.status(422).json({ success:false, message:'La sede seleccionada no existe o está inactiva.' });
+    }
 
     // Verificar email duplicado (excluyendo el propio)
     const [existe] = await req.db.query(
@@ -149,14 +179,16 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
     if (password) {
       if (password.length < 8) return res.status(422).json({ success:false, message:'El password debe tener al menos 8 caracteres.' });
       const hash = await bcrypt.hash(password, 10);
+      // CAMBIO: actualizar sede_id
       await req.db.query(
-        'UPDATE usuarios SET nombre=?, email=?, rol=?, password=? WHERE id=?',
-        [nombre.trim(), email.trim().toLowerCase(), rol, hash, req.params.id]
+        'UPDATE usuarios SET nombre=?, email=?, rol=?, sede_id=?, password=? WHERE id=?',
+        [nombre.trim(), email.trim().toLowerCase(), rol, sede_id || null, hash, req.params.id]
       );
     } else {
+      // CAMBIO: actualizar sede_id
       await req.db.query(
-        'UPDATE usuarios SET nombre=?, email=?, rol=? WHERE id=?',
-        [nombre.trim(), email.trim().toLowerCase(), rol, req.params.id]
+        'UPDATE usuarios SET nombre=?, email=?, rol=?, sede_id=? WHERE id=?',
+        [nombre.trim(), email.trim().toLowerCase(), rol, sede_id || null, req.params.id]
       );
     }
 
@@ -167,7 +199,6 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
 // ── PATCH /api/v1/usuarios/:id/toggle — activar/desactivar ────────
 router.patch('/:id/toggle', authorize('admin'), async (req, res, next) => {
   try {
-    // No permitir desactivarse a sí mismo
     if (parseInt(req.params.id) === req.user.id) {
       return res.status(422).json({ success:false, message:'No puedes desactivar tu propio usuario.' });
     }
@@ -175,7 +206,6 @@ router.patch('/:id/toggle', authorize('admin'), async (req, res, next) => {
     const [user] = await req.db.query('SELECT id, activo, nombre FROM usuarios WHERE id=?', [req.params.id]);
     if (!user) return res.status(404).json({ success:false, message:'Usuario no encontrado.' });
 
-    // Si van a activar, verificar límite
     if (!user.activo) {
       const [conteo] = await req.db.query('SELECT COUNT(*) AS total FROM usuarios WHERE activo = 1');
       const [config] = await masterQuery('SELECT max_usuarios FROM tenant_config WHERE tenant_id = ?', [req.tenant.id]);

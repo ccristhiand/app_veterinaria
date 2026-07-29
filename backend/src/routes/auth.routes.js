@@ -5,8 +5,17 @@ const bcrypt       = require('bcryptjs');
 const { signTokens, authenticate } = require('../middlewares/auth.middleware');
 const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
 
-
 const router = Router();
+
+// ── Helper: obtener sede del usuario ─────────────────────────────
+async function getSedeUsuario(db, sedeId) {
+  if (!sedeId) return null;
+  const [sede] = await db.query(
+    'SELECT id, nombre, ciudad FROM sedes WHERE id = ? AND activo = 1',
+    [sedeId]
+  ).catch(() => [null]);
+  return sede || null;
+}
 
 // POST /api/v1/auth/login
 router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), async (req, res, next) => {
@@ -16,6 +25,7 @@ router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), 
       return res.status(422).json({ success: false, message: 'Email y password requeridos.' });
     }
 
+    // ── CAMBIO: incluir sede_id en la query ──────────────────────
     const [user] = await req.db.query(
       'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
       [email.trim().toLowerCase()]
@@ -30,7 +40,6 @@ router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), 
 
     // Si debe cambiar password → devolver flag especial sin tokens completos
     if (user.must_change_password) {
-      // Token temporal solo para cambiar password (expira en 10 min)
       const jwt    = require('jsonwebtoken');
       const SECRET = process.env.JWT_SECRET || 'vetclinic-key';
       const tempToken = jwt.sign(
@@ -39,22 +48,35 @@ router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), 
         { expiresIn: '10m' }
       );
       return res.json({
-        success            : true,
+        success             : true,
         must_change_password: true,
-        temp_token         : tempToken,
-        message            : 'Debes cambiar tu contraseña antes de continuar.',
+        temp_token          : tempToken,
+        message             : 'Debes cambiar tu contraseña antes de continuar.',
         user: { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol },
       });
     }
 
+    // ── CAMBIO: buscar la sede del usuario ───────────────────────
+    const sede = await getSedeUsuario(req.db, user.sede_id);
+
     const { accessToken, refreshToken } = signTokens(user);
     auditAuth('login:exitoso', req.tenant?.id, req.tenant?.nombre_clinica, user, req.ip, req.headers['user-agent']);
+
     return res.json({
       success: true,
       data: {
         accessToken,
         refreshToken,
-        user: { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol },
+        user: {
+          id    : user.id,
+          nombre: user.nombre,
+          email : user.email,
+          rol   : user.rol,
+          // ── NUEVO: datos de sede ─────────────────────────────
+          sede_id    : user.sede_id || null,
+          sede_nombre: sede?.nombre || null,
+          sede_ciudad: sede?.ciudad || null,
+        },
       },
     });
   } catch (err) { next(err); }
@@ -75,7 +97,6 @@ router.post('/change-password', auditMiddleware('autenticacion:creado', 'autenti
     let userId;
 
     if (temp_token) {
-      // Flujo primer login — verificar token temporal
       const jwt    = require('jsonwebtoken');
       const SECRET = process.env.JWT_SECRET || 'vetclinic-key';
       let decoded;
@@ -89,7 +110,6 @@ router.post('/change-password', auditMiddleware('autenticacion:creado', 'autenti
       }
       userId = decoded.id;
     } else {
-      // Flujo desde perfil — requiere autenticación normal
       const authHeader = req.headers.authorization;
       if (!authHeader) return res.status(401).json({ success: false, message: 'No autenticado.' });
       const jwt    = require('jsonwebtoken');
@@ -102,32 +122,43 @@ router.post('/change-password', auditMiddleware('autenticacion:creado', 'autenti
       }
       userId = decoded.id;
 
-      // Verificar password actual
       if (!password_actual) {
         return res.status(422).json({ success: false, message: 'Debes ingresar tu contraseña actual.' });
       }
-      const [user] = await req.db.query('SELECT password FROM usuarios WHERE id=?', [userId]);
-      const ok = await bcrypt.compare(password_actual, user.password);
-      if (!ok) return res.status(401).json({ success: false, message: 'La contraseña actual es incorrecta.' });
+      const [userCheck] = await req.db.query('SELECT password FROM usuarios WHERE id=?', [userId]);
+      const okPass = await bcrypt.compare(password_actual, userCheck.password);
+      if (!okPass) return res.status(401).json({ success: false, message: 'La contraseña actual es incorrecta.' });
     }
 
-    // Actualizar password
     const hash = await bcrypt.hash(password_nuevo, 10);
     await req.db.query(
       'UPDATE usuarios SET password=?, must_change_password=0, last_password_change=NOW() WHERE id=?',
       [hash, userId]
     );
 
-    // Devolver tokens completos para que el usuario entre directo
+    // ── CAMBIO: incluir sede en los tokens de retorno ────────────
     const [user] = await req.db.query(
-      'SELECT id, nombre, email, rol FROM usuarios WHERE id=?', [userId]
+      'SELECT id, nombre, email, rol, sede_id FROM usuarios WHERE id=?', [userId]
     );
+    const sede = await getSedeUsuario(req.db, user.sede_id);
     const { accessToken, refreshToken } = signTokens(user);
 
     return res.json({
       success: true,
       message: 'Contraseña actualizada correctamente.',
-      data: { accessToken, refreshToken, user },
+      data: {
+        accessToken,
+        refreshToken,
+        user: {
+          id         : user.id,
+          nombre     : user.nombre,
+          email      : user.email,
+          rol        : user.rol,
+          sede_id    : user.sede_id || null,
+          sede_nombre: sede?.nombre || null,
+          sede_ciudad: sede?.ciudad || null,
+        },
+      },
     });
   } catch (err) { next(err); }
 });

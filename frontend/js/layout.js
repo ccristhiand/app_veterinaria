@@ -1,7 +1,7 @@
 /**
- * VetClinic — Layout shell v6
+ * VetClinic — Layout shell v7
  * Permisos por PLAN (básico/profesional/premium)
- * Sin permisos granulares por botón
+ * v7: + módulo Sedes (solo admin), + badge de sede en sidebar
  */
 
 // ── Módulos por plan ──────────────────────────────────────────────
@@ -22,6 +22,7 @@ const MODULOS_POR_PLAN = {
 };
 
 // ── Todos los links del sistema ───────────────────────────────────
+// NUEVO: 'sedes' con roles:['admin'] — solo el admin de la clínica lo ve
 const TODOS_LOS_LINKS = [
   { id:'dashboard',      icon:'📊', label:'Dashboard',        href:'dashboard',      roles:['admin','veterinario','recepcionista'] },
   { id:'citas',          icon:'📅', label:'Citas',            href:'citas',          roles:['admin','veterinario','recepcionista'] },
@@ -35,6 +36,7 @@ const TODOS_LOS_LINKS = [
   { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
   { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos',roles:['admin','veterinario'] },
   { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios',       roles:['admin'] },
+  { id:'sedes',          icon:'🏥', label:'Sedes',            href:'sedes',          roles:['admin'] },
   { id:'configuracion',  icon:'⚙️', label:'Configuración',    href:'configuracion',  roles:['admin'] },
   { id:'whatsapp',       icon:'💬', label:'WhatsApp',         href:'whatsapp',       roles:['admin'] },
 ];
@@ -43,7 +45,16 @@ function renderShell({ activePage, title, subtitle }) {
   const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
   const rol  = user.rol || 'recepcionista';
 
-  // Filtrar por rol (sin branding aún — se aplica después)
+  // ── NUEVO: Badge de sede para mostrar en el área del usuario ──
+  const sedeBadge = user.sede_nombre
+    ? `<span style="display:inline-flex;align-items:center;gap:.25rem;margin-top:.25rem;
+        font-size:.62rem;font-weight:700;color:#6ee7b7;background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.15);border-radius:.5rem;
+        padding:.15rem .5rem;letter-spacing:.02em;">
+        🏥 ${esc(user.sede_nombre)}
+      </span>`
+    : '';
+
   const nav     = TODOS_LOS_LINKS.filter(n => n.roles.includes(rol));
   const navHTML = nav.map(n => `
     <a href="${n.href}" class="sb-link ${n.id === activePage ? 'active' : ''}" data-modulo="${n.id}">
@@ -59,7 +70,7 @@ function renderShell({ activePage, title, subtitle }) {
           style="display:none;width:36px;height:36px;object-fit:contain;border-radius:.5rem"/>
         <div>
           <span class="sb-logo-text" id="sidebar-clinica-nombre">VetClinic</span>
-          <span class="sb-logo-sub">Gestión Veterinaria</span>
+          <span class="sb-logo-sub" id="sidebar-clinica-sub">Gestión Veterinaria</span>
         </div>
       </div>
 
@@ -73,6 +84,7 @@ function renderShell({ activePage, title, subtitle }) {
         <div style="flex:1;min-width:0">
           <p class="sb-user-name" id="user-name">Cargando…</p>
           <p class="sb-user-rol"  id="user-rol">—</p>
+          <div id="user-sede-badge">${sedeBadge}</div>
           <a href="cambiar-password"
             style="font-size:.65rem;color:#a7f3d0;text-decoration:none;font-weight:600;
             display:inline-flex;align-items:center;gap:.25rem;margin-top:.1rem;opacity:.8"
@@ -199,11 +211,17 @@ function aplicarModulosPlan(branding, activePage) {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
 
+  const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
+
   // Módulos habilitados por el plan
   const modulosPlan = [...(MODULOS_POR_PLAN[plan] || MODULOS_POR_PLAN.basic)];
 
+  // ── NUEVO: 'sedes' siempre visible para admin, sin importar plan ──
+  if (user.rol === 'admin' && !modulosPlan.includes('sedes')) {
+    modulosPlan.push('sedes');
+  }
+
   // Módulos desactivados manualmente por el admin SaaS
-  // Solo desactivar módulos que tienen toggle propio — no afectar módulos base
   if (!branding.modulo_facturacion) {
     ['facturacion','caja'].forEach(m => {
       const idx = modulosPlan.indexOf(m);
@@ -225,9 +243,20 @@ function aplicarModulosPlan(branding, activePage) {
     if (!modulosPlan.includes(modulo)) {
       el.style.display = 'none';
     } else {
-      el.style.display = ''; // asegurar que se muestra
+      el.style.display = '';
     }
   });
+
+  // ── NUEVO: actualizar subtítulo del sidebar con nombre de sede ──
+  if (branding.nombre_clinica) {
+    const subEl = document.getElementById('sidebar-clinica-sub');
+    if (subEl) {
+      const user2 = JSON.parse(localStorage.getItem('vet_user') || '{}');
+      subEl.textContent = user2.sede_nombre
+        ? `🏥 ${user2.sede_nombre}`
+        : 'Gestión Veterinaria';
+    }
+  }
 
   // Verificar acceso a la página actual
   if (activePage && !modulosPlan.includes(activePage)) {

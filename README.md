@@ -382,3 +382,17 @@ sudo nano /etc/nginx/sites-available/vetclinic
 sudo ln -s /etc/nginx/sites-available/vetclinic /etc/nginx/sites-enabled/vetclinic
 sudo nginx -t
 sudo systemctl reload nginx
+
+# conf ngix
+# 1. Eliminar config actual
+rm /etc/nginx/sites-available/vetclinic
+rm /etc/nginx/sites-enabled/vetclinic
+
+# 2. Crear nuevo archivo
+nano /etc/nginx/sites-available/vetclinic
+
+# 3. Habilitar
+ln -s /etc/nginx/sites-available/vetclinic /etc/nginx/sites-enabled/vetclinic
+
+# 4. Verificar y recargar
+nginx -t && systemctl reload nginx

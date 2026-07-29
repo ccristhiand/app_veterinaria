@@ -94,12 +94,9 @@ router.post('/tenants', async (req, res) => {
       return res.status(422).json({ success: false, message: 'Se requiere email y password del admin inicial.' });
     }
 
-    // ── Generar slug y nombre de BD desde subdominio ──────────────
-    // subdominio puede venir como "prueba" o "prueba.netcodip.com"
-    // Extraer solo la primera parte
-    const slugBase = subdominio.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const slug     = slugBase;
-    const dbName   = `vet_${slugBase}`;
+    const slugBase       = subdominio.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const slug           = slugBase;
+    const dbName         = `vet_${slugBase}`;
     const subdominioFull = subdominio.includes('.') ? subdominio : `${subdominio}.netcodip.com`;
 
     // 1. Verificar que no existe
@@ -121,13 +118,11 @@ router.post('/tenants', async (req, res) => {
     );
     await tempConn.end();
 
-    // 3. Ejecutar schema base — statement por statement
+    // 3. Ejecutar schema v6 (incluye tabla sedes + sede_id en tablas operativas)
     const schemaPath = path.join(__dirname, '../../sql/tenant_schema.sql');
     if (fs.existsSync(schemaPath)) {
       let schema = fs.readFileSync(schemaPath, 'utf8');
 
-      // Limpiar el schema — solo hasta el final del SQL válido
-      // Eliminar cualquier código JS o texto que no sea SQL
       const jsIndex = schema.indexOf("'use strict'");
       if (jsIndex > 0) schema = schema.substring(0, jsIndex);
 
@@ -137,8 +132,8 @@ router.post('/tenants', async (req, res) => {
       });
 
       const statements = schema
-        .replace(/--[^\n]*/g, '')   // eliminar comentarios --
-        .replace(/\/\*[\s\S]*?\*\//g, '') // eliminar comentarios /* */
+        .replace(/--[^\n]*/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
         .split(';')
         .map(s => s.trim())
         .filter(s => s.length > 10);
@@ -175,14 +170,28 @@ router.post('/tenants', async (req, res) => {
        modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0]
     );
 
-    // 6. Crear usuario admin inicial en la BD del tenant
+    // 6. Configurar sede principal y crear usuario admin
     const tenantConn2 = await mysql.createConnection({
       host: dbHost, user: dbUser, password: dbPass, database: dbName,
     });
+
+    // 6a. Renombrar la sede principal con el nombre real de la clínica
+    await tenantConn2.execute(
+      'UPDATE sedes SET nombre = ? WHERE es_principal = 1',
+      [nombre_clinica]
+    );
+
+    // 6b. Obtener id de la sede principal para asignársela al admin
+    const [[sedePrincipal]] = await tenantConn2.execute(
+      'SELECT id FROM sedes WHERE es_principal = 1 LIMIT 1'
+    );
+    const sedeId = sedePrincipal?.id || null;
+
+    // 6c. Crear admin con sede_id asignado
     const hashedPass = await bcrypt.hash(admin_password, 10);
     await tenantConn2.execute(
-      "INSERT INTO usuarios (nombre, email, password, rol, must_change_password) VALUES (?,?,?,'admin',0)",
-      [admin_nombre || 'Administrador', admin_email, hashedPass]
+      "INSERT INTO usuarios (nombre, email, password, rol, sede_id, must_change_password) VALUES (?,?,?,'admin',?,0)",
+      [admin_nombre || 'Administrador', admin_email, hashedPass, sedeId]
     );
 
     // 7. Actualizar empresa_config con nombre de la clínica
@@ -334,7 +343,6 @@ router.get('/stats', async (req, res) => {
     const porPlan      = await masterQuery('SELECT plan, COUNT(*) AS n FROM tenants GROUP BY plan');
     const poolStats    = getPoolStats();
 
-    // Próximos a vencer en trial (próximos 7 días)
     const proximosVencer = await masterQuery(
       `SELECT t.id, t.slug, tc.nombre_clinica, t.trial_hasta, t.plan
        FROM tenants t
@@ -345,7 +353,6 @@ router.get('/stats', async (req, res) => {
        ORDER BY t.trial_hasta ASC`
     );
 
-    // Último backup por tenant
     const ultimosBackups = await masterQuery(
       `SELECT tenant_id, MAX(created_at) AS ultimo, COUNT(*) AS total,
               SUM(CASE WHEN estado='exitoso' THEN 1 ELSE 0 END) AS exitosos
@@ -354,12 +361,10 @@ router.get('/stats', async (req, res) => {
        GROUP BY tenant_id`
     );
 
-    // WA conectadas
     const [waConectadas] = await masterQuery(
       "SELECT COUNT(*) AS n FROM wa_sesiones WHERE estado='conectado'"
     );
 
-    // Actividad reciente por clínica (logs últimas 24h)
     const actividadHoy = await masterQuery(
       `SELECT tenant_nombre, COUNT(*) AS acciones,
               SUM(CASE WHEN resultado='error' THEN 1 ELSE 0 END) AS errores
@@ -404,6 +409,9 @@ router.get('/tenants/:id/stats', async (req, res) => {
     const [[{ facturas_mes }]]  = await conn.execute("SELECT COUNT(*) AS facturas_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
     const [[{ ingresos_mes }]]  = await conn.execute("SELECT COALESCE(SUM(total),0) AS ingresos_mes FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE()) AND estado='pagado'");
     const [[{ usuarios_total }]]= await conn.execute('SELECT COUNT(*) AS usuarios_total FROM usuarios WHERE activo=1');
+
+    // Sedes de esta clínica
+    const [sedes] = await conn.execute('SELECT id, nombre, activo FROM sedes ORDER BY es_principal DESC, nombre ASC');
     await conn.end();
 
     const io = req.app?.get('io');
@@ -423,6 +431,7 @@ router.get('/tenants/:id/stats', async (req, res) => {
         ingresos_mes   : parseFloat(ingresos_mes),
         usuarios_total : parseInt(usuarios_total),
         usuarios_online,
+        sedes,
       }
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }

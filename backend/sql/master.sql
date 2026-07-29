@@ -1,6 +1,6 @@
 -- ============================================================
--- VETCLINIC SaaS — SCHEMA VET_MASTER v4
--- Base: v3 original + Facturación Electrónica + WhatsApp
+-- VETCLINIC SaaS — SCHEMA VET_MASTER v5
+-- Base: v4 + zona_horaria en tenant_config + trigger actualizado
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS vet_master
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS tenant_plan_fe (
   docs_incluidos INT UNSIGNED  NOT NULL DEFAULT 50,
   docs_usados    INT UNSIGNED  NOT NULL DEFAULT 0,
   precio_extra   DECIMAL(6,4)  NOT NULL DEFAULT 0.05,
-  mes_actual     CHAR(7)       NOT NULL DEFAULT '2026-07',
+  mes_actual     CHAR(7)       NOT NULL DEFAULT (DATE_FORMAT(NOW(),'%Y-%m')),
   updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS wa_config_global (
   ilimitado      TINYINT(1)    NOT NULL DEFAULT 0,
   msgs_incluidos INT UNSIGNED  NOT NULL DEFAULT 100,
   msgs_usados    INT UNSIGNED  NOT NULL DEFAULT 0,
-  mes_actual     CHAR(7)       NOT NULL DEFAULT '2026-07',
+  mes_actual     CHAR(7)       NOT NULL DEFAULT (DATE_FORMAT(NOW(),'%Y-%m')),
   updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -242,4 +242,4 @@ DELIMITER ;
 
 SET GLOBAL event_scheduler = ON;
 
-SELECT 'Schema vet_master v4 ✅' AS resultado;
+SELECT 'Schema vet_master v5 ✅' AS resultado;

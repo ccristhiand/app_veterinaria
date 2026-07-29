@@ -1,19 +1,42 @@
--- VETCLINIC SaaS — TENANT SCHEMA v4
--- Ejecutar al crear nueva clinica — incluye columnas FE SUNAT
+-- VETCLINIC SaaS — TENANT SCHEMA v6
+-- v6: + sedes (multi-sedes) + sede_id en tablas operativas
+-- Ejecutar al crear nueva clinica
 -- Compatible MySQL 5.7+
 
+-- ── Tabla de sedes ────────────────────────────────────────────────
+-- PRIMERO: se crea sedes para que las FK funcionen
+CREATE TABLE IF NOT EXISTS sedes (
+  id           INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  nombre       VARCHAR(150)  NOT NULL,
+  direccion    VARCHAR(255)  NULL,
+  telefono     VARCHAR(30)   NULL,
+  email        VARCHAR(100)  NULL,
+  ciudad       VARCHAR(100)  NULL,
+  activo       TINYINT(1)    NOT NULL DEFAULT 1,
+  es_principal TINYINT(1)    NOT NULL DEFAULT 0,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Sede principal por defecto (el admin la edita con los datos reales)
+INSERT INTO sedes (nombre, es_principal, activo) VALUES ('Sede Principal', 1, 1);
+
+-- ── Usuarios ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS usuarios (
   id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre               VARCHAR(100) NOT NULL,
   email                VARCHAR(150) NOT NULL UNIQUE,
   password             VARCHAR(255) NOT NULL,
   rol                  ENUM('admin','veterinario','recepcionista') NOT NULL DEFAULT 'recepcionista',
+  sede_id              INT UNSIGNED NULL DEFAULT NULL,        -- NULL = todas las sedes (admin)
   activo               TINYINT(1)   NOT NULL DEFAULT 1,
   must_change_password TINYINT(1)   NOT NULL DEFAULT 1,
   last_password_change TIMESTAMP    NULL DEFAULT NULL,
-  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sede (sede_id)
 ) ENGINE=InnoDB;
 
+-- ── Propietarios — SIN sede_id (datos de la clínica, compartidos) ─
 CREATE TABLE IF NOT EXISTS propietarios (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre           VARCHAR(100) NOT NULL,
@@ -28,6 +51,7 @@ CREATE TABLE IF NOT EXISTS propietarios (
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- ── Mascotas — SIN sede_id (sigue a la mascota, no al local) ──────
 CREATE TABLE IF NOT EXISTS mascotas (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   propietario_id   INT UNSIGNED NOT NULL,
@@ -45,11 +69,13 @@ CREATE TABLE IF NOT EXISTS mascotas (
   FOREIGN KEY (propietario_id) REFERENCES propietarios(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- ── Citas — CON sede_id (ocurre en un local físico) ──────────────
 CREATE TABLE IF NOT EXISTS citas (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id     INT UNSIGNED NOT NULL,
   veterinario_id INT UNSIGNED NOT NULL,
   creada_por_id  INT UNSIGNED NOT NULL,
+  sede_id        INT UNSIGNED NULL DEFAULT NULL,              -- sede donde se atiende
   fecha_hora     DATETIME     NOT NULL,
   duracion_min   SMALLINT     NOT NULL DEFAULT 30,
   motivo         VARCHAR(255) NOT NULL,
@@ -60,9 +86,11 @@ CREATE TABLE IF NOT EXISTS citas (
   FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
   FOREIGN KEY (creada_por_id)  REFERENCES usuarios(id) ON DELETE RESTRICT,
   INDEX idx_fecha  (fecha_hora),
-  INDEX idx_estado (estado)
+  INDEX idx_estado (estado),
+  INDEX idx_sede   (sede_id)
 ) ENGINE=InnoDB;
 
+-- ── Historia clínica — SIN sede_id (sigue a la mascota) ──────────
 CREATE TABLE IF NOT EXISTS historia_clinica (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id     INT UNSIGNED NOT NULL,
@@ -95,6 +123,7 @@ CREATE TABLE IF NOT EXISTS recetas (
   FOREIGN KEY (historia_clinica_id) REFERENCES historia_clinica(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Vacunas — SIN sede_id (sigue a la mascota) ───────────────────
 CREATE TABLE IF NOT EXISTS vacunas (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id       INT UNSIGNED NOT NULL,
@@ -113,6 +142,7 @@ CREATE TABLE IF NOT EXISTS vacunas (
   INDEX idx_proxima (proxima_dosis)
 ) ENGINE=InnoDB;
 
+-- ── Inventario — CON sede_id (stock por local) ───────────────────
 CREATE TABLE IF NOT EXISTS inventario (
   id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre            VARCHAR(200)  NOT NULL,
@@ -124,10 +154,13 @@ CREATE TABLE IF NOT EXISTS inventario (
   proveedor         VARCHAR(150)  NULL,
   stock_minimo      DECIMAL(10,2) NOT NULL DEFAULT 5,
   fecha_vencimiento DATE          NULL,
+  sede_id           INT UNSIGNED  NULL DEFAULT NULL,           -- NULL = stock general
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sede (sede_id)
 ) ENGINE=InnoDB;
 
+-- ── Estética — SIN sede_id por simplicidad (se puede agregar luego)
 CREATE TABLE IF NOT EXISTS servicios_estetica (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id      INT UNSIGNED NOT NULL,
@@ -159,6 +192,7 @@ CREATE TABLE IF NOT EXISTS notificaciones (
   INDEX idx_leida   (leida)
 ) ENGINE=InnoDB;
 
+-- ── Servicios catálogo — SIN sede_id (compartido por todas las sedes)
 CREATE TABLE IF NOT EXISTS servicios_catalogo (
   id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre      VARCHAR(150)  NOT NULL,
@@ -169,7 +203,7 @@ CREATE TABLE IF NOT EXISTS servicios_catalogo (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- empresa_config incluye columnas FE SUNAT desde el inicio
+-- ── Empresa config — SIN sede_id (config global de la clínica) ───
 CREATE TABLE IF NOT EXISTS empresa_config (
   id                 INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre             VARCHAR(150)  NOT NULL DEFAULT 'VetClinic',
@@ -200,12 +234,12 @@ CREATE TABLE IF NOT EXISTS empresa_config (
   fe_serie_boleta    VARCHAR(4)    NOT NULL DEFAULT 'B001',
   fe_serie_factura   VARCHAR(4)    NOT NULL DEFAULT 'F001',
   fe_serie_nota_cred VARCHAR(4)    NOT NULL DEFAULT 'BC01',
-  nubefact_ruta      VARCHAR(100)  NULL COMMENT 'UUID ruta Nubefact',
-  nubefact_token     TEXT          NULL COMMENT 'Token Nubefact encriptado AES-256',
+  nubefact_ruta      VARCHAR(100)  NULL,
+  nubefact_token     TEXT          NULL,
   updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- facturas incluye columnas FE SUNAT desde el inicio
+-- ── Facturas — CON sede_id (para reportes financieros por local) ──
 CREATE TABLE IF NOT EXISTS facturas (
   id                       INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   numero                   VARCHAR(20)   NOT NULL UNIQUE,
@@ -214,6 +248,7 @@ CREATE TABLE IF NOT EXISTS facturas (
   mascota_id               INT UNSIGNED  NULL,
   cita_id                  INT UNSIGNED  NULL,
   emitido_por_id           INT UNSIGNED  NOT NULL,
+  sede_id                  INT UNSIGNED  NULL DEFAULT NULL,   -- sede que emite
   fecha                    DATE          NOT NULL,
   subtotal                 DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   igv                      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -242,7 +277,8 @@ CREATE TABLE IF NOT EXISTS facturas (
   FOREIGN KEY (emitido_por_id)  REFERENCES usuarios(id)     ON DELETE RESTRICT,
   INDEX idx_fecha        (fecha),
   INDEX idx_estado       (estado),
-  INDEX idx_sunat_estado (sunat_estado)
+  INDEX idx_sunat_estado (sunat_estado),
+  INDEX idx_sede         (sede_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS factura_items (
@@ -268,11 +304,13 @@ CREATE TABLE IF NOT EXISTS factura_pagos (
   INDEX idx_factura (factura_id)
 ) ENGINE=InnoDB;
 
+-- ── Caja cierres — CON sede_id (cierre por local) ────────────────
 CREATE TABLE IF NOT EXISTS caja_cierres (
   id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   fecha                 DATE         NOT NULL,
   turno                 ENUM('mañana','tarde','dia_completo') NOT NULL DEFAULT 'dia_completo',
   realizado_por_id      INT UNSIGNED NOT NULL,
+  sede_id               INT UNSIGNED NULL DEFAULT NULL,         -- sede del cierre
   monto_inicial         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_efectivo      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_tarjeta       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -289,7 +327,8 @@ CREATE TABLE IF NOT EXISTS caja_cierres (
   updated_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (realizado_por_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
   INDEX idx_fecha  (fecha),
-  INDEX idx_estado (estado)
+  INDEX idx_estado (estado),
+  INDEX idx_sede   (sede_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS caja_gastos (
@@ -341,41 +380,46 @@ CREATE TABLE IF NOT EXISTS consentimientos_generados (
   INDEX idx_mascota (mascota_id)
 ) ENGINE=InnoDB;
 
--- Datos iniciales
-INSERT INTO empresa_config (nombre) VALUES ('VetClinic');
+-- ── Desparasitaciones — SIN sede_id (sigue a la mascota) ─────────
+CREATE TABLE IF NOT EXISTS desparasitaciones (
+  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  mascota_id       INT UNSIGNED NOT NULL,
+  veterinario_id   INT UNSIGNED NOT NULL,
+  tipo             ENUM('interna','externa','interna_externa') NOT NULL DEFAULT 'interna',
+  producto         VARCHAR(150) NOT NULL,
+  dosis            VARCHAR(100) NULL,
+  fecha_aplicacion DATE         NOT NULL,
+  proxima_dosis    DATE         NULL,
+  notas            TEXT         NULL,
+  notificado       TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mascota_id)     REFERENCES mascotas(id) ON DELETE RESTRICT,
+  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+  INDEX idx_mascota (mascota_id),
+  INDEX idx_proxima (proxima_dosis),
+  INDEX idx_notif   (notificado)
+) ENGINE=InnoDB;
 
-INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
-  ('Consulta general',        'consulta',    60.00),
-  ('Consulta de urgencia',    'consulta',   100.00),
-  ('Vacuna séxtuple canina',  'vacunacion',  45.00),
-  ('Vacuna antirrábica',      'vacunacion',  35.00),
-  ('Vacuna triple felina',    'vacunacion',  40.00),
-  ('Baño básico',             'estetica',    35.00),
-  ('Baño completo + corte',   'estetica',    60.00),
-  ('Desparasitación interna', 'otro',        30.00),
-  ('Examen de sangre',        'laboratorio', 80.00);
-
-SELECT 'tenant_schema v4 OK' AS resultado;
-
--- ── WhatsApp por tenant ───────────────────────────────────────
+-- ── WhatsApp — SIN sede_id (config global) ───────────────────────
 CREATE TABLE IF NOT EXISTS wa_config (
-  id                          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  activo                      TINYINT(1)    NOT NULL DEFAULT 0,
-  codigo_pais                 VARCHAR(5)    NOT NULL DEFAULT '+51',
-  recordatorio_citas_activo   TINYINT(1)    NOT NULL DEFAULT 1,
-  recordatorio_citas_horas    INT UNSIGNED  NOT NULL DEFAULT 24,
-  recordatorio_citas_horas2   INT UNSIGNED  NULL DEFAULT 2,
-  recordatorio_vacunas_activo TINYINT(1)    NOT NULL DEFAULT 1,
-  recordatorio_vacunas_dias   INT UNSIGNED  NOT NULL DEFAULT 7,
-  recordatorio_vacunas_dias2  INT UNSIGNED  NULL DEFAULT 1,
-  updated_at                  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  id                                    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  activo                                TINYINT(1)    NOT NULL DEFAULT 0,
+  codigo_pais                           VARCHAR(5)    NOT NULL DEFAULT '+51',
+  recordatorio_citas_activo             TINYINT(1)    NOT NULL DEFAULT 1,
+  recordatorio_citas_horas              INT UNSIGNED  NOT NULL DEFAULT 24,
+  recordatorio_citas_horas2             INT UNSIGNED  NULL DEFAULT 2,
+  recordatorio_vacunas_activo           TINYINT(1)    NOT NULL DEFAULT 1,
+  recordatorio_vacunas_dias             INT UNSIGNED  NOT NULL DEFAULT 7,
+  recordatorio_vacunas_dias2            INT UNSIGNED  NULL DEFAULT 1,
+  recordatorio_desparasitaciones_activo TINYINT(1)    NOT NULL DEFAULT 1,
+  updated_at                            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS wa_plantillas (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(100) NOT NULL,
   tipo       ENUM('recordatorio_cita','recordatorio_vacuna','manual','campana','otro') NOT NULL DEFAULT 'manual',
-  contenido  TEXT         NOT NULL COMMENT 'Variables: [nombre] [mascota] [fecha] [hora] [vacuna] [clinica] [telefono]',
+  contenido  TEXT         NOT NULL,
   activo     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -391,28 +435,28 @@ CREATE TABLE IF NOT EXISTS wa_mensajes_log (
   error          TEXT            NULL,
   enviado_at     TIMESTAMP       NULL,
   created_at     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_tipo      (tipo),
-  INDEX idx_campana   (campana_id),
-  INDEX idx_estado    (estado),
-  INDEX idx_fecha     (created_at)
+  INDEX idx_tipo    (tipo),
+  INDEX idx_campana (campana_id),
+  INDEX idx_estado  (estado),
+  INDEX idx_fecha   (created_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS wa_campanas (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  nombre        VARCHAR(150)   NOT NULL,
-  mensaje       TEXT           NOT NULL,
-  segmento      ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d') NOT NULL DEFAULT 'todos',
-  segmento_valor VARCHAR(50)   NULL COMMENT 'ej: perro para por_especie',
-  estado        ENUM('borrador','programada','enviando','pausada','completada','cancelada') NOT NULL DEFAULT 'borrador',
-  total         INT UNSIGNED   NOT NULL DEFAULT 0,
-  enviados      INT UNSIGNED   NOT NULL DEFAULT 0,
-  fallidos      INT UNSIGNED   NOT NULL DEFAULT 0,
-  ultimo_id     INT UNSIGNED   NOT NULL DEFAULT 0 COMMENT 'ultimo propietario_id procesado para reanudar',
-  programada_at TIMESTAMP      NULL,
-  iniciada_at   TIMESTAMP      NULL,
-  pausada_at    TIMESTAMP      NULL,
-  completada_at TIMESTAMP      NULL,
-  created_at    TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre         VARCHAR(150)   NOT NULL,
+  mensaje        TEXT           NOT NULL,
+  segmento       ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d') NOT NULL DEFAULT 'todos',
+  segmento_valor VARCHAR(50)    NULL,
+  estado         ENUM('borrador','programada','enviando','pausada','completada','cancelada') NOT NULL DEFAULT 'borrador',
+  total          INT UNSIGNED   NOT NULL DEFAULT 0,
+  enviados       INT UNSIGNED   NOT NULL DEFAULT 0,
+  fallidos       INT UNSIGNED   NOT NULL DEFAULT 0,
+  ultimo_id      INT UNSIGNED   NOT NULL DEFAULT 0,
+  programada_at  TIMESTAMP      NULL,
+  iniciada_at    TIMESTAMP      NULL,
+  pausada_at     TIMESTAMP      NULL,
+  completada_at  TIMESTAMP      NULL,
+  created_at     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_estado (estado),
   INDEX idx_fecha  (created_at)
 ) ENGINE=InnoDB;
@@ -431,7 +475,20 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
   FOREIGN KEY (campana_id) REFERENCES wa_campanas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Datos iniciales WA
+-- ── Datos iniciales ───────────────────────────────────────────────
+INSERT INTO empresa_config (nombre) VALUES ('VetClinic');
+
+INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
+  ('Consulta general',        'consulta',    60.00),
+  ('Consulta de urgencia',    'consulta',   100.00),
+  ('Vacuna séxtuple canina',  'vacunacion',  45.00),
+  ('Vacuna antirrábica',      'vacunacion',  35.00),
+  ('Vacuna triple felina',    'vacunacion',  40.00),
+  ('Baño básico',             'estetica',    35.00),
+  ('Baño completo + corte',   'estetica',    60.00),
+  ('Desparasitación interna', 'otro',        30.00),
+  ('Examen de sangre',        'laboratorio', 80.00);
+
 INSERT INTO wa_config (activo) VALUES (0);
 
 INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
@@ -443,3 +500,5 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
  '🐾 Hola [nombre], bienvenido/a a *[clinica]*. Estamos felices de cuidar a *[mascota]*. Ante cualquier consulta estamos a tu disposición.'),
 ('Campaña general', 'campana',
  '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
+
+SELECT 'tenant_schema v6 ✅ (multi-sedes)' AS resultado;

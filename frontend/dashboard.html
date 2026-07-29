@@ -13,16 +13,27 @@
 
 <div id="main-content" class="page">
 
-  <!-- Saludo -->
+  <!-- Saludo + selector de sede (solo admin) -->
   <div class="page-head">
     <div>
       <h2 id="saludo">Buen día 👋</h2>
       <p id="fecha-hoy"></p>
     </div>
-    <a href="citas.html" class="vbtn vbtn-primary">📅 Nueva Cita</a>
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <!-- Selector de sede — visible solo para admin, se inyecta por JS -->
+      <div id="sede-selector-wrap" style="display:none">
+        <select id="sede-selector" onchange="cambiarSede(this.value)"
+          style="padding:.45rem .9rem;border:1.5px solid var(--line);border-radius:.75rem;
+                 font-size:.82rem;font-weight:600;background:var(--card);color:var(--ink);
+                 cursor:pointer;outline:none">
+          <option value="all">🏥 Todas las sedes</option>
+        </select>
+      </div>
+      <a href="citas.html" class="vbtn vbtn-primary">📅 Nueva Cita</a>
+    </div>
   </div>
 
-  <!-- Stats -->
+  <!-- Stats principales -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="stat" style="--stat-accent:#10b981;--stat-bg:#ecfdf5">
       <div class="stat-icon">📅</div>
@@ -46,15 +57,26 @@
     </div>
   </div>
 
+  <!-- Panel multi-sede para admin (se muestra solo si hay +1 sede y es admin) -->
+  <div id="sedes-panel" style="display:none;margin-bottom:1.25rem">
+    <div class="vcard">
+      <div style="padding:1rem 1.4rem;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:1.1rem">🏥</span>
+        <h3 style="font-size:.9rem;font-weight:700">Resumen por sede — hoy</h3>
+      </div>
+      <div id="sedes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--line)"></div>
+    </div>
+  </div>
+
   <!-- Grid principal -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-    <!-- Citas hoy -->
+    <!-- Agenda de hoy -->
     <div class="lg:col-span-2 vcard">
       <div style="padding:1.2rem 1.4rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
         <div>
           <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700">Agenda de Hoy</h3>
-          <p style="font-size:.72rem;color:var(--ink-faint);margin-top:2px">Se actualiza en tiempo real</p>
+          <p id="agenda-sub" style="font-size:.72rem;color:var(--ink-faint);margin-top:2px">Se actualiza en tiempo real</p>
         </div>
         <span style="display:flex;align-items:center;gap:.4rem;font-size:.7rem;color:#059669;font-weight:700;background:#ecfdf5;padding:.35rem .75rem;border-radius:999px">
           <span class="ws-dot-on"></span> EN VIVO
@@ -105,45 +127,102 @@
 </div>
 
 <script>
+  const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  const esAdmin = user.rol === 'admin';
+
   initPage({ activePage: 'dashboard', title: 'Dashboard', subtitle: 'Resumen general de la clínica' });
 
   // Saludo dinámico
   const h = new Date().getHours();
-  const user = JSON.parse(localStorage.getItem('vet_user')||'{}');
   document.getElementById('saludo').textContent =
     (h < 12 ? '☀️ Buenos días' : h < 19 ? '🌤️ Buenas tardes' : '🌙 Buenas noches') + `, ${user.nombre?.split(' ')[0]||''}`;
   document.getElementById('fecha-hoy').textContent =
     new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
+  // ── Selector de sede para admin ───────────────────────────────
+  var sedeSeleccionada = esAdmin ? 'all' : (user.sede_id || null);
+
+  async function iniciarSelectorSede() {
+    if (!esAdmin) return;
+    document.getElementById('sede-selector-wrap').style.display = 'block';
+    try {
+      const res = await api('/reportes/sedes');
+      if (!res) return;
+      const sedes = (await res.json()).data || [];
+      const sel = document.getElementById('sede-selector');
+      sedes.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `🏥 ${s.nombre}${s.ciudad ? ' · '+s.ciudad : ''}`;
+        sel.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  function cambiarSede(valor) {
+    sedeSeleccionada = valor;
+    // Actualizar subtítulo de la agenda
+    const sel = document.getElementById('sede-selector');
+    const label = sel.options[sel.selectedIndex]?.text || 'Todas las sedes';
+    document.getElementById('agenda-sub').textContent = valor === 'all' ? 'Todas las sedes — tiempo real' : label + ' — tiempo real';
+    load();
+  }
+
+  // ── Carga de datos ────────────────────────────────────────────
   async function load() {
     const hoy = new Date().toISOString().split('T')[0];
 
+    // Para admin: llama dashboard-stats con sede_id
+    // Para otros roles: el header X-Sede-Id se manda automáticamente desde shared.js
+    const sedeParam = esAdmin && sedeSeleccionada !== 'all' ? `?sede_id=${sedeSeleccionada}` : (esAdmin ? '?sede_id=all' : '');
+
     try {
-      const res  = await api(`/citas?fecha=${hoy}&limit=50`);
+      const res = await api(`/reportes/dashboard-stats${sedeParam}`);
+      if (!res) return;
+      const d = (await res.json()).data || {};
+
+      document.getElementById('stat-citas').textContent       = d.citas_hoy   || 0;
+      document.getElementById('stat-pendientes').textContent  = d.pendientes   || 0;
+      document.getElementById('stat-completadas').textContent = d.completadas  || 0;
+      document.getElementById('stat-stock').textContent       = d.stock_bajo   || 0;
+
+      // Panel multi-sede solo para admin cuando ve todas
+      if (esAdmin && d.sedes?.length > 1) {
+        renderSedesPanel(d.sedes);
+        document.getElementById('sedes-panel').style.display = 'block';
+      } else {
+        document.getElementById('sedes-panel').style.display = 'none';
+      }
+    } catch (e) {
+      console.error('Error cargando stats:', e);
+    }
+
+    // Citas de hoy filtradas por sede
+    try {
+      const sedeQ = esAdmin && sedeSeleccionada !== 'all' ? `&sede_id=${sedeSeleccionada}` : '';
+      const res = await api(`/citas?fecha=${hoy}&limit=50${sedeQ}`);
       if (!res) return;
       const citas = (await res.json()).data || [];
-
-      document.getElementById('stat-citas').textContent       = citas.length;
-      document.getElementById('stat-pendientes').textContent  = citas.filter(c=>['pendiente','confirmada'].includes(c.estado)).length;
-      document.getElementById('stat-completadas').textContent = citas.filter(c=>c.estado==='completada').length;
-
       renderCitas(citas);
     } catch {
       document.getElementById('citas-hoy').innerHTML =
         `<tr><td colspan="5"><div class="vempty"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="load()">Reintentar</button></p></div></td></tr>`;
     }
 
+    // Stock bajo
     try {
-      const res  = await api('/inventario');
+      const sedeQ = esAdmin && sedeSeleccionada !== 'all' ? `?sede_id=${sedeSeleccionada}` : '';
+      const res = await api(`/inventario${sedeQ}`);
       if (!res) return;
       const items = ((await res.json()).data || []).filter(i => i.bajo_stock);
-      document.getElementById('stat-stock').textContent = items.length;
       document.getElementById('stock-list').innerHTML = items.length
         ? items.slice(0,5).map(i => `
           <div style="padding:.85rem 1.3rem;border-bottom:1px solid #f2f5f2;display:flex;align-items:center;justify-content:space-between">
             <div>
               <p style="font-size:.82rem;font-weight:600">${esc(i.nombre)}</p>
-              <p style="font-size:.7rem;color:var(--ink-faint)">${i.cantidad} ${esc(i.unidad)} · mínimo ${i.stock_minimo}</p>
+              <p style="font-size:.7rem;color:var(--ink-faint)">${i.cantidad} ${esc(i.unidad)} · mín. ${i.stock_minimo}
+                ${i.sede_nombre ? `<span style="margin-left:.4rem;font-size:.65rem;background:#f0fdf4;color:#15803d;padding:.1rem .35rem;border-radius:.4rem;font-weight:600">${esc(i.sede_nombre)}</span>` : ''}
+              </p>
             </div>
             <span style="width:9px;height:9px;background:#f59e0b;border-radius:50%;box-shadow:0 0 8px rgba(245,158,11,.6)"></span>
           </div>`).join('')
@@ -151,7 +230,38 @@
     } catch {}
   }
 
-  load();
+  // ── Render panel de sedes (solo admin, vista general) ─────────
+  function renderSedesPanel(sedes) {
+    const grid = document.getElementById('sedes-grid');
+    grid.innerHTML = sedes.map(s => `
+      <div style="background:var(--card);padding:1rem 1.2rem;cursor:pointer"
+           onclick="filtrarPorSede(${s.id})"
+           title="Ver solo ${esc(s.sede)}">
+        <p style="font-size:.8rem;font-weight:700;color:var(--ink);margin-bottom:.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          🏥 ${esc(s.sede)}
+        </p>
+        <div style="display:flex;gap:.75rem">
+          <div style="text-align:center">
+            <p style="font-size:1.2rem;font-weight:800;color:#059669">${s.citas_hoy||0}</p>
+            <p style="font-size:.62rem;color:var(--ink-faint);font-weight:600">CITAS</p>
+          </div>
+          <div style="text-align:center">
+            <p style="font-size:1.2rem;font-weight:800;color:#0284c7">${s.pendientes||0}</p>
+            <p style="font-size:.62rem;color:var(--ink-faint);font-weight:600">PEND.</p>
+          </div>
+          <div style="text-align:center">
+            <p style="font-size:1.2rem;font-weight:800;color:#7c3aed">${s.completadas||0}</p>
+            <p style="font-size:.62rem;color:var(--ink-faint);font-weight:600">COMP.</p>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function filtrarPorSede(sedeId) {
+    const sel = document.getElementById('sede-selector');
+    if (sel) sel.value = sedeId;
+    cambiarSede(sedeId);
+  }
 
   function renderCitas(citas) {
     const tbody = document.getElementById('citas-hoy');
@@ -174,8 +284,13 @@
     </tr>`;
   }
 
-  // Tiempo real
+  // Tiempo real — solo agregar citas de la sede filtrada
   getSocket().on('cita:nueva', msg => {
+    const citaSede = msg.payload?.sede_id;
+    const sedeOk = !sedeSeleccionada || sedeSeleccionada === 'all' ||
+                   String(citaSede) === String(sedeSeleccionada);
+    if (!sedeOk) return;
+
     const tbody = document.getElementById('citas-hoy');
     const empty = tbody.querySelector('.vempty');
     if (empty) tbody.innerHTML = '';
@@ -187,6 +302,9 @@
     const el = document.getElementById('stat-citas');
     el.textContent = (parseInt(el.textContent)||0) + 1;
   });
+
+  // Iniciar
+  iniciarSelectorSede().then(() => load());
 </script>
 </body>
 </html>

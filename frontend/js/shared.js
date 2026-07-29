@@ -18,7 +18,6 @@ const API_URL    = _isLocal
 const SOCKET_URL = API_URL;
 
 // ── Aplicar favicon inmediatamente al cargar shared.js ────────────
-// No espera al DOMContentLoaded — así el tab del navegador lo muestra antes
 (async function aplicarFaviconInmediato() {
   try {
     const res = await fetch(`${API_URL}/api/v1/branding`, {
@@ -30,7 +29,6 @@ const SOCKET_URL = API_URL;
 
     const iconUrl = b.favicon_url || b.logo_url;
     if (iconUrl) {
-      // Favicon
       let link = document.querySelector("link[rel~='icon']");
       if (!link) {
         link = document.createElement('link');
@@ -40,7 +38,6 @@ const SOCKET_URL = API_URL;
       link.href = iconUrl;
     }
 
-    // Título del tab con nombre de clínica
     if (b.nombre_clinica && b.nombre_clinica !== 'VetClinic') {
       const title = document.querySelector('title');
       if (title) title.textContent = title.textContent.replace('VetClinic', b.nombre_clinica);
@@ -61,7 +58,6 @@ function logout() {
   window.location.href = 'login.html';
 }
 
-// ── API Helper ───────────────────────────────────────────────────
 // ── Loader global ────────────────────────────────────────────────
 let _loaderCount = 0;
 let _loaderTimer = null;
@@ -69,7 +65,6 @@ let _loaderTimer = null;
 function showLoader() {
   _loaderCount++;
   if (_loaderCount === 1) {
-    // Pequeño delay para no mostrar el loader en requests muy rápidos
     _loaderTimer = setTimeout(() => {
       let el = document.getElementById('__global-loader');
       if (!el) {
@@ -103,7 +98,7 @@ function showLoader() {
         document.body.appendChild(el);
       }
       el.style.display = 'block';
-    }, 150); // solo mostrar si tarda más de 150ms
+    }, 150);
   }
 }
 
@@ -116,6 +111,7 @@ function hideLoader() {
   }
 }
 
+// ── API Helper ───────────────────────────────────────────────────
 async function api(path, { method = 'GET', body } = {}) {
   const token   = localStorage.getItem('vet_access');
   const headers = {
@@ -123,6 +119,10 @@ async function api(path, { method = 'GET', body } = {}) {
     'X-Tenant-Host' : window.location.hostname,
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  // ── NUEVO: enviar sede_id del usuario logueado en cada request ──
+  const _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}').sede_id;
+  if (_userSede) headers['X-Sede-Id'] = String(_userSede);
 
   showLoader();
   try {
@@ -172,7 +172,6 @@ function getSocket() {
     reconnection: true,
     reconnectionDelay: 2000,
   });
-  // Forzar logout si el tenant es suspendido
   _socket.on(`tenant:suspendido:${window.location.hostname}`, (data) => {
     const motivo = data?.mensaje || 'La clínica ha sido suspendida.';
     localStorage.setItem('vet_suspension_msg', motivo);
@@ -182,7 +181,6 @@ function getSocket() {
       localStorage.removeItem('vet_user');
       window.location.href = 'login.html';
     }, 1500);
-    // Mostrar toast antes de redirigir
     toast(`🚫 ${motivo}`, 'danger', 1500);
   });
 
@@ -248,7 +246,7 @@ async function marcarTodasLeidas() {
   if (list) list.innerHTML = '<li data-placeholder class="notif-empty"><span>🔔</span>Sin notificaciones nuevas</li>';
 }
 
-// ── User info ────────────────────────────────────────────────────
+// ── User info ─────────────────────────────────────────────────────
 function renderUserInfo(user) {
   const nameEl   = document.getElementById('user-name');
   const rolEl    = document.getElementById('user-rol');
@@ -348,7 +346,7 @@ function badgeEspecie(especie) {
   return icons[especie] || '🐾';
 }
 
-// ── Branding dinámico ─────────────────────────────────────────
+// ── Branding dinámico ─────────────────────────────────────────────
 let _branding  = null;
 let _permisos  = null;
 
@@ -369,13 +367,11 @@ function aplicarBranding(b) {
   if (!b) return;
   const r = document.documentElement;
 
-  // Sidebar background
   if (b.color_sidebar) {
     r.style.setProperty('--sidebar-bg',  b.color_sidebar);
     r.style.setProperty('--sidebar-bg2', ajustarColor(b.color_sidebar, -10));
   }
 
-  // Colores primarios — solo cambiar si son diferentes al default
   if (b.color_primario && b.color_primario !== '#10b981') {
     r.style.setProperty('--brand-primary', b.color_primario);
     r.style.setProperty('--green-500',     b.color_primario);
@@ -387,18 +383,15 @@ function aplicarBranding(b) {
     r.style.setProperty('--brand-accent', b.color_acento);
   }
 
-  // Título del documento
   if (b.nombre_clinica) {
     const title = document.querySelector('title');
     if (title) {
       title.textContent = title.textContent.replace('VetClinic', b.nombre_clinica);
     }
-    // Nombre en sidebar
     const nameEl = document.getElementById('sidebar-clinica-nombre');
     if (nameEl) nameEl.textContent = b.nombre_clinica;
   }
 
-  // Logo en sidebar
   if (b.logo_url) {
     const logoImg  = document.getElementById('sidebar-logo-img');
     const logoIcon = document.getElementById('sidebar-logo-icon');
@@ -409,7 +402,6 @@ function aplicarBranding(b) {
     }
   }
 
-  // Favicon
   if (b.favicon_url) {
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
@@ -421,7 +413,7 @@ function aplicarBranding(b) {
   }
 }
 
-// ── Permisos granulares ───────────────────────────────────────
+// ── Permisos granulares ───────────────────────────────────────────
 async function cargarPermisos() {
   if (_permisos) return _permisos;
   try {
@@ -439,12 +431,10 @@ async function cargarPermisos() {
   } catch { return null; }
 }
 
-// Verificar si el usuario tiene un permiso específico
-// Uso: puede('facturacion','crear')
 function puede(modulo, permiso) {
-  if (!_permisos) return true; // Si no cargaron, permitir todo
+  if (!_permisos) return true;
   const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
-  if (user.rol === 'admin') return true; // Admin siempre puede todo
+  if (user.rol === 'admin') return true;
   return _permisos?.[modulo]?.[permiso] === true;
 }
 
@@ -468,9 +458,9 @@ function hexToRgba(hex, alpha) {
 }
 
 function getBranding() { return _branding; }
+
 function vconfirm({ titulo = '¿Confirmas esta acción?', mensaje = '', labelOk = 'Confirmar', labelCancel = 'Cancelar', tipo = 'warning' } = {}) {
   return new Promise(resolve => {
-    // Eliminar modal anterior si existe
     document.getElementById('__vconfirm')?.remove();
 
     const colors = {
@@ -511,7 +501,6 @@ function vconfirm({ titulo = '¿Confirmas esta acción?', mensaje = '', labelOk 
         </div>
       </div>`;
 
-    // Estilos de animación
     if (!document.getElementById('__vconfirm-style')) {
       const style = document.createElement('style');
       style.id = '__vconfirm-style';
@@ -558,5 +547,5 @@ function apiError(status, message) {
     toast('🔧 Error del servidor. Intenta de nuevo.', 'danger');
   } else {
     toast(message || 'Ocurrió un error inesperado.', 'danger');
-  } 
+  }
 }

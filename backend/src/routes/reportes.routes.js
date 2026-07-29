@@ -1,5 +1,12 @@
 'use strict';
 
+/**
+ * VetNetcodip SaaS — Reportes con soporte multi-sedes
+ * Parámetro opcional: ?sede_id=N  → filtra esa sede
+ * Sin sede_id (o sede_id=all)     → datos de todas las sedes
+ * Solo accesible para rol 'admin'
+ */
+
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
@@ -7,12 +14,32 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize('admin'));
 
+// ── Helper: construir filtro de sede ─────────────────────────────
+// Devuelve { sql: 'AND tabla.sede_id = ?', params: [N] }
+// o        { sql: '', params: [] }  cuando se pide todo
+function sedeFilter(sedeId, col = 'sede_id') {
+  const sid = sedeId && sedeId !== 'all' ? parseInt(sedeId, 10) : null;
+  if (sid && !isNaN(sid)) return { sql: `AND ${col} = ?`, params: [sid] };
+  return { sql: '', params: [] };
+}
+
+// ── GET /api/v1/reportes/sedes — listado de sedes para el selector ─
+router.get('/sedes', async (req, res, next) => {
+  try {
+    const sedes = await req.db.query(
+      'SELECT id, nombre, ciudad FROM sedes WHERE activo = 1 ORDER BY es_principal DESC, nombre ASC'
+    );
+    return res.json({ success: true, data: sedes });
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/reportes/citas ────────────────────────────────────
 router.get('/citas', async (req, res, next) => {
   try {
-    const { desde, hasta } = req.query;
+    const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
     const h = hasta || d;
+    const sf = sedeFilter(sede_id);
 
     const [resumen] = await req.db.query(
       `SELECT
@@ -22,40 +49,59 @@ router.get('/citas', async (req, res, next) => {
          SUM(estado='pendiente')   AS pendientes,
          SUM(estado='confirmada')  AS confirmadas,
          SUM(estado='en_curso')    AS en_curso
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ?`, [d, h]
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}`,
+      [d, h, ...sf.params]
     );
 
     const porVeterinario = await req.db.query(
       `SELECT u.nombre AS veterinario, COUNT(*) AS total,
               SUM(c.estado='completada') AS completadas
        FROM citas c JOIN usuarios u ON u.id = c.veterinario_id
-       WHERE DATE(c.fecha_hora) BETWEEN ? AND ?
-       GROUP BY u.id, u.nombre ORDER BY total DESC`, [d, h]
+       WHERE DATE(c.fecha_hora) BETWEEN ? AND ? ${sf.sql}
+       GROUP BY u.id, u.nombre ORDER BY total DESC`,
+      [d, h, ...sf.params]
     );
 
     const porDia = await req.db.query(
       `SELECT DATE(fecha_hora) AS dia, COUNT(*) AS total,
               SUM(estado='completada') AS completadas
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ?
-       GROUP BY DATE(fecha_hora) ORDER BY dia ASC`, [d, h]
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}
+       GROUP BY DATE(fecha_hora) ORDER BY dia ASC`,
+      [d, h, ...sf.params]
     );
 
     const porEstado = await req.db.query(
       `SELECT estado, COUNT(*) AS total
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ?
-       GROUP BY estado ORDER BY total DESC`, [d, h]
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}
+       GROUP BY estado ORDER BY total DESC`,
+      [d, h, ...sf.params]
     );
 
-    return res.json({ success:true, data:{ resumen, porVeterinario, porDia, porEstado, periodo:{desde:d, hasta:h} } });
+    // Si no se filtra por sede, mostrar desglose por sede
+    let porSede = [];
+    if (!sf.sql) {
+      porSede = await req.db.query(
+        `SELECT s.nombre AS sede, COUNT(*) AS total,
+                SUM(c.estado='completada') AS completadas
+         FROM citas c
+         LEFT JOIN sedes s ON s.id = c.sede_id
+         WHERE DATE(c.fecha_hora) BETWEEN ? AND ?
+         GROUP BY c.sede_id, s.nombre ORDER BY total DESC`,
+        [d, h]
+      );
+    }
+
+    return res.json({ success:true, data:{ resumen, porVeterinario, porDia, porEstado, porSede, periodo:{desde:d, hasta:h}, sede_id: sede_id||null } });
   } catch (err) { next(err); }
 });
 
 // ── GET /api/v1/reportes/financiero ──────────────────────────────
 router.get('/financiero', async (req, res, next) => {
   try {
-    const { desde, hasta } = req.query;
+    const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
     const h = hasta || d;
+    const sf = sedeFilter(sede_id);
 
     const [resumen] = await req.db.query(
       `SELECT
@@ -68,23 +114,26 @@ router.get('/financiero', async (req, res, next) => {
          COALESCE(SUM(CASE WHEN estado='pagado'    THEN igv   END),0) AS total_igv,
          COALESCE(SUM(CASE WHEN estado='pagado' AND tipo='boleta'  THEN total END),0) AS boletas,
          COALESCE(SUM(CASE WHEN estado='pagado' AND tipo='factura' THEN total END),0) AS facturas
-       FROM facturas WHERE fecha BETWEEN ? AND ?`, [d, h]
+       FROM facturas WHERE fecha BETWEEN ? AND ? ${sf.sql}`,
+      [d, h, ...sf.params]
     );
 
     const porDia = await req.db.query(
       `SELECT fecha AS dia,
               SUM(CASE WHEN estado='pagado' THEN total ELSE 0 END) AS ingresos,
               COUNT(*) AS documentos
-       FROM facturas WHERE fecha BETWEEN ? AND ?
-       GROUP BY fecha ORDER BY fecha ASC`, [d, h]
+       FROM facturas WHERE fecha BETWEEN ? AND ? ${sf.sql}
+       GROUP BY fecha ORDER BY fecha ASC`,
+      [d, h, ...sf.params]
     );
 
     const porMetodo = await req.db.query(
       `SELECT fp.metodo_pago, SUM(fp.monto) AS monto, COUNT(*) AS transacciones
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pagado'
-       GROUP BY fp.metodo_pago ORDER BY monto DESC`, [d, h]
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pagado' ${sf.sql ? sf.sql.replace('AND sede_id', 'AND f.sede_id') : ''}
+       GROUP BY fp.metodo_pago ORDER BY monto DESC`,
+      [d, h, ...sf.params]
     );
 
     const topServicios = await req.db.query(
@@ -92,8 +141,9 @@ router.get('/financiero', async (req, res, next) => {
               SUM(fi.subtotal) AS monto_total
        FROM factura_items fi
        JOIN facturas f ON f.id = fi.factura_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pagado'
-       GROUP BY fi.descripcion ORDER BY monto_total DESC LIMIT 10`, [d, h]
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pagado' ${sf.sql ? sf.sql.replace('AND sede_id', 'AND f.sede_id') : ''}
+       GROUP BY fi.descripcion ORDER BY monto_total DESC LIMIT 10`,
+      [d, h, ...sf.params]
     );
 
     const pendientes = await req.db.query(
@@ -101,15 +151,32 @@ router.get('/financiero', async (req, res, next) => {
               CONCAT(p.nombre,' ',p.apellido) AS cliente
        FROM facturas f
        JOIN propietarios p ON p.id = f.propietario_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pendiente'
-       ORDER BY f.fecha ASC`, [d, h]
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado='pendiente' ${sf.sql ? sf.sql.replace('AND sede_id', 'AND f.sede_id') : ''}
+       ORDER BY f.fecha ASC`,
+      [d, h, ...sf.params]
     );
 
-    return res.json({ success:true, data:{ resumen, porDia, porMetodo, topServicios, pendientes, periodo:{desde:d,hasta:h} } });
+    // Desglose por sede cuando se pide todo
+    let porSede = [];
+    if (!sf.sql) {
+      porSede = await req.db.query(
+        `SELECT s.nombre AS sede,
+                COALESCE(SUM(CASE WHEN f.estado='pagado' THEN f.total END),0) AS ingresos,
+                COUNT(CASE WHEN f.estado='pagado' THEN 1 END) AS documentos
+         FROM facturas f
+         LEFT JOIN sedes s ON s.id = f.sede_id
+         WHERE f.fecha BETWEEN ? AND ?
+         GROUP BY f.sede_id, s.nombre ORDER BY ingresos DESC`,
+        [d, h]
+      );
+    }
+
+    return res.json({ success:true, data:{ resumen, porDia, porMetodo, topServicios, pendientes, porSede, periodo:{desde:d,hasta:h}, sede_id: sede_id||null } });
   } catch (err) { next(err); }
 });
 
 // ── GET /api/v1/reportes/mascotas ─────────────────────────────────
+// Mascotas no tiene sede_id — este reporte siempre es global
 router.get('/mascotas', async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
@@ -202,33 +269,44 @@ router.get('/vacunas', async (req, res, next) => {
 // ── GET /api/v1/reportes/inventario ──────────────────────────────
 router.get('/inventario', async (req, res, next) => {
   try {
+    const { sede_id } = req.query;
+    const sf = sedeFilter(sede_id);
+
     const [resumen] = await req.db.query(
       `SELECT COUNT(*) AS total_items,
               SUM(cantidad <= stock_minimo) AS stock_bajo,
               SUM(fecha_vencimiento < CURDATE()) AS vencidos,
               SUM(fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 30 DAY)) AS por_vencer
-       FROM inventario`
+       FROM inventario WHERE 1=1 ${sf.sql}`,
+      [...sf.params]
     );
 
     const stockBajo = await req.db.query(
-      `SELECT nombre, categoria, cantidad, stock_minimo, unidad, proveedor
-       FROM inventario WHERE cantidad <= stock_minimo
-       ORDER BY (cantidad/stock_minimo) ASC`
+      `SELECT i.nombre, i.categoria, i.cantidad, i.stock_minimo, i.unidad, i.proveedor,
+              s.nombre AS sede
+       FROM inventario i LEFT JOIN sedes s ON s.id = i.sede_id
+       WHERE i.cantidad <= i.stock_minimo ${sf.sql}
+       ORDER BY (i.cantidad/i.stock_minimo) ASC`,
+      [...sf.params]
     );
 
     const porVencer = await req.db.query(
-      `SELECT nombre, categoria, cantidad, unidad, fecha_vencimiento, proveedor
-       FROM inventario
-       WHERE fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 30 DAY)
-       ORDER BY fecha_vencimiento ASC`
+      `SELECT i.nombre, i.categoria, i.cantidad, i.unidad, i.fecha_vencimiento, i.proveedor,
+              s.nombre AS sede
+       FROM inventario i LEFT JOIN sedes s ON s.id = i.sede_id
+       WHERE i.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 30 DAY) ${sf.sql}
+       ORDER BY i.fecha_vencimiento ASC`,
+      [...sf.params]
     );
 
     const porCategoria = await req.db.query(
       `SELECT categoria, COUNT(*) AS items, SUM(cantidad) AS total_unidades
-       FROM inventario GROUP BY categoria ORDER BY items DESC`
+       FROM inventario WHERE 1=1 ${sf.sql}
+       GROUP BY categoria ORDER BY items DESC`,
+      [...sf.params]
     );
 
-    return res.json({ success:true, data:{ resumen, stockBajo, porVencer, porCategoria } });
+    return res.json({ success:true, data:{ resumen, stockBajo, porVencer, porCategoria, sede_id: sede_id||null } });
   } catch (err) { next(err); }
 });
 
@@ -268,30 +346,99 @@ router.get('/estetica', async (req, res, next) => {
 // ── GET /api/v1/reportes/veterinarios ────────────────────────────
 router.get('/veterinarios', async (req, res, next) => {
   try {
-    const { desde, hasta } = req.query;
+    const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
     const h = hasta || d;
+    const sf = sedeFilter(sede_id, 'u.sede_id');
 
     const veterinarios = await req.db.query(
-      `SELECT u.id, u.nombre,
+      `SELECT u.id, u.nombre, s.nombre AS sede,
               COUNT(DISTINCT c.id) AS citas_total,
               SUM(c.estado='completada') AS citas_completadas,
               SUM(c.estado='cancelada')  AS citas_canceladas,
-              COUNT(DISTINCT h.id)       AS consultas,
+              COUNT(DISTINCT hc.id)      AS consultas,
               COUNT(DISTINCT v.id)       AS vacunas
        FROM usuarios u
+       LEFT JOIN sedes s ON s.id = u.sede_id
        LEFT JOIN citas c ON c.veterinario_id = u.id
          AND DATE(c.fecha_hora) BETWEEN ? AND ?
-       LEFT JOIN historia_clinica h ON h.veterinario_id = u.id
-         AND DATE(h.fecha) BETWEEN ? AND ?
+       LEFT JOIN historia_clinica hc ON hc.veterinario_id = u.id
+         AND DATE(hc.fecha) BETWEEN ? AND ?
        LEFT JOIN vacunas v ON v.veterinario_id = u.id
          AND v.fecha_aplicacion BETWEEN ? AND ?
-       WHERE u.rol = 'veterinario' AND u.activo = 1
-       GROUP BY u.id, u.nombre
-       ORDER BY citas_total DESC`, [d, h, d, h, d, h]
+       WHERE u.rol = 'veterinario' AND u.activo = 1 ${sf.sql}
+       GROUP BY u.id, u.nombre, s.nombre
+       ORDER BY citas_total DESC`,
+      [d, h, d, h, d, h, ...sf.params]
     );
 
-    return res.json({ success:true, data:{ veterinarios, periodo:{desde:d,hasta:h} } });
+    return res.json({ success:true, data:{ veterinarios, periodo:{desde:d,hasta:h}, sede_id: sede_id||null } });
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/v1/reportes/dashboard-stats ─────────────────────────
+// Endpoint especial para el dashboard: admin ve por sede o todo,
+// otros roles ven solo su sede automáticamente
+router.get('/dashboard-stats', async (req, res, next) => {
+  try {
+    const hoy  = new Date().toISOString().split('T')[0];
+    const user = req.user;
+
+    // Admin sin sede_id en query → todas las sedes; con sede_id → filtra
+    // Otros roles → su sede automáticamente (viene del header X-Sede-Id)
+    const sedeIdParam = req.query.sede_id;
+    const sedeHeader  = req.headers['x-sede-id'];
+    const sedeId = user.rol === 'admin'
+      ? (sedeIdParam && sedeIdParam !== 'all' ? parseInt(sedeIdParam) : null)
+      : (sedeHeader ? parseInt(sedeHeader) : null);
+
+    const sf = sedeId ? { sql: 'AND sede_id = ?', params: [sedeId] } : { sql: '', params: [] };
+
+    // Citas de hoy
+    const [citas] = await req.db.query(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(estado IN ('pendiente','confirmada')) AS pendientes,
+         SUM(estado='completada') AS completadas
+       FROM citas WHERE DATE(fecha_hora) = ? ${sf.sql}`,
+      [hoy, ...sf.params]
+    );
+
+    // Stock bajo
+    const [stock] = await req.db.query(
+      `SELECT COUNT(*) AS bajo_stock FROM inventario
+       WHERE cantidad <= stock_minimo ${sf.sql}`,
+      [...sf.params]
+    );
+
+    // Desglose por sedes (solo admin sin filtro de sede)
+    let sedes = [];
+    if (user.rol === 'admin' && !sedeId) {
+      sedes = await req.db.query(
+        `SELECT s.id, s.nombre AS sede,
+                COUNT(DISTINCT c.id) AS citas_hoy,
+                SUM(c.estado IN ('pendiente','confirmada')) AS pendientes,
+                SUM(c.estado='completada') AS completadas
+         FROM sedes s
+         LEFT JOIN citas c ON c.sede_id = s.id AND DATE(c.fecha_hora) = ?
+         WHERE s.activo = 1
+         GROUP BY s.id, s.nombre
+         ORDER BY s.es_principal DESC, s.nombre ASC`,
+        [hoy]
+      );
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        citas_hoy   : citas.total       || 0,
+        pendientes  : citas.pendientes  || 0,
+        completadas : citas.completadas || 0,
+        stock_bajo  : stock.bajo_stock  || 0,
+        sedes,
+        sede_id     : sedeId,
+      },
+    });
   } catch (err) { next(err); }
 });
 
