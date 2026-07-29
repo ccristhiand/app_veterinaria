@@ -16,14 +16,24 @@ function getSedeFiltro(req) {
   return user.sede_id || header || null;
 }
 
+// Incluye sede_id IS NULL para datos legacy (registros antes de multi-sedes)
+function sedeSQL(sedeId, col) {
+  col = col || 'sede_id';
+  if (!sedeId) return { sql: '', params: [] };
+  return {
+    sql   : 'AND (' + col + ' = ? OR ' + col + ' IS NULL)',
+    params: [sedeId],
+  };
+}
+
 // GET /api/v1/caja/resumen-dia
 router.get('/resumen-dia', async (req, res, next) => {
   try {
     const { fecha, turno } = req.query;
     const dia    = fecha || new Date().toISOString().split('T')[0];
     const sedeId = getSedeFiltro(req);
-    const sf     = sedeId ? 'AND f.sede_id = ?' : '';
-    const sp     = sedeId ? [sedeId] : [];
+    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
+    const sf = sff; const sp = spf;
 
     const [totales] = await req.db.query(
       `SELECT
@@ -36,8 +46,8 @@ router.get('/resumen-dia', async (req, res, next) => {
          COUNT(DISTINCT f.id)         AS total_documentos
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha = ? AND f.estado = 'pagado' ${sf}`,
-      [dia, ...sp]
+       WHERE f.fecha = ? AND f.estado = 'pagado' ${sff}`,
+      [dia, ...spf]
     );
 
     const [cierreExistente] = await req.db.query(
@@ -126,8 +136,8 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
     // Sede del usuario que cierra caja
     const sedeId = req.user.sede_id ||
                    (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-    const sf     = sedeId ? 'AND f.sede_id = ?' : '';
-    const sp     = sedeId ? [sedeId] : [];
+    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
+    const sf = sff; const sp = spf;
 
     const [totales] = await req.db.query(
       `SELECT
@@ -139,8 +149,8 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
          COALESCE(SUM(fp.monto), 0) AS total
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha = ? AND f.estado = 'pagado' ${sf}`,
-      [fecha, ...sp]
+       WHERE f.fecha = ? AND f.estado = 'pagado' ${sff}`,
+      [fecha, ...spf]
     );
 
     const totalGastos      = gastos.reduce((a, g) => a + parseFloat(g.monto || 0), 0);

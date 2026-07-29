@@ -14,6 +14,16 @@ function getSedeFiltro(req) {
   return user.sede_id || header || null;
 }
 
+// Construye el fragmento SQL para filtrar por sede
+// Incluye sede_id IS NULL para datos legacy (antes de multi-sedes)
+function sedeSQL(sedeId, col = 'sede_id') {
+  if (!sedeId) return { sql: '', params: [] };
+  return {
+    sql   : `AND (${col} = ? OR ${col} IS NULL)`,
+    params: [sedeId],
+  };
+}
+
 // ── GET /api/v1/facturas/resumen ──────────────────────────────────
 router.get('/resumen', async (req, res, next) => {
   try {
@@ -21,8 +31,8 @@ router.get('/resumen', async (req, res, next) => {
     const hoy    = desde || new Date().toISOString().split('T')[0];
     const hasta_ = hasta || hoy;
     const sedeId = getSedeFiltro(req);
-    const sf     = sedeId ? 'AND f.sede_id = ?' : '';
-    const sp     = sedeId ? [sedeId] : [];
+    const { sql: sf,  params: sp  } = sedeSQL(sedeId, 'sede_id');
+    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
 
     const [totales] = await req.db.query(
       `SELECT
@@ -41,9 +51,9 @@ router.get('/resumen', async (req, res, next) => {
       `SELECT fp.metodo_pago, SUM(fp.monto) AS monto, COUNT(*) AS cantidad
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado = 'pagado' ${sf}
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado = 'pagado' ${sff}
        GROUP BY fp.metodo_pago ORDER BY monto DESC`,
-      [hoy, hasta_, ...sp]
+      [hoy, hasta_, ...spf]
     );
 
     const por7dias = await req.db.query(
@@ -60,9 +70,9 @@ router.get('/resumen', async (req, res, next) => {
               SUM(fi.subtotal) AS monto_total
        FROM factura_items fi
        JOIN facturas f ON f.id = fi.factura_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado = 'pagado' ${sf}
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado = 'pagado' ${sff}
        GROUP BY fi.descripcion ORDER BY monto_total DESC LIMIT 8`,
-      [hoy, hasta_, ...sp]
+      [hoy, hasta_, ...spf]
     );
 
     return res.json({
@@ -99,7 +109,7 @@ router.get('/', async (req, res, next) => {
       WHERE 1=1`;
     const params = [];
 
-    if (sedeId)         { sql += ' AND f.sede_id = ?';          params.push(sedeId); }
+    if (sedeId) { const _sf = sedeSQL(sedeId, 'f.sede_id'); sql += ' ' + _sf.sql; params.push(..._sf.params); }
     if (fecha)          { sql += ' AND f.fecha = ?';            params.push(fecha); }
     if (estado)         { sql += ' AND f.estado = ?';           params.push(estado); }
     if (tipo)           { sql += ' AND f.tipo = ?';             params.push(tipo); }
