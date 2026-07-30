@@ -396,3 +396,10 @@ ln -s /etc/nginx/sites-available/vetclinic /etc/nginx/sites-enabled/vetclinic
 
 # 4. Verificar y recargar
 nginx -t && systemctl reload nginx
+
+
+nano /etc/nginx/nginx.conf
+
+Agrega dentro del bloque http {}:
+nginx
+client_max_body_size 20m;

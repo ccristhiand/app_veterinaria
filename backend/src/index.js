@@ -47,6 +47,9 @@ const adminWaRoutes      = require('./routes/admin_wa.routes');
 const app    = express();
 const server = http.createServer(app);
 
+// Confiar en el proxy de Nginx para obtener IP real del cliente
+app.set('trust proxy', 1);
+
 // ── CORS dinámico por tenant ──────────────────────────────────────
 const corsOptions = {
   origin: true,
@@ -76,7 +79,20 @@ app.use(rateLimit({
   max     : parseInt(process.env.RATE_LIMIT_MAX       || '200',    10),
   standardHeaders: true, legacyHeaders: false,
   message: { success: false, message: 'Demasiadas peticiones.' },
-  keyGenerator: (req) => `${req.hostname}:${req.ip}`,
+  keyGenerator: (req) => {
+    // Si hay token JWT, limitar por tenant + usuario (no por IP)
+    // Así 10 usuarios de la misma clínica en la misma red no se bloquean entre sí
+    try {
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith('Bearer ')) {
+        const jwt     = require('jsonwebtoken');
+        const payload = jwt.decode(auth.slice(7));
+        if (payload?.id) return `${req.hostname}:user:${payload.id}`;
+      }
+    } catch {}
+    // Sin token (login, branding, etc.) → por hostname + ip
+    return `${req.hostname}:${req.ip}`;
+  },
 }));
 
 // ── Healthcheck (sin tenant) ──────────────────────────────────────
