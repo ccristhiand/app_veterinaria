@@ -28,22 +28,47 @@ function sedeSQL(sedeId, col) {
 // ── GET /api/v1/inventario ────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { categoria, bajo } = req.query;
-    const sedeId = getSedeFiltro(req);
+    const { categoria, bajo, search, page = 1, limit = 50 } = req.query;
+    const sedeId  = getSedeFiltro(req);
+    const limitN  = Math.min(parseInt(limit) || 50, 200);
+    const offsetN = (Math.max(parseInt(page) || 1, 1) - 1) * limitN;
 
-    let sql = `SELECT i.*, s.nombre AS sede_nombre
-               FROM inventario i
-               LEFT JOIN sedes s ON s.id = i.sede_id
-               WHERE 1=1`;
+    let where  = 'WHERE 1=1';
     const params = [];
 
-    if (sedeId)        { sql += ' AND i.sede_id = ?';          params.push(sedeId); }
-    if (categoria)     { sql += ' AND i.categoria = ?';        params.push(categoria); }
-    if (bajo === '1')  { sql += ' AND i.cantidad < i.stock_minimo'; }
+    if (sedeId)        { where += ' AND i.sede_id = ?';               params.push(sedeId); }
+    if (categoria)     { where += ' AND i.categoria = ?';             params.push(categoria); }
+    if (bajo === '1')  { where += ' AND i.cantidad < i.stock_minimo'; }
+    if (search)        { where += ' AND i.nombre LIKE ?';             params.push(`%${search}%`); }
 
-    sql += ' ORDER BY i.nombre ASC';
-    const rows = await req.db.query(sql, params);
-    return res.json({ success: true, data: rows });
+    // Total para paginación
+    const [{ total }] = await req.db.query(
+      `SELECT COUNT(*) AS total FROM inventario i ${where}`, params
+    );
+
+    // Datos paginados
+    const rows = await req.db.query(
+      `SELECT i.*, s.nombre AS sede_nombre
+       FROM inventario i
+       LEFT JOIN sedes s ON s.id = i.sede_id
+       ${where}
+       ORDER BY i.nombre ASC
+       LIMIT ${limitN} OFFSET ${offsetN}`,
+      params
+    );
+
+    return res.json({
+      success: true,
+      data   : rows,
+      meta   : {
+        total,
+        page     : parseInt(page) || 1,
+        limit    : limitN,
+        pages    : Math.ceil(total / limitN),
+        desde    : offsetN + 1,
+        hasta    : Math.min(offsetN + limitN, total),
+      },
+    });
   } catch (err) { next(err); }
 });
 

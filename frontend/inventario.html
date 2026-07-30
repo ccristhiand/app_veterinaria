@@ -38,7 +38,7 @@
   <div class="vcard vcard-pad" style="margin-bottom:1.3rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
     <div>
       <label class="vlabel">Categoría</label>
-      <select id="f-cat" class="vinput" style="width:auto" onchange="cargar()">
+      <select id="f-cat" class="vinput" style="width:auto" onchange="cargar(true)">
         <option value="">Todas</option>
         <option value="medicamento">💊 Medicamento</option>
         <option value="vacuna">💉 Vacuna</option>
@@ -47,7 +47,7 @@
       </select>
     </div>
     <div style="display:flex;align-items:center;gap:.5rem;padding-top:1.4rem">
-      <input type="checkbox" id="f-bajo" onchange="cargar()"
+      <input type="checkbox" id="f-bajo" onchange="cargar(true)"
         style="accent-color:var(--green-600);width:16px;height:16px"/>
       <label for="f-bajo" style="font-size:.84rem;font-weight:600;cursor:pointer">Solo stock bajo</label>
     </div>
@@ -81,6 +81,28 @@
           <tr><td colspan="8"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Paginador -->
+    <div id="paginador" style="display:none;padding:1rem 1.25rem;border-top:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <p id="pag-info" style="font-size:.78rem;color:var(--ink-soft)"></p>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <button id="pag-prev" onclick="cambiarPagina(paginaActual-1)" class="vbtn vbtn-ghost"
+          style="padding:.4rem .8rem;font-size:.8rem">← Anterior</button>
+        <span id="pag-paginas" style="font-size:.8rem;font-weight:600;color:var(--ink-soft);
+          padding:.4rem .6rem"></span>
+        <button id="pag-next" onclick="cambiarPagina(paginaActual+1)" class="vbtn vbtn-ghost"
+          style="padding:.4rem .8rem;font-size:.8rem">Siguiente →</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <label style="font-size:.76rem;color:var(--ink-soft)">Por página:</label>
+        <select onchange="cambiarLimit(this.value)" class="vinput" style="width:auto;font-size:.78rem;padding:.3rem .6rem">
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -227,9 +249,12 @@
 </div>
 
 <script>
-let itemsActuales  = [];
-let stockItemActual = null;
-let itemsMasiva    = [];
+var itemsActuales  = [];
+var stockItemActual = null;
+var itemsMasiva    = [];
+var paginaActual   = 1;
+var limitActual    = 50;
+var totalItems     = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'inventario', title:'Inventario', subtitle:'Control de stock' });
@@ -265,40 +290,72 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Cargar inventario ─────────────────────────────────────────────
-async function cargar() {
-  const cat   = document.getElementById('f-cat').value;
-  const bajo  = document.getElementById('f-bajo').checked;
-  const tbody = document.getElementById('tbody-inv');
+async function cargar(resetPage) {
+  if (resetPage) paginaActual = 1;
+  var cat    = document.getElementById('f-cat').value;
+  var bajo   = document.getElementById('f-bajo').checked;
+  var search = document.getElementById('f-search').value.trim();
+  var tbody  = document.getElementById('tbody-inv');
 
-  let url = '/inventario?';
-  if (cat)  url += `categoria=${cat}&`;
-  if (bajo) url += `bajo=1`;
+  var url = '/inventario?page=' + paginaActual + '&limit=' + limitActual;
+  if (cat)    url += '&categoria=' + cat;
+  if (bajo)   url += '&bajo=1';
+  if (search) url += '&search=' + encodeURIComponent(search);
 
-  tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><div class="vspinner"></div></div></td></tr>`;
+  tbody.innerHTML = '<tr><td colspan="9"><div class="vempty"><div class="vspinner"></div><p>Cargando...</p></div></td></tr>';
 
   try {
-    const res = await api(url);
+    var res = await api(url);
     if (!res?.ok) return;
-    itemsActuales = (await res.json()).data || [];
-    renderStats(itemsActuales);
-    filtrar();
+    var json = await res.json();
+    itemsActuales = json.data || [];
+    var meta = json.meta || {};
+    totalItems = meta.total || itemsActuales.length;
+
+    renderStats(meta);
+    renderTabla(itemsActuales);
+    renderPaginador(meta);
   } catch {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><span class="icon">😿</span>
-      <p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p></div></td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="9"><div class="vempty"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p></div></td></tr>';
   }
 }
 
-function renderStats(items) {
-  const total  = items.length;
-  const bajo   = items.filter(i => parseFloat(i.cantidad) <= parseFloat(i.stock_minimo)).length;
-  const meds   = items.filter(i => i.categoria === 'medicamento').length;
-  const vacs   = items.filter(i => i.categoria === 'vacuna').length;
+function cambiarPagina(nueva) {
+  var meta_pages = Math.ceil(totalItems / limitActual);
+  if (nueva < 1 || nueva > meta_pages) return;
+  paginaActual = nueva;
+  cargar();
+}
 
-  document.getElementById('stats-inv').innerHTML = `
-    ${stat('📦', total,  'TOTAL ÍTEMS',   '#15803d', '#f0fdf4', '#bbf7d0')}
-    ${stat('⚠️', bajo,   'STOCK BAJO',    '#b45309', '#fffbeb', '#fde68a')}
-    ${stat('💊', meds,   'MEDICAMENTOS',  '#1d4ed8', '#eff6ff', '#bfdbfe')}
-    ${stat('💉', vacs,   'VACUNAS',       '#6d28d9', '#f5f3ff', '#ddd6fe')}`;
+function cambiarLimit(val) {
+  limitActual  = parseInt(val) || 50;
+  paginaActual = 1;
+  cargar();
+}
+
+function renderPaginador(meta) {
+  var pag = document.getElementById('paginador');
+  if (!meta.total) { pag.style.display = 'none'; return; }
+  pag.style.display = 'flex';
+  document.getElementById('pag-info').textContent =
+    'Mostrando ' + (meta.desde||1) + '–' + (meta.hasta||meta.total) + ' de ' + meta.total + ' productos';
+  document.getElementById('pag-paginas').textContent = 'Pág. ' + meta.page + ' / ' + meta.pages;
+  document.getElementById('pag-prev').disabled = meta.page <= 1;
+  document.getElementById('pag-next').disabled = meta.page >= meta.pages;
+}
+
+function renderStats(meta) {
+  // Stats globales vienen del servidor en meta, o calculamos de la página actual
+  var total = meta.total || totalItems || itemsActuales.length;
+  var bajo  = itemsActuales.filter(function(i) { return parseFloat(i.cantidad) <= parseFloat(i.stock_minimo); }).length;
+  var meds  = itemsActuales.filter(function(i) { return i.categoria === 'medicamento'; }).length;
+  var vacs  = itemsActuales.filter(function(i) { return i.categoria === 'vacuna'; }).length;
+
+  document.getElementById('stats-inv').innerHTML =
+    stat('📦', total, 'TOTAL ÍTEMS',  '#15803d', '#f0fdf4', '#bbf7d0') +
+    stat('⚠️', bajo,  'STOCK BAJO',   '#b45309', '#fffbeb', '#fde68a') +
+    stat('💊', meds,  'MEDICAMENTOS', '#1d4ed8', '#eff6ff', '#bfdbfe') +
+    stat('💉', vacs,  'VACUNAS',      '#6d28d9', '#f5f3ff', '#ddd6fe');
 }
 
 function stat(icon, val, label, color, bg, border) {
@@ -315,15 +372,19 @@ function stat(icon, val, label, color, bg, border) {
   </div>`;
 }
 
-// ── Filtrar por búsqueda ──────────────────────────────────────────
+// ── Búsqueda — dispara al servidor con debounce ───────────────────
+var _searchTimer = null;
 function filtrar() {
-  const q     = document.getElementById('f-search').value.toLowerCase();
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(function() { cargar(true); }, 400);
+}
+
+function renderTabla(items) {
+  const q     = ''; // La búsqueda ya viene filtrada del servidor
   const tbody = document.getElementById('tbody-inv');
-  let items   = itemsActuales;
-  if (q) items = items.filter(i => i.nombre.toLowerCase().includes(q) || (i.proveedor||'').toLowerCase().includes(q));
 
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="vempty"><span class="icon">🔍</span><p>Sin resultados</p></div></td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="9"><div class="vempty"><span class="icon">🔍</span><p>Sin resultados</p></div></td></tr>';
     return;
   }
 
