@@ -662,24 +662,33 @@ function mostrarPreviewMasiva(validos, errores) {
 async function confirmarCargaMasiva() {
   if (!itemsMasiva.length) return;
 
-  const btn = document.getElementById('btn-confirmar-masiva');
+  var btn = document.getElementById('btn-confirmar-masiva');
   btn.disabled = true;
-  btn.textContent = 'Importando…';
 
-  let exitosos = 0, fallidos = 0;
+  var total = itemsMasiva.length;
+  btn.textContent = 'Importando ' + total + ' productos…';
 
-  for (const item of itemsMasiva) {
-    try {
-      const res = await api('/inventario', { method:'POST', body:item });
-      if (res?.ok) exitosos++;
-      else fallidos++;
-    } catch { fallidos++; }
+  try {
+    // Un solo request con todos los items — bulk insert en el servidor
+    var res  = await api('/inventario/bulk', { method: 'POST', body: { items: itemsMasiva } });
+    if (!res) { btn.disabled = false; btn.textContent = '✅ Confirmar e importar'; return; }
+
+    var data = await res.json();
+
+    if (res.ok) {
+      toast(data.message || ('✅ ' + data.data.insertados + ' productos importados'), 'success', 6000);
+      if (data.data.errores > 0) {
+        toast('⚠️ ' + data.data.errores + ' productos con errores fueron omitidos', 'warning', 5000);
+      }
+    } else {
+      toast(data.message || 'Error al importar.', 'danger');
+    }
+  } catch {
+    toast('Error de conexión durante la importación.', 'danger');
   }
 
   btn.disabled = false;
   btn.textContent = '✅ Confirmar e importar';
-
-  toast(`✅ ${exitosos} productos importados${fallidos?` · ${fallidos} fallidos`:''}`, 'success', 6000);
   closeModal('modal-masiva');
   itemsMasiva = [];
   cargar();

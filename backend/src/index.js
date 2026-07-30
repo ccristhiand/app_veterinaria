@@ -64,8 +64,8 @@ initSocket(io);
 // ── Middlewares globales ─────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev', { stream: { write: msg => logger.http(msg.trim()) } }));
 }
@@ -110,12 +110,13 @@ app.use('/admin/api',         adminRoutes);
 
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
 app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max     : 10000,
+  windowMs: parseInt(process.env.LOGIN_RATE_WINDOW_MS || String(5 * 60 * 1000), 10),
+  max     : parseInt(process.env.LOGIN_RATE_MAX       || '30', 10),
   standardHeaders: true,
   legacyHeaders  : false,
-  message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
+  message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera unos minutos.' },
   keyGenerator: (req) => req.ip,
+  skip: (req) => process.env.NODE_ENV === 'development',
 }));
 
 // ── Resolver tenant para todas las rutas de la API ────────────────

@@ -15,6 +15,16 @@ function getSedeFiltro(req) {
   return user.sede_id || header || null;
 }
 
+// Incluye sede_id IS NULL para datos legacy (registros antes de multi-sedes)
+function sedeSQL(sedeId, col) {
+  col = col || 'sede_id';
+  if (!sedeId) return { sql: '', params: [] };
+  return {
+    sql   : 'AND (' + col + ' = ? OR ' + col + ' IS NULL)',
+    params: [sedeId],
+  };
+}
+
 // ── GET /api/v1/inventario ────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
@@ -48,6 +58,77 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!row) return res.status(404).json({ success: false, message: 'Ítem no encontrado.' });
     return res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+});
+
+
+// ── POST /api/v1/inventario/bulk — carga masiva ───────────────────
+// Recibe hasta 10,000 items en un solo request y hace INSERT masivo
+router.post('/bulk', authorize('admin', 'veterinario', 'recepcionista'), async (req, res, next) => {
+  try {
+    const { items = [] } = req.body;
+
+    if (!items.length)
+      return res.status(422).json({ success: false, message: 'No se enviaron items.' });
+
+    if (items.length > 10000)
+      return res.status(422).json({ success: false, message: 'Máximo 10,000 items por carga.' });
+
+    // Sede del usuario
+    const sedeId = req.user.sede_id ||
+                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+
+    const catValidas = ['medicamento','vacuna','insumo','otro'];
+
+    // Validar y limpiar items
+    const validos  = [];
+    const errores  = [];
+
+    items.forEach((item, idx) => {
+      const nombre = String(item.nombre || '').trim();
+      if (!nombre) { errores.push(`Fila ${idx + 2}: nombre vacío`); return; }
+
+      const cat = catValidas.includes(item.categoria) ? item.categoria : 'otro';
+      validos.push([
+        nombre,
+        cat,
+        parseFloat(item.cantidad)        || 0,
+        String(item.unidad || 'unidad').trim(),
+        parseFloat(item.stock_minimo)    || 5,
+        parseFloat(item.precio_unitario) || null,
+        String(item.proveedor || '').trim() || null,
+        item.fecha_vencimiento || null,
+        sedeId,
+      ]);
+    });
+
+    if (!validos.length)
+      return res.status(422).json({ success: false, message: 'Ningún item válido.', errores });
+
+    // INSERT masivo en lotes de 500 para no saturar MySQL
+    const LOTE = 500;
+    let insertados = 0;
+
+    for (let i = 0; i < validos.length; i += LOTE) {
+      const lote = validos.slice(i, i + LOTE);
+      const placeholders = lote.map(() => '(?,?,?,?,?,?,?,?,?)').join(',');
+      const valores = lote.flat();
+
+      await req.db.query(
+        `INSERT INTO inventario
+           (nombre, categoria, cantidad, unidad, stock_minimo,
+            precio_unitario, proveedor, fecha_vencimiento, sede_id)
+         VALUES ${placeholders}`,
+        valores
+      );
+      insertados += lote.length;
+    }
+
+    return res.status(201).json({
+      success   : true,
+      message   : `✅ ${insertados} productos importados correctamente.`,
+      data      : { insertados, errores: errores.length, detalles_errores: errores.slice(0, 20) },
+    });
   } catch (err) { next(err); }
 });
 
