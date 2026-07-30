@@ -1305,16 +1305,13 @@ function sec(label,val,color,bold) { if (!val) return ''; return '<div style="ma
 
 // ══ AUTOCOMPLETADO INVENTARIO ════════════════════════════════════
 
-// Cache del inventario para no hacer fetch en cada keystroke
-let _inventarioCache = null;
-
-async function getInventario() {
-  if (_inventarioCache) return _inventarioCache;
+// Búsqueda server-side — no carga todo el inventario
+async function buscarInventarioServer(q, cats) {
   try {
-    const res = await api('/inventario');
+    var catParam = cats && cats.length === 1 ? '&categoria=' + cats[0] : '';
+    var res = await api('/inventario?limit=20&search=' + encodeURIComponent(q) + catParam);
     if (!res || !res.ok) return [];
-    _inventarioCache = (await res.json()).data || [];
-    return _inventarioCache;
+    return (await res.json()).data || [];
   } catch { return []; }
 }
 
@@ -1335,16 +1332,14 @@ function attachAutocomplete(input, cats, onSelect) {
     list = null;
   }
 
+  var _acTimer = null;
   input.addEventListener('input', async () => {
-    const q = input.value.trim().toLowerCase();
+    const q = input.value.trim();
     cerrar();
     if (q.length < 1) return;
-
-    const items = await getInventario();
-    const filtrados = items.filter(i =>
-      (!cats.length || cats.includes(i.categoria)) &&
-      i.nombre.toLowerCase().includes(q)
-    ).slice(0, 8);
+    clearTimeout(_acTimer);
+    _acTimer = setTimeout(async () => {
+      const filtrados = await buscarInventarioServer(q, cats);
 
     list = document.createElement('ul');
     list.className = 'autocomplete-list';
@@ -1376,6 +1371,7 @@ function attachAutocomplete(input, cats, onSelect) {
     }
 
     input.parentElement.appendChild(list);
+    }, 300); // fin setTimeout debounce
   });
 
   // Cerrar al perder foco (con delay para permitir click en la lista)
