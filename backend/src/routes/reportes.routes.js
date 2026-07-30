@@ -12,7 +12,8 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 const router = Router();
 router.use(authenticate);
-router.use(authorize('admin'));
+// Nota: dashboard-stats es accesible para todos los roles
+// Los demás endpoints de reportes requieren admin — se aplica por ruta
 
 // ── Helper: construir filtro de sede ─────────────────────────────
 // Devuelve { sql: 'AND tabla.sede_id = ?', params: [N] }
@@ -34,7 +35,7 @@ router.get('/sedes', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/citas ────────────────────────────────────
-router.get('/citas', async (req, res, next) => {
+router.get('/citas', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
@@ -96,7 +97,7 @@ router.get('/citas', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/financiero ──────────────────────────────
-router.get('/financiero', async (req, res, next) => {
+router.get('/financiero', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
@@ -177,7 +178,7 @@ router.get('/financiero', async (req, res, next) => {
 
 // ── GET /api/v1/reportes/mascotas ─────────────────────────────────
 // Mascotas no tiene sede_id — este reporte siempre es global
-router.get('/mascotas', async (req, res, next) => {
+router.get('/mascotas', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
@@ -221,7 +222,7 @@ router.get('/mascotas', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/vacunas ──────────────────────────────────
-router.get('/vacunas', async (req, res, next) => {
+router.get('/vacunas', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
@@ -267,7 +268,7 @@ router.get('/vacunas', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/inventario ──────────────────────────────
-router.get('/inventario', async (req, res, next) => {
+router.get('/inventario', authorize('admin'), async (req, res, next) => {
   try {
     const { sede_id } = req.query;
     const sf = sedeFilter(sede_id);
@@ -311,7 +312,7 @@ router.get('/inventario', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/estetica ────────────────────────────────
-router.get('/estetica', async (req, res, next) => {
+router.get('/estetica', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
@@ -344,7 +345,7 @@ router.get('/estetica', async (req, res, next) => {
 });
 
 // ── GET /api/v1/reportes/veterinarios ────────────────────────────
-router.get('/veterinarios', async (req, res, next) => {
+router.get('/veterinarios', authorize('admin'), async (req, res, next) => {
   try {
     const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
