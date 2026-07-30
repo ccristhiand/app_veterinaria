@@ -390,18 +390,15 @@ router.get('/dashboard-stats', async (req, res, next) => {
     const user = req.user;
 
     // Admin sin sede_id en query → todas las sedes; con sede_id → filtra
-    // Otros roles → su sede automáticamente (viene del header X-Sede-Id)
+    // Otros roles → siempre su sede del JWT (req.user.sede_id)
     const sedeIdParam = req.query.sede_id;
-    const sedeHeader  = req.headers['x-sede-id'];
     const sedeId = user.rol === 'admin'
       ? (sedeIdParam && sedeIdParam !== 'all' ? parseInt(sedeIdParam) : null)
-      : (sedeHeader ? parseInt(sedeHeader) : null);
+      : (req.user.sede_id || null);
 
     const sf = sedeId ? { sql: 'AND sede_id = ?', params: [sedeId] } : { sql: '', params: [] };
 
-    // ── Citas de hoy ─────────────────────────────────────────────
-    // Usa COALESCE(c.sede_id, u.sede_id) para cubrir citas sin sede
-    // asignada directamente pero cuyo veterinario sí tiene sede
+    // Citas: filtra por sede de la cita, o sede del vet si la cita no tiene sede
     const sfCitas = sedeId
       ? { sql: 'AND COALESCE(c.sede_id, u.sede_id) = ?', params: [sedeId] }
       : { sql: '', params: [] };

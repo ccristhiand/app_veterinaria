@@ -22,7 +22,7 @@ async function authenticate(req, res, next) {
 
     // Verificar que el usuario existe en la DB del tenant
     const [user] = await req.db.query(
-      'SELECT id, nombre, email, rol FROM usuarios WHERE id = ? AND activo = 1',
+      'SELECT id, nombre, email, rol, sede_id FROM usuarios WHERE id = ? AND activo = 1',
       [decoded.id]
     );
 
@@ -69,7 +69,7 @@ async function verifySocketToken(token) {
 }
 
 function signTokens(user) {
-  const payload = { id: user.id, rol: user.rol, nombre: user.nombre };
+  const payload = { id: user.id, rol: user.rol, nombre: user.nombre, sede_id: user.sede_id || null };
   return {
     accessToken : jwt.sign(payload, ACCESS_SECRET,  { expiresIn: '8h' }),
     refreshToken: jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' }),
