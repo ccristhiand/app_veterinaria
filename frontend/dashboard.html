@@ -170,7 +170,11 @@
 
   // ── Carga de datos ────────────────────────────────────────────
   async function load() {
-    const hoy = new Date().toISOString().split('T')[0];
+    // Fecha local del tenant — NO usar toISOString() que devuelve UTC
+    const _tz  = getBranding()?.zona_horaria || 'America/Lima';
+    const hoy  = new Intl.DateTimeFormat('en-CA', {
+      timeZone: _tz, year:'numeric', month:'2-digit', day:'2-digit'
+    }).format(new Date());
 
     // Para admin: llama dashboard-stats con sede_id
     // Para otros roles: el header X-Sede-Id se manda automáticamente desde shared.js
