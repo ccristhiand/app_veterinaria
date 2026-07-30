@@ -388,6 +388,7 @@ router.get('/dashboard-stats', async (req, res, next) => {
       year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(new Date());
     const user = req.user;
+    console.log('[dashboard-stats] user.id:', user.id, '| user.rol:', user.rol, '| user.sede_id:', user.sede_id, '| tz:', req.tzOffset, '| hoy:', hoy);
 
     // Admin sin sede_id en query → todas las sedes; con sede_id → filtra
     // Otros roles → siempre su sede del JWT (req.user.sede_id)
@@ -403,6 +404,7 @@ router.get('/dashboard-stats', async (req, res, next) => {
       ? { sql: 'AND COALESCE(c.sede_id, u.sede_id) = ?', params: [sedeId] }
       : { sql: '', params: [] };
 
+    console.log('[dashboard-stats] sedeId:', sedeId, '| sfCitas:', JSON.stringify(sfCitas));
     const [citas] = await req.db.query(
       `SELECT
          COUNT(*) AS total,
@@ -441,6 +443,7 @@ router.get('/dashboard-stats', async (req, res, next) => {
       );
     }
 
+    console.log('[dashboard-stats] resultado citas:', JSON.stringify(citas));
     return res.json({
       success: true,
       data: {
