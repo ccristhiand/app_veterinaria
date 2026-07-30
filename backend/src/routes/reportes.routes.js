@@ -381,7 +381,12 @@ router.get('/veterinarios', async (req, res, next) => {
 // otros roles ven solo su sede automáticamente
 router.get('/dashboard-stats', async (req, res, next) => {
   try {
-    const hoy  = new Date().toISOString().split('T')[0];
+    const tz   = req.tzOffset || '-05:00';
+    // Fecha de hoy en la zona horaria del tenant
+    const hoy  = new Intl.DateTimeFormat('en-CA', {
+      timeZone: req.tenant?.zona_horaria || 'America/Lima',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
     const user = req.user;
 
     // Admin sin sede_id en query → todas las sedes; con sede_id → filtra
@@ -394,14 +399,22 @@ router.get('/dashboard-stats', async (req, res, next) => {
 
     const sf = sedeId ? { sql: 'AND sede_id = ?', params: [sedeId] } : { sql: '', params: [] };
 
-    // Citas de hoy
+    // ── Citas de hoy ─────────────────────────────────────────────
+    // Usa COALESCE(c.sede_id, u.sede_id) para cubrir citas sin sede
+    // asignada directamente pero cuyo veterinario sí tiene sede
+    const sfCitas = sedeId
+      ? { sql: 'AND COALESCE(c.sede_id, u.sede_id) = ?', params: [sedeId] }
+      : { sql: '', params: [] };
+
     const [citas] = await req.db.query(
       `SELECT
          COUNT(*) AS total,
-         SUM(estado IN ('pendiente','confirmada')) AS pendientes,
-         SUM(estado='completada') AS completadas
-       FROM citas WHERE DATE(fecha_hora) = ? ${sf.sql}`,
-      [hoy, ...sf.params]
+         SUM(c.estado IN ('pendiente','confirmada')) AS pendientes,
+         SUM(c.estado='completada') AS completadas
+       FROM citas c
+       JOIN usuarios u ON u.id = c.veterinario_id
+       WHERE DATE(CONVERT_TZ(c.fecha_hora, '+00:00', ?)) = ? ${sfCitas.sql}`,
+      [tz, hoy, ...sfCitas.params]
     );
 
     // Stock bajo
@@ -412,6 +425,7 @@ router.get('/dashboard-stats', async (req, res, next) => {
     );
 
     // Desglose por sedes (solo admin sin filtro de sede)
+    // Agrupa por sede de la cita, o sede del veterinario si la cita no tiene sede
     let sedes = [];
     if (user.rol === 'admin' && !sedeId) {
       sedes = await req.db.query(
@@ -420,11 +434,13 @@ router.get('/dashboard-stats', async (req, res, next) => {
                 SUM(c.estado IN ('pendiente','confirmada')) AS pendientes,
                 SUM(c.estado='completada') AS completadas
          FROM sedes s
-         LEFT JOIN citas c ON c.sede_id = s.id AND DATE(c.fecha_hora) = ?
+         LEFT JOIN citas c ON COALESCE(c.sede_id, (
+           SELECT u.sede_id FROM usuarios u WHERE u.id = c.veterinario_id
+         )) = s.id AND DATE(CONVERT_TZ(c.fecha_hora, '+00:00', ?)) = ?
          WHERE s.activo = 1
          GROUP BY s.id, s.nombre
          ORDER BY s.es_principal DESC, s.nombre ASC`,
-        [hoy]
+        [tz, hoy]
       );
     }
 

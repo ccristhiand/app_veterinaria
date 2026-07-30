@@ -1,5 +1,23 @@
 'use strict';
 
+// Convierte zona IANA a offset MySQL (+HH:MM)
+function getTzOffset(ianaZone) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaZone || 'America/Lima',
+      timeZoneName: 'shortOffset',
+    });
+    const parts     = formatter.formatToParts(new Date());
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT-5';
+    const match     = offsetPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!match) return '-05:00';
+    const sign    = match[1];
+    const hours   = match[2].padStart(2, '0');
+    const minutes = (match[3] || '00').padStart(2, '0');
+    return `${sign}${hours}:${minutes}`;
+  } catch { return '-05:00'; }
+}
+
 const { masterQuery }                      = require('../config/masterDB');
 const { getPoolForTenant, createDBHelper } = require('../config/tenantDB');
 const logger                               = require('../config/logger');

@@ -41,7 +41,8 @@ router.get('/', async (req, res, next) => {
     const params = [];
 
     if (sedeId)         { sql += ' AND c.sede_id = ?';          params.push(sedeId); }
-    if (fecha)          { sql += ' AND DATE(c.fecha_hora) = ?'; params.push(fecha); }
+    const tz = req.tzOffset || '-05:00';
+    if (fecha)          { sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) = ?'; params.push(tz, fecha); }
     if (estado)         { sql += ' AND c.estado = ?';           params.push(estado); }
     if (veterinario_id) { sql += ' AND c.veterinario_id = ?';   params.push(veterinario_id); }
     if (mascota_id)     { sql += ' AND c.mascota_id = ?';       params.push(mascota_id); }
@@ -80,8 +81,16 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
       return res.status(422).json({ success: false, message: 'Campos obligatorios faltantes.' });
 
     // La cita se registra con la sede del usuario que la crea
-    const sedeId = req.user.sede_id ||
-                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    // Si no tiene sede, usa la sede del veterinario asignado
+    let sedeId = req.user.sede_id ||
+                 (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+
+    if (!sedeId && veterinario_id) {
+      const [vet] = await req.db.query(
+        'SELECT sede_id FROM usuarios WHERE id = ?', [veterinario_id]
+      );
+      if (vet?.sede_id) sedeId = vet.sede_id;
+    }
 
     const result = await req.db.query(
       `INSERT INTO citas (mascota_id, veterinario_id, creada_por_id, sede_id, fecha_hora, duracion_min, motivo, notas)
