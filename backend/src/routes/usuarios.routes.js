@@ -32,15 +32,23 @@ router.get('/me', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const { rol, activo } = req.query;
-    // CAMBIO: incluir sede en el listado
+    const user    = req.user;
+    const header  = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
+
+    // Admin ve todos los usuarios; otros roles solo ven los de su sede
+    const sedeId = user.rol === 'admin' ? null : (user.sede_id || header || null);
+
     let sql = `SELECT u.id, u.nombre, u.email, u.rol, u.activo, u.created_at,
                       u.sede_id, s.nombre AS sede_nombre
                FROM usuarios u
                LEFT JOIN sedes s ON s.id = u.sede_id
                WHERE 1=1`;
     const params = [];
-    if (rol !== undefined)    { sql += ' AND u.rol = ?';    params.push(rol); }
-    if (activo !== undefined) { sql += ' AND u.activo = ?'; params.push(activo === 'false' ? 0 : 1); }
+
+    // Filtrar por sede solo para no-admins
+    if (sedeId)               { sql += ' AND u.sede_id = ?';  params.push(sedeId); }
+    if (rol !== undefined)    { sql += ' AND u.rol = ?';       params.push(rol); }
+    if (activo !== undefined) { sql += ' AND u.activo = ?';    params.push(activo === 'false' ? 0 : 1); }
     sql += ' ORDER BY u.nombre';
     const rows = await req.db.query(sql, params);
     return res.json({ success: true, data: rows });
