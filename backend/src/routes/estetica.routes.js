@@ -5,6 +5,49 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
 
 const router = Router();
+// ── GET /api/v1/estetica/foto-publica/:fotoId?carnet=TOKEN ────────
+// Endpoint público para el carnet digital — valida el token del carnet
+router.get('/foto-publica/:fotoId', async (req, res, next) => {
+  try {
+    const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
+    if (!connStr) return res.status(500).end();
+
+    // Validar que el token de carnet es válido
+    const carnetToken = req.query.carnet;
+    if (!carnetToken) return res.status(401).end();
+
+    const [carnet] = await req.db.query(
+      'SELECT id FROM carnets_digitales WHERE token = ? AND activo = 1',
+      [carnetToken]
+    );
+    if (!carnet) return res.status(403).end();
+
+    // Obtener foto
+    const [foto] = await req.db.query(
+      'SELECT url FROM estetica_fotos WHERE id = ?', [req.params.fotoId]
+    );
+    if (!foto) return res.status(404).end();
+
+    const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
+    const accountName = parts.AccountName;
+    const accountKey  = parts.AccountKey;
+    const blobName    = foto.url.split(`/${container}/`)[1];
+    if (!blobName) return res.status(400).end();
+
+    // Pipe directo — no redirect
+    const { BlobServiceClient: BSC2 } = require('@azure/storage-blob');
+    const client2     = BSC2.fromConnectionString(connStr);
+    const blobClient2 = client2.getContainerClient(container).getBlobClient(blobName);
+    const download2   = await blobClient2.download();
+    const ext2        = blobName.split('.').pop().toLowerCase();
+    const mimeMap2    = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    res.setHeader('Content-Type', download2.contentType || mimeMap2[ext2] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    download2.readableStreamBody.pipe(res);
+  } catch (err) { next(err); }
+});
+
 router.use(authenticate);
 
 // ── GET /api/v1/estetica ─────────────────────────────────────────
@@ -154,48 +197,6 @@ router.post('/upload', async (req, res, next) => {
 
 
 
-// ── GET /api/v1/estetica/foto-publica/:fotoId?carnet=TOKEN ────────
-// Endpoint público para el carnet digital — valida el token del carnet
-router.get('/foto-publica/:fotoId', async (req, res, next) => {
-  try {
-    const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
-    const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
-    if (!connStr) return res.status(500).end();
-
-    // Validar que el token de carnet es válido
-    const carnetToken = req.query.carnet;
-    if (!carnetToken) return res.status(401).end();
-
-    const [carnet] = await req.db.query(
-      'SELECT id FROM carnets_digitales WHERE token = ? AND activo = 1',
-      [carnetToken]
-    );
-    if (!carnet) return res.status(403).end();
-
-    // Obtener foto
-    const [foto] = await req.db.query(
-      'SELECT url FROM estetica_fotos WHERE id = ?', [req.params.fotoId]
-    );
-    if (!foto) return res.status(404).end();
-
-    const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
-    const accountName = parts.AccountName;
-    const accountKey  = parts.AccountKey;
-    const blobName    = foto.url.split(`/${container}/`)[1];
-    if (!blobName) return res.status(400).end();
-
-    // Pipe directo — no redirect
-    const { BlobServiceClient: BSC2 } = require('@azure/storage-blob');
-    const client2     = BSC2.fromConnectionString(connStr);
-    const blobClient2 = client2.getContainerClient(container).getBlobClient(blobName);
-    const download2   = await blobClient2.download();
-    const ext2        = blobName.split('.').pop().toLowerCase();
-    const mimeMap2    = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
-    res.setHeader('Content-Type', download2.contentType || mimeMap2[ext2] || 'image/jpeg');
-    res.setHeader('Cache-Control', 'private, max-age=300');
-    download2.readableStreamBody.pipe(res);
-  } catch (err) { next(err); }
-});
 
 // ── GET /api/v1/estetica/foto/:fotoId — sirve foto via pipe ─────────
 // El backend descarga de Azure y hace pipe al navegador

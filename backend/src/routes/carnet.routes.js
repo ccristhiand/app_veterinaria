@@ -186,7 +186,7 @@ router.get('/:token', async (req, res, next) => {
     );
     const banos = await Promise.all(banosRaw.map(async b => {
       const fotos = await req.db.query(
-        'SELECT momento, url FROM estetica_fotos WHERE estetica_id = ? ORDER BY momento, created_at ASC',
+        'SELECT id, momento, url FROM estetica_fotos WHERE estetica_id = ? ORDER BY momento, created_at ASC',
         [b.id]
       ).catch(() => []);
       return { ...b, fecha: formatDate(b.fecha), fotos };
