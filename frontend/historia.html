@@ -1878,13 +1878,45 @@ async function openLightboxSingle(fotoId) {
 }
 
 async function openLightbox(ids, idx) {
-  _lightboxFotos = ids; // array de IDs
+  _lightboxFotos = Array.isArray(ids) ? ids.slice() : [ids];
   _lightboxIdx   = idx || 0;
-  document.getElementById('lightbox').classList.remove('hidden');
-  document.getElementById('lightbox').style.display = 'flex';
-  var img = document.getElementById('lightbox-img');
-  img.src = '';
+  var lb = document.getElementById('lightbox');
+  lb.classList.remove('hidden');
+  lb.style.display = 'flex';
+  document.getElementById('lb-h-prev').style.display = _lightboxFotos.length > 1 ? 'block' : 'none';
+  document.getElementById('lb-h-next').style.display = _lightboxFotos.length > 1 ? 'block' : 'none';
+  await lbHMostrar();
+  lbHThumbs();
+}
+
+async function lbHMostrar() {
+  var img     = document.getElementById('lightbox-img');
+  var loading = document.getElementById('lightbox-loading');
+  var counter = document.getElementById('lightbox-counter');
+  img.style.opacity = '0';
+  if (loading) loading.style.display = 'block';
+  if (counter) counter.textContent = _lightboxFotos.length > 1 ? (_lightboxIdx + 1) + ' / ' + _lightboxFotos.length : '';
   await cargarFotoSegura(img, _lightboxFotos[_lightboxIdx]);
+  // Actualizar thumb activo
+  document.querySelectorAll('.lb-h-thumb').forEach(function(t, i) {
+    t.style.border   = i === _lightboxIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,.3)';
+    t.style.opacity  = i === _lightboxIdx ? '1' : '0.6';
+  });
+}
+
+function lbHThumbs() {
+  var cont = document.getElementById('lightbox-thumbs');
+  if (!cont) return;
+  cont.innerHTML = '';
+  if (_lightboxFotos.length <= 1) return;
+  _lightboxFotos.forEach(function(fotoId, i) {
+    var thumb = document.createElement('img');
+    thumb.className = 'lb-h-thumb';
+    thumb.style.cssText = 'width:48px;height:48px;object-fit:cover;border-radius:.5rem;cursor:pointer;transition:all .15s;border:2px solid rgba(255,255,255,.3);opacity:.6;flex-shrink:0';
+    thumb.onclick = async function(e) { e.stopPropagation(); _lightboxIdx = i; await lbHMostrar(); };
+    cargarFotoSegura(thumb, fotoId);
+    cont.appendChild(thumb);
+  });
 }
 
 function closeLightbox() {
@@ -1894,9 +1926,7 @@ function closeLightbox() {
 
 async function lightboxNav(dir) {
   _lightboxIdx = (_lightboxIdx + dir + _lightboxFotos.length) % _lightboxFotos.length;
-  var img = document.getElementById('lightbox-img');
-  img.src = '';
-  await cargarFotoSegura(img, _lightboxFotos[_lightboxIdx]);
+  await lbHMostrar();
 }
 
 document.addEventListener('keydown', function(e) {
@@ -1920,11 +1950,18 @@ function renderFotosEstetica(fotos, esteticaId) {
       '<p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">' + label + '</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
       lista.map(function(f, i) {
-        var idx = todasIds.indexOf(f.id);
-        return '<img src="' + fotoUrl(f.id) + '" onclick="openLightbox(todasIds,' + idx + ')" ' +
-          'style="width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line);transition:transform .15s" ' +
-          
-          'loading="lazy" alt="foto"/>';
+        var _wid = 'fg-' + f.id + '-' + i;
+        setTimeout(function() {
+          var _w = document.getElementById(_wid);
+          if (!_w) return;
+          var _idx = todasIds.indexOf(f.id);
+          var _img = crearImgSegura(f.id,
+            'width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line)',
+            (function(capturedIdx) { return function() { openLightbox(todasIds.slice(), capturedIdx); }; })(_idx)
+          );
+          _w.appendChild(_img);
+        }, 100);
+        return '<span id="' + _wid + '" style="display:inline-block;width:60px;height:60px;background:#f8faf8;border-radius:.6rem;border:2px solid var(--line)"></span>';
       }).join('') +
       '</div></div>';
   }
@@ -2081,19 +2118,29 @@ function catIcon(cat) {
 </div>
 
 <!-- Lightbox de fotos -->
-<div id="lightbox" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.92);
-  z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out"
+<div id="lightbox" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.94);
+  z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center"
   onclick="closeLightbox()">
-  <img id="lightbox-img" src="" style="max-width:92vw;max-height:90vh;border-radius:1rem;object-fit:contain"/>
-  <button onclick="event.stopPropagation();lightboxNav(-1)"
-    style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);
-    border:none;border-radius:50%;width:48px;height:48px;font-size:1.4rem;color:#fff;cursor:pointer">‹</button>
-  <button onclick="event.stopPropagation();lightboxNav(1)"
-    style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);
-    border:none;border-radius:50%;width:48px;height:48px;font-size:1.4rem;color:#fff;cursor:pointer">›</button>
+  <div id="lightbox-counter" style="position:absolute;top:1rem;left:50%;transform:translateX(-50%);
+    background:rgba(255,255,255,.15);color:#fff;font-size:.8rem;font-weight:600;
+    padding:.3rem .85rem;border-radius:999px"></div>
+  <div onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;position:relative">
+    <div id="lightbox-loading" style="position:absolute;width:36px;height:36px;border:3px solid rgba(255,255,255,.2);
+      border-top-color:#fff;border-radius:50%;animation:loaderSpin .7s linear infinite"></div>
+    <img id="lightbox-img" src="" style="max-width:90vw;max-height:80vh;border-radius:1rem;object-fit:contain;
+      opacity:0;transition:opacity .2s"
+      onload="this.style.opacity=1;document.getElementById('lightbox-loading').style.display='none'"/>
+  </div>
+  <div id="lightbox-thumbs" style="display:flex;gap:.5rem;margin-top:.85rem;max-width:90vw;overflow-x:auto;padding:.25rem"></div>
+  <button onclick="event.stopPropagation();lightboxNav(-1)" id="lb-h-prev"
+    style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer">‹</button>
+  <button onclick="event.stopPropagation();lightboxNav(1)" id="lb-h-next"
+    style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer">›</button>
   <button onclick="closeLightbox()"
-    style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);
-    border:none;border-radius:50%;width:40px;height:40px;font-size:1.2rem;color:#fff;cursor:pointer">✕</button>
+    style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.18);
+    border:none;border-radius:50%;width:42px;height:42px;font-size:1.2rem;color:#fff;cursor:pointer">✕</button>
 </div>
 </body>
 </html>

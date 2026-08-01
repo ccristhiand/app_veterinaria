@@ -23,6 +23,7 @@
     .timeline-dot.pink { background:#ec4899; }
     .timeline-dot.gray { background:#9ca3af; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    #lightbox { flex-direction:column; }
   </style>
 </head>
 <body>
@@ -421,12 +422,49 @@
     var _lbIdx   = 0;
 
     async function openLB(ids, idx) {
-      _lbFotos = ids;
+      _lbFotos = Array.isArray(ids) ? ids.slice() : [ids];
       _lbIdx   = idx || 0;
-      document.getElementById('lightbox').style.display = 'flex';
+      var lb = document.getElementById('lightbox');
+      lb.style.display = 'flex';
+      // Ocultar botones si solo hay 1 foto
+      document.getElementById('lb-prev').style.display = _lbFotos.length > 1 ? 'block' : 'none';
+      document.getElementById('lb-next').style.display = _lbFotos.length > 1 ? 'block' : 'none';
+      await lbMostrar();
+      lbThumbs();
+    }
+
+    async function lbMostrar() {
       var img = document.getElementById('lb-img');
-      img.src = '';
+      var loading = document.getElementById('lb-loading');
+      img.style.opacity = '0';
+      if (loading) loading.style.display = 'block';
+      document.getElementById('lb-counter').textContent =
+        _lbFotos.length > 1 ? (_lbIdx + 1) + ' / ' + _lbFotos.length : '';
       await cargarFotoCarnet(img, _lbFotos[_lbIdx]);
+      // Actualizar thumb activo
+      var thumbs = document.querySelectorAll('.lb-thumb');
+      thumbs.forEach(function(t, i) {
+        t.style.border = i === _lbIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,.3)';
+        t.style.opacity = i === _lbIdx ? '1' : '0.6';
+      });
+    }
+
+    function lbThumbs() {
+      var cont = document.getElementById('lb-thumbs');
+      cont.innerHTML = '';
+      if (_lbFotos.length <= 1) return;
+      _lbFotos.forEach(function(fotoId, i) {
+        var thumb = document.createElement('img');
+        thumb.className = 'lb-thumb';
+        thumb.style.cssText = 'width:48px;height:48px;object-fit:cover;border-radius:.5rem;cursor:pointer;transition:all .15s;border:2px solid rgba(255,255,255,.3);opacity:.6;flex-shrink:0';
+        thumb.onclick = async function(e) {
+          e.stopPropagation();
+          _lbIdx = i;
+          await lbMostrar();
+        };
+        cargarFotoCarnet(thumb, fotoId);
+        cont.appendChild(thumb);
+      });
     }
 
     function closeLB() {
@@ -435,9 +473,7 @@
 
     async function lbNav(dir) {
       _lbIdx = (_lbIdx + dir + _lbFotos.length) % _lbFotos.length;
-      var img = document.getElementById('lb-img');
-      img.src = '';
-      await cargarFotoCarnet(img, _lbFotos[_lbIdx]);
+      await lbMostrar();
     }
 
     document.addEventListener('keydown', function(e) {
@@ -453,21 +489,43 @@
   </script>
 
   <!-- Lightbox fotos -->
-  <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);
-    z-index:9999;align-items:center;justify-content:center;cursor:zoom-out"
+  <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.94);
+    z-index:9999;flex-direction:column;align-items:center;justify-content:center"
     onclick="closeLB()">
-    <img id="lb-img" src="" style="max-width:92vw;max-height:88vh;border-radius:1rem;object-fit:contain"/>
-    <button onclick="event.stopPropagation();lbNav(-1)"
+    <!-- Contador -->
+    <div id="lb-counter" style="position:absolute;top:1rem;left:50%;transform:translateX(-50%);
+      background:rgba(255,255,255,.15);color:#fff;font-size:.8rem;font-weight:600;
+      padding:.3rem .85rem;border-radius:999px;backdrop-filter:blur(4px)"></div>
+    <!-- Imagen -->
+    <div onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;
+      max-width:96vw;max-height:88vh;position:relative">
+      <div id="lb-loading" style="position:absolute;width:40px;height:40px;border:3px solid rgba(255,255,255,.2);
+        border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div>
+      <img id="lb-img" src="" style="max-width:92vw;max-height:85vh;border-radius:1rem;
+        object-fit:contain;opacity:0;transition:opacity .2s" onload="this.style.opacity=1;document.getElementById('lb-loading').style.display='none'"/>
+    </div>
+    <!-- Miniaturas -->
+    <div id="lb-thumbs" style="display:flex;gap:.5rem;margin-top:.85rem;max-width:90vw;overflow-x:auto;padding:.25rem"></div>
+    <!-- Botones nav -->
+    <button onclick="event.stopPropagation();lbNav(-1)" id="lb-prev"
       style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);
       background:rgba(255,255,255,.18);border:none;border-radius:50%;
-      width:44px;height:44px;font-size:1.4rem;color:#fff;cursor:pointer">‹</button>
-    <button onclick="event.stopPropagation();lbNav(1)"
+      width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer;
+      backdrop-filter:blur(4px);transition:background .15s"
+      onmouseover="this.style.background='rgba(255,255,255,.3)'"
+      onmouseout="this.style.background='rgba(255,255,255,.18)'">‹</button>
+    <button onclick="event.stopPropagation();lbNav(1)" id="lb-next"
       style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);
       background:rgba(255,255,255,.18);border:none;border-radius:50%;
-      width:44px;height:44px;font-size:1.4rem;color:#fff;cursor:pointer">›</button>
+      width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer;
+      backdrop-filter:blur(4px);transition:background .15s"
+      onmouseover="this.style.background='rgba(255,255,255,.3)'"
+      onmouseout="this.style.background='rgba(255,255,255,.18)'">›</button>
+    <!-- Cerrar -->
     <button onclick="closeLB()"
       style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.18);
-      border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;color:#fff;cursor:pointer">✕</button>
+      border:none;border-radius:50%;width:42px;height:42px;font-size:1.2rem;color:#fff;
+      cursor:pointer;backdrop-filter:blur(4px)">✕</button>
   </div>
 </body>
 </html>
