@@ -577,7 +577,18 @@
   <div class="vmodal" style="max-width:640px">
     <div class="vmodal-head"><h3 id="ver-titulo">📋 Detalle de Consulta</h3><button onclick="closeModal('modal-ver')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" id="ver-body"></div>
-    <div class="vmodal-foot"><button onclick="closeModal('modal-ver')" class="vbtn vbtn-ghost">Cerrar</button></div>
+    <div class="vmodal-foot" style="justify-content:space-between">
+      <button onclick="closeModal('modal-ver')" class="vbtn vbtn-ghost">Cerrar</button>
+      <div style="display:flex;gap:.5rem">
+        <button id="ver-btn-editar" onclick="verAEditar()" class="vbtn vbtn-primary" style="padding:.55rem 1.1rem">
+          ✏️ Editar
+        </button>
+        <button id="ver-btn-eliminar" onclick="eliminarConsulta()" class="vbtn"
+          style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;padding:.55rem 1.1rem">
+          🗑️ Eliminar
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1008,7 +1019,7 @@ function renderTimeline(consultas) {
   cont.className='timeline';
   cont.innerHTML=consultas.map(c=>`
     <div class="timeline-item">
-      <div class="vcard vcard-pad" style="cursor:pointer;transition:all .22s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow=''" onclick="verConsulta(${c.id})">
+      <div class="vcard vcard-pad" style="cursor:pointer;transition:all .22s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow=''" onclick="verConsultaConId(${c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
           <div style="flex:1;min-width:200px">
             <div style="display:flex;gap:.6rem;align-items:center;font-size:.7rem;color:var(--ink-faint);margin-bottom:.4rem;flex-wrap:wrap">
@@ -1042,6 +1053,40 @@ function renderTimeline(consultas) {
         ${c.seguimientos?.length ? renderSeguimientos(c.seguimientos) : ''}
       </div>
     </div>`).join('');
+}
+
+
+var _verConsultaId = null;
+
+async function verConsultaConId(id) {
+  _verConsultaId = id;
+  return verConsulta(id);
+}
+
+function verAEditar() {
+  if (!_verConsultaId) return;
+  closeModal('modal-ver');
+  abrirEditarConsulta(_verConsultaId);
+}
+
+async function eliminarConsulta() {
+  if (!_verConsultaId) return;
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta consulta?',
+    mensaje : 'Se eliminará la consulta y todas sus recetas y seguimientos. Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + _verConsultaId, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Consulta eliminada.', 'success');
+    closeModal('modal-ver');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
 }
 
 async function verConsulta(id) {
@@ -1868,13 +1913,15 @@ async function subirFotosEstetica(esteticaId) {
 // ══ LIGHTBOX ══════════════════════════════════════════════════════
 
 async function openLightboxSingle(fotoId) {
-  document.getElementById('lightbox').classList.remove('hidden');
-  document.getElementById('lightbox').style.display = 'flex';
-  var img = document.getElementById('lightbox-img');
-  img.src = '';
   _lightboxFotos = [fotoId];
   _lightboxIdx   = 0;
-  await cargarFotoSegura(img, fotoId);
+  var lb = document.getElementById('lightbox');
+  lb.classList.remove('hidden');
+  lb.style.display = 'flex';
+  document.getElementById('lb-h-prev').style.display = 'none';
+  document.getElementById('lb-h-next').style.display = 'none';
+  document.getElementById('lightbox-thumbs').innerHTML = '';
+  await lbHMostrar();
 }
 
 async function openLightbox(ids, idx) {
@@ -1895,12 +1942,22 @@ async function lbHMostrar() {
   var counter = document.getElementById('lightbox-counter');
   img.style.opacity = '0';
   if (loading) loading.style.display = 'block';
-  if (counter) counter.textContent = _lightboxFotos.length > 1 ? (_lightboxIdx + 1) + ' / ' + _lightboxFotos.length : '';
-  await cargarFotoSegura(img, _lightboxFotos[_lightboxIdx]);
+  if (counter) counter.textContent = _lightboxFotos.length > 1
+    ? (_lightboxIdx + 1) + ' / ' + _lightboxFotos.length : '';
+
+  var item = _lightboxFotos[_lightboxIdx];
+  if (typeof item === 'string' && item.startsWith('blob:')) {
+    // blob URL de preview — asignar directo
+    img.src = item;
+  } else {
+    // ID numérico — cargar via fetch con JWT
+    await cargarFotoSegura(img, item);
+  }
+
   // Actualizar thumb activo
   document.querySelectorAll('.lb-h-thumb').forEach(function(t, i) {
-    t.style.border   = i === _lightboxIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,.3)';
-    t.style.opacity  = i === _lightboxIdx ? '1' : '0.6';
+    t.style.border  = i === _lightboxIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,.3)';
+    t.style.opacity = i === _lightboxIdx ? '1' : '0.6';
   });
 }
 

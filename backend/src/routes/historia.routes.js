@@ -176,4 +176,21 @@ router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), asy
   } catch (err) { next(err); }
 });
 
+
+// DELETE /api/v1/historia/:id
+router.delete('/:id', authorize('admin', 'veterinario'), auditMiddleware('historia_clinica:eliminado', 'historia_clinica'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
+
+    await req.db.withTransaction(async (conn) => {
+      await conn.execute('DELETE FROM historia_seguimientos WHERE historia_id = ?', [req.params.id]);
+      await conn.execute('DELETE FROM recetas WHERE historia_clinica_id = ?', [req.params.id]);
+      await conn.execute('DELETE FROM historia_clinica WHERE id = ?', [req.params.id]);
+    });
+
+    return res.json({ success: true, message: 'Consulta eliminada correctamente.' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
