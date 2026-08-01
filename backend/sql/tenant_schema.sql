@@ -475,6 +475,36 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
   FOREIGN KEY (campana_id) REFERENCES wa_campanas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+
+-- ── Seguimientos de consulta (tratamiento multi-día) ─────────────
+CREATE TABLE IF NOT EXISTS historia_seguimientos (
+  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  historia_id    INT UNSIGNED  NOT NULL,
+  veterinario_id INT UNSIGNED  NOT NULL,
+  fecha          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  evolucion      TEXT          NOT NULL,
+  tratamiento    TEXT          NULL,
+  observaciones  TEXT          NULL,
+  peso_kg        DECIMAL(6,2)  NULL,
+  temperatura_c  DECIMAL(4,1)  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (historia_id)    REFERENCES historia_clinica(id) ON DELETE CASCADE,
+  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id)         ON DELETE RESTRICT,
+  INDEX idx_historia (historia_id)
+) ENGINE=InnoDB;
+
+-- ── Fotos de estética (Azure Blob Storage) ────────────────────────
+CREATE TABLE IF NOT EXISTS estetica_fotos (
+  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  estetica_id    INT UNSIGNED  NOT NULL,
+  momento        ENUM('antes','despues') NOT NULL,
+  url            VARCHAR(500)  NOT NULL,
+  nombre_archivo VARCHAR(200)  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (estetica_id) REFERENCES servicios_estetica(id) ON DELETE CASCADE,
+  INDEX idx_estetica (estetica_id)
+) ENGINE=InnoDB;
+
 -- ── Datos iniciales ───────────────────────────────────────────────
 INSERT INTO empresa_config (nombre) VALUES ('VetClinic');
 
@@ -501,4 +531,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 ('Campaña general', 'campana',
  '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v6 ✅ (multi-sedes)' AS resultado;
+SELECT 'tenant_schema v7 ✅ (multi-sedes + seguimientos + fotos)' AS resultado;

@@ -2,8 +2,7 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
-
+const { auditMiddleware } = require('../middlewares/audit.middleware');
 
 const router = Router();
 router.use(authenticate);
@@ -20,9 +19,15 @@ router.get('/', async (req, res, next) => {
        WHERE h.mascota_id = ?
        ORDER BY h.fecha DESC`, [mascota_id]
     );
-    // Recetas por consulta
     for (const h of rows) {
-      h.recetas = await req.db.query('SELECT * FROM recetas WHERE historia_clinica_id = ?', [h.id]);
+      h.recetas      = await req.db.query('SELECT * FROM recetas WHERE historia_clinica_id = ?', [h.id]);
+      h.seguimientos = await req.db.query(
+        `SELECT s.*, u.nombre AS veterinario_nombre
+         FROM historia_seguimientos s
+         JOIN usuarios u ON u.id = s.veterinario_id
+         WHERE s.historia_id = ?
+         ORDER BY s.fecha ASC`, [h.id]
+      );
     }
     return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
@@ -40,7 +45,14 @@ router.get('/:id', async (req, res, next) => {
        WHERE h.id = ?`, [req.params.id]
     );
     if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
-    h.recetas = await req.db.query('SELECT * FROM recetas WHERE historia_clinica_id = ?', [h.id]);
+    h.recetas      = await req.db.query('SELECT * FROM recetas WHERE historia_clinica_id = ?', [h.id]);
+    h.seguimientos = await req.db.query(
+      `SELECT s.*, u.nombre AS veterinario_nombre
+       FROM historia_seguimientos s
+       JOIN usuarios u ON u.id = s.veterinario_id
+       WHERE s.historia_id = ?
+       ORDER BY s.fecha ASC`, [h.id]
+    );
     return res.json({ success: true, data: h });
   } catch (err) { next(err); }
 });
@@ -105,6 +117,62 @@ router.put('/:id', auditMiddleware('historia_clinica:actualizado', 'historia_cli
       }
     });
     return res.json({ success: true, message: 'Consulta actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// ── SEGUIMIENTOS ──────────────────────────────────────────────────
+
+// GET /api/v1/historia/:id/seguimientos
+router.get('/:id/seguimientos', async (req, res, next) => {
+  try {
+    const rows = await req.db.query(
+      `SELECT s.*, u.nombre AS veterinario_nombre
+       FROM historia_seguimientos s
+       JOIN usuarios u ON u.id = s.veterinario_id
+       WHERE s.historia_id = ?
+       ORDER BY s.fecha ASC`, [req.params.id]
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/historia/:id/seguimientos
+router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
+  try {
+    const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
+
+    if (!evolucion?.trim())
+      return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
+
+    // Verificar que la consulta existe
+    const [historia] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
+    if (!historia) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
+
+    const result = await req.db.query(
+      `INSERT INTO historia_seguimientos
+         (historia_id, veterinario_id, fecha, evolucion, tratamiento, observaciones, peso_kg, temperatura_c)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [req.params.id, req.user.id, fecha || new Date(),
+       evolucion.trim(), tratamiento?.trim()||null, observaciones?.trim()||null,
+       peso_kg||null, temperatura_c||null]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Seguimiento agregado correctamente.',
+      data: { id: result.insertId },
+    });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/historia/:id/seguimientos/:segId
+router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), async (req, res, next) => {
+  try {
+    await req.db.query(
+      'DELETE FROM historia_seguimientos WHERE id = ? AND historia_id = ?',
+      [req.params.segId, req.params.id]
+    );
+    return res.json({ success: true, message: 'Seguimiento eliminado.' });
   } catch (err) { next(err); }
 });
 
