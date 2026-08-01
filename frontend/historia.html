@@ -360,6 +360,46 @@
           placeholder="Estado del pelaje, condición de la piel, comportamiento, recomendaciones…"></textarea>
       </div>
 
+      <!-- Fotos Antes / Después -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <p style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif;margin-bottom:.75rem">
+          📸 Fotos del servicio
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Antes -->
+          <div>
+            <label class="vlabel">📷 Antes</label>
+            <div id="est-fotos-antes-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem"></div>
+            <label style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+              padding:.65rem 1rem;border:2px dashed #fbcfe8;border-radius:.85rem;
+              cursor:pointer;font-size:.8rem;font-weight:600;color:#db2777;
+              background:#fdf2f8;transition:all .15s"
+              onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+              <input type="file" id="est-fotos-antes" accept="image/*" multiple style="display:none"
+                onchange="previewFotos(this,'est-fotos-antes-preview','antes')"/>
+              ＋ Agregar fotos
+            </label>
+          </div>
+          <!-- Después -->
+          <div>
+            <label class="vlabel">✨ Después</label>
+            <div id="est-fotos-despues-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem"></div>
+            <label style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+              padding:.65rem 1rem;border:2px dashed #fbcfe8;border-radius:.85rem;
+              cursor:pointer;font-size:.8rem;font-weight:600;color:#db2777;
+              background:#fdf2f8;transition:all .15s"
+              onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+              <input type="file" id="est-fotos-despues" accept="image/*" multiple style="display:none"
+                onchange="previewFotos(this,'est-fotos-despues-preview','despues')"/>
+              ＋ Agregar fotos
+            </label>
+          </div>
+        </div>
+        <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.5rem">
+          Las fotos se suben automáticamente al guardar el servicio.
+        </p>
+      </div>
+
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-estetica')" class="vbtn vbtn-ghost">Cancelar</button>
@@ -952,9 +992,15 @@ function renderTimeline(consultas) {
               style="font-size:.68rem;color:var(--sky);background:none;border:none;
               cursor:pointer;font-family:inherit;font-weight:600;padding:0"
               title="Editar consulta">✏️ Editar</button>
+            <button onclick="event.stopPropagation();abrirModalSeguimiento(${c.id})"
+              style="font-size:.68rem;color:#8b5cf6;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Agregar seguimiento">➕ Seguimiento</button>
           </div>
           ${c.tratamiento?'<span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;font-weight:600">💊 Con tratamiento</span>':''}
         </div>
+        <!-- Seguimientos -->
+        ${c.seguimientos?.length ? renderSeguimientos(c.seguimientos) : ''}
       </div>
     </div>`).join('');
 }
@@ -1136,10 +1182,16 @@ async function guardarEstetica() {
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
 
-    toast('✂️ Servicio de estética registrado','success');
+    var esteticaId = data.data.id;
+    // Subir fotos si hay
+    if (_fotasAntes.length || _fotosDespues.length) {
+      await subirFotosEstetica(esteticaId);
+    } else {
+      toast('✂️ Servicio de estética registrado', 'success');
+    }
     closeModal('modal-estetica');
     limpiarFormEstetica();
-    mostrarTab('estetica'); // ir al tab para ver el registro
+    mostrarTab('estetica');
   } catch { toast('Error de conexión.','danger'); }
 }
 
@@ -1152,6 +1204,13 @@ function limpiarFormEstetica() {
   document.getElementById('est-productos').value     = '';
   document.getElementById('est-precio').value        = '';
   document.getElementById('est-observaciones').value = '';
+  // Limpiar previews de fotos
+  _fotasAntes   = [];
+  _fotosDespues = [];
+  var pa = document.getElementById('est-fotos-antes-preview');
+  var pd = document.getElementById('est-fotos-despues-preview');
+  if (pa) pa.innerHTML = '';
+  if (pd) pd.innerHTML = '';
 }
 
 function limpiarForm() {
@@ -1489,9 +1548,336 @@ function attachAutocomplete(input, cats, onSelect) {
   });
 }
 
+
+// ══ SEGUIMIENTOS ═════════════════════════════════════════════════
+
+function renderSeguimientos(seguimientos) {
+  if (!seguimientos || !seguimientos.length) return '';
+  return '<div style="margin-top:.85rem;padding:.85rem;background:#f5f3ff;border-radius:.9rem;border:1px solid #ddd6fe">' +
+    '<p style="font-size:.7rem;font-weight:700;color:#6d28d9;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.08em">🔄 Seguimientos (' + seguimientos.length + ')</p>' +
+    '<div style="display:flex;flex-direction:column;gap:.6rem">' +
+    seguimientos.map(function(s) {
+      return '<div style="background:#fff;border-radius:.75rem;padding:.75rem;border:1px solid #ede9fe">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.5rem">' +
+          '<span style="font-size:.72rem;color:#6d28d9;font-weight:700">' + fDate(s.fecha) + ' — Dr(a). ' + esc(s.veterinario_nombre||'') + '</span>' +
+          '<div style="display:flex;gap:.5rem">' +
+            (s.peso_kg ? '<span style="font-size:.65rem;background:#f0f9ff;color:#0369a1;padding:.15rem .45rem;border-radius:999px;font-weight:700">⚖️ ' + s.peso_kg + ' kg</span>' : '') +
+            (s.temperatura_c ? '<span style="font-size:.65rem;background:#fffbeb;color:#b45309;padding:.15rem .45rem;border-radius:999px;font-weight:700">🌡️ ' + s.temperatura_c + '°C</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<p style="font-size:.78rem;color:var(--ink);line-height:1.5"><strong>Evolución:</strong> ' + esc(s.evolucion) + '</p>' +
+        (s.tratamiento ? '<p style="font-size:.75rem;color:var(--ink-soft);margin-top:.3rem;line-height:1.5"><strong>Tratamiento:</strong> ' + esc(s.tratamiento) + '</p>' : '') +
+        (s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.3rem">📝 ' + esc(s.observaciones) + '</p>' : '') +
+      '</div>';
+    }).join('') +
+    '</div></div>';
+}
+
+function abrirModalSeguimiento(historiaId) {
+  document.getElementById('seg-historia-id').value = historiaId;
+  document.getElementById('seg-fecha').value        = fechaHoyInput();
+  document.getElementById('seg-evolucion').value    = '';
+  document.getElementById('seg-tratamiento').value  = '';
+  document.getElementById('seg-observaciones').value= '';
+  document.getElementById('seg-peso').value         = '';
+  document.getElementById('seg-temp').value         = '';
+  openModal('modal-seguimiento');
+  setTimeout(function() { document.getElementById('seg-evolucion').focus(); }, 150);
+}
+
+async function guardarSeguimiento() {
+  var historiaId = document.getElementById('seg-historia-id').value;
+  var evolucion  = document.getElementById('seg-evolucion').value.trim();
+  if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+
+  var body = {
+    fecha        : document.getElementById('seg-fecha').value,
+    evolucion,
+    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
+    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+  };
+
+  try {
+    var res  = await api('/historia/' + historiaId + '/seguimientos', { method: 'POST', body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
+    toast('🔄 Seguimiento registrado correctamente.', 'success');
+    closeModal('modal-seguimiento');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+// ══ FOTOS ESTÉTICA ════════════════════════════════════════════════
+
+var _fotasAntes   = [];
+var _fotosDespues = [];
+var _lightboxFotos = [];
+var _lightboxIdx   = 0;
+
+function previewFotos(input, previewId, momento) {
+  var files = Array.from(input.files);
+  var cont  = document.getElementById(previewId);
+
+  files.forEach(function(file) {
+    if (momento === 'antes')   _fotasAntes.push(file);
+    else                       _fotosDespues.push(file);
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:72px;height:72px';
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:.65rem;border:2px solid #fbcfe8;cursor:pointer';
+      img.onclick = function() { openLightboxSingle(e.target.result); };
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#db2777;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-weight:700';
+      btn.onclick = function() {
+        if (momento === 'antes') _fotasAntes   = _fotasAntes.filter(function(f) { return f !== file; });
+        else                     _fotosDespues = _fotosDespues.filter(function(f) { return f !== file; });
+        wrap.remove();
+      };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      cont.appendChild(wrap);
+    };
+    reader.readAsDataURL(file);
+  });
+  // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
+  input.value = '';
+}
+
+async function subirFotosEstetica(esteticaId) {
+  var todas = [
+    ..._fotasAntes.map(function(f)   { return { file: f, momento: 'antes' };   }),
+    ..._fotosDespues.map(function(f) { return { file: f, momento: 'despues' }; }),
+  ];
+  if (!todas.length) return;
+
+  toast('📸 Subiendo ' + todas.length + ' foto(s)...', 'info', 3000);
+
+  for (var i = 0; i < todas.length; i++) {
+    var item = todas[i];
+    try {
+      // 1. Pedir SAS Token al backend
+      var tokenRes = await api('/estetica/upload-token', {
+        method: 'POST',
+        body  : { filename: item.file.name, content_type: item.file.type }
+      });
+      if (!tokenRes?.ok) { toast('Error al obtener token de subida.', 'danger'); continue; }
+      var tokenData = (await tokenRes.json()).data;
+
+      // 2. Subir directamente a Azure
+      var uploadRes = await fetch(tokenData.upload_url, {
+        method : 'PUT',
+        headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': item.file.type },
+        body   : item.file,
+      });
+      if (!uploadRes.ok) { toast('Error al subir foto ' + item.file.name, 'danger'); continue; }
+
+      // 3. Registrar URL en el backend
+      await api('/estetica/' + esteticaId + '/fotos', {
+        method: 'POST',
+        body  : { momento: item.momento, url: tokenData.public_url, nombre_archivo: item.file.name }
+      });
+    } catch(e) {
+      toast('Error subiendo ' + item.file.name + ': ' + e.message, 'danger');
+    }
+  }
+
+  toast('✅ Fotos subidas correctamente.', 'success');
+  _fotasAntes   = [];
+  _fotosDespues = [];
+}
+
+// ══ LIGHTBOX ══════════════════════════════════════════════════════
+
+function openLightboxSingle(src) {
+  _lightboxFotos = [src];
+  _lightboxIdx   = 0;
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
+  document.getElementById('lightbox').style.display = 'flex';
+}
+
+function openLightbox(fotos, idx) {
+  _lightboxFotos = fotos;
+  _lightboxIdx   = idx || 0;
+  document.getElementById('lightbox-img').src = _lightboxFotos[_lightboxIdx];
+  document.getElementById('lightbox').classList.remove('hidden');
+  document.getElementById('lightbox').style.display = 'flex';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.getElementById('lightbox').classList.add('hidden');
+}
+
+function lightboxNav(dir) {
+  _lightboxIdx = (_lightboxIdx + dir + _lightboxFotos.length) % _lightboxFotos.length;
+  document.getElementById('lightbox-img').src = _lightboxFotos[_lightboxIdx];
+}
+
+document.addEventListener('keydown', function(e) {
+  var lb = document.getElementById('lightbox');
+  if (lb && !lb.classList.contains('hidden')) {
+    if (e.key === 'ArrowLeft')  lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+    if (e.key === 'Escape')     closeLightbox();
+  }
+});
+
+
+function renderFotosEstetica(fotos, esteticaId) {
+  var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
+  var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
+  var todasUrls = fotos.map(function(f) { return f.url; });
+
+  function grid(lista, label) {
+    if (!lista.length) return '';
+    return '<div>' +
+      '<p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">' + label + '</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
+      lista.map(function(f, i) {
+        var idx = todasUrls.indexOf(f.url);
+        return '<img src="' + esc(f.url) + '" onclick="openLightbox(' + JSON.stringify(todasUrls) + ',' + idx + ')" ' +
+          'style="width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line);transition:transform .15s" ' +
+          
+          'loading="lazy" alt="foto"/>';
+      }).join('') +
+      '</div></div>';
+  }
+
+  if (!antes.length && !despues.length) return '';
+
+  return '<div style="margin-top:.75rem;padding:.85rem;background:#fdf2f8;border-radius:.85rem;border:1px solid #fbcfe8">' +
+    '<p style="font-size:.7rem;font-weight:700;color:#db2777;margin-bottom:.65rem">📸 Fotos del servicio</p>' +
+    '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">' +
+      grid(antes,   '📷 Antes') +
+      grid(despues, '✨ Después') +
+    '</div>' +
+    '<p style="font-size:.62rem;color:var(--ink-faint);margin-top:.5rem">Click en una foto para ampliar</p>' +
+    '<button onclick="abrirSubidaFotos(' + esteticaId + ')" ' +
+      'style="margin-top:.6rem;font-size:.7rem;color:#db2777;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600">＋ Agregar más fotos</button>' +
+  '</div>';
+}
+
+function abrirSubidaFotos(esteticaId) {
+  // Crear input file temporal para agregar fotos a un servicio existente
+  var inp = document.createElement('input');
+  inp.type     = 'file';
+  inp.accept   = 'image/*';
+  inp.multiple = true;
+  inp.onchange = async function() {
+    var files = Array.from(inp.files);
+    var momento = prompt('Tipo de fotos: "antes" o "despues"', 'despues');
+    if (!['antes','despues'].includes(momento)) return;
+    toast('Subiendo ' + files.length + ' foto(s)...', 'info', 3000);
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      try {
+        var tokenRes = await api('/estetica/upload-token', {
+          method: 'POST', body: { filename: file.name, content_type: file.type }
+        });
+        if (!tokenRes?.ok) continue;
+        var td = (await tokenRes.json()).data;
+        await fetch(td.upload_url, {
+          method: 'PUT',
+          headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type },
+          body: file,
+        });
+        await api('/estetica/' + esteticaId + '/fotos', {
+          method: 'POST',
+          body: { momento, url: td.public_url, nombre_archivo: file.name }
+        });
+      } catch(e) { toast('Error: ' + e.message, 'danger'); }
+    }
+    toast('Fotos agregadas.', 'success');
+    cargarEstetica(mascotaId);
+  };
+  inp.click();
+}
+
 function catIcon(cat) {
   return { medicamento:'💊', vacuna:'💉', insumo:'🧰', otro:'📎' }[cat] || '📦';
 }
 </script>
+
+<!-- Modal Seguimiento -->
+<div id="modal-seguimiento" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3>🔄 Agregar Seguimiento</h3>
+      <button onclick="closeModal('modal-seguimiento')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="seg-historia-id"/>
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.85rem;
+        padding:.7rem 1rem;font-size:.78rem;color:#6d28d9;font-weight:600">
+        🔄 Este seguimiento se vinculará a la consulta original como parte del mismo tratamiento.
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Fecha *</label>
+          <input id="seg-fecha" type="date" class="vinput"/>
+        </div>
+        <div style="display:flex;gap:1rem">
+          <div style="flex:1">
+            <label class="vlabel">Peso (kg)</label>
+            <input id="seg-peso" type="number" step="0.1" class="vinput" placeholder="3.5"/>
+          </div>
+          <div style="flex:1">
+            <label class="vlabel">Temp. (°C)</label>
+            <input id="seg-temp" type="number" step="0.1" class="vinput" placeholder="38.5"/>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel">Evolución *</label>
+        <textarea id="seg-evolucion" rows="3" class="vinput"
+          placeholder="¿Cómo evolucionó el paciente? Estado actual, síntomas, mejoría…"></textarea>
+      </div>
+      <div>
+        <label class="vlabel">Ajuste de tratamiento</label>
+        <textarea id="seg-tratamiento" rows="2" class="vinput"
+          placeholder="Cambios al plan de tratamiento, nuevos medicamentos…"></textarea>
+      </div>
+      <div>
+        <label class="vlabel">Observaciones</label>
+        <textarea id="seg-observaciones" rows="2" class="vinput"
+          placeholder="Indicaciones al propietario, próxima cita…"></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-seguimiento')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarSeguimiento()"
+        style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;
+        border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;
+        font-weight:600;cursor:pointer;font-family:inherit">
+        🔄 Guardar Seguimiento
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox de fotos -->
+<div id="lightbox" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.92);
+  z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out"
+  onclick="closeLightbox()">
+  <img id="lightbox-img" src="" style="max-width:92vw;max-height:90vh;border-radius:1rem;object-fit:contain"/>
+  <button onclick="event.stopPropagation();lightboxNav(-1)"
+    style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.4rem;color:#fff;cursor:pointer">‹</button>
+  <button onclick="event.stopPropagation();lightboxNav(1)"
+    style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.4rem;color:#fff;cursor:pointer">›</button>
+  <button onclick="closeLightbox()"
+    style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);
+    border:none;border-radius:50%;width:40px;height:40px;font-size:1.2rem;color:#fff;cursor:pointer">✕</button>
+</div>
 </body>
 </html>
