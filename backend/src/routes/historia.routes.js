@@ -165,6 +165,33 @@ router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado',
   } catch (err) { next(err); }
 });
 
+
+// PUT /api/v1/historia/:id/seguimientos/:segId
+router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
+  try {
+    const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
+    if (!evolucion?.trim())
+      return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
+
+    const [seg] = await req.db.query(
+      'SELECT id FROM historia_seguimientos WHERE id = ? AND historia_id = ?',
+      [req.params.segId, req.params.id]
+    );
+    if (!seg) return res.status(404).json({ success: false, message: 'Seguimiento no encontrado.' });
+
+    await req.db.query(
+      `UPDATE historia_seguimientos SET
+         fecha=?, evolucion=?, tratamiento=?, observaciones=?, peso_kg=?, temperatura_c=?
+       WHERE id=?`,
+      [fecha || new Date(), evolucion.trim(),
+       tratamiento?.trim()||null, observaciones?.trim()||null,
+       peso_kg||null, temperatura_c||null, req.params.segId]
+    );
+
+    return res.json({ success: true, message: 'Seguimiento actualizado.' });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/v1/historia/:id/seguimientos/:segId
 router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), async (req, res, next) => {
   try {

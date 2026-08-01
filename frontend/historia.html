@@ -1782,16 +1782,20 @@ function attachAutocomplete(input, cats, onSelect) {
 
 function renderSeguimientos(seguimientos) {
   if (!seguimientos || !seguimientos.length) return '';
-  return '<div style="margin-top:.85rem;padding:.85rem;background:#f5f3ff;border-radius:.9rem;border:1px solid #ddd6fe">' +
+  return '<div onclick="event.stopPropagation()" style="margin-top:.85rem;padding:.85rem;background:#f5f3ff;border-radius:.9rem;border:1px solid #ddd6fe">' +
     '<p style="font-size:.7rem;font-weight:700;color:#6d28d9;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.08em">🔄 Seguimientos (' + seguimientos.length + ')</p>' +
     '<div style="display:flex;flex-direction:column;gap:.6rem">' +
     seguimientos.map(function(s) {
       return '<div style="background:#fff;border-radius:.75rem;padding:.75rem;border:1px solid #ede9fe">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.5rem">' +
           '<span style="font-size:.72rem;color:#6d28d9;font-weight:700">' + fDate(s.fecha) + ' — Dr(a). ' + esc(s.veterinario_nombre||'') + '</span>' +
-          '<div style="display:flex;gap:.5rem">' +
+          '<div style="display:flex;gap:.5rem;align-items:center">' +
             (s.peso_kg ? '<span style="font-size:.65rem;background:#f0f9ff;color:#0369a1;padding:.15rem .45rem;border-radius:999px;font-weight:700">⚖️ ' + s.peso_kg + ' kg</span>' : '') +
             (s.temperatura_c ? '<span style="font-size:.65rem;background:#fffbeb;color:#b45309;padding:.15rem .45rem;border-radius:999px;font-weight:700">🌡️ ' + s.temperatura_c + '°C</span>' : '') +
+            '<button onclick="event.stopPropagation();editarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
+              'style="font-size:.65rem;color:var(--sky);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">✏️</button>' +
+            '<button onclick="event.stopPropagation();eliminarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
+              'style="font-size:.65rem;color:#e11d48;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">🗑️</button>' +
           '</div>' +
         '</div>' +
         '<p style="font-size:.78rem;color:var(--ink);line-height:1.5"><strong>Evolución:</strong> ' + esc(s.evolucion) + '</p>' +
@@ -1800,6 +1804,85 @@ function renderSeguimientos(seguimientos) {
       '</div>';
     }).join('') +
     '</div></div>';
+}
+
+
+async function editarSeguimiento(segId, historiaId) {
+  // Cargar datos del seguimiento
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos');
+    if (!res) return;
+    var segs = (await res.json()).data || [];
+    var s    = segs.find(function(x) { return x.id === segId; });
+    if (!s) { toast('Seguimiento no encontrado.', 'danger'); return; }
+
+    document.getElementById('seg-historia-id').value  = historiaId;
+    document.getElementById('seg-fecha').value         = s.fecha ? s.fecha.split('T')[0] : fechaHoyInput();
+    document.getElementById('seg-evolucion').value     = s.evolucion || '';
+    document.getElementById('seg-tratamiento').value   = s.tratamiento || '';
+    document.getElementById('seg-observaciones').value = s.observaciones || '';
+    document.getElementById('seg-peso').value          = s.peso_kg || '';
+    document.getElementById('seg-temp').value          = s.temperatura_c || '';
+
+    // Cambiar el botón guardar para que haga PUT en lugar de POST
+    var btnGuardar = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
+    if (btnGuardar) {
+      btnGuardar.textContent = '💾 Guardar Cambios';
+      btnGuardar.onclick = function() { guardarEditSeguimiento(segId, historiaId); };
+    }
+
+    document.getElementById('modal-seguimiento').querySelector('h3').textContent = '✏️ Editar Seguimiento';
+    openModal('modal-seguimiento');
+  } catch { toast('Error al cargar seguimiento.', 'danger'); }
+}
+
+async function guardarEditSeguimiento(segId, historiaId) {
+  var evolucion = document.getElementById('seg-evolucion').value.trim();
+  if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+
+  var body = {
+    fecha        : document.getElementById('seg-fecha').value,
+    evolucion,
+    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
+    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+  };
+
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos/' + segId, { method: 'PUT', body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+    toast('✅ Seguimiento actualizado.', 'success');
+    closeModal('modal-seguimiento');
+    // Restaurar botón a modo crear
+    var btnGuardar = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
+    if (btnGuardar) {
+      btnGuardar.textContent = '🔄 Guardar Seguimiento';
+      btnGuardar.onclick = guardarSeguimiento;
+    }
+    document.getElementById('modal-seguimiento').querySelector('h3').textContent = '🔄 Agregar Seguimiento';
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+async function eliminarSeguimiento(segId, historiaId) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar seguimiento?',
+    mensaje : 'Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos/' + segId, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+    toast('🗑️ Seguimiento eliminado.', 'success');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
 }
 
 function abrirModalSeguimiento(historiaId) {
@@ -1940,8 +2023,8 @@ async function openLightboxSingle(fotoId) {
   var lb = document.getElementById('lightbox');
   lb.classList.remove('hidden');
   lb.style.display = 'flex';
-  document.getElementById('lb-h-prev').style.display = 'none';
-  document.getElementById('lb-h-next').style.display = 'none';
+  document.getElementById('lb-h-prev').style.visibility = 'hidden';
+  document.getElementById('lb-h-next').style.visibility = 'hidden';
   document.getElementById('lightbox-thumbs').innerHTML = '';
   document.getElementById('lightbox-counter').textContent = '';
   await lbHMostrar();
@@ -1955,8 +2038,8 @@ async function openLightbox(ids, idx) {
   var next = document.getElementById('lb-h-next');
   lb.classList.remove('hidden');
   lb.style.display = 'flex';
-  prev.style.cssText = prev.style.cssText.replace('display:none','') + (';display:' + (_lightboxFotos.length > 1 ? 'block' : 'none'));
-  next.style.cssText = next.style.cssText.replace('display:none','') + (';display:' + (_lightboxFotos.length > 1 ? 'block' : 'none'));
+  prev.style.visibility = _lightboxFotos.length > 1 ? 'visible' : 'hidden';
+  next.style.visibility = _lightboxFotos.length > 1 ? 'visible' : 'hidden';
   await lbHMostrar();
   lbHThumbs();
 }
