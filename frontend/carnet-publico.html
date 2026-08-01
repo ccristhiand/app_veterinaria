@@ -335,7 +335,7 @@
                 <div style="display:flex;flex-wrap:wrap;gap:.35rem">
                   ${lista.map((f, i) => `
                     <img id="foto-carnet-${f.id}"
-                      onclick="openLB(todasIds,${offset+i})"
+                      onclick="openLB(${JSON.stringify(todasIds)},${offset+i})"
                       style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;
                         cursor:zoom-in;border:2px solid #fbcfe8;background:#f8faf8"
                       alt="foto baño"/>`
