@@ -333,11 +333,11 @@
                   letter-spacing:.08em;margin-bottom:.35rem">${label}</p>
                 <div style="display:flex;flex-wrap:wrap;gap:.35rem">
                   ${lista.map((f, i) => `
-                    <img src="${fotoUrl(f.id)}"
+                    <img id="foto-carnet-${f.id}"
                       onclick="openLB(todasIds,${offset+i})"
                       style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;
-                        cursor:zoom-in;border:2px solid #fbcfe8"
-                      loading="lazy" alt="foto baño"/>`
+                        cursor:zoom-in;border:2px solid #fbcfe8;background:#f8faf8"
+                      alt="foto baño"/>`
                   ).join('')}
                 </div>
               </div>`;
@@ -371,6 +371,14 @@
               ${fotosHtml}
             </div>`;
           }).join('');
+
+          // Cargar fotos via fetch con token de carnet
+          banos.forEach(function(b) {
+            (b.fotos||[]).forEach(function(f) {
+              var imgEl = document.getElementById('foto-carnet-' + f.id);
+              if (imgEl) cargarFotoCarnet(imgEl, f.id);
+            });
+          });
         }
 
         document.getElementById('loading').style.display   = 'none';
@@ -385,30 +393,44 @@
 
 
 
-    function fotoUrl(fotoId) {
-      // Usar endpoint público con token del carnet como validación
-      return API + '/estetica/foto-publica/' + fotoId + '?carnet=' + token;
+    // Cache de blob URLs para el carnet
+    var _carnetFotoCache = {};
+
+    async function cargarFotoCarnet(imgEl, fotoId) {
+      if (_carnetFotoCache[fotoId]) { imgEl.src = _carnetFotoCache[fotoId]; return; }
+      try {
+        var res = await fetch(API + '/estetica/foto-publica/' + fotoId + '?carnet=' + token, {
+          headers: { 'X-Tenant-Host': host }
+        });
+        if (!res.ok) return;
+        var blob = await res.blob();
+        var blobUrl = URL.createObjectURL(blob);
+        _carnetFotoCache[fotoId] = blobUrl;
+        imgEl.src = blobUrl;
+      } catch(e) { console.error('Error foto carnet:', e); }
     }
 
     var _lbFotos = [];
     var _lbIdx   = 0;
 
-    function openLB(fotosOrIds, idx) {
-      _lbFotos = fotosOrIds.map(function(f) {
-        return (typeof f === 'number') ? fotoUrl(f) : f;
-      });
+    async function openLB(ids, idx) {
+      _lbFotos = ids;
       _lbIdx   = idx || 0;
-      document.getElementById('lb-img').src = _lbFotos[_lbIdx];
       document.getElementById('lightbox').style.display = 'flex';
+      var img = document.getElementById('lb-img');
+      img.src = '';
+      await cargarFotoCarnet(img, _lbFotos[_lbIdx]);
     }
 
     function closeLB() {
       document.getElementById('lightbox').style.display = 'none';
     }
 
-    function lbNav(dir) {
+    async function lbNav(dir) {
       _lbIdx = (_lbIdx + dir + _lbFotos.length) % _lbFotos.length;
-      document.getElementById('lb-img').src = _lbFotos[_lbIdx];
+      var img = document.getElementById('lb-img');
+      img.src = '';
+      await cargarFotoCarnet(img, _lbFotos[_lbIdx]);
     }
 
     document.addEventListener('keydown', function(e) {
