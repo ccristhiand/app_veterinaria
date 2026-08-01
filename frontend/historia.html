@@ -1472,25 +1472,38 @@ function renderFotosEdit(fotos, esteticaId) {
   var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
   var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
 
-  function gridEdit(lista, label) {
-    if (!lista.length) return '';
-    return '<div style="margin-bottom:.5rem">' +
-      '<p style="font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem">' + label + '</p>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
-      lista.map(function(f) {
-        return '<div style="position:relative">' +
-          '<img src="' + fotoUrl(f.id) + '" onclick="openLightboxSingle(' + f.id + ')" ' +
-            'style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid #fbcfe8"/>' +
-          '<button onclick="eliminarFotoEdit(' + f.id + ',this.parentElement)" ' +
-            'style="position:absolute;top:-6px;right:-6px;background:#e11d48;color:#fff;border:none;' +
-            'border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;' +
-            'display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1">✕</button>' +
-        '</div>';
-      }).join('') +
-      '</div></div>';
+  function appendGridEdit(container, lista, label) {
+    if (!lista.length) return;
+    var section = document.createElement('div');
+    section.style.marginBottom = '.5rem';
+    var title = document.createElement('p');
+    title.style.cssText = 'font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem';
+    title.textContent = label;
+    section.appendChild(title);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:.4rem';
+    lista.forEach(function(f) {
+      var wrap = document.createElement('div');
+      wrap.style.position = 'relative';
+      var img = crearImgSegura(f.id,
+        'width:64px;height:64px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid #fbcfe8',
+        function() { openLightboxSingle(f.id); }
+      );
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#e11d48;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center';
+      btn.onclick = function() { eliminarFotoEdit(f.id, wrap); };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      row.appendChild(wrap);
+    });
+    section.appendChild(row);
+    container.appendChild(section);
   }
 
-  cont.innerHTML = gridEdit(antes, '📷 Antes') + gridEdit(despues, '✨ Después');
+  cont.innerHTML = '';
+  appendGridEdit(cont, antes, '📷 Antes');
+  appendGridEdit(cont, despues, '✨ Después');
 }
 
 async function eliminarFotoEdit(fotoId, wrapper) {
@@ -1854,26 +1867,24 @@ async function subirFotosEstetica(esteticaId) {
 
 // ══ LIGHTBOX ══════════════════════════════════════════════════════
 
-function openLightboxSingle(srcOrId) {
-  var src = (typeof srcOrId === 'number') ? fotoUrl(srcOrId) : srcOrId;
-  _lightboxFotos = [src];
-  _lightboxIdx   = 0;
-  document.getElementById('lightbox-img').src = src;
+async function openLightboxSingle(fotoId) {
   document.getElementById('lightbox').classList.remove('hidden');
   document.getElementById('lightbox').style.display = 'flex';
+  var img = document.getElementById('lightbox-img');
+  img.src = '';
+  _lightboxFotos = [fotoId];
+  _lightboxIdx   = 0;
+  await cargarFotoSegura(img, fotoId);
 }
 
-function openLightbox(fotosOrIds, idx) {
-  // Acepta array de IDs (números) o URLs
-  _lightboxFotos = fotosOrIds.map(function(f) {
-    return (typeof f === 'number' || (typeof f === 'string' && !f.startsWith('http')))
-      ? fotoUrl(f)
-      : f;
-  });
+async function openLightbox(ids, idx) {
+  _lightboxFotos = ids; // array de IDs
   _lightboxIdx   = idx || 0;
-  document.getElementById('lightbox-img').src = _lightboxFotos[_lightboxIdx];
   document.getElementById('lightbox').classList.remove('hidden');
   document.getElementById('lightbox').style.display = 'flex';
+  var img = document.getElementById('lightbox-img');
+  img.src = '';
+  await cargarFotoSegura(img, _lightboxFotos[_lightboxIdx]);
 }
 
 function closeLightbox() {
@@ -1881,9 +1892,11 @@ function closeLightbox() {
   document.getElementById('lightbox').classList.add('hidden');
 }
 
-function lightboxNav(dir) {
+async function lightboxNav(dir) {
   _lightboxIdx = (_lightboxIdx + dir + _lightboxFotos.length) % _lightboxFotos.length;
-  document.getElementById('lightbox-img').src = _lightboxFotos[_lightboxIdx];
+  var img = document.getElementById('lightbox-img');
+  img.src = '';
+  await cargarFotoSegura(img, _lightboxFotos[_lightboxIdx]);
 }
 
 document.addEventListener('keydown', function(e) {
@@ -1967,9 +1980,42 @@ function abrirSubidaFotos(esteticaId) {
 }
 
 
-// URL segura de foto — usa proxy del backend, no URL directa de Azure
-function fotoUrl(fotoId) {
-  return API_URL + '/api/v1/estetica/foto/' + fotoId;
+// Cache de blob URLs para evitar recargas
+var _fotoBlobCache = {};
+
+// Carga una foto via fetch con JWT y crea blob URL local
+async function cargarFotoSegura(imgEl, fotoId) {
+  if (_fotoBlobCache[fotoId]) {
+    imgEl.src = _fotoBlobCache[fotoId];
+    return;
+  }
+  try {
+    var token = localStorage.getItem('vet_access');
+    var res   = await fetch(API_URL + '/api/v1/estetica/foto/' + fotoId, {
+      headers: {
+        'Authorization' : 'Bearer ' + token,
+        'X-Tenant-Host' : window.location.hostname,
+      }
+    });
+    if (!res.ok) { imgEl.src = ''; return; }
+    var blob = await res.blob();
+    var blobUrl = URL.createObjectURL(blob);
+    _fotoBlobCache[fotoId] = blobUrl;
+    imgEl.src = blobUrl;
+  } catch(e) {
+    console.error('Error cargando foto:', e);
+  }
+}
+
+// Crear elemento img con carga segura
+function crearImgSegura(fotoId, style, onclick) {
+  var img = document.createElement('img');
+  img.style.cssText = style || 'width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line)';
+  img.loading = 'lazy';
+  img.alt     = 'foto';
+  if (onclick) img.onclick = onclick;
+  cargarFotoSegura(img, fotoId);
+  return img;
 }
 
 function catIcon(cat) {
