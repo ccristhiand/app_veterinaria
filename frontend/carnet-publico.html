@@ -332,8 +332,8 @@
                   letter-spacing:.08em;margin-bottom:.35rem">${label}</p>
                 <div style="display:flex;flex-wrap:wrap;gap:.35rem">
                   ${lista.map((f, i) => `
-                    <img src="${esc(f.url)}"
-                      onclick="openLB(${JSON.stringify(todasUrls)},${offset+i})"
+                    <img src="${fotoUrl(f.id)}"
+                      onclick="openLB(todasIds,${offset+i})"
                       style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;
                         cursor:zoom-in;border:2px solid #fbcfe8"
                       loading="lazy" alt="foto baño"/>`
@@ -383,11 +383,18 @@
     }
 
 
+
+    function fotoUrl(fotoId) {
+      return API + '/estetica/foto/' + fotoId;
+    }
+
     var _lbFotos = [];
     var _lbIdx   = 0;
 
-    function openLB(fotos, idx) {
-      _lbFotos = fotos;
+    function openLB(fotosOrIds, idx) {
+      _lbFotos = fotosOrIds.map(function(f) {
+        return (typeof f === 'number') ? fotoUrl(f) : f;
+      });
       _lbIdx   = idx || 0;
       document.getElementById('lb-img').src = _lbFotos[_lbIdx];
       document.getElementById('lightbox').style.display = 'flex';
