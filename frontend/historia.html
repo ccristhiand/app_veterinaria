@@ -1448,14 +1448,18 @@ function attachAutocomplete(input, cats, onSelect) {
 
         // mousedown se dispara ANTES que blur — así podemos seleccionar sin que se cierre
         li.addEventListener('mousedown', function(e) {
-          e.preventDefault();       // evita blur del input
-          seleccionando = true;     // flag: no cerrar
+          e.preventDefault();
+          seleccionando = true;
           input.value = item.nombre;
           if (onSelect) onSelect(item);
+          cerrar();
+          seleccionando = false;
+          // Mover foco al siguiente campo
           setTimeout(function() {
-            cerrar();
-            seleccionando = false;
-          }, 50);
+            var next = input.closest('div')?.querySelector('input:not(#' + input.id + '), select');
+            if (next) next.focus();
+            else input.blur();
+          }, 30);
         });
         list.appendChild(li);
       });
