@@ -373,12 +373,17 @@
           }).join('');
 
           // Cargar fotos via fetch con token de carnet
-          banos.forEach(function(b) {
-            (b.fotos||[]).forEach(function(f) {
-              var imgEl = document.getElementById('foto-carnet-' + f.id);
-              if (imgEl) cargarFotoCarnet(imgEl, f.id);
+          // setTimeout para dar tiempo al DOM de renderizar el innerHTML
+          setTimeout(function() {
+            console.log('[fotos] iniciando carga de fotos, banos:', banos.length);
+            banos.forEach(function(b) {
+              (b.fotos||[]).forEach(function(f) {
+                var imgEl = document.getElementById('foto-carnet-' + f.id);
+                console.log('[fotos] buscando foto-carnet-' + f.id + ':', imgEl ? 'encontrado' : 'NO encontrado');
+                if (imgEl) cargarFotoCarnet(imgEl, f.id);
+              });
             });
-          });
+          }, 200);
         }
 
         document.getElementById('loading').style.display   = 'none';
