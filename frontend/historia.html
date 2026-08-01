@@ -1046,6 +1046,10 @@ function renderTimeline(consultas) {
               style="font-size:.68rem;color:#8b5cf6;background:none;border:none;
               cursor:pointer;font-family:inherit;font-weight:600;padding:0"
               title="Agregar seguimiento">➕ Seguimiento</button>
+            <button onclick="event.stopPropagation();eliminarConsultaDirecto(${c.id})"
+              style="font-size:.68rem;color:#e11d48;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Eliminar consulta">🗑️ Eliminar</button>
           </div>
           ${c.tratamiento?'<span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;font-weight:600">💊 Con tratamiento</span>':''}
         </div>
@@ -1067,6 +1071,24 @@ function verAEditar() {
   if (!_verConsultaId) return;
   closeModal('modal-ver');
   abrirEditarConsulta(_verConsultaId);
+}
+
+async function eliminarConsultaDirecto(id) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta consulta?',
+    mensaje : 'Se eliminarán la consulta, recetas y seguimientos. No se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + id, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Consulta eliminada.', 'success');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
 }
 
 async function eliminarConsulta() {
@@ -1921,17 +1943,20 @@ async function openLightboxSingle(fotoId) {
   document.getElementById('lb-h-prev').style.display = 'none';
   document.getElementById('lb-h-next').style.display = 'none';
   document.getElementById('lightbox-thumbs').innerHTML = '';
+  document.getElementById('lightbox-counter').textContent = '';
   await lbHMostrar();
 }
 
 async function openLightbox(ids, idx) {
   _lightboxFotos = Array.isArray(ids) ? ids.slice() : [ids];
   _lightboxIdx   = idx || 0;
-  var lb = document.getElementById('lightbox');
+  var lb   = document.getElementById('lightbox');
+  var prev = document.getElementById('lb-h-prev');
+  var next = document.getElementById('lb-h-next');
   lb.classList.remove('hidden');
   lb.style.display = 'flex';
-  document.getElementById('lb-h-prev').style.display = _lightboxFotos.length > 1 ? 'block' : 'none';
-  document.getElementById('lb-h-next').style.display = _lightboxFotos.length > 1 ? 'block' : 'none';
+  prev.style.cssText = prev.style.cssText.replace('display:none','') + (';display:' + (_lightboxFotos.length > 1 ? 'block' : 'none'));
+  next.style.cssText = next.style.cssText.replace('display:none','') + (';display:' + (_lightboxFotos.length > 1 ? 'block' : 'none'));
   await lbHMostrar();
   lbHThumbs();
 }
@@ -2191,10 +2216,10 @@ function catIcon(cat) {
   <div id="lightbox-thumbs" style="display:flex;gap:.5rem;margin-top:.85rem;max-width:90vw;overflow-x:auto;padding:.25rem"></div>
   <button onclick="event.stopPropagation();lightboxNav(-1)" id="lb-h-prev"
     style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);
-    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer">‹</button>
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer;z-index:10000">‹</button>
   <button onclick="event.stopPropagation();lightboxNav(1)" id="lb-h-next"
     style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);
-    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer">›</button>
+    border:none;border-radius:50%;width:48px;height:48px;font-size:1.6rem;color:#fff;cursor:pointer;z-index:10000">›</button>
   <button onclick="closeLightbox()"
     style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.18);
     border:none;border-radius:50%;width:42px;height:42px;font-size:1.2rem;color:#fff;cursor:pointer">✕</button>
