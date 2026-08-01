@@ -1411,22 +1411,19 @@ async function buscarInventarioServer(q, cats) {
  * @param {Function}         onSelect - Callback(item) cuando el usuario elige una sugerencia
  */
 function attachAutocomplete(input, cats, onSelect) {
-  // Contenedor relativo
   input.parentElement.classList.add('autocomplete-wrap');
 
-  let list = null;
+  let list      = null;
+  let timer     = null;
+  let seleccionando = false; // flag para evitar cerrar al hacer click
 
   function cerrar() {
-    list?.remove();
-    list = null;
+    if (seleccionando) return; // no cerrar si estamos seleccionando
+    if (list) { list.remove(); list = null; }
   }
 
-  input.addEventListener('input', async () => {
-    const q = input.value.trim();
-    cerrar();
-    if (q.length < 1) return;
-
-    const filtrados = await buscarInventarioServer(q, cats);
+  function mostrarLista(filtrados) {
+    if (list) { list.remove(); list = null; }
 
     list = document.createElement('ul');
     list.className = 'autocomplete-list';
@@ -1434,36 +1431,57 @@ function attachAutocomplete(input, cats, onSelect) {
     if (!filtrados.length) {
       const li = document.createElement('li');
       li.className = 'ac-empty';
-      li.textContent = 'Sin coincidencias en inventario — puedes escribir manualmente';
+      li.textContent = 'Sin coincidencias — puedes escribir manualmente';
       list.appendChild(li);
     } else {
-      filtrados.forEach(item => {
+      filtrados.forEach(function(item) {
         const li   = document.createElement('li');
-        const bajo = item.cantidad <= item.stock_minimo;
-        li.innerHTML = `
-          <span class="ac-cat ac-cat-${item.categoria}">${catIcon(item.categoria)} ${esc(item.categoria)}</span>
-          <span class="ac-nombre">${esc(item.nombre)}</span>
-          <span class="ac-stock" style="${bajo ? 'color:#b45309' : ''}">
-            ${bajo ? '⚠️' : '📦'} ${item.cantidad} ${esc(item.unidad)}
-          </span>
-          <span class="ac-hint">← seleccionar</span>`;
-        li.addEventListener('mousedown', e => {
-          e.preventDefault(); // evita que el input pierda foco antes de seleccionar
+        const bajo = parseFloat(item.cantidad) <= parseFloat(item.stock_minimo);
+        li.innerHTML =
+          '<span class="ac-cat ac-cat-' + item.categoria + '">' + catIcon(item.categoria) + ' ' + esc(item.categoria) + '</span>' +
+          '<span class="ac-nombre">' + esc(item.nombre) + '</span>' +
+          '<span class="ac-stock" style="' + (bajo ? 'color:#b45309' : '') + '">' +
+            (bajo ? '⚠️' : '📦') + ' ' + item.cantidad + ' ' + esc(item.unidad) +
+          '</span>' +
+          '<span class="ac-hint">seleccionar</span>';
+
+        // mousedown se dispara ANTES que blur — así podemos seleccionar sin que se cierre
+        li.addEventListener('mousedown', function(e) {
+          e.preventDefault();       // evita blur del input
+          seleccionando = true;     // flag: no cerrar
           input.value = item.nombre;
-          cerrar();
           if (onSelect) onSelect(item);
+          setTimeout(function() {
+            cerrar();
+            seleccionando = false;
+          }, 50);
         });
         list.appendChild(li);
       });
     }
-
     input.parentElement.appendChild(list);
+  }
+
+  input.addEventListener('input', function() {
+    const q = input.value.trim();
+    clearTimeout(timer);
+    if (list) { list.remove(); list = null; }
+    if (q.length < 1) return;
+
+    timer = setTimeout(async function() {
+      const filtrados = await buscarInventarioServer(q, cats);
+      // Solo mostrar si el input aún tiene el mismo texto
+      if (input.value.trim() === q) mostrarLista(filtrados);
+    }, 350);
   });
 
-  // Cerrar al perder foco (con delay para permitir click en la lista)
-  input.addEventListener('blur', () => setTimeout(cerrar, 180));
-  // Cerrar con Escape
-  input.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+  input.addEventListener('blur', function() {
+    setTimeout(cerrar, 200);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') cerrar();
+  });
 }
 
 function catIcon(cat) {
