@@ -120,23 +120,53 @@
 <div id="modal-buscar" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:520px">
     <div class="vmodal-head"><h3>🔍 Buscar Paciente</h3><button onclick="closeModal('modal-buscar')" class="vmodal-close">✕</button></div>
-    <div class="vmodal-body">
-      <label class="vlabel">Buscar propietario por DNI, nombre o teléfono</label>
-      <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
-        <div class="search-wrap" style="flex:1">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input id="b-prop" type="text" placeholder="Ej: 45678912 · Juan García · 987654321" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
-        </div>
-        <button onclick="buscarPropH()" class="vbtn vbtn-primary">Buscar</button>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:.85rem">
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:.4rem;background:#f8faf8;border-radius:.85rem;padding:.3rem">
+        <button id="tab-buscar-prop" onclick="switchBuscarTab('prop')"
+          style="flex:1;padding:.5rem;border:none;border-radius:.65rem;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;background:#fff;color:#15803d;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:all .15s">
+          👥 Por propietario
+        </button>
+        <button id="tab-buscar-masc" onclick="switchBuscarTab('masc')"
+          style="flex:1;padding:.5rem;border:none;border-radius:.65rem;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;background:none;color:var(--ink-soft);transition:all .15s">
+          🐾 Por mascota
+        </button>
       </div>
-      <div id="b-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:200px;overflow-y:auto;margin-bottom:.75rem"></div>
-      <div id="b-mascotas-section" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
-          <label class="vlabel" style="margin-bottom:0">Mascotas de <strong id="b-prop-nombre-sel">—</strong></label>
-          <button onclick="resetBusqueda()" class="vlink" style="font-size:.72rem">← Cambiar propietario</button>
+
+      <!-- Panel propietario -->
+      <div id="panel-buscar-prop">
+        <label class="vlabel">DNI, nombre o teléfono del propietario</label>
+        <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
+          <div class="search-wrap" style="flex:1">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input id="b-prop" type="text" placeholder="Ej: 45678912 - Juan Garcia - 987654321" class="vinput" onkeydown="if(event.key==='Enter')buscarPropH()"/>
+          </div>
+          <button onclick="buscarPropH()" class="vbtn vbtn-primary">Buscar</button>
         </div>
-        <div id="b-mascotas-lista" style="display:flex;flex-direction:column;gap:.4rem;max-height:240px;overflow-y:auto"></div>
+        <div id="b-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:200px;overflow-y:auto;margin-bottom:.75rem"></div>
+        <div id="b-mascotas-section" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+            <label class="vlabel" style="margin-bottom:0">Mascotas de <strong id="b-prop-nombre-sel">-</strong></label>
+            <button onclick="resetBusqueda()" class="vlink" style="font-size:.72rem">Cambiar propietario</button>
+          </div>
+          <div id="b-mascotas-lista" style="display:flex;flex-direction:column;gap:.4rem;max-height:240px;overflow-y:auto"></div>
+        </div>
       </div>
+
+      <!-- Panel mascota -->
+      <div id="panel-buscar-masc" style="display:none">
+        <label class="vlabel">Nombre de la mascota, raza o especie</label>
+        <div style="display:flex;gap:.6rem;margin-bottom:.75rem">
+          <div class="search-wrap" style="flex:1">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input id="b-masc" type="text" placeholder="Ej: Coco - Golden - Gato" class="vinput" onkeydown="if(event.key==='Enter')buscarMascotaH()"/>
+          </div>
+          <button onclick="buscarMascotaH()" class="vbtn vbtn-primary">Buscar</button>
+        </div>
+        <div id="b-masc-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:280px;overflow-y:auto"></div>
+      </div>
+
     </div>
     <div class="vmodal-foot"><button onclick="closeModal('modal-buscar')" class="vbtn vbtn-ghost">Cerrar</button></div>
   </div>
@@ -561,6 +591,65 @@ function abrirModalVacuna() {
         fabInput.value = item.proveedor;
       }
     });
+  }
+}
+
+function switchBuscarTab(tab) {
+  var isProp = tab === 'prop';
+  document.getElementById('panel-buscar-prop').style.display = isProp ? 'block' : 'none';
+  document.getElementById('panel-buscar-masc').style.display = isProp ? 'none' : 'block';
+  var bp = document.getElementById('tab-buscar-prop');
+  var bm = document.getElementById('tab-buscar-masc');
+  bp.style.background  = isProp ? '#fff' : 'none';
+  bp.style.color       = isProp ? '#15803d' : 'var(--ink-soft)';
+  bp.style.fontWeight  = isProp ? '700' : '600';
+  bp.style.boxShadow   = isProp ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
+  bm.style.background  = isProp ? 'none' : '#fff';
+  bm.style.color       = isProp ? 'var(--ink-soft)' : '#15803d';
+  bm.style.fontWeight  = isProp ? '600' : '700';
+  bm.style.boxShadow   = isProp ? 'none' : '0 1px 3px rgba(0,0,0,.1)';
+  document.getElementById('b-prop-resultados').innerHTML = '';
+  if (document.getElementById('b-masc-resultados'))
+    document.getElementById('b-masc-resultados').innerHTML = '';
+  document.getElementById('b-mascotas-section').style.display = 'none';
+  setTimeout(function() {
+    var inp = document.getElementById(isProp ? 'b-prop' : 'b-masc');
+    if (inp) inp.focus();
+  }, 100);
+}
+
+async function buscarMascotaH() {
+  var q = document.getElementById('b-masc').value.trim();
+  if (!q) { toast('Ingresa el nombre de la mascota', 'warning'); return; }
+  var cont = document.getElementById('b-masc-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando...</div>';
+  try {
+    var res = await api('/mascotas?search=' + encodeURIComponent(q) + '&limit=10');
+    if (!res) return;
+    var rows = (await res.json()).data || [];
+    if (!rows.length) {
+      cont.innerHTML = '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:.75rem">No se encontraron mascotas</div>';
+      return;
+    }
+    cont.innerHTML = '';
+    rows.forEach(function(m) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s;margin-bottom:.4rem';
+      btn.onmouseover = function() { this.style.borderColor = '#10b981'; this.style.background = '#f0fdf4'; };
+      btn.onmouseout  = function() { this.style.borderColor = 'var(--line)'; this.style.background = '#fff'; };
+      btn.onclick     = function() { selMascotaH(m.id); };
+      btn.innerHTML =
+        '<span style="font-size:1.6rem">' + badgeEspecie(m.especie) + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<p style="font-weight:700;font-size:.88rem">' + esc(m.nombre) + '</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-faint)">' + esc(m.especie) + ' - ' + esc(m.raza || 'Sin raza') + '</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-soft);margin-top:.1rem">Prop: ' + esc(m.propietario_nombre || '') + '</p>' +
+        '</div>' +
+        (m.alertas_medicas ? '<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3">Alerta</span>' : '');
+      cont.appendChild(btn);
+    });
+  } catch {
+    cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>';
   }
 }
 
@@ -1305,7 +1394,7 @@ function sec(label,val,color,bold) { if (!val) return ''; return '<div style="ma
 
 // ══ AUTOCOMPLETADO INVENTARIO ════════════════════════════════════
 
-// Búsqueda server-side — no carga todo el inventario
+// Busqueda server-side con debounce
 async function buscarInventarioServer(q, cats) {
   try {
     var catParam = cats && cats.length === 1 ? '&categoria=' + cats[0] : '';
@@ -1332,14 +1421,12 @@ function attachAutocomplete(input, cats, onSelect) {
     list = null;
   }
 
-  var _acTimer = null;
   input.addEventListener('input', async () => {
     const q = input.value.trim();
     cerrar();
     if (q.length < 1) return;
-    clearTimeout(_acTimer);
-    _acTimer = setTimeout(async () => {
-      const filtrados = await buscarInventarioServer(q, cats);
+
+    const filtrados = await buscarInventarioServer(q, cats);
 
     list = document.createElement('ul');
     list.className = 'autocomplete-list';
@@ -1371,7 +1458,6 @@ function attachAutocomplete(input, cats, onSelect) {
     }
 
     input.parentElement.appendChild(list);
-    }, 300); // fin setTimeout debounce
   });
 
   // Cerrar al perder foco (con delay para permitir click en la lista)
