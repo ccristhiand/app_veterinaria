@@ -399,15 +399,17 @@
     async function cargarFotoCarnet(imgEl, fotoId) {
       if (_carnetFotoCache[fotoId]) { imgEl.src = _carnetFotoCache[fotoId]; return; }
       try {
-        var res = await fetch(API + '/estetica/foto-publica/' + fotoId + '?carnet=' + token, {
-          headers: { 'X-Tenant-Host': host }
-        });
-        if (!res.ok) return;
+        var url = API + '/estetica/foto-publica/' + fotoId + '?carnet=' + token;
+        console.log('[foto] cargando:', url, 'host:', host);
+        var res = await fetch(url, { headers: { 'X-Tenant-Host': host } });
+        console.log('[foto] status:', res.status, res.headers.get('content-type'));
+        if (!res.ok) { console.error('[foto] error status:', res.status); return; }
         var blob = await res.blob();
+        console.log('[foto] blob:', blob.size, blob.type);
         var blobUrl = URL.createObjectURL(blob);
         _carnetFotoCache[fotoId] = blobUrl;
         imgEl.src = blobUrl;
-      } catch(e) { console.error('Error foto carnet:', e); }
+      } catch(e) { console.error('[foto] Error foto carnet:', e); }
     }
 
     var _lbFotos = [];
