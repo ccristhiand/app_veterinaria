@@ -153,6 +153,50 @@ router.post('/upload', async (req, res, next) => {
 });
 
 
+
+// ── GET /api/v1/estetica/foto-publica/:fotoId?carnet=TOKEN ────────
+// Endpoint público para el carnet digital — valida el token del carnet
+router.get('/foto-publica/:fotoId', async (req, res, next) => {
+  try {
+    const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
+
+    const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
+    if (!connStr) return res.status(500).end();
+
+    // Validar que el token de carnet es válido
+    const carnetToken = req.query.carnet;
+    if (!carnetToken) return res.status(401).end();
+
+    const [carnet] = await req.db.query(
+      'SELECT id FROM carnets_digitales WHERE token = ? AND activo = 1',
+      [carnetToken]
+    );
+    if (!carnet) return res.status(403).end();
+
+    // Obtener foto
+    const [foto] = await req.db.query(
+      'SELECT url FROM estetica_fotos WHERE id = ?', [req.params.fotoId]
+    );
+    if (!foto) return res.status(404).end();
+
+    const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
+    const accountName = parts.AccountName;
+    const accountKey  = parts.AccountKey;
+    const blobName    = foto.url.split(`/${container}/`)[1];
+    if (!blobName) return res.status(400).end();
+
+    const cred   = new StorageSharedKeyCredential(accountName, accountKey);
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
+    const sas    = generateBlobSASQueryParameters(
+      { containerName: container, blobName, permissions: BlobSASPermissions.parse('r'), expiresOn: expiry },
+      cred
+    ).toString();
+
+    return res.redirect(302, `https://${accountName}.blob.core.windows.net/${container}/${blobName}?${sas}`);
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/estetica/foto/:fotoId — sirve foto via SAS temporal ──
 // El navegador nunca ve la URL real de Azure
 router.get('/foto/:fotoId', async (req, res, next) => {

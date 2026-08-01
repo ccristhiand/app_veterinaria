@@ -322,7 +322,8 @@
             // Fotos — solo mostrar si tiene
             const fotosAntes   = (b.fotos||[]).filter(f => f.momento === 'antes');
             const fotosDespues = (b.fotos||[]).filter(f => f.momento === 'despues');
-            const todasUrls    = (b.fotos||[]).map(f => f.url);
+            const todasIds     = (b.fotos||[]).map(f => f.id);
+            const todasUrls    = todasIds;
             const tieneFotos   = fotosAntes.length > 0 || fotosDespues.length > 0;
 
             function fotoGrid(lista, label, offset) {
@@ -385,7 +386,8 @@
 
 
     function fotoUrl(fotoId) {
-      return API + '/estetica/foto/' + fotoId;
+      // Usar endpoint público con token del carnet como validación
+      return API + '/estetica/foto-publica/' + fotoId + '?carnet=' + token;
     }
 
     var _lbFotos = [];

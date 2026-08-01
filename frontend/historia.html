@@ -1479,7 +1479,7 @@ function renderFotosEdit(fotos, esteticaId) {
       '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
       lista.map(function(f) {
         return '<div style="position:relative">' +
-          '<img src="' + esc(f.url) + '" onclick="openLightboxSingle(\'' + esc(f.url) + '\')" ' +
+          '<img src="' + fotoUrl(f.id) + '" onclick="openLightboxSingle(' + f.id + ')" ' +
             'style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid #fbcfe8"/>' +
           '<button onclick="eliminarFotoEdit(' + f.id + ',this.parentElement)" ' +
             'style="position:absolute;top:-6px;right:-6px;background:#e11d48;color:#fff;border:none;' +
@@ -1899,7 +1899,7 @@ document.addEventListener('keydown', function(e) {
 function renderFotosEstetica(fotos, esteticaId) {
   var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
   var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
-  var todasUrls = fotos.map(function(f) { return f.url; });
+  var todasIds  = fotos.map(function(f) { return f.id; });
 
   function grid(lista, label) {
     if (!lista.length) return '';
@@ -1907,8 +1907,8 @@ function renderFotosEstetica(fotos, esteticaId) {
       '<p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">' + label + '</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
       lista.map(function(f, i) {
-        var idx = todasUrls.indexOf(f.url);
-        return '<img src="' + esc(f.url) + '" onclick="openLightbox(' + JSON.stringify(todasUrls) + ',' + idx + ')" ' +
+        var idx = todasIds.indexOf(f.id);
+        return '<img src="' + fotoUrl(f.id) + '" onclick="openLightbox(todasIds,' + idx + ')" ' +
           'style="width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line);transition:transform .15s" ' +
           
           'loading="lazy" alt="foto"/>';
