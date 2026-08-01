@@ -209,7 +209,7 @@
         </div>
         <div id="vacuna-rapida-form" style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:1rem;padding:1rem;flex-direction:column;gap:.8rem">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label class="vlabel">Nombre de la vacuna *</label><input id="vr-nombre" type="text" class="vinput" placeholder="Séxtuple, Antirrábica, Triple felina…"/></div>
+            <div><label class="vlabel">Nombre de la vacuna *</label><div style="position:relative"><input id="vr-nombre" type="text" class="vinput" placeholder="Séxtuple, Antirrábica, Triple felina…"/></div></div>
             <div><label class="vlabel">Fabricante</label><input id="vr-fabricante" type="text" class="vinput" placeholder="Zoetis, Merial, Boehringer…"/></div>
             <div><label class="vlabel">N° de Lote</label><input id="vr-lote" type="text" class="vinput" placeholder="LOT-2026-XXXX"/></div>
             <div><label class="vlabel">Fecha de aplicación *</label><input id="vr-fecha" type="date" class="vinput"/></div>
@@ -236,7 +236,7 @@
         <div><p style="font-weight:700;font-size:.9rem" id="vac-mascota-nombre">—</p><p style="font-size:.72rem;color:var(--ink-soft)" id="vac-mascota-info">—</p></div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="sm:col-span-2"><label class="vlabel">Nombre de la vacuna *</label><input id="v-nombre" type="text" class="vinput" placeholder="Séxtuple canina, Antirrábica, Triple felina…"/></div>
+        <div class="sm:col-span-2"><label class="vlabel">Nombre de la vacuna *</label><div style="position:relative"><input id="v-nombre" type="text" class="vinput" placeholder="Séxtuple canina, Antirrábica, Triple felina…"/></div></div>
         <div><label class="vlabel">Fabricante</label><input id="v-fabricante" type="text" class="vinput" placeholder="Zoetis, Merial, Boehringer…"/></div>
         <div><label class="vlabel">N° de Lote</label><input id="v-lote" type="text" class="vinput" placeholder="LOT-2026-XXXX"/></div>
         <div><label class="vlabel">Fecha de aplicación *</label><input id="v-fecha" type="date" class="vinput"/></div>
@@ -1412,6 +1412,7 @@ async function buscarInventarioServer(q, cats) {
  */
 function attachAutocomplete(input, cats, onSelect) {
   input.parentElement.classList.add('autocomplete-wrap');
+  input.parentElement.style.position = 'relative';  // garantizar position:relative
 
   let list      = null;
   let timer     = null;
