@@ -318,18 +318,56 @@
               b.incluye_unas   ? '💅 Uñas'  : '',
               b.incluye_dental ? '🦷 Dental' : '',
             ].filter(Boolean).join(' · ');
+
+            // Fotos — solo mostrar si tiene
+            const fotosAntes   = (b.fotos||[]).filter(f => f.momento === 'antes');
+            const fotosDespues = (b.fotos||[]).filter(f => f.momento === 'despues');
+            const todasUrls    = (b.fotos||[]).map(f => f.url);
+            const tieneFotos   = fotosAntes.length > 0 || fotosDespues.length > 0;
+
+            function fotoGrid(lista, label, offset) {
+              if (!lista.length) return '';
+              return `<div>
+                <p style="font-size:.62rem;font-weight:700;color:#9ca3af;text-transform:uppercase;
+                  letter-spacing:.08em;margin-bottom:.35rem">${label}</p>
+                <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+                  ${lista.map((f, i) => `
+                    <img src="${esc(f.url)}"
+                      onclick="openLB(${JSON.stringify(todasUrls)},${offset+i})"
+                      style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;
+                        cursor:zoom-in;border:2px solid #fbcfe8"
+                      loading="lazy" alt="foto baño"/>`
+                  ).join('')}
+                </div>
+              </div>`;
+            }
+
+            const fotosHtml = tieneFotos ? `
+              <div style="margin-top:.75rem;background:#fdf2f8;border-radius:.75rem;
+                padding:.75rem;border:1px solid #fbcfe8">
+                <p style="font-size:.7rem;font-weight:700;color:#db2777;margin-bottom:.6rem">📸 Fotos del servicio</p>
+                <div style="display:flex;gap:1.25rem;flex-wrap:wrap">
+                  ${fotoGrid(fotosAntes,   '📷 Antes',   0)}
+                  ${fotoGrid(fotosDespues, '✨ Después', fotosAntes.length)}
+                </div>
+                <p style="font-size:.6rem;color:#9ca3af;margin-top:.5rem">Toca para ampliar</p>
+              </div>` : '';
+
             return `
-            <div class="timeline-item">
-              <div class="timeline-dot pink"></div>
-              <div style="flex:1">
-                <p style="font-weight:600;font-size:.88rem">${tipoLabel[b.tipo_bano]||b.tipo_bano}</p>
-                <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">
-                  ${esc(b.atendido_por)} · ${fDate(b.fecha)}
-                  ${servicios ? ' · '+servicios : ''}
-                </p>
-                ${b.productos ? `<p style="font-size:.72rem;color:#9ca3af;margin-top:.1rem">🧴 ${esc(b.productos)}</p>` : ''}
+            <div class="timeline-item" style="flex-direction:column;align-items:flex-start">
+              <div style="display:flex;align-items:flex-start;width:100%;gap:.75rem">
+                <div class="timeline-dot pink" style="margin-top:.4rem;flex-shrink:0"></div>
+                <div style="flex:1">
+                  <p style="font-weight:600;font-size:.88rem">${tipoLabel[b.tipo_bano]||b.tipo_bano}</p>
+                  <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">
+                    ${esc(b.atendido_por)} · ${fDate(b.fecha)}
+                    ${servicios ? ' · '+servicios : ''}
+                  </p>
+                  ${b.productos ? `<p style="font-size:.72rem;color:#9ca3af;margin-top:.1rem">🧴 ${esc(b.productos)}</p>` : ''}
+                  ${b.precio ? `<p style="font-size:.72rem;font-weight:700;color:#db2777;margin-top:.2rem">S/. ${parseFloat(b.precio).toFixed(2)}</p>` : ''}
+                </div>
               </div>
-              ${b.precio ? `<span style="font-size:.75rem;font-weight:700;color:#db2777;flex-shrink:0">S/. ${parseFloat(b.precio).toFixed(2)}</span>` : ''}
+              ${fotosHtml}
             </div>`;
           }).join('');
         }
@@ -344,7 +382,54 @@
       }
     }
 
+
+    var _lbFotos = [];
+    var _lbIdx   = 0;
+
+    function openLB(fotos, idx) {
+      _lbFotos = fotos;
+      _lbIdx   = idx || 0;
+      document.getElementById('lb-img').src = _lbFotos[_lbIdx];
+      document.getElementById('lightbox').style.display = 'flex';
+    }
+
+    function closeLB() {
+      document.getElementById('lightbox').style.display = 'none';
+    }
+
+    function lbNav(dir) {
+      _lbIdx = (_lbIdx + dir + _lbFotos.length) % _lbFotos.length;
+      document.getElementById('lb-img').src = _lbFotos[_lbIdx];
+    }
+
+    document.addEventListener('keydown', function(e) {
+      var lb = document.getElementById('lightbox');
+      if (lb && lb.style.display !== 'none') {
+        if (e.key === 'ArrowLeft')  lbNav(-1);
+        if (e.key === 'ArrowRight') lbNav(1);
+        if (e.key === 'Escape')     closeLB();
+      }
+    });
+
     cargar();
   </script>
+
+  <!-- Lightbox fotos -->
+  <div id="lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);
+    z-index:9999;align-items:center;justify-content:center;cursor:zoom-out"
+    onclick="closeLB()">
+    <img id="lb-img" src="" style="max-width:92vw;max-height:88vh;border-radius:1rem;object-fit:contain"/>
+    <button onclick="event.stopPropagation();lbNav(-1)"
+      style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);
+      background:rgba(255,255,255,.18);border:none;border-radius:50%;
+      width:44px;height:44px;font-size:1.4rem;color:#fff;cursor:pointer">‹</button>
+    <button onclick="event.stopPropagation();lbNav(1)"
+      style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);
+      background:rgba(255,255,255,.18);border:none;border-radius:50%;
+      width:44px;height:44px;font-size:1.4rem;color:#fff;cursor:pointer">›</button>
+    <button onclick="closeLB()"
+      style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.18);
+      border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;color:#fff;cursor:pointer">✕</button>
+  </div>
 </body>
 </html>

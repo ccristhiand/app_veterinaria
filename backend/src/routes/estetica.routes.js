@@ -95,50 +95,59 @@ router.put('/:id', auditMiddleware('estetica:actualizado', 'estetica'), async (r
   } catch (err) { next(err); }
 });
 
-// ── POST /api/v1/estetica/upload-token — genera SAS Token para Azure ──
-router.post('/upload-token', async (req, res, next) => {
+// ── POST /api/v1/estetica/upload — sube foto via backend a Azure ──
+// El navegador manda la foto como multipart/form-data al backend
+// El backend la sube a Azure y devuelve la URL pública
+router.post('/upload', async (req, res, next) => {
   try {
-    const { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
+    const { BlobServiceClient } = require('@azure/storage-blob');
+    const multer = require('multer');
 
     const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
     const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
 
     if (!connStr) return res.status(500).json({ success: false, message: 'Azure Storage no configurado.' });
 
-    const { filename, content_type } = req.body;
-    if (!filename) return res.status(422).json({ success: false, message: 'filename requerido.' });
+    // Usar multer en memoria para procesar el archivo
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits : { fileSize: 10 * 1024 * 1024 }, // 10MB máximo
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new Error('Solo se permiten imágenes.'));
+        }
+        cb(null, true);
+      },
+    }).single('foto');
 
-    // Organizar fotos por tenant/fecha para fácil gestión
-    const tenant    = req.tenant?.slug || 'default';
-    const fecha     = new Date().toISOString().split('T')[0];
-    const blobName  = `${tenant}/${fecha}/${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    // Procesar el archivo con multer
+    await new Promise((resolve, reject) => {
+      upload(req, res, (err) => { if (err) reject(err); else resolve(); });
+    });
 
-    // Parsear connection string para obtener credenciales
+    if (!req.file) return res.status(422).json({ success: false, message: 'No se recibió ningún archivo.' });
+
+    const tenant   = req.tenant?.slug || 'default';
+    const fecha    = new Date().toISOString().split('T')[0];
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blobName = `${tenant}/${fecha}/${Date.now()}_${safeName}`;
+
+    // Subir a Azure desde el backend
+    const client    = BlobServiceClient.fromConnectionString(connStr);
+    const contClient = client.getContainerClient(container);
+    const blobClient = contClient.getBlockBlobClient(blobName);
+
+    await blobClient.uploadData(req.file.buffer, {
+      blobHTTPHeaders: { blobContentType: req.file.mimetype },
+    });
+
     const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
     const accountName = parts.AccountName;
-    const accountKey  = parts.AccountKey;
-
-    const cred = new StorageSharedKeyCredential(accountName, accountKey);
-
-    // SAS Token válido 10 minutos — solo para subir este blob específico
-    const expiry = new Date(Date.now() + 10 * 60 * 1000);
-    const sas    = generateBlobSASQueryParameters(
-      {
-        containerName  : container,
-        blobName,
-        permissions    : BlobSASPermissions.parse('cw'), // create + write
-        expiresOn      : expiry,
-        contentType    : content_type || 'image/jpeg',
-      },
-      cred
-    ).toString();
-
-    const uploadUrl = `https://${accountName}.blob.core.windows.net/${container}/${blobName}?${sas}`;
-    const publicUrl = `https://${accountName}.blob.core.windows.net/${container}/${blobName}`;
+    const publicUrl   = `https://${accountName}.blob.core.windows.net/${container}/${blobName}`;
 
     return res.json({
       success: true,
-      data: { upload_url: uploadUrl, public_url: publicUrl, blob_name: blobName },
+      data: { public_url: publicUrl, blob_name: blobName },
     });
   } catch (err) { next(err); }
 });

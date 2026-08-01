@@ -175,16 +175,22 @@ router.get('/:token', async (req, res, next) => {
       })
     );
 
-    // Baños/estética
+    // Baños/estética con fotos
     const banosRaw = await req.db.query(
-      `SELECT s.fecha, s.tipo_bano, s.incluye_corte, s.incluye_unas,
+      `SELECT s.id, s.fecha, s.tipo_bano, s.incluye_corte, s.incluye_unas,
               s.incluye_dental, s.productos, s.observaciones, s.precio,
               u.nombre AS atendido_por
        FROM servicios_estetica s JOIN usuarios u ON u.id = s.atendido_por_id
        WHERE s.mascota_id = ?
        ORDER BY s.fecha DESC LIMIT 10`, [carnet.mascota_id]
     );
-    const banos = banosRaw.map(b => ({ ...b, fecha: formatDate(b.fecha) }));
+    const banos = await Promise.all(banosRaw.map(async b => {
+      const fotos = await req.db.query(
+        'SELECT momento, url FROM estetica_fotos WHERE estetica_id = ? ORDER BY momento, created_at ASC',
+        [b.id]
+      ).catch(() => []);
+      return { ...b, fecha: formatDate(b.fecha), fotos };
+    }));
 
     const [ultimaConsulta] = await req.db.query(
       `SELECT h.fecha, h.diagnostico, h.tratamiento, u.nombre AS veterinario

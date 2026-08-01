@@ -525,6 +525,45 @@
         <input id="ee-precio" type="number" step="0.50" min="0" class="vinput" placeholder="0.00"/></div>
       <div><label class="vlabel">Observaciones</label>
         <textarea id="ee-obs" rows="2" class="vinput" placeholder="Estado del pelaje, comportamiento…"></textarea></div>
+
+      <!-- Fotos existentes + agregar nuevas -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <p style="font-weight:700;font-size:.88rem;font-family:'Playfair Display',serif;margin-bottom:.75rem">
+          📸 Fotos del servicio
+        </p>
+        <!-- Fotos existentes -->
+        <div id="ee-fotos-actuales" style="margin-bottom:.85rem"></div>
+        <!-- Agregar nuevas -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="vlabel">📷 Agregar Antes</label>
+            <div id="ee-fotos-antes-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem"></div>
+            <label style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+              padding:.55rem 1rem;border:2px dashed #fbcfe8;border-radius:.85rem;
+              cursor:pointer;font-size:.78rem;font-weight:600;color:#db2777;
+              background:#fdf2f8;transition:all .15s"
+              onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+              <input type="file" id="ee-fotos-antes" accept="image/*" multiple style="display:none"
+                onchange="previewFotosEdit(this,'ee-fotos-antes-preview','antes')"/>
+              ＋ Agregar
+            </label>
+          </div>
+          <div>
+            <label class="vlabel">✨ Agregar Después</label>
+            <div id="ee-fotos-despues-preview" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem"></div>
+            <label style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+              padding:.55rem 1rem;border:2px dashed #fbcfe8;border-radius:.85rem;
+              cursor:pointer;font-size:.78rem;font-weight:600;color:#db2777;
+              background:#fdf2f8;transition:all .15s"
+              onmouseover="this.style.background='#fce7f3'" onmouseout="this.style.background='#fdf2f8'">
+              <input type="file" id="ee-fotos-despues" accept="image/*" multiple style="display:none"
+                onchange="previewFotosEdit(this,'ee-fotos-despues-preview','despues')"/>
+              ＋ Agregar
+            </label>
+          </div>
+        </div>
+      </div>
+
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-editar-estetica')" class="vbtn vbtn-ghost">Cancelar</button>
@@ -1392,24 +1431,104 @@ async function guardarEditVacuna() {
 
 // ══ EDICIÓN ESTÉTICA ═════════════════════════════════════════════
 
+var _eeNuevasAntes   = [];
+var _eeNuevasDespues = [];
+
 async function abrirEditarEstetica(id) {
   document.getElementById('ee-id').value = id;
+  _eeNuevasAntes   = [];
+  _eeNuevasDespues = [];
+  document.getElementById('ee-fotos-antes-preview').innerHTML   = '';
+  document.getElementById('ee-fotos-despues-preview').innerHTML = '';
+  document.getElementById('ee-fotos-actuales').innerHTML        = '<div style="font-size:.75rem;color:var(--ink-faint)">Cargando fotos...</div>';
   openModal('modal-editar-estetica');
   try {
-    const res  = await api(`/estetica?mascota_id=${mascotaId}`);
+    // Cargar detalle del servicio con fotos
+    const res = await api('/estetica/' + id);
     if (!res) return;
-    const rows = (await res.json()).data || [];
-    const s    = rows.find(x => x.id === id);
+    const s   = (await res.json()).data;
     if (!s) { toast('Registro no encontrado.','danger'); return; }
-    document.getElementById('ee-fecha').value      = s.fecha?.split('T')[0] || '';
-    document.getElementById('ee-tipo').value       = s.tipo_bano            || 'basico';
-    document.getElementById('ee-corte').checked   = !!s.incluye_corte;
-    document.getElementById('ee-unas').checked    = !!s.incluye_unas;
-    document.getElementById('ee-dental').checked  = !!s.incluye_dental;
-    document.getElementById('ee-productos').value  = s.productos            || '';
-    document.getElementById('ee-precio').value     = s.precio               || '';
-    document.getElementById('ee-obs').value        = s.observaciones        || '';
+
+    document.getElementById('ee-fecha').value     = s.fecha?.split('T')[0] || '';
+    document.getElementById('ee-tipo').value      = s.tipo_bano             || 'basico';
+    document.getElementById('ee-corte').checked  = !!s.incluye_corte;
+    document.getElementById('ee-unas').checked   = !!s.incluye_unas;
+    document.getElementById('ee-dental').checked = !!s.incluye_dental;
+    document.getElementById('ee-productos').value = s.productos             || '';
+    document.getElementById('ee-precio').value    = s.precio                || '';
+    document.getElementById('ee-obs').value       = s.observaciones         || '';
+
+    // Renderizar fotos existentes
+    renderFotosEdit(s.fotos || [], id);
   } catch { toast('Error al cargar registro.','danger'); }
+}
+
+function renderFotosEdit(fotos, esteticaId) {
+  var cont = document.getElementById('ee-fotos-actuales');
+  if (!fotos.length) {
+    cont.innerHTML = '<p style="font-size:.75rem;color:var(--ink-faint)">Sin fotos aún.</p>';
+    return;
+  }
+  var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
+  var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
+
+  function gridEdit(lista, label) {
+    if (!lista.length) return '';
+    return '<div style="margin-bottom:.5rem">' +
+      '<p style="font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem">' + label + '</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
+      lista.map(function(f) {
+        return '<div style="position:relative">' +
+          '<img src="' + esc(f.url) + '" onclick="openLightboxSingle(\'' + esc(f.url) + '\')" ' +
+            'style="width:64px;height:64px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid #fbcfe8"/>' +
+          '<button onclick="eliminarFotoEdit(' + f.id + ',this.parentElement)" ' +
+            'style="position:absolute;top:-6px;right:-6px;background:#e11d48;color:#fff;border:none;' +
+            'border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;' +
+            'display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1">✕</button>' +
+        '</div>';
+      }).join('') +
+      '</div></div>';
+  }
+
+  cont.innerHTML = gridEdit(antes, '📷 Antes') + gridEdit(despues, '✨ Después');
+}
+
+async function eliminarFotoEdit(fotoId, wrapper) {
+  try {
+    var res = await api('/estetica/fotos/' + fotoId, { method: 'DELETE' });
+    if (res?.ok) { wrapper.remove(); toast('Foto eliminada.', 'success'); }
+    else toast('Error al eliminar foto.', 'danger');
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+function previewFotosEdit(input, previewId, momento) {
+  var files = Array.from(input.files);
+  var cont  = document.getElementById(previewId);
+  files.forEach(function(file) {
+    if (momento === 'antes') _eeNuevasAntes.push(file);
+    else                     _eeNuevasDespues.push(file);
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:64px;height:64px';
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:.6rem;border:2px solid #fbcfe8';
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#db2777;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;font-weight:700;line-height:1';
+      btn.onclick = function() {
+        if (momento === 'antes') _eeNuevasAntes   = _eeNuevasAntes.filter(function(f) { return f !== file; });
+        else                     _eeNuevasDespues = _eeNuevasDespues.filter(function(f) { return f !== file; });
+        wrap.remove();
+      };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      cont.appendChild(wrap);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
 }
 
 async function guardarEditEstetica() {
@@ -1435,6 +1554,36 @@ async function guardarEditEstetica() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+
+    // Subir nuevas fotos si las hay
+    var todasNuevas = [
+      ..._eeNuevasAntes.map(function(f)   { return { file: f, momento: 'antes' }; }),
+      ..._eeNuevasDespues.map(function(f) { return { file: f, momento: 'despues' }; }),
+    ];
+    if (todasNuevas.length) {
+      var tk = localStorage.getItem('vet_access');
+      for (var i = 0; i < todasNuevas.length; i++) {
+        var item = todasNuevas[i];
+        try {
+          var fd = new FormData();
+          fd.append('foto', item.file);
+          var uRes = await fetch(API_URL + '/api/v1/estetica/upload', {
+            method : 'POST',
+            headers: { 'Authorization': 'Bearer ' + tk, 'X-Tenant-Host': window.location.hostname },
+            body   : fd,
+          });
+          if (!uRes.ok) continue;
+          var ud = (await uRes.json()).data;
+          await api('/estetica/' + id + '/fotos', {
+            method: 'POST',
+            body  : { momento: item.momento, url: ud.public_url, nombre_archivo: item.file.name }
+          });
+        } catch(e) { console.error(e); }
+      }
+      _eeNuevasAntes   = [];
+      _eeNuevasDespues = [];
+    }
+
     toast('✅ Servicio de estética actualizado','success');
     closeModal('modal-editar-estetica');
     cargarEstetica(mascotaId);
@@ -1660,36 +1809,44 @@ async function subirFotosEstetica(esteticaId) {
 
   toast('📸 Subiendo ' + todas.length + ' foto(s)...', 'info', 3000);
 
+  var token = localStorage.getItem('vet_access');
+  var errores = 0;
+
   for (var i = 0; i < todas.length; i++) {
     var item = todas[i];
     try {
-      // 1. Pedir SAS Token al backend
-      var tokenRes = await api('/estetica/upload-token', {
-        method: 'POST',
-        body  : { filename: item.file.name, content_type: item.file.type }
-      });
-      if (!tokenRes?.ok) { toast('Error al obtener token de subida.', 'danger'); continue; }
-      var tokenData = (await tokenRes.json()).data;
+      // Subir via backend (evita problemas de CORS con Azure)
+      var fd = new FormData();
+      fd.append('foto', item.file);
 
-      // 2. Subir directamente a Azure
-      var uploadRes = await fetch(tokenData.upload_url, {
-        method : 'PUT',
-        headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': item.file.type },
-        body   : item.file,
+      var uploadRes = await fetch(API_URL + '/api/v1/estetica/upload', {
+        method : 'POST',
+        headers: {
+          'Authorization' : 'Bearer ' + token,
+          'X-Tenant-Host' : window.location.hostname,
+        },
+        body: fd,
       });
-      if (!uploadRes.ok) { toast('Error al subir foto ' + item.file.name, 'danger'); continue; }
 
-      // 3. Registrar URL en el backend
+      if (!uploadRes.ok) { errores++; continue; }
+      var uploadData = (await uploadRes.json()).data;
+
+      // Registrar URL en la BD
       await api('/estetica/' + esteticaId + '/fotos', {
         method: 'POST',
-        body  : { momento: item.momento, url: tokenData.public_url, nombre_archivo: item.file.name }
+        body  : { momento: item.momento, url: uploadData.public_url, nombre_archivo: item.file.name }
       });
     } catch(e) {
-      toast('Error subiendo ' + item.file.name + ': ' + e.message, 'danger');
+      errores++;
+      console.error('Error subiendo foto:', e.message);
     }
   }
 
-  toast('✅ Fotos subidas correctamente.', 'success');
+  if (errores > 0) {
+    toast('⚠️ ' + (todas.length - errores) + ' fotos subidas, ' + errores + ' fallaron.', 'warning', 5000);
+  } else {
+    toast('✅ ' + todas.length + ' foto(s) subidas correctamente.', 'success');
+  }
   _fotasAntes   = [];
   _fotosDespues = [];
 }
@@ -1780,19 +1937,19 @@ function abrirSubidaFotos(esteticaId) {
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
       try {
-        var tokenRes = await api('/estetica/upload-token', {
-          method: 'POST', body: { filename: file.name, content_type: file.type }
+        var fd2 = new FormData();
+        fd2.append('foto', file);
+        var token2 = localStorage.getItem('vet_access');
+        var uploadRes2 = await fetch(API_URL + '/api/v1/estetica/upload', {
+          method : 'POST',
+          headers: { 'Authorization': 'Bearer ' + token2, 'X-Tenant-Host': window.location.hostname },
+          body   : fd2,
         });
-        if (!tokenRes?.ok) continue;
-        var td = (await tokenRes.json()).data;
-        await fetch(td.upload_url, {
-          method: 'PUT',
-          headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type },
-          body: file,
-        });
+        if (!uploadRes2.ok) continue;
+        var ud2 = (await uploadRes2.json()).data;
         await api('/estetica/' + esteticaId + '/fotos', {
           method: 'POST',
-          body: { momento, url: td.public_url, nombre_archivo: file.name }
+          body: { momento, url: ud2.public_url, nombre_archivo: file.name }
         });
       } catch(e) { toast('Error: ' + e.message, 'danger'); }
     }
