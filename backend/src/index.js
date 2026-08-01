@@ -65,7 +65,20 @@ app.set('io', io);
 initSocket(io);
 
 // ── Middlewares globales ─────────────────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc : ["'self'"],
+      scriptSrc  : ["'self'", "'unsafe-inline'", "cdn.tailwindcss.com", "cdn.socket.io"],
+      styleSrc   : ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdn.tailwindcss.com"],
+      fontSrc    : ["'self'", "fonts.gstatic.com"],
+      imgSrc     : ["'self'", "data:", "blob:", "*.blob.core.windows.net"],
+      connectSrc : ["'self'", "wss:", "ws:"],
+      frameSrc   : ["'none'"],
+    },
+  },
+}));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
