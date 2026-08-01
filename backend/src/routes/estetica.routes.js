@@ -158,8 +158,6 @@ router.post('/upload', async (req, res, next) => {
 // Endpoint público para el carnet digital — valida el token del carnet
 router.get('/foto-publica/:fotoId', async (req, res, next) => {
   try {
-    const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
-
     const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
     const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
     if (!connStr) return res.status(500).end();
@@ -186,61 +184,55 @@ router.get('/foto-publica/:fotoId', async (req, res, next) => {
     const blobName    = foto.url.split(`/${container}/`)[1];
     if (!blobName) return res.status(400).end();
 
-    const cred   = new StorageSharedKeyCredential(accountName, accountKey);
-    const expiry = new Date(Date.now() + 5 * 60 * 1000);
-    const sas    = generateBlobSASQueryParameters(
-      { containerName: container, blobName, permissions: BlobSASPermissions.parse('r'), expiresOn: expiry },
-      cred
-    ).toString();
-
-    return res.redirect(302, `https://${accountName}.blob.core.windows.net/${container}/${blobName}?${sas}`);
+    // Pipe directo — no redirect
+    const { BlobServiceClient: BSC2 } = require('@azure/storage-blob');
+    const client2     = BSC2.fromConnectionString(connStr);
+    const blobClient2 = client2.getContainerClient(container).getBlobClient(blobName);
+    const download2   = await blobClient2.download();
+    const ext2        = blobName.split('.').pop().toLowerCase();
+    const mimeMap2    = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    res.setHeader('Content-Type', download2.contentType || mimeMap2[ext2] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    download2.readableStreamBody.pipe(res);
   } catch (err) { next(err); }
 });
 
-// ── GET /api/v1/estetica/foto/:fotoId — sirve foto via SAS temporal ──
-// El navegador nunca ve la URL real de Azure
+// ── GET /api/v1/estetica/foto/:fotoId — sirve foto via pipe ─────────
+// El backend descarga de Azure y hace pipe al navegador
+// Así nunca se expone la URL de Azure ni hay problemas de CORS/ORB
 router.get('/foto/:fotoId', async (req, res, next) => {
   try {
-    const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
+    const { BlobServiceClient } = require('@azure/storage-blob');
 
     const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
     const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
 
-    if (!connStr) return res.status(500).json({ success: false, message: 'Azure Storage no configurado.' });
+    if (!connStr) return res.status(500).end();
 
-    // Obtener la URL del blob desde la BD
     const [foto] = await req.db.query(
       'SELECT url, nombre_archivo FROM estetica_fotos WHERE id = ?', [req.params.fotoId]
     );
-    if (!foto) return res.status(404).json({ success: false, message: 'Foto no encontrada.' });
+    if (!foto) return res.status(404).end();
 
-    // Extraer nombre del blob de la URL
-    const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
-    const accountName = parts.AccountName;
-    const accountKey  = parts.AccountKey;
-
-    // blobName = todo lo que viene después de /{container}/
     const blobName = foto.url.split(`/${container}/`)[1];
-    if (!blobName) return res.status(400).json({ success: false, message: 'URL de blob inválida.' });
+    if (!blobName) return res.status(400).end();
 
-    // Generar SAS Token válido 5 minutos — solo lectura
-    const cred   = new StorageSharedKeyCredential(accountName, accountKey);
-    const expiry = new Date(Date.now() + 5 * 60 * 1000);
-    const sas    = generateBlobSASQueryParameters(
-      {
-        containerName: container,
-        blobName,
-        permissions  : BlobSASPermissions.parse('r'), // solo lectura
-        expiresOn    : expiry,
-      },
-      cred
-    ).toString();
+    // Descargar directamente desde Azure con el SDK (usa las credenciales del servidor)
+    const client     = BlobServiceClient.fromConnectionString(connStr);
+    const blobClient = client.getContainerClient(container).getBlobClient(blobName);
 
-    const sasUrl = `https://${accountName}.blob.core.windows.net/${container}/${blobName}?${sas}`;
+    const download = await blobClient.download();
 
-    // Redirigir al SAS URL temporal — el navegador descarga la foto de Azure directamente
-    // pero con una URL que expira en 5 min y no revela la URL base
-    return res.redirect(302, sasUrl);
+    // Detectar content-type por extensión si no viene del blob
+    const ext = blobName.split('.').pop().toLowerCase();
+    const mimeMap = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp', heic:'image/heic' };
+    const contentType = download.contentType || mimeMap[ext] || 'image/jpeg';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=300'); // cache 5 min en el navegador
+
+    // Pipe del stream de Azure al response
+    download.readableStreamBody.pipe(res);
   } catch (err) { next(err); }
 });
 
