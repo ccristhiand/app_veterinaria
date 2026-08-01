@@ -152,6 +152,54 @@ router.post('/upload', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── GET /api/v1/estetica/foto/:fotoId — sirve foto via SAS temporal ──
+// El navegador nunca ve la URL real de Azure
+router.get('/foto/:fotoId', async (req, res, next) => {
+  try {
+    const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
+
+    const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
+
+    if (!connStr) return res.status(500).json({ success: false, message: 'Azure Storage no configurado.' });
+
+    // Obtener la URL del blob desde la BD
+    const [foto] = await req.db.query(
+      'SELECT url, nombre_archivo FROM estetica_fotos WHERE id = ?', [req.params.fotoId]
+    );
+    if (!foto) return res.status(404).json({ success: false, message: 'Foto no encontrada.' });
+
+    // Extraer nombre del blob de la URL
+    const parts       = Object.fromEntries(connStr.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; }));
+    const accountName = parts.AccountName;
+    const accountKey  = parts.AccountKey;
+
+    // blobName = todo lo que viene después de /{container}/
+    const blobName = foto.url.split(`/${container}/`)[1];
+    if (!blobName) return res.status(400).json({ success: false, message: 'URL de blob inválida.' });
+
+    // Generar SAS Token válido 5 minutos — solo lectura
+    const cred   = new StorageSharedKeyCredential(accountName, accountKey);
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
+    const sas    = generateBlobSASQueryParameters(
+      {
+        containerName: container,
+        blobName,
+        permissions  : BlobSASPermissions.parse('r'), // solo lectura
+        expiresOn    : expiry,
+      },
+      cred
+    ).toString();
+
+    const sasUrl = `https://${accountName}.blob.core.windows.net/${container}/${blobName}?${sas}`;
+
+    // Redirigir al SAS URL temporal — el navegador descarga la foto de Azure directamente
+    // pero con una URL que expira en 5 min y no revela la URL base
+    return res.redirect(302, sasUrl);
+  } catch (err) { next(err); }
+});
+
 // ── POST /api/v1/estetica/:id/fotos — guardar URL de foto ─────────
 router.post('/:id/fotos', async (req, res, next) => {
   try {
