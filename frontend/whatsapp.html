@@ -56,7 +56,10 @@
       <div class="wa-stat"><div class="val" id="stat-enviados-hoy">0</div><div class="lbl">Enviados hoy</div></div>
       <div class="wa-stat"><div class="val" id="stat-enviados-mes">0</div><div class="lbl">Enviados mes</div></div>
       <div class="wa-stat" id="stat-cuota-box"><div class="val" id="stat-cuota">—</div><div class="lbl">Cuota disponible</div></div>
-      <div class="wa-stat"><div class="val" id="stat-campanas">0</div><div class="lbl">Campañas activas</div></div>
+      <div class="wa-stat" onclick="verCampanasActivas()" style="cursor:pointer" title="Ver campañas activas">
+        <div class="val" id="stat-campanas">0</div>
+        <div class="lbl">Campañas activas</div>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 340px;gap:1.3rem;align-items:start">
       <div class="vcard vcard-pad">
@@ -72,6 +75,18 @@
           <div style="display:flex;flex-direction:column;gap:.5rem">
             <button onclick="mostrarTab('enviar')" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none;justify-content:flex-start;gap:.6rem">📤 Enviar mensaje manual</button>
             <button onclick="window.location.href='wa-campanas'" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📢 Nueva campaña masiva</button>
+
+      <!-- Panel campañas activas -->
+      <div id="panel-campanas-activas" style="display:none;margin-top:.75rem;
+        background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem">
+          <p style="font-size:.78rem;font-weight:700;color:#15803d">📢 Campañas en curso</p>
+          <button onclick="window.location.href='wa-campanas'" class="vlink" style="font-size:.72rem">
+            Ver todas →
+          </button>
+        </div>
+        <div id="campanas-activas-lista" style="display:flex;flex-direction:column;gap:.5rem"></div>
+      </div>
             <button onclick="mostrarTab('plantillas')" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📝 Gestionar plantillas</button>
           </div>
         </div>
@@ -325,7 +340,85 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarEstado();
   cargarStats();
   cargarPlantillasSelect();
+  cargarCampanasActivas();
+  setInterval(cargarCampanasActivas, 15000); // refrescar cada 15s
 });
+
+
+// ── Campañas activas en panel de WhatsApp ─────────────────────
+var _campanasActivas = {};
+
+async function verCampanasActivas() {
+  window.location.href = 'wa-campanas';
+}
+
+async function cargarCampanasActivas() {
+  try {
+    var res  = await api('/wa/campanas?estado=enviando');
+    if (!res?.ok) return;
+    var rows = (await res.json()).data || [];
+    var panel = document.getElementById('panel-campanas-activas');
+    var lista = document.getElementById('campanas-activas-lista');
+    var statEl = document.getElementById('stat-campanas');
+    if (statEl) statEl.textContent = rows.length;
+    if (!rows.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    rows.forEach(function(c) { _campanasActivas[c.id] = c; });
+    renderCampanasActivas();
+  } catch(e) {}
+}
+
+function renderCampanasActivas() {
+  var lista = document.getElementById('campanas-activas-lista');
+  if (!lista) return;
+  var rows  = Object.values(_campanasActivas).filter(function(c) { return c.estado === 'enviando'; });
+  if (!rows.length) {
+    document.getElementById('panel-campanas-activas').style.display = 'none';
+    return;
+  }
+  lista.innerHTML = rows.map(function(c) {
+    var pct = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0;
+    return '<div style="background:#fff;border-radius:.75rem;padding:.65rem .85rem;border:1px solid #bbf7d0">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">' +
+        '<p style="font-size:.78rem;font-weight:700">' + esc(c.nombre) + '</p>' +
+        '<span style="font-size:.72rem;font-weight:700;color:#15803d">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="height:5px;border-radius:999px;background:#e5e7eb;overflow:hidden">' +
+        '<div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);' +
+          'transition:width .4s;width:' + pct + '%"></div>' +
+      '</div>' +
+      '<p style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">' +
+        c.enviados + '/' + (c.total || '?') + ' enviados · ' + (c.fallidos || 0) + ' fallidos' +
+      '</p>' +
+    '</div>';
+  }).join('');
+}
+
+function actualizarCampanaActiva(data) {
+  if (!_campanasActivas[data.campanaId]) {
+    _campanasActivas[data.campanaId] = { id: data.campanaId, nombre: 'Campaña #' + data.campanaId };
+  }
+  Object.assign(_campanasActivas[data.campanaId], {
+    estado  : data.estado,
+    enviados: data.enviados,
+    fallidos: data.fallidos,
+    total   : data.total,
+  });
+  var statEl = document.getElementById('stat-campanas');
+  var activas = Object.values(_campanasActivas).filter(function(c) { return c.estado === 'enviando'; });
+  if (statEl) statEl.textContent = activas.length;
+  if (activas.length) {
+    document.getElementById('panel-campanas-activas').style.display = 'block';
+  } else {
+    document.getElementById('panel-campanas-activas').style.display = 'none';
+  }
+  renderCampanasActivas();
+  // Toast si completó
+  if (data.estado === 'completada') {
+    toast('✅ Campaña completada: ' + (data.porcentaje || 100) + '% enviado', 'success', 5000);
+    delete _campanasActivas[data.campanaId];
+  }
+}
 
 function iniciarSocket() {
   try {
@@ -348,6 +441,10 @@ function iniciarSocket() {
       _waEstado = 'desconectado';
       actualizarBadgeEstado('desconectado');
       cargarEstado();
+    });
+    // Progreso de campañas en tiempo real
+    _waSocket.on('wa:campana:progreso', function(data) {
+      actualizarCampanaActiva(data);
     });
   } catch(e) { console.warn('[WA Socket]', e.message); }
 }
