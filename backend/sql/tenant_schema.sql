@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- ── Propietarios — SIN sede_id (datos de la clínica, compartidos) ─
 CREATE TABLE IF NOT EXISTS propietarios (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo_documento   ENUM('DNI','RUC','CE','PASAPORTE','OTRO') NOT NULL DEFAULT 'DNI',
   nombre           VARCHAR(100) NOT NULL,
   apellido         VARCHAR(100) NOT NULL,
   dni              VARCHAR(20)  NULL,
