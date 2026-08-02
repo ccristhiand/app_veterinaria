@@ -1,13 +1,9 @@
 'use strict';
 
 /**
- * VetClinic SaaS — WhatsApp Gateway
- * Proceso SEPARADO del API principal
+ * VetNetcodip SaaS — WhatsApp Gateway v2
  * Puerto: 5000
- * PM2: pm2 start wa-gateway.js --name wa-gateway
- * 
- * Cada tenant tiene su propia sesión Baileys
- * Sesiones guardadas en /var/www/app_veterinaria/wa-sessions/{tenant_slug}/
+ * Mejoras: soporte imágenes/media, WebSocket progreso campañas, control cuota
  */
 
 const express    = require('express');
@@ -16,17 +12,16 @@ const { Server } = require('socket.io');
 const mysql      = require('mysql2/promise');
 const path       = require('path');
 const fs         = require('fs');
-const crypto     = require('crypto');
+const https      = require('https');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Baileys
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeInMemoryStore,
   jidDecode,
+  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino      = require('pino');
@@ -35,13 +30,12 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
-const PORT         = process.env.WA_PORT || 5000;
+const PORT         = process.env.WA_PORT        || 5000;
 const SESSIONS_DIR = process.env.WA_SESSIONS_DIR || '/var/www/app_veterinaria/wa-sessions';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 
-// Asegurar que existe el directorio de sesiones
 if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 
 // ── Pool DB ───────────────────────────────────────────────────
@@ -67,41 +61,28 @@ async function getTenantConn(tenantId) {
   );
   if (!t) throw new Error('Tenant no encontrado');
   return mysql.createConnection({
-    host    : t.db_host,
-    port    : t.db_port || 3306,
-    user    : t.db_user,
-    password: t.db_pass,
-    database: t.db_name,
+    host: t.db_host, port: t.db_port || 3306,
+    user: t.db_user, password: t.db_pass, database: t.db_name,
   });
 }
 
 // ── Estado de sesiones en memoria ─────────────────────────────
-// { tenantId: { socket, estado, numero, qr } }
 const sesiones = new Map();
 
-// ── Middleware autenticación interna ──────────────────────────
+// ── Auth interna ──────────────────────────────────────────────
 function authInternal(req, res, next) {
-  const key = req.headers['x-internal-key'];
-  if (key !== INTERNAL_KEY) {
+  if (req.headers['x-internal-key'] !== INTERNAL_KEY)
     return res.status(401).json({ success: false, message: 'No autorizado' });
-  }
   next();
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-function sessionDir(slug) {
-  return path.join(SESSIONS_DIR, slug);
-}
+function sessionDir(slug) { return path.join(SESSIONS_DIR, slug); }
 
 function formatTelefono(telefono, codigoPais = '+51') {
   if (!telefono) return null;
-  // Limpiar todo excepto dígitos y +
   let clean = telefono.replace(/[^\d+]/g, '');
-  // Si ya tiene código de país
   if (clean.startsWith('+')) return clean.replace('+', '') + '@s.whatsapp.net';
-  // Si empieza con 0 (número local) → quitar el 0
   if (clean.startsWith('0')) clean = clean.substring(1);
-  // Agregar código de país
   const codigo = codigoPais.replace('+', '');
   return `${codigo}${clean}@s.whatsapp.net`;
 }
@@ -112,12 +93,11 @@ async function logMensaje(tenantId, tipo, propietarioId, telefono, mensaje, esta
     await conn.execute(
       `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at)
        VALUES (?,?,?,?,?,?,?)`,
-      [tipo, propietarioId || null, telefono, mensaje, estado, error, estado === 'enviado' ? new Date() : null]
+      [tipo, propietarioId || null, telefono, mensaje || '[imagen]', estado, error,
+       estado === 'enviado' ? new Date() : null]
     );
     await conn.end();
-  } catch (e) {
-    console.error('[WA log]', e.message);
-  }
+  } catch (e) { console.error('[WA log]', e.message); }
 }
 
 async function verificarCuota(tenantId) {
@@ -127,9 +107,7 @@ async function verificarCuota(tenantId) {
   );
   if (!cfg) return { ok: false, razon: 'Sin config WA' };
   if (cfg.ilimitado) return { ok: true };
-
   const mesActual = new Date().toISOString().slice(0, 7);
-  // Reset si cambió el mes
   if (cfg.mes_actual !== mesActual) {
     await masterQuery(
       'UPDATE wa_config_global SET msgs_usados=0, mes_actual=? WHERE tenant_id=?',
@@ -137,9 +115,8 @@ async function verificarCuota(tenantId) {
     );
     return { ok: true };
   }
-  if (cfg.msgs_usados >= cfg.msgs_incluidos) {
+  if (cfg.msgs_usados >= cfg.msgs_incluidos)
     return { ok: false, razon: `Cuota agotada: ${cfg.msgs_usados}/${cfg.msgs_incluidos} mensajes este mes` };
-  }
   return { ok: true, restantes: cfg.msgs_incluidos - cfg.msgs_usados };
 }
 
@@ -150,9 +127,23 @@ async function incrementarCuota(tenantId) {
   );
 }
 
+// ── Descargar imagen desde URL ────────────────────────────────
+function descargarImagen(url) {
+  return new Promise((resolve, reject) => {
+    const proto = url.startsWith('https') ? https : require('http');
+    proto.get(url, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({
+        buffer  : Buffer.concat(chunks),
+        mimetype: res.headers['content-type'] || 'image/jpeg',
+      }));
+    }).on('error', reject);
+  });
+}
+
 // ── Crear / restaurar sesión Baileys ──────────────────────────
 async function crearSesion(tenantId, tenantSlug, tenantNombre) {
-  // Si ya hay sesión activa, no crear otra
   if (sesiones.has(tenantId)) {
     const s = sesiones.get(tenantId);
     if (s.estado === 'conectado') return { ok: true, message: 'Ya conectado' };
@@ -174,36 +165,29 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
 
   const sock = makeWASocket({
     version,
-    auth        : state,
-    logger      : pino({ level: 'silent' }),
+    auth            : state,
+    logger          : pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser     : ['VetClinic', 'Chrome', '1.0'],
-    syncFullHistory: false,
+    browser         : ['VetNetcodip', 'Chrome', '1.0'],
+    syncFullHistory : false,
   });
 
   const sesion = { socket: sock, estado: 'conectando', numero: null, qr: null, slug: tenantSlug };
   sesiones.set(tenantId, sesion);
 
-  // ── Eventos Baileys ───────────────────────────────────────
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // QR generado
     if (qr) {
       sesion.qr     = qr;
       sesion.estado = 'conectando';
       console.log(`[WA] QR generado: ${tenantSlug}`);
-      // Emitir QR via WebSocket al frontend
       io.to(`tenant:${tenantId}`).emit('wa:qr', { tenantId, qr });
-      await masterQuery(
-        'UPDATE wa_sesiones SET estado=? WHERE tenant_id=?',
-        ['conectando', tenantId]
-      );
+      await masterQuery('UPDATE wa_sesiones SET estado=? WHERE tenant_id=?', ['conectando', tenantId]);
     }
 
-    // Conectado
     if (connection === 'open') {
       const numero = sock.user?.id?.split(':')[0] || null;
       sesion.estado = 'conectado';
@@ -217,22 +201,16 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
       io.to(`tenant:${tenantId}`).emit('wa:conectado', { tenantId, numero });
     }
 
-    // Desconectado
     if (connection === 'close') {
       const codigo = (lastDisconnect?.error instanceof Boom)
-        ? lastDisconnect.error.output?.statusCode
-        : null;
+        ? lastDisconnect.error.output?.statusCode : null;
       const debeReconectar = codigo !== DisconnectReason.loggedOut;
-
       console.log(`[WA] ❌ Desconectado: ${tenantSlug} — código: ${codigo}`);
-
       if (debeReconectar) {
-        // Reconexión automática por caída temporal
         console.log(`[WA] 🔄 Reconectando: ${tenantSlug}`);
         sesiones.delete(tenantId);
-        setTimeout(() => crearSesion(tenantId, tenantSlug, tenantNombre), 3000);
+        setTimeout(() => crearSesion(tenantId, tenantSlug, tenantNombre), 5000);
       } else {
-        // Logout explícito — limpiar todo
         await limpiarSesion(tenantId, tenantSlug, 'desconectado');
         io.to(`tenant:${tenantId}`).emit('wa:desconectado', { tenantId });
       }
@@ -242,61 +220,58 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
   return { ok: true, message: 'Sesión iniciada, espera el QR' };
 }
 
-// ── Limpiar sesión ────────────────────────────────────────────
 async function limpiarSesion(tenantId, tenantSlug, estadoFinal = 'desconectado') {
   console.log(`[WA] 🧹 Limpiando sesión: ${tenantSlug}`);
-
-  // Cerrar socket si existe
   const sesion = sesiones.get(tenantId);
   if (sesion?.socket) {
     try { await sesion.socket.logout(); } catch {}
     try { sesion.socket.end(undefined); } catch {}
   }
   sesiones.delete(tenantId);
-
-  // Eliminar archivos de sesión del disco
   const dir = sessionDir(tenantSlug);
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    console.log(`[WA] 🗑️  Archivos eliminados: ${dir}`);
-  }
-
-  // Actualizar BD
+  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
   await masterQuery(
     'UPDATE wa_sesiones SET estado=?, numero_wa=NULL, error_msg=NULL, updated_at=NOW() WHERE tenant_id=?',
     [estadoFinal, tenantId]
   );
 }
 
-// ── Enviar mensaje ────────────────────────────────────────────
+// ── Enviar mensaje texto ──────────────────────────────────────
 async function enviarMensaje(tenantId, telefono, mensaje, codigoPais = '+51') {
   const sesion = sesiones.get(tenantId);
-  if (!sesion || sesion.estado !== 'conectado') {
+  if (!sesion || sesion.estado !== 'conectado')
     throw new Error('WhatsApp no conectado para este tenant');
-  }
+  const jid = formatTelefono(telefono, codigoPais);
+  if (!jid) throw new Error('Teléfono inválido');
+  await sesion.socket.sendMessage(jid, { text: mensaje });
+  await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
+}
 
+// ── Enviar imagen ─────────────────────────────────────────────
+async function enviarImagen(tenantId, telefono, imagenUrl, caption, codigoPais = '+51') {
+  const sesion = sesiones.get(tenantId);
+  if (!sesion || sesion.estado !== 'conectado')
+    throw new Error('WhatsApp no conectado para este tenant');
   const jid = formatTelefono(telefono, codigoPais);
   if (!jid) throw new Error('Teléfono inválido');
 
-  await sesion.socket.sendMessage(jid, { text: mensaje });
-  sesion.estado_actividad = new Date();
+  const { buffer, mimetype } = await descargarImagen(imagenUrl);
 
-  // Actualizar ultima actividad
-  await masterQuery(
-    'UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?',
-    [tenantId]
-  );
+  await sesion.socket.sendMessage(jid, {
+    image  : buffer,
+    mimetype,
+    caption: caption || '',
+  });
+  await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
 }
 
-// ── RUTAS HTTP (consumidas por el API principal) ──────────────
+// ── RUTAS HTTP ────────────────────────────────────────────────
 
-// POST /wa/sesion/iniciar
 app.post('/wa/sesion/iniciar', authInternal, async (req, res) => {
   try {
     const { tenantId, tenantSlug, tenantNombre } = req.body;
-    if (!tenantId || !tenantSlug) {
+    if (!tenantId || !tenantSlug)
       return res.status(422).json({ success: false, message: 'tenantId y tenantSlug requeridos' });
-    }
     const result = await crearSesion(parseInt(tenantId), tenantSlug, tenantNombre);
     return res.json({ success: true, ...result });
   } catch (err) {
@@ -305,7 +280,6 @@ app.post('/wa/sesion/iniciar', authInternal, async (req, res) => {
   }
 });
 
-// POST /wa/sesion/desconectar
 app.post('/wa/sesion/desconectar', authInternal, async (req, res) => {
   try {
     const { tenantId, tenantSlug } = req.body;
@@ -316,7 +290,6 @@ app.post('/wa/sesion/desconectar', authInternal, async (req, res) => {
   }
 });
 
-// GET /wa/sesion/:tenantId/estado
 app.get('/wa/sesion/:tenantId/estado', authInternal, async (req, res) => {
   try {
     const tenantId = parseInt(req.params.tenantId);
@@ -328,12 +301,12 @@ app.get('/wa/sesion/:tenantId/estado', authInternal, async (req, res) => {
     return res.json({
       success: true,
       data: {
-        en_memoria   : !!sesion,
-        estado       : sesion?.estado || dbSesion?.estado || 'desconectado',
-        numero       : sesion?.numero || dbSesion?.numero_wa || null,
-        tiene_qr     : !!sesion?.qr,
-        ultima_conexion  : dbSesion?.ultima_conexion || null,
-        ultima_actividad : dbSesion?.ultima_actividad || null,
+        en_memoria      : !!sesion,
+        estado          : sesion?.estado || dbSesion?.estado || 'desconectado',
+        numero          : sesion?.numero || dbSesion?.numero_wa || null,
+        tiene_qr        : !!sesion?.qr,
+        ultima_conexion : dbSesion?.ultima_conexion || null,
+        ultima_actividad: dbSesion?.ultima_actividad || null,
       },
     });
   } catch (err) {
@@ -341,45 +314,47 @@ app.get('/wa/sesion/:tenantId/estado', authInternal, async (req, res) => {
   }
 });
 
-// GET /wa/sesion/:tenantId/qr
 app.get('/wa/sesion/:tenantId/qr', authInternal, async (req, res) => {
   const tenantId = parseInt(req.params.tenantId);
   const sesion   = sesiones.get(tenantId);
-  if (!sesion?.qr) {
-    return res.status(404).json({ success: false, message: 'QR no disponible aún. Inicia la sesión primero.' });
-  }
+  if (!sesion?.qr)
+    return res.status(404).json({ success: false, message: 'QR no disponible aún.' });
   return res.json({ success: true, data: { qr: sesion.qr } });
 });
 
-// POST /wa/enviar
+// POST /wa/enviar — texto o imagen
 app.post('/wa/enviar', authInternal, async (req, res) => {
   try {
-    const { tenantId, telefono, mensaje, propietarioId, tipo, codigoPais } = req.body;
-    if (!tenantId || !telefono || !mensaje) {
-      return res.status(422).json({ success: false, message: 'tenantId, telefono y mensaje requeridos' });
-    }
+    const { tenantId, telefono, mensaje, imagen_url, propietarioId, tipo, codigoPais } = req.body;
+    if (!tenantId || !telefono)
+      return res.status(422).json({ success: false, message: 'tenantId y telefono requeridos' });
+    if (!mensaje && !imagen_url)
+      return res.status(422).json({ success: false, message: 'mensaje o imagen_url requerido' });
 
-    // Verificar cuota
     const cuota = await verificarCuota(parseInt(tenantId));
-    if (!cuota.ok) {
+    if (!cuota.ok)
       return res.status(422).json({ success: false, message: cuota.razon, code: 'CUOTA_AGOTADA' });
+
+    if (imagen_url) {
+      await enviarImagen(parseInt(tenantId), telefono, imagen_url, mensaje, codigoPais || '+51');
+    } else {
+      await enviarMensaje(parseInt(tenantId), telefono, mensaje, codigoPais || '+51');
     }
 
-    await enviarMensaje(parseInt(tenantId), telefono, mensaje, codigoPais || '+51');
     await incrementarCuota(parseInt(tenantId));
-    await logMensaje(parseInt(tenantId), tipo || 'manual', propietarioId, telefono, mensaje, 'enviado');
+    await logMensaje(parseInt(tenantId), tipo || 'manual', propietarioId, telefono, mensaje || '[imagen]', 'enviado');
 
     return res.json({ success: true, message: 'Mensaje enviado.' });
   } catch (err) {
     await logMensaje(
       parseInt(req.body.tenantId), req.body.tipo || 'manual',
-      req.body.propietarioId, req.body.telefono, req.body.mensaje, 'fallido', err.message
+      req.body.propietarioId, req.body.telefono, req.body.mensaje || '[imagen]', 'fallido', err.message
     );
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /wa/estado — estado general de todas las sesiones
+// GET /wa/estado
 app.get('/wa/estado', authInternal, async (req, res) => {
   try {
     const sesionesDB = await masterQuery(
@@ -392,7 +367,7 @@ app.get('/wa/estado', authInternal, async (req, res) => {
     );
     const data = sesionesDB.map(s => ({
       ...s,
-      en_memoria: sesiones.has(s.tenant_id),
+      en_memoria    : sesiones.has(s.tenant_id),
       estado_memoria: sesiones.get(s.tenant_id)?.estado || null,
     }));
     return res.json({ success: true, data });
@@ -401,20 +376,24 @@ app.get('/wa/estado', authInternal, async (req, res) => {
   }
 });
 
-// ── Health check ──────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({
-    status  : 'ok',
-    sesiones: sesiones.size,
-    uptime  : process.uptime(),
-  });
+
+// POST /wa/campana/progreso — recibe progreso de wa-campanas.js y lo emite via WS
+app.post('/wa/campana/progreso', authInternal, (req, res) => {
+  const { tenantId, campanaId, ...datos } = req.body;
+  if (tenantId && campanaId) {
+    io.to(`tenant:${tenantId}`).emit('wa:campana:progreso', { campanaId, ...datos });
+  }
+  res.json({ success: true });
 });
 
-// ── WebSocket — tenant se suscribe a sus eventos ──────────────
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', sesiones: sesiones.size, uptime: process.uptime() });
+});
+
+// ── WebSocket ─────────────────────────────────────────────────
 io.on('connection', (socket) => {
   socket.on('wa:suscribir', (tenantId) => {
     socket.join(`tenant:${tenantId}`);
-    // Enviar estado actual
     const sesion = sesiones.get(parseInt(tenantId));
     socket.emit('wa:estado', {
       tenantId,
@@ -424,7 +403,14 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Restaurar sesiones activas al arrancar ────────────────────
+// Función pública para emitir progreso de campaña desde wa-campanas.js
+function emitirProgresoCampana(tenantId, campanaId, datos) {
+  io.to(`tenant:${tenantId}`).emit('wa:campana:progreso', { campanaId, ...datos });
+}
+
+module.exports = { io, emitirProgresoCampana };
+
+// ── Restaurar sesiones ────────────────────────────────────────
 async function restaurarSesiones() {
   try {
     const activas = await masterQuery(
@@ -440,38 +426,28 @@ async function restaurarSesiones() {
       const dir = sessionDir(s.slug);
       if (fs.existsSync(dir)) {
         await crearSesion(s.tenant_id, s.slug, s.nombre_clinica);
-        await new Promise(r => setTimeout(r, 1000)); // esperar entre reconexiones
+        await new Promise(r => setTimeout(r, 1000));
       } else {
-        // No hay archivos de sesión — marcar como desconectado
-        await masterQuery(
-          'UPDATE wa_sesiones SET estado=? WHERE tenant_id=?',
-          ['desconectado', s.tenant_id]
-        );
+        await masterQuery('UPDATE wa_sesiones SET estado=? WHERE tenant_id=?', ['desconectado', s.tenant_id]);
       }
     }
-  } catch (e) {
-    console.error('[WA restore]', e.message);
-  }
+  } catch (e) { console.error('[WA restore]', e.message); }
 }
 
-// ── Limpieza periódica — cada 5 minutos ──────────────────────
-// Elimina del Map sesiones que están en error sin reconectarse
 setInterval(async () => {
   for (const [tenantId, sesion] of sesiones.entries()) {
     if (sesion.estado === 'error') {
-      console.log(`[WA] 🧹 Limpiando sesión en error: ${sesion.slug}`);
       const [t] = await masterQuery('SELECT slug FROM tenants WHERE id=?', [tenantId]);
       if (t) await limpiarSesion(tenantId, t.slug, 'error');
     }
   }
 }, 5 * 60 * 1000);
 
-// ── Arrancar servidor ─────────────────────────────────────────
 server.listen(PORT, async () => {
   console.log(`[WA Gateway] ✅ Puerto ${PORT}`);
   console.log(`[WA Gateway] Sesiones en: ${SESSIONS_DIR}`);
   await restaurarSesiones();
 });
 
-process.on('uncaughtException', (err) => console.error('[WA uncaught]', err.message));
-process.on('unhandledRejection', (err) => console.error('[WA unhandled]', err?.message));
+process.on('uncaughtException',  (err) => console.error('[WA uncaught]',    err.message));
+process.on('unhandledRejection', (err) => console.error('[WA unhandled]',   err?.message));
