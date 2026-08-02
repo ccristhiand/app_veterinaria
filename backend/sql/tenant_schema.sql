@@ -1,7 +1,8 @@
--- VETCLINIC SaaS — TENANT SCHEMA v6
+-- VETNETCODIP SaaS — TENANT SCHEMA v7
 -- v6: + sedes (multi-sedes) + sede_id en tablas operativas
+-- v7: + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- Ejecutar al crear nueva clinica
--- Compatible MySQL 5.7+
+-- Compatible MySQL 8+
 
 -- ── Tabla de sedes ────────────────────────────────────────────────
 -- PRIMERO: se crea sedes para que las FK funcionen
@@ -531,4 +532,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 ('Campaña general', 'campana',
  '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v7 ✅ (multi-sedes + seguimientos + fotos)' AS resultado;
+SELECT 'tenant_schema v7 ✅ (multi-sedes + seguimientos + fotos + tipo_documento)' AS resultado;

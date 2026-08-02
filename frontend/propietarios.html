@@ -42,7 +42,7 @@
         <thead>
           <tr>
             <th>Propietario</th>
-            <th>DNI</th>
+            <th>Tipo / Doc.</th>
             <th class="hidden sm:table-cell">Teléfono</th>
             <th class="hidden md:table-cell">Email</th>
             <th class="hidden md:table-cell">RUC</th>
@@ -70,6 +70,53 @@
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="prop-id"/>
 
+      <!-- Tipo de documento -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Tipo de documento *</label>
+          <select id="p-tipo-doc" class="vinput" onchange="onTipoDocChange()">
+            <option value="DNI">🪪 DNI</option>
+            <option value="RUC">🏢 RUC</option>
+            <option value="CE">🌎 Carné de Extranjería</option>
+            <option value="PASAPORTE">📘 Pasaporte</option>
+            <option value="OTRO">📄 Otro</option>
+          </select>
+        </div>
+        <div id="campo-documento">
+          <label class="vlabel" id="lbl-documento">Número de documento</label>
+          <div style="position:relative">
+            <input id="p-documento" type="text" class="vinput"
+              placeholder="12345678"
+              oninput="this.value=this.value.replace(/\D/g,'')"
+              onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();buscarDocumento()}"
+              onblur="buscarDocumento()"/>
+            <div id="doc-loading" style="display:none;position:absolute;right:.75rem;
+              top:50%;transform:translateY(-50%);width:16px;height:16px;
+              border:2px solid #e2e8f0;border-top-color:#10b981;
+              border-radius:50%;animation:spin .6s linear infinite"></div>
+          </div>
+          <!-- Banner propietario existente -->
+          <div id="doc-existente" style="display:none;margin-top:.5rem;
+            background:#fff7ed;border:1px solid #fed7aa;border-radius:.75rem;
+            padding:.65rem .9rem;font-size:.78rem">
+            <p style="font-weight:700;color:#c2410c">⚠️ Propietario ya registrado</p>
+            <p id="doc-existente-nombre" style="color:#9a3412;margin-top:.15rem"></p>
+            <button id="doc-existente-link" onclick=""
+              style="margin-top:.4rem;font-size:.72rem;color:#2563eb;
+              background:none;border:none;cursor:pointer;font-family:inherit;
+              font-weight:600;text-decoration:underline">
+              Ver ficha del propietario →
+            </button>
+          </div>
+          <!-- Banner autocompletado -->
+          <div id="doc-autocomplete" style="display:none;margin-top:.5rem;
+            background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.75rem;
+            padding:.65rem .9rem;font-size:.78rem">
+            <p style="color:#065f46">✅ Datos autocompletados desde RENIEC/SUNAT</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Datos personales -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -81,14 +128,10 @@
           <input id="p-apellido" type="text" class="vinput" placeholder="García"/>
         </div>
         <div>
-          <label class="vlabel">DNI</label>
-          <input id="p-dni" type="text" maxlength="8" class="vinput" placeholder="45678912"/>
-        </div>
-        <div>
           <label class="vlabel">Teléfono</label>
           <input id="p-telefono" type="text" class="vinput" placeholder="987 654 321"/>
         </div>
-        <div class="sm:col-span-2">
+        <div>
           <label class="vlabel">Email</label>
           <input id="p-email" type="email" class="vinput" placeholder="juan@email.com"/>
         </div>
@@ -155,9 +198,10 @@
 <script>
 let propEditandoId = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   initPage({ activePage:'propietarios', title:'Propietarios', subtitle:'Registro de clientes' });
   cargar();
+  cargarEstadoIntegraciones();
 });
 
 function buscar() { cargar(document.getElementById('search').value.trim()); }
@@ -202,7 +246,15 @@ async function cargar(search='') {
             </div>
           </div>
         </td>
-        <td style="font-family:monospace;font-size:.8rem">${esc(p.dni||'—')}</td>
+        <td>
+          <span style="font-size:.65rem;font-weight:700;background:#f1f5f9;
+            color:#475569;padding:.15rem .45rem;border-radius:999px">
+            ${esc(p.tipo_documento||'DNI')}
+          </span>
+          <p style="font-family:monospace;font-size:.78rem;margin-top:.2rem">
+            ${esc(p.tipo_documento==='RUC' ? p.ruc||'—' : p.dni||'—')}
+          </p>
+        </td>
         <td class="hidden sm:table-cell" style="font-size:.82rem">${esc(p.telefono||'—')}</td>
         <td class="hidden md:table-cell" style="font-size:.78rem;color:var(--ink-soft)">
           ${esc(p.email||'—')}
@@ -249,6 +301,154 @@ async function cargar(search='') {
 }
 
 // ── Nuevo propietario ─────────────────────────────────────────────
+// ── Estado de integraciones del tenant ──────────────────────────
+var _integraciones = null;
+
+async function cargarEstadoIntegraciones() {
+  try {
+    var res = await api('/integracion/estado');
+    if (res && res.ok) {
+      _integraciones = (await res.json()).data;
+    }
+  } catch { _integraciones = { reniec: false, sunat: false }; }
+}
+
+// ── Tipo de documento ────────────────────────────────────────────
+function onTipoDocChange() {
+  var tipo  = document.getElementById('p-tipo-doc').value;
+  var lbl   = document.getElementById('lbl-documento');
+  var input = document.getElementById('p-documento');
+  var labels = { DNI:'Número de DNI (8 dígitos)', RUC:'Número de RUC (11 dígitos)',
+    CE:'Número de CE', PASAPORTE:'Número de pasaporte', OTRO:'Número de documento' };
+  var placeholders = { DNI:'12345678', RUC:'20123456789', CE:'', PASAPORTE:'', OTRO:'' };
+  var maxlens = { DNI:'8', RUC:'11', CE:'12', PASAPORTE:'20', OTRO:'20' };
+
+  lbl.textContent     = labels[tipo] || 'Número de documento';
+  input.placeholder   = placeholders[tipo] || '';
+  input.maxLength     = maxlens[tipo] || '20';
+  input.value         = '';
+
+  // Solo forzar numérico en DNI y RUC
+  if (tipo === 'DNI' || tipo === 'RUC') {
+    input.oninput = function() { this.value = this.value.replace(/\D/g,''); };
+  } else {
+    input.oninput = null;
+  }
+
+  // Limpiar banners
+  ocultarBannersDoc();
+
+  // Si es RUC, autocompletar en el campo DNI/empresa
+  // Si es DNI, limpiar nombre/apellido para autocompletar
+}
+
+function ocultarBannersDoc() {
+  document.getElementById('doc-existente').style.display   = 'none';
+  document.getElementById('doc-autocomplete').style.display = 'none';
+}
+
+var _docBuscarTimer = null;
+
+async function buscarDocumento() {
+  var tipo   = document.getElementById('p-tipo-doc').value;
+  var numero = document.getElementById('p-documento').value.trim();
+
+  // Solo buscar para DNI (8 dig) y RUC (11 dig)
+  if (tipo === 'DNI'  && numero.length !== 8)  return;
+  if (tipo === 'RUC'  && numero.length !== 11) return;
+  if (tipo !== 'DNI'  && tipo !== 'RUC')       return;
+
+  // Si estamos editando, no buscar duplicados del mismo propietario
+  ocultarBannersDoc();
+
+  var loading = document.getElementById('doc-loading');
+  loading.style.display = 'block';
+
+  try {
+    // 1. Verificar si ya existe en BD
+    var res = await api('/propietarios/buscar-documento?tipo=' + tipo + '&numero=' + numero);
+    if (res && res.ok) {
+      var data = await res.json();
+      if (data.existe && (!propEditandoId || data.data.id !== propEditandoId)) {
+        loading.style.display = 'none';
+        var p = data.data;
+        var nombreCompleto = (p.nombre || '') + ' ' + (p.apellido || '');
+        document.getElementById('doc-existente-nombre').textContent = nombreCompleto.trim();
+        document.getElementById('doc-existente-link').onclick = function() {
+          closeModal('modal-prop');
+          verDetalle(p.id);
+        };
+        document.getElementById('doc-existente').style.display = 'block';
+        return;
+      }
+    }
+
+    // 2. Si no existe, intentar autocompletar via integración
+    if (!propEditandoId) {
+      await autocompletarDocumento(tipo, numero);
+    }
+  } catch(e) {
+    console.error('Error buscando documento:', e);
+  }
+  loading.style.display = 'none';
+}
+
+async function autocompletarDocumento(tipo, numero) {
+  if (!_integraciones) await cargarEstadoIntegraciones();
+
+  var loading = document.getElementById('doc-loading');
+
+  if (tipo === 'DNI' && _integraciones?.reniec) {
+    loading.style.display = 'block';
+    try {
+      var res = await api('/integracion/dni/' + numero);
+      if (res && res.ok) {
+        var data = (await res.json()).data;
+        if (data) {
+          // Separar nombres: el primero va a nombre, el resto al apellido
+          var nombres   = (data.nombres || '').trim();
+          var apPaterno = (data.apellido_paterno || '').trim();
+          var apMaterno = (data.apellido_materno || '').trim();
+
+          document.getElementById('p-nombre').value  = nombres;
+          document.getElementById('p-apellido').value = (apPaterno + ' ' + apMaterno).trim();
+
+          // Poner el DNI en el campo dni oculto (para guardarlo)
+          document.getElementById('p-documento').dataset.valorDni = numero;
+
+          document.getElementById('doc-autocomplete').style.display = 'block';
+          setTimeout(function() { document.getElementById('p-telefono').focus(); }, 100);
+        }
+      }
+    } catch(e) { console.error('Error RENIEC:', e); }
+    loading.style.display = 'none';
+  }
+
+  if (tipo === 'RUC' && _integraciones?.sunat) {
+    loading.style.display = 'block';
+    try {
+      var res2 = await api('/integracion/ruc/' + numero);
+      if (res2 && res2.ok) {
+        var data2 = (await res2.json()).data;
+        if (data2) {
+          var razon = data2.razon_social || '';
+          document.getElementById('p-nombre').value    = razon;
+          document.getElementById('p-apellido').value  = '';
+          document.getElementById('p-razon').value     = razon;
+          document.getElementById('p-ruc').value       = numero;
+          if (data2.direccion) {
+            document.getElementById('p-dir-fiscal').value = data2.direccion;
+            document.getElementById('p-direccion').value  = data2.direccion;
+          }
+          document.getElementById('doc-autocomplete').style.display = 'block';
+          setTimeout(function() { document.getElementById('p-telefono').focus(); }, 100);
+        }
+      }
+    } catch(e) { console.error('Error SUNAT:', e); }
+    loading.style.display = 'none';
+  }
+}
+
 function abrirModalNuevo() {
   propEditandoId = null;
   document.getElementById('modal-prop-titulo').textContent = '👤 Nuevo Propietario';
@@ -256,6 +456,8 @@ function abrirModalNuevo() {
   document.getElementById('prop-id').value = '';
   limpiarForm();
   openModal('modal-prop');
+  // Cargar estado integraciones si no se ha hecho
+  if (!_integraciones) cargarEstadoIntegraciones();
 }
 
 // ── Editar propietario ────────────────────────────────────────────
@@ -271,39 +473,52 @@ async function abrirModalEditar(id) {
     if (!res || !res.ok) { toast('Error al cargar datos.','danger'); return; }
     const p   = (await res.json()).data;
 
-    document.getElementById('p-nombre').value    = p.nombre        || '';
-    document.getElementById('p-apellido').value  = p.apellido      || '';
-    document.getElementById('p-dni').value       = p.dni           || '';
-    document.getElementById('p-telefono').value  = p.telefono      || '';
-    document.getElementById('p-email').value     = p.email         || '';
-    document.getElementById('p-direccion').value = p.direccion     || '';
-    document.getElementById('p-ruc').value       = p.ruc           || '';
-    document.getElementById('p-razon').value     = p.razon_social  || '';
-    document.getElementById('p-dir-fiscal').value= p.direccion_fiscal || '';
+    document.getElementById('p-tipo-doc').value   = p.tipo_documento || 'DNI';
+    document.getElementById('p-documento').value  = p.tipo_documento === 'RUC'
+      ? (p.ruc || '') : (p.dni || '');
+    document.getElementById('p-nombre').value     = p.nombre        || '';
+    document.getElementById('p-apellido').value   = p.apellido      || '';
+    document.getElementById('p-telefono').value   = p.telefono      || '';
+    document.getElementById('p-email').value      = p.email         || '';
+    document.getElementById('p-direccion').value  = p.direccion     || '';
+    document.getElementById('p-ruc').value        = p.ruc           || '';
+    document.getElementById('p-razon').value      = p.razon_social  || '';
+    document.getElementById('p-dir-fiscal').value = p.direccion_fiscal || '';
+    onTipoDocChange();
+    ocultarBannersDoc();
   } catch { toast('Error de conexión.','danger'); }
 }
 
 // ── Guardar (crear o actualizar) ──────────────────────────────────
 async function guardarProp() {
-  const nombre   = document.getElementById('p-nombre').value.trim();
-  const apellido = document.getElementById('p-apellido').value.trim();
-  const ruc      = document.getElementById('p-ruc').value.trim();
+  var nombre   = document.getElementById('p-nombre').value.trim();
+  var apellido = document.getElementById('p-apellido').value.trim();
+  var ruc      = document.getElementById('p-ruc').value.trim();
+  var tipoDocVal = document.getElementById('p-tipo-doc').value;
+  var numDocVal  = document.getElementById('p-documento').value.trim();
 
   if (!nombre || !apellido) {
     toast('Nombre y apellido son obligatorios.','warning'); return;
   }
-  if (ruc && !/^\d{11}$/.test(ruc)) {
+  if (tipoDocVal === 'DNI' && numDocVal && numDocVal.length !== 8) {
+    toast('El DNI debe tener exactamente 8 dígitos.','warning'); return;
+  }
+  if (tipoDocVal === 'RUC' && numDocVal && numDocVal.length !== 11) {
     toast('El RUC debe tener exactamente 11 dígitos.','warning'); return;
   }
+
+  var tipoDoc = document.getElementById('p-tipo-doc').value;
+  var numDoc  = document.getElementById('p-documento').value.trim();
 
   const body = {
     nombre,
     apellido,
-    dni            : document.getElementById('p-dni').value.trim()        || null,
+    tipo_documento : tipoDoc,
+    dni            : tipoDoc === 'DNI' ? numDoc || null : null,
     telefono       : document.getElementById('p-telefono').value.trim()   || null,
     email          : document.getElementById('p-email').value.trim()      || null,
     direccion      : document.getElementById('p-direccion').value.trim()  || null,
-    ruc            : ruc || null,
+    ruc            : tipoDoc === 'RUC' ? numDoc || null : (ruc || null),
     razon_social   : document.getElementById('p-razon').value.trim()      || null,
     direccion_fiscal: document.getElementById('p-dir-fiscal').value.trim()|| null,
   };
@@ -326,9 +541,15 @@ async function guardarProp() {
 }
 
 function limpiarForm() {
-  ['p-nombre','p-apellido','p-dni','p-telefono','p-email',
+  ['p-nombre','p-apellido','p-documento','p-telefono','p-email',
    'p-direccion','p-ruc','p-razon','p-dir-fiscal']
-    .forEach(id => document.getElementById(id).value = '');
+    .forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  document.getElementById('p-tipo-doc').value = 'DNI';
+  onTipoDocChange();
+  ocultarBannersDoc();
 }
 
 // ── Ver detalle ───────────────────────────────────────────────────

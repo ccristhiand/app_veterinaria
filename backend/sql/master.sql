@@ -1,6 +1,7 @@
 -- ============================================================
--- VETCLINIC SaaS — SCHEMA VET_MASTER v5
--- Base: v4 + zona_horaria en tenant_config + trigger actualizado
+-- VETNETCODIP SaaS — SCHEMA VET_MASTER v6
+-- v5: + zona_horaria en tenant_config
+-- v6: + integraciones RENIEC/SUNAT + tabla tenant_api_consumo
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS vet_master
@@ -47,6 +48,10 @@ CREATE TABLE IF NOT EXISTS tenant_config (
   simbolo_moneda         VARCHAR(5)    NOT NULL DEFAULT 'S/.',
   pais                   VARCHAR(50)   NOT NULL DEFAULT 'Peru',
   zona_horaria           VARCHAR(50)   NOT NULL DEFAULT 'America/Lima',
+  integracion_reniec_activo  TINYINT(1)   NOT NULL DEFAULT 0,
+  integracion_sunat_activo   TINYINT(1)   NOT NULL DEFAULT 0,
+  apidoc_token               TEXT         NULL DEFAULT NULL,
+  apidoc_token_exp           DATETIME     NULL DEFAULT NULL,
   igv_porcentaje         DECIMAL(5,2)  NOT NULL DEFAULT 18.00,
   max_usuarios           INT           NOT NULL DEFAULT 5,
   modulo_estetica        TINYINT(1)    NOT NULL DEFAULT 1,

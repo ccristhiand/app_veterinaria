@@ -437,4 +437,67 @@ router.get('/tenants/:id/stats', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+
+// ── GET /admin/api/tenants/:id/integraciones ──────────────────────
+router.get('/tenants/:id/integraciones', async (req, res, next) => {
+  try {
+    const [cfg] = await masterQuery(
+      `SELECT integracion_reniec_activo, integracion_sunat_activo
+       FROM tenant_config WHERE tenant_id = ?`, [req.params.id]
+    );
+    return res.json({ success: true, data: cfg || {} });
+  } catch (err) { next(err); }
+});
+
+// ── PUT /admin/api/tenants/:id/integraciones ──────────────────────
+router.put('/tenants/:id/integraciones', async (req, res, next) => {
+  try {
+    const { integracion_reniec_activo, integracion_sunat_activo } = req.body;
+    const sets = [];
+    const vals = [];
+    if (integracion_reniec_activo !== undefined) { sets.push('integracion_reniec_activo=?'); vals.push(integracion_reniec_activo ? 1 : 0); }
+    if (integracion_sunat_activo  !== undefined) { sets.push('integracion_sunat_activo=?');  vals.push(integracion_sunat_activo  ? 1 : 0); }
+    if (!sets.length) return res.status(422).json({ success: false, message: 'Nada que actualizar.' });
+    vals.push(req.params.id);
+    await masterQuery(`UPDATE tenant_config SET ${sets.join(',')} WHERE tenant_id = ?`, vals);
+    return res.json({ success: true, message: 'Integración actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// ── GET /admin/api/tenants/consumo ────────────────────────────────
+router.get('/tenants/consumo', async (req, res, next) => {
+  try {
+    const { tenant_id, mes, tipo, fuente } = req.query;
+    if (!tenant_id) return res.status(422).json({ success: false, message: 'tenant_id requerido.' });
+
+    let where  = 'WHERE tenant_id = ?';
+    const vals = [tenant_id];
+
+    if (mes) {
+      where += ' AND DATE_FORMAT(created_at, "%Y-%m") = ?';
+      vals.push(mes);
+    }
+    if (tipo)   { where += ' AND tipo = ?';   vals.push(tipo); }
+    if (fuente) { where += ' AND fuente = ?'; vals.push(fuente); }
+
+    // Registros individuales (últimos 200)
+    const rows = await masterQuery(
+      `SELECT id, tipo, fuente, numero, created_at
+       FROM tenant_api_consumo ${where}
+       ORDER BY created_at DESC LIMIT 200`, vals
+    );
+
+    // Totales
+    const [totales] = await masterQuery(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(fuente='cache') AS cache,
+         SUM(fuente='api')   AS api
+       FROM tenant_api_consumo ${where}`, vals
+    );
+
+    return res.json({ success: true, data: rows, totales });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
