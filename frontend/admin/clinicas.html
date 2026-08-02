@@ -654,6 +654,139 @@
     cargar();
   }
 
+
+  // ── Integraciones ──────────────────────────────────────────────
+  var _integTenantId = null;
+
+  function updateToggleUI(tipo, activo) {
+    var slider = document.getElementById('integ-' + tipo + '-slider');
+    var knob   = document.getElementById('integ-' + tipo + '-knob');
+    var cb     = document.getElementById('integ-' + tipo);
+    if (!slider || !cb) return;
+    cb.checked = activo;
+    slider.style.background = activo ? '#6366f1' : '#334155';
+    knob.style.transform    = activo ? 'translateX(22px)' : 'translateX(0)';
+  }
+
+  async function abrirIntegraciones(tenantId, nombre) {
+    _integTenantId = tenantId;
+    document.getElementById('integ-tenant-id').value       = tenantId;
+    document.getElementById('integ-subtitulo').textContent = nombre;
+    document.getElementById('modal-integraciones').classList.remove('hidden');
+    try {
+      var res = await adminFetch('/tenants/' + tenantId + '/integraciones');
+      if (res && res.ok) {
+        var data = (await res.json()).data || {};
+        updateToggleUI('reniec', !!data.integracion_reniec_activo);
+        updateToggleUI('sunat',  !!data.integracion_sunat_activo);
+      }
+    } catch(e) { console.error(e); }
+    poblarFiltroMeses();
+    cargarConsumo();
+  }
+
+  function cerrarIntegraciones() {
+    document.getElementById('modal-integraciones').classList.add('hidden');
+    _integTenantId = null;
+  }
+
+  async function toggleIntegracion(tipo) {
+    var cb     = document.getElementById('integ-' + tipo);
+    var activo = cb.checked;
+    updateToggleUI(tipo, activo);
+    try {
+      var body = {};
+      body['integracion_' + tipo + '_activo'] = activo ? 1 : 0;
+      var res = await adminFetch('/tenants/' + _integTenantId + '/integraciones', { method: 'PUT', body: body });
+      if (!res || !res.ok) {
+        updateToggleUI(tipo, !activo);
+        toast('Error al actualizar integración.', 'error');
+      } else {
+        toast('Integración ' + (activo ? 'activada' : 'desactivada'), 'success');
+      }
+    } catch {
+      updateToggleUI(tipo, !activo);
+      toast('Error de conexión.', 'error');
+    }
+  }
+
+  function poblarFiltroMeses() {
+    var sel   = document.getElementById('integ-filtro-mes');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Todos los meses</option>';
+    var now   = new Date();
+    var meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    for (var i = 0; i < 12; i++) {
+      var d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0');
+      var lbl = meses[d.getMonth()] + ' ' + d.getFullYear();
+      sel.innerHTML += '<option value="' + val + '">' + lbl + '</option>';
+    }
+  }
+
+  async function cargarConsumo() {
+    if (!_integTenantId) return;
+    var mes     = document.getElementById('integ-filtro-mes').value;
+    var tipo    = document.getElementById('integ-filtro-tipo').value;
+    var fuente  = document.getElementById('integ-filtro-fuente').value;
+    var tbody   = document.getElementById('integ-tbody');
+    var statsEl = document.getElementById('integ-stats');
+    tbody.innerHTML   = '<tr><td colspan="4" style="text-align:center;padding:1.5rem"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+    statsEl.innerHTML = '';
+    var qs = '?tenant_id=' + _integTenantId;
+    if (mes)    qs += '&mes='    + encodeURIComponent(mes);
+    if (tipo)   qs += '&tipo='   + tipo;
+    if (fuente) qs += '&fuente=' + fuente;
+    try {
+      var res  = await adminFetch('/tenants/consumo' + qs);
+      if (!res || !res.ok) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:#475569">Error al cargar</td></tr>';
+        return;
+      }
+      var json    = await res.json();
+      var rows    = json.data    || [];
+      var totales = json.totales || {};
+      statsEl.innerHTML =
+        '<div style="background:#0f172a;border:1px solid #334155;border-radius:.75rem;padding:.85rem;text-align:center">' +
+          '<p style="font-size:1.5rem;font-weight:800;color:#f1f5f9">' + (totales.total || 0) + '</p>' +
+          '<p style="font-size:.65rem;color:#64748b;text-transform:uppercase;margin-top:.2rem">Total</p>' +
+        '</div>' +
+        '<div style="background:#0f172a;border:1px solid #1d4ed8;border-radius:.75rem;padding:.85rem;text-align:center">' +
+          '<p style="font-size:1.5rem;font-weight:800;color:#60a5fa">' + (totales.cache || 0) + '</p>' +
+          '<p style="font-size:.65rem;color:#64748b;text-transform:uppercase;margin-top:.2rem">Cache</p>' +
+        '</div>' +
+        '<div style="background:#0f172a;border:1px solid #7f1d1d;border-radius:.75rem;padding:.85rem;text-align:center">' +
+          '<p style="font-size:1.5rem;font-weight:800;color:#f87171">' + (totales.api || 0) + '</p>' +
+          '<p style="font-size:.65rem;color:#64748b;text-transform:uppercase;margin-top:.2rem">API</p>' +
+        '</div>';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:2rem;color:#475569;font-size:.8rem">Sin registros para el período</td></tr>';
+        document.getElementById('integ-total').textContent = '';
+        return;
+      }
+      var mNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      tbody.innerHTML = rows.map(function(r) {
+        var d    = new Date(r.created_at);
+        var fStr = d.getDate() + ' ' + mNames[d.getMonth()] + ' ' + d.getFullYear()
+          + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        var tipoBadge = r.tipo === 'dni'
+          ? '<span style="background:#1d4ed8;color:#bfdbfe;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;font-weight:700">DNI</span>'
+          : '<span style="background:#166534;color:#bbf7d0;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;font-weight:700">RUC</span>';
+        var fuenteBadge = r.fuente === 'cache'
+          ? '<span style="background:#0f172a;color:#60a5fa;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;border:1px solid #1d4ed8">Cache</span>'
+          : '<span style="background:#450a0a;color:#f87171;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;border:1px solid #7f1d1d">API</span>';
+        return '<tr>' +
+          '<td style="font-size:.75rem;color:#64748b;padding:.7rem 1rem">' + fStr + '</td>' +
+          '<td style="padding:.7rem 1rem">' + tipoBadge + '</td>' +
+          '<td style="font-family:monospace;font-size:.78rem;color:#94a3b8;padding:.7rem 1rem">' + r.numero + '</td>' +
+          '<td style="padding:.7rem 1rem">' + fuenteBadge + '</td></tr>';
+      }).join('');
+      document.getElementById('integ-total').textContent = rows.length + ' registros';
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:#475569">Error</td></tr>';
+    }
+  }
+
   cargar();
 </script>
 </body>
