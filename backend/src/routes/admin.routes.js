@@ -62,6 +62,31 @@ router.get('/tenants', async (req, res) => {
 });
 
 // ── GET /admin/api/tenants/:id ────────────────────────────────────
+// ── GET /admin/api/tenants/consumo ────────────────────────────────
+router.get('/tenants/consumo', async (req, res, next) => {
+  try {
+    const { tenant_id, mes, tipo, fuente } = req.query;
+    if (!tenant_id) return res.status(422).json({ success: false, message: 'tenant_id requerido.' });
+
+// ── GET /admin/api/tenants/:id/integraciones ──────────────────────
+router.get('/tenants/:id/integraciones', async (req, res, next) => {
+  try {
+    const [cfg] = await masterQuery(
+      `SELECT integracion_reniec_activo, integracion_sunat_activo
+       FROM tenant_config WHERE tenant_id = ?`, [req.params.id]
+    );
+    return res.json({ success: true, data: cfg || {} });
+
+// ── PUT /admin/api/tenants/:id/integraciones ──────────────────────
+router.put('/tenants/:id/integraciones', async (req, res, next) => {
+  try {
+    const { integracion_reniec_activo, integracion_sunat_activo } = req.body;
+    const sets = [];
+    const vals = [];
+    if (integracion_reniec_activo !== undefined) { sets.push('integracion_reniec_activo=?'); vals.push(integracion_reniec_activo ? 1 : 0); }
+    if (integracion_sunat_activo  !== undefined) { sets.push('integracion_sunat_activo=?');  vals.push(integracion_sunat_activo  ? 1 : 0); }
+    if (!sets.length) return res.status(422).json({ success: false, message: 'Nada que actualizar.' });
+
 router.get('/tenants/:id', async (req, res) => {
   try {
     const [tenant] = await masterQuery(
@@ -438,37 +463,15 @@ router.get('/tenants/:id/stats', async (req, res) => {
 });
 
 
-// ── GET /admin/api/tenants/:id/integraciones ──────────────────────
-router.get('/tenants/:id/integraciones', async (req, res, next) => {
-  try {
-    const [cfg] = await masterQuery(
-      `SELECT integracion_reniec_activo, integracion_sunat_activo
-       FROM tenant_config WHERE tenant_id = ?`, [req.params.id]
-    );
-    return res.json({ success: true, data: cfg || {} });
   } catch (err) { next(err); }
 });
 
-// ── PUT /admin/api/tenants/:id/integraciones ──────────────────────
-router.put('/tenants/:id/integraciones', async (req, res, next) => {
-  try {
-    const { integracion_reniec_activo, integracion_sunat_activo } = req.body;
-    const sets = [];
-    const vals = [];
-    if (integracion_reniec_activo !== undefined) { sets.push('integracion_reniec_activo=?'); vals.push(integracion_reniec_activo ? 1 : 0); }
-    if (integracion_sunat_activo  !== undefined) { sets.push('integracion_sunat_activo=?');  vals.push(integracion_sunat_activo  ? 1 : 0); }
-    if (!sets.length) return res.status(422).json({ success: false, message: 'Nada que actualizar.' });
     vals.push(req.params.id);
     await masterQuery(`UPDATE tenant_config SET ${sets.join(',')} WHERE tenant_id = ?`, vals);
     return res.json({ success: true, message: 'Integración actualizada.' });
   } catch (err) { next(err); }
 });
 
-// ── GET /admin/api/tenants/consumo ────────────────────────────────
-router.get('/tenants/consumo', async (req, res, next) => {
-  try {
-    const { tenant_id, mes, tipo, fuente } = req.query;
-    if (!tenant_id) return res.status(422).json({ success: false, message: 'tenant_id requerido.' });
 
     let where  = 'WHERE tenant_id = ?';
     const vals = [tenant_id];
