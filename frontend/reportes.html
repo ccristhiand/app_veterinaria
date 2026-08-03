@@ -99,12 +99,29 @@
   <div id="contenido-estetica"     style="display:none"></div>
   <div id="contenido-veterinarios" style="display:none"></div>
 
+  <!-- Selector de sede (solo admin) -->
+  <div id="selector-sede-reportes" style="display:none;margin-top:1rem"></div>
+
+  <!-- Comparativa por sede (solo admin, sin filtro de sede específica) -->
+  <div id="seccion-por-sede" style="display:none;margin-top:1.5rem">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding:.75rem 1rem;background:#f0fdf4;border-radius:.85rem;border:1px solid #bbf7d0">
+      <span style="font-size:1.2rem">🏥</span>
+      <div>
+        <p style="font-weight:700;font-size:.9rem;color:#15803d">Comparativa por sede</p>
+        <p style="font-size:.72rem;color:#6b7280">Distribución de actividad entre sedes — período seleccionado</p>
+      </div>
+    </div>
+    <div id="sede-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.85rem">
+      <p style="color:var(--ink-faint);font-size:.8rem;text-align:center;padding:1rem;grid-column:1/-1">Genera un reporte para ver la comparativa</p>
+    </div>
+  </div>
+
 </div>
 
 
 
 
-<script<script>
+<script>
 // Estado global de datos cargados
 const datosReporte = {};
 let tabActiva = 'financiero';
