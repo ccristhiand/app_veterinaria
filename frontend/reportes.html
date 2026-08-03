@@ -73,6 +73,8 @@
     <button onclick="setPeriodo('semana')" class="vbtn vbtn-ghost">Esta semana</button>
     <button onclick="setPeriodo('mes')"    class="vbtn vbtn-ghost">Este mes</button>
     <button onclick="setPeriodo('anio')"   class="vbtn vbtn-ghost">Este año</button>
+    <!-- Selector sede admin — aparece solo si hay varias sedes -->
+    <div id="selector-sede-reportes" style="display:none;margin-left:auto"></div>
   </div>
 
   <!-- Tabs -->
@@ -98,9 +100,6 @@
   <div id="contenido-inventario"   style="display:none"></div>
   <div id="contenido-estetica"     style="display:none"></div>
   <div id="contenido-veterinarios" style="display:none"></div>
-
-  <!-- Selector de sede (solo admin) -->
-  <div id="selector-sede-reportes" style="display:none;margin-top:1rem"></div>
 
   <!-- Comparativa por sede (solo admin, sin filtro de sede específica) -->
   <div id="seccion-por-sede" style="display:none;margin-top:1.5rem">
