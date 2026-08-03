@@ -40,7 +40,8 @@ router.get('/citas', authorize('admin'), async (req, res, next) => {
     const { desde, hasta, sede_id } = req.query;
     const d = desde || new Date().toISOString().split('T')[0];
     const h = hasta || d;
-    const sf = sedeFilter(sede_id);
+    const sf = sedeFilter(sede_id, 'c.sede_id');
+    const sfSimple = sedeFilter(sede_id, 'sede_id'); // para queries sin alias
 
     const [resumen] = await req.db.query(
       `SELECT
@@ -50,8 +51,8 @@ router.get('/citas', authorize('admin'), async (req, res, next) => {
          SUM(estado='pendiente')   AS pendientes,
          SUM(estado='confirmada')  AS confirmadas,
          SUM(estado='en_curso')    AS en_curso
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}`,
-      [d, h, ...sf.params]
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sfSimple.sql}`,
+      [d, h, ...sfSimple.params]
     );
 
     const porVeterinario = await req.db.query(
@@ -66,16 +67,16 @@ router.get('/citas', authorize('admin'), async (req, res, next) => {
     const porDia = await req.db.query(
       `SELECT DATE(fecha_hora) AS dia, COUNT(*) AS total,
               SUM(estado='completada') AS completadas
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sfSimple.sql}
        GROUP BY DATE(fecha_hora) ORDER BY dia ASC`,
-      [d, h, ...sf.params]
+      [d, h, ...sfSimple.params]
     );
 
     const porEstado = await req.db.query(
       `SELECT estado, COUNT(*) AS total
-       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sf.sql}
+       FROM citas WHERE DATE(fecha_hora) BETWEEN ? AND ? ${sfSimple.sql}
        GROUP BY estado ORDER BY total DESC`,
-      [d, h, ...sf.params]
+      [d, h, ...sfSimple.params]
     );
 
     // Si no se filtra por sede, mostrar desglose por sede
