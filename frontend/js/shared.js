@@ -111,6 +111,109 @@ function hideLoader() {
   }
 }
 
+
+// ── Selector de sede reutilizable (solo para admin) ──────────────
+// containerId: id del div donde insertar el selector
+// onChange: callback(sedeId) cuando cambia la selección
+async function initSelectorSede(containerId, onChange, opciones = {}) {
+  var user = getUser();
+  if (user.rol !== 'admin') return; // solo admin ve el selector
+
+  var cont = document.getElementById(containerId);
+  if (!cont) return;
+
+  // Cargar sedes disponibles
+  try {
+    var res   = await api('/reportes/sedes');
+    if (!res?.ok) return;
+    var sedes = (await res.json()).data || [];
+    if (sedes.length <= 1) return; // con 1 sede no tiene sentido el selector
+
+    var label  = opciones.label !== undefined ? opciones.label : 'Sede:';
+    var all    = opciones.labelTodas !== undefined ? opciones.labelTodas : '🏥 Todas las sedes';
+    var size   = opciones.size || 'normal';
+    var inline = opciones.inline !== false;
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = inline
+      ? 'display:flex;align-items:center;gap:.5rem'
+      : 'display:flex;flex-direction:column;gap:.25rem';
+
+    if (label) {
+      var lbl = document.createElement('label');
+      lbl.textContent = label;
+      lbl.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--ink-soft);white-space:nowrap';
+      wrap.appendChild(lbl);
+    }
+
+    var sel = document.createElement('select');
+    sel.className = 'vinput';
+    sel.style.cssText = size === 'small'
+      ? 'font-size:.78rem;padding:.3rem .6rem;width:auto;min-width:160px'
+      : 'width:auto;min-width:180px';
+    sel.id = containerId + '-select';
+
+    sel.innerHTML = '<option value="">' + all + '</option>' +
+      sedes.map(function(s) {
+        return '<option value="' + s.id + '">' + (s.nombre) + '</option>';
+      }).join('');
+
+    // Restaurar sede guardada en sessionStorage
+    var guardada = sessionStorage.getItem('sede_activa_admin');
+    if (guardada) {
+      sel.value = guardada;
+      setSedeActiva(guardada || null);
+    }
+
+    sel.onchange = function() {
+      var val = sel.value || null;
+      setSedeActiva(val);
+      sessionStorage.setItem('sede_activa_admin', val || '');
+      if (onChange) onChange(val);
+    };
+
+    wrap.appendChild(sel);
+    cont.innerHTML = '';
+    cont.appendChild(wrap);
+    cont.style.display = 'block';
+  } catch(e) { console.warn('Error cargando selector sede:', e); }
+}
+
+// ── Badge de sede para mostrar en cards/tablas ───────────────────
+function badgeSede(sedeNombre, opts) {
+  if (!sedeNombre) return '';
+  opts = opts || {};
+  var color = opts.color || '#0369a1';
+  var bg    = opts.bg    || '#f0f9ff';
+  var bdr   = opts.bdr   || '#bae6fd';
+  return '<span style="font-size:.62rem;font-weight:700;background:' + bg + ';color:' + color +
+    ';padding:.15rem .5rem;border-radius:999px;border:1px solid ' + bdr + ';white-space:nowrap">' +
+    '🏥 ' + sedeNombre + '</span>';
+}
+
+// ── Sede seleccionada globalmente (admin puede cambiar) ──────────
+var _sedeSeleccionadaGlobal = null; // null = todas las sedes (solo admin)
+
+function getSedeActiva() {
+  var user = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  // No-admin: siempre su sede del JWT
+  if (user.rol !== 'admin') return user.sede_id || null;
+  // Admin: la sede seleccionada en el selector (null = todas)
+  return _sedeSeleccionadaGlobal;
+}
+
+function setSedeActiva(sedeId) {
+  _sedeSeleccionadaGlobal = sedeId ? parseInt(sedeId) : null;
+}
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem('vet_user') || '{}'); } catch { return {}; }
+}
+
+function isAdmin() {
+  return getUser().rol === 'admin';
+}
+
 // ── API Helper ───────────────────────────────────────────────────
 async function api(path, { method = 'GET', body } = {}) {
   const token   = localStorage.getItem('vet_access');
@@ -120,9 +223,9 @@ async function api(path, { method = 'GET', body } = {}) {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // ── NUEVO: enviar sede_id del usuario logueado en cada request ──
-  const _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}').sede_id;
-  if (_userSede) headers['X-Sede-Id'] = String(_userSede);
+  // Sede activa: del selector si es admin, del JWT si no lo es
+  const sedeActiva = getSedeActiva();
+  if (sedeActiva) headers['X-Sede-Id'] = String(sedeActiva);
 
   showLoader();
   try {

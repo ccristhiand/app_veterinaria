@@ -13,7 +13,8 @@
 
 <div id="main-content" class="page">
 
-  <div class="page-head">
+  <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
+    <div id="selector-sede-citas" style="display:none"></div>
     <div>
       <h2>Gestión de Citas</h2>
       <p>Panel en tiempo real · Usa <strong>🩺 Atender</strong> para registrar la consulta médica</p>
@@ -401,7 +402,8 @@ function rowHTML(c) {
     </td>
     <td class="hidden md:table-cell"
       style="color:var(--ink-soft);font-size:.82rem">
-      ${esc(c.veterinario_nombre||'—')}
+      ${esc(c.veterinario_nombre||'—')}</td>
+          <td class="hide-mobile">${badgeSede(c.sede_nombre)}
     </td>
     <td class="estado-cell">${badgeEstado(c.estado)}</td>
     <td>

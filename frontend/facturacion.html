@@ -617,6 +617,11 @@ initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y docu
     }
   } catch {}
 
+  // Selector de sede para admin
+  initSelectorSede('selector-sede-fact', function(sedeId) {
+    cargarResumen();
+    cargarFacturas();
+  }, { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
   cargarResumen();
 })();
 

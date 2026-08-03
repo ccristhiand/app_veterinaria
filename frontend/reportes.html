@@ -101,16 +101,90 @@
 
 </div>
 
+
+<!-- Desglose por sede (admin con todas las sedes) -->
+<div id="seccion-por-sede" style="display:none;margin:1.5rem 0">
+  <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:1rem;padding:0 .25rem">
+    🏥 Comparativa por sede
+  </h3>
+  <div class="vcard" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+      <table class="vtable">
+        <thead>
+          <tr>
+            <th>Sede</th>
+            <th>Citas</th>
+            <th>Atenciones</th>
+            <th>Facturación (S/.)</th>
+            <th>% del total</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-por-sede">
+          <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink-faint)">Sin datos</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <script>
 // Estado global de datos cargados
 const datosReporte = {};
 let tabActiva = 'financiero';
+
+
+function renderPorSede(data) {
+  var seccion = document.getElementById('seccion-por-sede');
+  var tbody   = document.getElementById('tbody-por-sede');
+  
+  // Solo mostrar si es admin y no hay filtro de sede
+  if (!isAdmin() || _reporteSedeActiva) {
+    if (seccion) seccion.style.display = 'none';
+    return;
+  }
+  
+  var porSede = data.porSede || [];
+  if (!porSede.length) {
+    if (seccion) seccion.style.display = 'none';
+    return;
+  }
+  
+  if (seccion) seccion.style.display = 'block';
+  
+  var totalCitas = porSede.reduce(function(a, s) { return a + (parseInt(s.total_citas) || 0); }, 0);
+  var totalFact  = porSede.reduce(function(a, s) { return a + (parseFloat(s.total_facturado) || 0); }, 0);
+  
+  tbody.innerHTML = porSede.map(function(s) {
+    var pctCitas = totalCitas > 0 ? Math.round((s.total_citas / totalCitas) * 100) : 0;
+    return '<tr>' +
+      '<td><strong>' + esc(s.sede_nombre || s.sede || 'Sin sede') + '</strong></td>' +
+      '<td>' + (s.total_citas || 0) + '</td>' +
+      '<td>' + (s.total_atenciones || 0) + '</td>' +
+      '<td>S/. ' + parseFloat(s.total_facturado || 0).toFixed(2) + '</td>' +
+      '<td>' +
+        '<div style="display:flex;align-items:center;gap:.5rem">' +
+          '<div style="flex:1;height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden">' +
+            '<div style="height:100%;background:linear-gradient(135deg,#6366f1,#4f46e5);width:' + pctCitas + '%"></div>' +
+          '</div>' +
+          '<span style="font-size:.75rem;font-weight:700;color:var(--ink-soft)">' + pctCitas + '%</span>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+var _reporteSedeActiva = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'reportes', title:'Reportes', subtitle:'Análisis y estadísticas' });
   const hoy = new Date();
   document.getElementById('r-desde').value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01`;
   document.getElementById('r-hasta').value = fechaHoyInput();
+  // Selector de sede para admin
+  initSelectorSede('selector-sede-reportes', function(sedeId) {
+    _reporteSedeActiva = sedeId;
+    cargarReporte();
+  }, { label: 'Sede:', labelTodas: '🏥 Todas las sedes', size: 'small', inline: true });
   cargarReporte();
 });
 
@@ -159,11 +233,13 @@ async function cargarTab(tab) {
 
   try {
     let endpoint = tab === 'veterinarios' ? 'veterinarios' : tab;
-    const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}`);
+    const sedeParam = _reporteSedeActiva ? `&sede_id=${_reporteSedeActiva}` : '';
+    const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}${sedeParam}`);
     if (!res?.ok) { cont.innerHTML=`<div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div>`; return; }
     const d = (await res.json()).data;
     datosReporte[tab] = d;
     renderTab(tab, d, cont);
+    renderPorSede(d);
   } catch(e) {
     cont.innerHTML = `<div class="vempty"><span class="icon">😿</span><p>Error: ${e.message}</p></div>`;
   }

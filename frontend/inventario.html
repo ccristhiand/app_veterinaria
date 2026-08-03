@@ -14,7 +14,8 @@
 <body style="display:flex;height:100vh;overflow:hidden">
 <div id="main-content" class="page">
 
-  <div class="page-head">
+  <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
+    <div id="selector-sede-inv" style="display:none"></div>
     <div><h2>📦 Inventario</h2><p>Medicamentos, vacunas e insumos con alertas en tiempo real</p></div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
       <button onclick="descargarTemplate()" class="vbtn vbtn-ghost">📥 Template Excel</button>
@@ -269,7 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  cargar();
+  initSelectorSede('selector-sede-inv', function() {
+    cargar(true);
+  }, { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
+    cargar();
 
   const socket = getSocket();
 
