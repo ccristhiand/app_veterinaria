@@ -82,13 +82,21 @@ router.get('/citas', authorize('admin'), async (req, res, next) => {
     let porSede = [];
     if (!sf.sql) {
       porSede = await req.db.query(
-        `SELECT s.nombre AS sede, COUNT(*) AS total,
-                SUM(c.estado='completada') AS completadas
-         FROM citas c
-         LEFT JOIN sedes s ON s.id = c.sede_id
-         WHERE DATE(c.fecha_hora) BETWEEN ? AND ?
-         GROUP BY c.sede_id, s.nombre ORDER BY total DESC`,
-        [d, h]
+        `SELECT
+           s.nombre AS sede,
+           s.id     AS sede_id,
+           COUNT(c.id)                        AS total_citas,
+           SUM(c.estado='completada')         AS completadas,
+           SUM(c.estado IN ('pendiente','confirmada')) AS pendientes
+         FROM sedes s
+         LEFT JOIN citas c ON COALESCE(c.sede_id,
+           (SELECT u.sede_id FROM usuarios u WHERE u.id = c.veterinario_id LIMIT 1)
+         ) = s.id
+         AND DATE(CONVERT_TZ(c.fecha_hora,'+00:00',?)) BETWEEN ? AND ?
+         WHERE s.activo = 1
+         GROUP BY s.id, s.nombre
+         ORDER BY total_citas DESC`,
+        [tz, d, h]
       );
     }
 
@@ -161,13 +169,17 @@ router.get('/financiero', authorize('admin'), async (req, res, next) => {
     let porSede = [];
     if (!sf.sql) {
       porSede = await req.db.query(
-        `SELECT s.nombre AS sede,
-                COALESCE(SUM(CASE WHEN f.estado='pagado' THEN f.total END),0) AS ingresos,
-                COUNT(CASE WHEN f.estado='pagado' THEN 1 END) AS documentos
-         FROM facturas f
-         LEFT JOIN sedes s ON s.id = f.sede_id
-         WHERE f.fecha BETWEEN ? AND ?
-         GROUP BY f.sede_id, s.nombre ORDER BY ingresos DESC`,
+        `SELECT
+           s.nombre AS sede,
+           s.id     AS sede_id,
+           COALESCE(SUM(CASE WHEN f.estado='pagado' THEN f.total ELSE 0 END),0) AS ingresos,
+           COUNT(CASE WHEN f.estado='pagado' THEN 1 END)                         AS documentos,
+           COALESCE(SUM(CASE WHEN f.estado='pendiente' THEN f.total ELSE 0 END),0) AS pendiente
+         FROM sedes s
+         LEFT JOIN facturas f ON f.sede_id = s.id AND f.fecha BETWEEN ? AND ?
+         WHERE s.activo = 1
+         GROUP BY s.id, s.nombre
+         ORDER BY ingresos DESC`,
         [d, h]
       );
     }
@@ -456,6 +468,32 @@ router.get('/dashboard-stats', async (req, res, next) => {
         sede_id     : sedeId,
       },
     });
+  } catch (err) { next(err); }
+});
+
+
+// ── GET /api/v1/reportes/atenciones-por-sede ─────────────────────
+router.get('/atenciones-por-sede', authorize('admin'), async (req, res, next) => {
+  try {
+    const { desde, hasta } = req.query;
+    const d = desde || new Date().toISOString().split('T')[0];
+    const h = hasta || d;
+
+    const porSede = await req.db.query(
+      `SELECT
+         s.nombre AS sede,
+         s.id     AS sede_id,
+         COUNT(hc.id) AS total_atenciones
+       FROM sedes s
+       LEFT JOIN historia_clinica hc ON hc.sede_id = s.id
+         AND DATE(hc.fecha) BETWEEN ? AND ?
+       WHERE s.activo = 1
+       GROUP BY s.id, s.nombre
+       ORDER BY total_atenciones DESC`,
+      [d, h]
+    );
+
+    return res.json({ success: true, data: porSede });
   } catch (err) { next(err); }
 });
 

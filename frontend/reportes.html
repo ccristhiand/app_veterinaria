@@ -102,76 +102,72 @@
 </div>
 
 
-<!-- Desglose por sede (admin con todas las sedes) -->
-<div id="seccion-por-sede" style="display:none;margin:1.5rem 0">
-  <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;margin-bottom:1rem;padding:0 .25rem">
-    🏥 Comparativa por sede
-  </h3>
-  <div class="vcard" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto">
-      <table class="vtable">
-        <thead>
-          <tr>
-            <th>Sede</th>
-            <th>Citas</th>
-            <th>Atenciones</th>
-            <th>Facturación (S/.)</th>
-            <th>% del total</th>
-          </tr>
-        </thead>
-        <tbody id="tbody-por-sede">
-          <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink-faint)">Sin datos</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
-<script>
+
+<script<script>
 // Estado global de datos cargados
 const datosReporte = {};
 let tabActiva = 'financiero';
 
 
-function renderPorSede(data) {
+function renderPorSede(data, tab) {
+  // Solo mostrar para admin sin filtro de sede específica
   var seccion = document.getElementById('seccion-por-sede');
-  var tbody   = document.getElementById('tbody-por-sede');
-  
-  // Solo mostrar si es admin y no hay filtro de sede
+  if (!seccion) return;
+
   if (!isAdmin() || _reporteSedeActiva) {
-    if (seccion) seccion.style.display = 'none';
+    seccion.style.display = 'none';
     return;
   }
-  
+
   var porSede = data.porSede || [];
   if (!porSede.length) {
-    if (seccion) seccion.style.display = 'none';
+    seccion.style.display = 'none';
     return;
   }
-  
-  if (seccion) seccion.style.display = 'block';
-  
-  var totalCitas = porSede.reduce(function(a, s) { return a + (parseInt(s.total_citas) || 0); }, 0);
-  var totalFact  = porSede.reduce(function(a, s) { return a + (parseFloat(s.total_facturado) || 0); }, 0);
-  
-  tbody.innerHTML = porSede.map(function(s) {
-    var pctCitas = totalCitas > 0 ? Math.round((s.total_citas / totalCitas) * 100) : 0;
-    return '<tr>' +
-      '<td><strong>' + esc(s.sede_nombre || s.sede || 'Sin sede') + '</strong></td>' +
-      '<td>' + (s.total_citas || 0) + '</td>' +
-      '<td>' + (s.total_atenciones || 0) + '</td>' +
-      '<td>S/. ' + parseFloat(s.total_facturado || 0).toFixed(2) + '</td>' +
-      '<td>' +
-        '<div style="display:flex;align-items:center;gap:.5rem">' +
-          '<div style="flex:1;height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden">' +
-            '<div style="height:100%;background:linear-gradient(135deg,#6366f1,#4f46e5);width:' + pctCitas + '%"></div>' +
-          '</div>' +
-          '<span style="font-size:.75rem;font-weight:700;color:var(--ink-soft)">' + pctCitas + '%</span>' +
-        '</div>' +
-      '</td>' +
-    '</tr>';
+
+  seccion.style.display = 'block';
+
+  // Calcular totales para porcentajes
+  var totalCitas = porSede.reduce(function(a,s){ return a+(parseInt(s.total_citas||s.total)||0); },0);
+  var totalFact  = porSede.reduce(function(a,s){ return a+(parseFloat(s.ingresos)||0); },0);
+  var totalAten  = porSede.reduce(function(a,s){ return a+(parseInt(s.total_atenciones)||0); },0);
+
+  // Cards por sede
+  var cards = porSede.map(function(s) {
+    var citas  = parseInt(s.total_citas || s.total || 0);
+    var fact   = parseFloat(s.ingresos || 0);
+    var aten   = parseInt(s.total_atenciones || 0);
+    var pctC   = totalCitas > 0 ? Math.round((citas/totalCitas)*100) : 0;
+    var pctF   = totalFact  > 0 ? Math.round((fact/totalFact)*100)  : 0;
+
+    return '<div style="background:#fff;border:1px solid var(--line);border-radius:1rem;padding:1rem;display:flex;flex-direction:column;gap:.5rem">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<p style="font-weight:700;font-size:.9rem">' + esc(s.sede||'Sin sede') + '</p>' +
+        '<span style="font-size:.65rem;background:#f0f9ff;color:#0369a1;padding:.2rem .6rem;border-radius:999px;border:1px solid #bae6fd;font-weight:700">🏥 Sede</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-top:.25rem">' +
+        sedeStatCard('📅', citas, 'Citas', pctC + '%', '#6366f1') +
+        sedeStatCard('📋', aten || (data.porSede ? 'N/A' : 0), 'Atenciones', '', '#10b981') +
+        sedeStatCard('💰', 'S/.' + fact.toFixed(0), 'Facturado', pctF + '%', '#f59e0b') +
+      '</div>' +
+      (citas > 0 || fact > 0 ? '<div style="height:4px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-top:.25rem">' +
+        '<div style="height:100%;width:' + pctF + '%;background:linear-gradient(90deg,#6366f1,#10b981);border-radius:999px;transition:width .5s"></div>' +
+      '</div>' : '') +
+    '</div>';
   }).join('');
+
+  document.getElementById('sede-cards').innerHTML = cards || '<p style="color:var(--ink-faint);font-size:.8rem;text-align:center;padding:1rem">Sin datos para el período</p>';
 }
+
+function sedeStatCard(icon, valor, label, pct, color) {
+  return '<div style="text-align:center;padding:.4rem;background:#f8fafc;border-radius:.65rem">' +
+    '<p style="font-size:1rem;font-weight:800;color:' + color + '">' + valor + '</p>' +
+    '<p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">' + label + '</p>' +
+    (pct ? '<p style="font-size:.65rem;font-weight:600;color:' + color + '">' + pct + '</p>' : '') +
+  '</div>';
+}
+
 
 var _reporteSedeActiva = null;
 
