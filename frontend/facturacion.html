@@ -666,7 +666,8 @@ async function cargarResumen() {
   const desde = document.getElementById('d-desde').value;
   const hasta = document.getElementById('d-hasta').value;
   try {
-    const res = await api(`/facturas/resumen?desde=${desde}&hasta=${hasta}`);
+    const sedeParam = getSedeActiva() ? `&sede_id=${getSedeActiva()}` : '';
+    const res = await api(`/facturas/resumen?desde=${desde}&hasta=${hasta}${sedeParam}`);
     if (!res||!res.ok) return;
     const d   = (await res.json()).data;
     document.getElementById('stat-ingresos').textContent    = `S/. ${parseFloat(d.totales.ingresos||0).toFixed(2)}`;
@@ -802,12 +803,14 @@ function renderSubTab(tab) {
       <th style="width:36px"><input type="checkbox" id="chk-select-all" onchange="toggleSeleccionarTodos(this.checked)" style="accent-color:var(--green-600)"/></th>
       <th>Número</th><th>Fecha</th><th>Cliente</th>
       <th class="hidden sm:table-cell">Mascota</th>
+      <th class="hidden lg:table-cell">Sede</th>
       <th>Total</th><th>Método</th><th>Acciones</th>
     </tr>`;
   } else {
     thead.innerHTML = `<tr>
       <th>Número</th><th>Fecha</th><th>Cliente</th>
       <th class="hidden sm:table-cell">Mascota</th>
+      <th class="hidden lg:table-cell">Sede</th>
       <th>Total</th><th>Estado</th><th>SUNAT</th><th>Acciones</th>
     </tr>`;
   }
@@ -847,6 +850,7 @@ function renderSubTab(tab) {
         <td style="font-size:.8rem">${fDate(f.fecha)}</td>
         <td><p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p><p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p></td>
         <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
+        <td class="hidden lg:table-cell">${badgeSede(f.sede_nombre)}</td>
         <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
         <td style="font-size:.78rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago||'—'}</td>
         <td><div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">${acciones}</div></td>
@@ -861,6 +865,7 @@ function renderSubTab(tab) {
       <td style="font-size:.8rem">${fDate(f.fecha)}</td>
       <td><p style="font-weight:600;font-size:.83rem">${esc(f.propietario_nombre)}</p><p style="font-size:.68rem;color:var(--ink-faint)">${f.cliente_dni?'DNI: '+esc(f.cliente_dni):''}</p></td>
       <td class="hidden sm:table-cell" style="font-size:.8rem">${f.mascota_nombre?`${badgeEspecie(f.especie)} ${esc(f.mascota_nombre)}`:'—'}</td>
+      <td class="hidden lg:table-cell">${badgeSede(f.sede_nombre)}</td>
       <td style="font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</td>
       <td>${estadoBadge[f.estado]||f.estado}${f.metodo_pago?`<br/><span style="font-size:.68rem;color:var(--ink-soft)">${metodoBadge[f.metodo_pago]||f.metodo_pago}</span>`:''}</td>
       <td>${badgeSUNAT(f)}</td>

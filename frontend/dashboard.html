@@ -89,6 +89,7 @@
               <th>Hora</th><th>Paciente</th>
               <th class="hidden sm:table-cell">Propietario</th>
               <th class="hidden md:table-cell">Veterinario</th>
+              <th class="hidden lg:table-cell">Sede</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -141,6 +142,11 @@
 
   // ── Selector de sede para admin ───────────────────────────────
   var sedeSeleccionada = esAdmin ? 'all' : (user.sede_id || null);
+  // Sincronizar con sede global de shared.js
+  if (esAdmin && typeof _sedeSeleccionadaGlobal !== 'undefined' && _sedeSeleccionadaGlobal) {
+    sedeSeleccionada = String(_sedeSeleccionadaGlobal);
+    setSedeActiva(_sedeSeleccionadaGlobal);
+  }
 
   async function iniciarSelectorSede() {
     if (!esAdmin) return;
@@ -270,7 +276,7 @@
   function renderCitas(citas) {
     const tbody = document.getElementById('citas-hoy');
     tbody.innerHTML = citas.length ? citas.map(c => rowHTML(c)).join('')
-      : `<tr><td colspan="5"><div class="vempty"><span class="icon">🌿</span><p>Sin citas para hoy. ¡Día tranquilo!</p></div></td></tr>`;
+      : `<tr><td colspan="6"><div class="vempty"><span class="icon">🌿</span><p>Sin citas para hoy. ¡Día tranquilo!</p></div></td></tr>`;
   }
 
   function rowHTML(c) {
@@ -284,6 +290,7 @@
       </td>
       <td class="hidden sm:table-cell" style="color:var(--ink-soft)">${esc(c.propietario_nombre||'—')}</td>
       <td class="hidden md:table-cell" style="color:var(--ink-soft)">${esc(c.veterinario_nombre||'—')}</td>
+      <td class="hidden lg:table-cell">${c.sede_nombre ? `<span style="font-size:.62rem;background:#f0f9ff;color:#0369a1;padding:.15rem .45rem;border-radius:999px;border:1px solid #bae6fd;font-weight:700">🏥 ${esc(c.sede_nombre)}</span>` : ''}</td>
       <td>${badgeEstado(c.estado)}</td>
     </tr>`;
   }
