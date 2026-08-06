@@ -521,6 +521,273 @@
     </div>
   </div>
 </div>
+<script>
+  var _pagosTenantId   = null;
+  var _pagosNombre     = '';
+  var _pagoValidandoId = null;
+  var _pagosAPI = window.location.hostname.includes('localhost')
+    ? 'http://localhost:3030/api'
+    : '/pagos-api';
+
+  async function pagosFetch(path, opts) {
+    opts = opts || {};
+    var token = localStorage.getItem('admin_token');
+    var res = await fetch(_pagosAPI + path, {
+      method: opts.method || 'GET',
+      headers: Object.assign({
+        'Content-Type': 'application/json',
+      }, token ? { 'Authorization': 'Bearer ' + token } : {}, opts.headers || {}),
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    return res;
+  }
+
+  async function abrirPagos(tenantId, nombre) {
+    _pagosTenantId = tenantId;
+    _pagosNombre   = nombre;
+    document.getElementById('pagos-tenant-id').value       = tenantId;
+    document.getElementById('pagos-subtitulo').textContent = nombre;
+    document.getElementById('modal-pagos').classList.remove('hidden');
+    pagoTab('resumen');
+  }
+
+  function cerrarPagos() {
+    document.getElementById('modal-pagos').classList.add('hidden');
+    _pagosTenantId = null;
+  }
+
+  function pagoTab(tab) {
+    ['resumen','validar','historial','ajustar'].forEach(function(t) {
+      document.getElementById('ptab-' + t).classList.remove('active');
+      document.getElementById('ptab-content-' + t).style.display = 'none';
+    });
+    document.getElementById('ptab-' + tab).classList.add('active');
+    document.getElementById('ptab-content-' + tab).style.display = 'block';
+    if (tab === 'resumen')   cargarResumenPagos();
+    if (tab === 'validar')   cargarColaValidacion();
+    if (tab === 'historial') cargarHistorialPagos();
+    if (tab === 'ajustar')   cargarDatosSuscripcion();
+  }
+
+  async function cargarResumenPagos() {
+    var el = document.getElementById('pagos-resumen-content');
+    el.innerHTML = '<div style="text-align:center;padding:1.5rem"><div class="spinner"></div></div>';
+    try {
+      var res  = await pagosFetch('/admin/clientes/' + _pagosTenantId);
+      if (!res || !res.ok) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error al cargar</p>'; return; }
+      var data = (await res.json()).data;
+      var c    = data.cliente;
+      if (!c) { el.innerHTML = '<p style="color:#94a3b8;font-size:.82rem">Sin suscripción configurada</p>'; return; }
+      var dias = c.fecha_vencimiento
+        ? Math.ceil((new Date(c.fecha_vencimiento) - new Date()) / (1000*60*60*24)) : null;
+      var diasColor = dias === null ? '#64748b' : dias < 0 ? '#f87171' : dias <= 7 ? '#fbbf24' : '#4ade80';
+      el.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:1rem">' +
+          pStatCard('Plan', c.plan_nombre||'—', '📦') +
+          pStatCard('Estado', c.sus_estado||'—', '🔄') +
+          pStatCard('Días restantes', dias !== null ? dias+'d' : '—', '📅', diasColor) +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">' +
+          pInfoRow('Vencimiento', pFDate(c.fecha_vencimiento)) +
+          pInfoRow('Precio acordado', 'S/. '+parseFloat(c.precio_acordado||0).toFixed(2)+'/mes') +
+          pInfoRow('Email portal', c.portal_email||'—') +
+          pInfoRow('Último acceso', pFDate(c.ultimo_acceso)) +
+          pInfoRow('Total cobrado', 'S/. '+parseFloat(c.total_cobrado||0).toFixed(2)) +
+          pInfoRow('Pagos realizados', String(c.total_pagos||0)) +
+        '</div>';
+    } catch(e) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error: '+e.message+'</p>'; }
+  }
+
+  function pStatCard(lbl, val, icon, color) {
+    return '<div style="background:#0f172a;border:1px solid #334155;border-radius:.75rem;padding:.85rem;text-align:center">' +
+      '<p style="font-size:1.1rem">'+icon+'</p>' +
+      '<p style="font-size:1.2rem;font-weight:800;color:'+(color||'#f1f5f9')+'">'+val+'</p>' +
+      '<p style="font-size:.62rem;color:#475569;text-transform:uppercase;letter-spacing:.08em">'+lbl+'</p>' +
+    '</div>';
+  }
+
+  function pInfoRow(lbl, val) {
+    return '<div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .85rem">' +
+      '<p style="font-size:.62rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">'+lbl+'</p>' +
+      '<p style="font-size:.85rem;font-weight:600;color:#e2e8f0">'+val+'</p>' +
+    '</div>';
+  }
+
+  function pFDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  async function cargarColaValidacion() {
+    var el = document.getElementById('cola-validacion-list');
+    el.innerHTML = '<div style="text-align:center;padding:1rem"><div class="spinner"></div></div>';
+    try {
+      var res  = await pagosFetch('/admin/dashboard');
+      if (!res || !res.ok) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error</p>'; return; }
+      var cola = (await res.json()).data.colaValidacion || [];
+      var misCola = cola.filter(function(p) { return String(p.tenant_id) === String(_pagosTenantId); });
+      if (!misCola.length) {
+        el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#475569;font-size:.82rem">✅ Sin pagos pendientes</div>';
+        return;
+      }
+      el.innerHTML = misCola.map(function(p) {
+        return '<div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;margin-bottom:.75rem">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">' +
+            '<div>' +
+              '<p style="font-weight:700;font-size:.88rem">'+esc(p.numero_cobro)+' — '+esc(p.periodo)+'</p>' +
+              '<p style="font-size:.75rem;color:#64748b;margin-top:.15rem">S/. '+parseFloat(p.monto).toFixed(2)+' · '+esc(p.metodo)+' · '+pFDate(p.created_at)+'</p>' +
+            '</div>' +
+            '<div style="display:flex;gap:.4rem">' +
+              (p.comprobante_url ? '<a href="'+p.comprobante_url+'" target="_blank" style="padding:.35rem .7rem;font-size:.72rem;color:#60a5fa;border:1px solid #1d4ed8;border-radius:.5rem;text-decoration:none;background:none">👁️ Ver</a>' : '') +
+              '<button onclick="abrirValidarComp('+p.id+')" class="btn-success" style="padding:.35rem .7rem;font-size:.72rem">✅ Validar</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    } catch(e) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error: '+e.message+'</p>'; }
+  }
+
+  async function cargarHistorialPagos() {
+    var tbody = document.getElementById('pagos-historial-tbody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem"><div class="spinner" style="margin:auto"></div></td></tr>';
+    try {
+      var res  = await pagosFetch('/admin/clientes/' + _pagosTenantId);
+      if (!res || !res.ok) return;
+      var rows = (await res.json()).data.historial || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">Sin cobros</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function(r) {
+        var badge = r.estado === 'pagado'
+          ? '<span style="background:#052e16;color:#4ade80;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;font-weight:700">✅ Pagado</span>'
+          : r.pago_estado === 'pendiente_validacion'
+          ? '<span style="background:#451a03;color:#fbbf24;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;font-weight:700">⏳ Revisión</span>'
+          : '<span style="background:#1e293b;color:#64748b;font-size:.65rem;padding:.15rem .45rem;border-radius:999px;font-weight:700">⏰ Pendiente</span>';
+        return '<tr>' +
+          '<td style="font-weight:600">'+esc(r.periodo)+'</td>' +
+          '<td style="font-family:monospace;font-size:.75rem;color:#64748b">'+esc(r.numero_cobro)+'</td>' +
+          '<td>'+(r.meses||1)+'</td>' +
+          '<td style="font-weight:700">S/. '+parseFloat(r.monto_final||0).toFixed(2)+'</td>' +
+          '<td>'+badge+'</td>' +
+          '<td>'+(r.comprobante_url ? '<a href="'+r.comprobante_url+'" target="_blank" style="color:#60a5fa;font-size:.75rem">📄 Ver</a>' : '—')+'</td>' +
+        '</tr>';
+      }).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;padding:1rem">'+e.message+'</td></tr>'; }
+  }
+
+  async function cargarDatosSuscripcion() {
+    try {
+      var res = await pagosFetch('/admin/clientes/' + _pagosTenantId);
+      if (!res || !res.ok) return;
+      var c = (await res.json()).data.cliente;
+      if (!c) return;
+      if (c.plan_codigo)        document.getElementById('aj-plan').value        = c.plan_codigo;
+      if (c.precio_acordado)    document.getElementById('aj-precio').value      = parseFloat(c.precio_acordado).toFixed(2);
+      if (c.fecha_vencimiento)  document.getElementById('aj-vencimiento').value = c.fecha_vencimiento.split('T')[0];
+      if (c.sus_estado)         document.getElementById('aj-estado').value      = c.sus_estado;
+      if (c.notas_internas)     document.getElementById('aj-notas').value       = c.notas_internas;
+    } catch(e) { console.error(e); }
+  }
+
+  async function guardarAjusteSuscripcion() {
+    var body = {
+      precio_acordado  : parseFloat(document.getElementById('aj-precio').value) || null,
+      fecha_vencimiento: document.getElementById('aj-vencimiento').value || null,
+      notas            : document.getElementById('aj-notas').value.trim() || null,
+    };
+    try {
+      var res  = await pagosFetch('/admin/clientes/'+_pagosTenantId+'/suscripcion', { method:'PUT', body: body });
+      var data = await res.json();
+      toast(data.message || (res.ok ? '✅ Actualizado' : 'Error'), res.ok ? 'success' : 'error');
+      if (res.ok) cargarResumenPagos();
+    } catch { toast('Error de conexión','error'); }
+  }
+
+  async function enviarRecordatorio() {
+    try {
+      var res  = await pagosFetch('/admin/clientes/'+_pagosTenantId+'/recordatorio', { method:'POST' });
+      var data = await res.json();
+      toast(data.message || (res.ok ? 'Recordatorio enviado' : 'Error'), res.ok ? 'success' : 'error');
+    } catch { toast('Error de conexión','error'); }
+  }
+
+  async function abrirValidarComp(pagoId) {
+    _pagoValidandoId = pagoId;
+    var res  = await pagosFetch('/admin/dashboard');
+    if (!res) return;
+    var cola = (await res.json()).data.colaValidacion || [];
+    var pago = cola.find(function(p) { return p.id === pagoId; });
+    if (!pago) return;
+    document.getElementById('comp-titulo').textContent = 'Validar — ' + esc(pago.numero_cobro);
+    document.getElementById('comp-body').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">' +
+        '<div><p style="font-size:.68rem;color:#64748b;text-transform:uppercase">Cobro</p><p style="font-weight:700">'+esc(pago.numero_cobro)+'</p></div>' +
+        '<div><p style="font-size:.68rem;color:#64748b;text-transform:uppercase">Monto</p><p style="font-weight:800;font-size:1.1rem">S/. '+parseFloat(pago.monto).toFixed(2)+'</p></div>' +
+        '<div><p style="font-size:.68rem;color:#64748b;text-transform:uppercase">Método</p><p>'+esc(pago.metodo)+'</p></div>' +
+        '<div><p style="font-size:.68rem;color:#64748b;text-transform:uppercase">N° operación</p><p style="font-family:monospace">'+esc(pago.numero_operacion||'—')+'</p></div>' +
+      '</div>' +
+      (pago.comprobante_url
+        ? '<div style="border:1px solid #334155;border-radius:.75rem;overflow:hidden;margin-bottom:1rem">' +
+            (pago.comprobante_url.endsWith('.pdf')
+              ? '<embed src="'+pago.comprobante_url+'" type="application/pdf" style="width:100%;height:280px"/>'
+              : '<img src="'+pago.comprobante_url+'" style="width:100%;max-height:280px;object-fit:contain;background:#0f172a"/>') +
+            '<div style="padding:.5rem;text-align:right"><a href="'+pago.comprobante_url+'" target="_blank" style="font-size:.75rem;color:#60a5fa">↗ Abrir</a></div>' +
+          '</div>'
+        : '<p style="font-size:.82rem;color:#94a3b8;margin-bottom:1rem">Sin comprobante adjunto</p>') +
+      '<div><label style="font-size:.7rem;color:#64748b;text-transform:uppercase;display:block;margin-bottom:.3rem">Notas del admin</label>' +
+      '<textarea id="comp-notas" rows="2" style="width:100%;background:#0f172a;border:1.5px solid #334155;border-radius:.65rem;padding:.6rem .85rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;resize:vertical"></textarea></div>' +
+      '<div id="comp-rechazo" style="display:none;margin-top:.75rem">' +
+        '<label style="font-size:.7rem;color:#f87171;text-transform:uppercase;display:block;margin-bottom:.3rem">Motivo de rechazo *</label>' +
+        '<textarea id="comp-motivo" rows="2" style="width:100%;background:#0f172a;border:1.5px solid #f87171;border-radius:.65rem;padding:.6rem .85rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;resize:vertical"></textarea>' +
+      '</div>';
+    document.getElementById('btn-rechazar-comp').textContent = '❌ Rechazar';
+    document.getElementById('comp-rechazo').style.display = 'none';
+    document.getElementById('modal-pagos').classList.add('hidden');
+    document.getElementById('modal-comp').classList.remove('hidden');
+  }
+
+  function cerrarModalComp() {
+    document.getElementById('modal-comp').classList.add('hidden');
+    document.getElementById('modal-pagos').classList.remove('hidden');
+    _pagoValidandoId = null;
+  }
+
+  async function aprobarPagoAdmin() {
+    if (!_pagoValidandoId) return;
+    var notas = document.getElementById('comp-notas')?.value.trim();
+    var btn   = document.getElementById('btn-aprobar-comp');
+    btn.disabled = true; btn.textContent = 'Aprobando…';
+    try {
+      var res  = await pagosFetch('/admin/pagos/'+_pagoValidandoId+'/aprobar', { method:'POST', body:{ notas_admin: notas } });
+      var data = await res.json();
+      if (!res.ok) { toast(data.message||'Error','error'); return; }
+      toast('✅ Pago aprobado — '+(data.numero_comprobante||''),'success');
+      cerrarModalComp();
+      pagoTab('resumen');
+    } catch { toast('Error de conexión','error'); }
+    finally { btn.disabled = false; btn.textContent = '✅ Aprobar'; }
+  }
+
+  async function rechazarPagoAdmin() {
+    var motEl = document.getElementById('comp-rechazo');
+    if (motEl.style.display === 'none') {
+      motEl.style.display = 'block';
+      document.getElementById('btn-rechazar-comp').textContent = '❌ Confirmar rechazo';
+      return;
+    }
+    var motivo = document.getElementById('comp-motivo')?.value.trim();
+    if (!motivo) { toast('El motivo es obligatorio','warning'); return; }
+    try {
+      var res  = await pagosFetch('/admin/pagos/'+_pagoValidandoId+'/rechazar', { method:'POST', body:{ motivo } });
+      var data = await res.json();
+      if (!res.ok) { toast(data.message||'Error','error'); return; }
+      toast('Pago rechazado y cliente notificado','warning');
+      cerrarModalComp();
+      pagoTab('validar');
+    } catch { toast('Error de conexión','error'); }
+  }
+</script>
 <script src="admin_shared.js"></script>
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
