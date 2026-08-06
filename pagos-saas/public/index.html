@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Portal de Pagos — VetNetcodip</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#166534;--green-light:#dcfce7;--green-mid:#15803d;
+      --ink:#111827;--ink-soft:#6b7280;--ink-faint:#9ca3af;
+      --line:#e5e7eb;--bg:#f9fafb;--white:#fff;
+      --red:#dc2626;--yellow:#d97706;--blue:#2563eb;
+      --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+      --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+      --radius:.85rem;
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px}
+
+    /* NAV */
+    .nav{background:var(--white);border-bottom:1px solid var(--line);
+      padding:0 1.5rem;height:60px;display:flex;align-items:center;
+      justify-content:space-between;position:sticky;top:0;z-index:100;
+      box-shadow:var(--shadow)}
+    .nav-brand{display:flex;align-items:center;gap:.6rem;font-weight:700;
+      font-size:1rem;color:var(--green);text-decoration:none}
+    .nav-brand span{font-size:1.4rem}
+    .nav-user{display:flex;align-items:center;gap:.75rem}
+    .nav-clinica{font-size:.82rem;color:var(--ink-soft)}
+    .btn-logout{background:none;border:1px solid var(--line);padding:.35rem .75rem;
+      border-radius:.5rem;cursor:pointer;font-size:.78rem;color:var(--ink-soft);
+      font-family:inherit;transition:all .15s}
+    .btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+    /* MAIN */
+    .main{max-width:900px;margin:0 auto;padding:2rem 1.25rem}
+    .page-title{font-size:1.5rem;font-weight:800;margin-bottom:.25rem}
+    .page-sub{font-size:.85rem;color:var(--ink-soft);margin-bottom:1.75rem}
+
+    /* CARD */
+    .card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+      padding:1.5rem;box-shadow:var(--shadow)}
+    .card+.card{margin-top:1rem}
+    .card-title{font-size:.72rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.1em;color:var(--ink-faint);margin-bottom:.85rem}
+
+    /* STATUS CARD */
+    .status-card{background:linear-gradient(135deg,var(--green),var(--green-mid));
+      color:white;border-radius:var(--radius);padding:1.5rem;margin-bottom:1rem;
+      position:relative;overflow:hidden}
+    .status-card::before{content:'🐾';position:absolute;right:1rem;bottom:-.5rem;
+      font-size:5rem;opacity:.1}
+    .status-badge{display:inline-flex;align-items:center;gap:.35rem;
+      background:rgba(255,255,255,.2);padding:.25rem .75rem;border-radius:999px;
+      font-size:.75rem;font-weight:700;margin-bottom:.75rem}
+    .status-clinica{font-size:1.3rem;font-weight:800;margin-bottom:.25rem}
+    .status-plan{font-size:.85rem;opacity:.85}
+    .dias-bar-wrap{margin-top:1.1rem}
+    .dias-bar-label{display:flex;justify-content:space-between;font-size:.78rem;
+      opacity:.9;margin-bottom:.4rem}
+    .dias-bar{height:8px;background:rgba(255,255,255,.25);border-radius:999px;overflow:hidden}
+    .dias-bar-fill{height:100%;background:#fff;border-radius:999px;transition:width .8s}
+
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem}
+    .stat{background:var(--white);border:1px solid var(--line);border-radius:.75rem;
+      padding:1rem;text-align:center;box-shadow:var(--shadow)}
+    .stat-val{font-size:1.4rem;font-weight:800;line-height:1}
+    .stat-lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;
+      color:var(--ink-faint);margin-top:.3rem}
+
+    /* STEPPER */
+    .stepper{display:flex;gap:0;margin-bottom:1.75rem}
+    .step{flex:1;text-align:center;position:relative}
+    .step::after{content:'';position:absolute;top:16px;left:50%;width:100%;
+      height:2px;background:var(--line);z-index:0}
+    .step:last-child::after{display:none}
+    .step-num{width:32px;height:32px;border-radius:50%;border:2px solid var(--line);
+      background:var(--white);color:var(--ink-faint);font-size:.8rem;font-weight:700;
+      display:inline-flex;align-items:center;justify-content:center;
+      position:relative;z-index:1;transition:all .3s}
+    .step.active .step-num{background:var(--green);border-color:var(--green);color:#fff}
+    .step.done .step-num{background:var(--green-light);border-color:var(--green);color:var(--green)}
+    .step-label{font-size:.65rem;color:var(--ink-faint);margin-top:.35rem;font-weight:600}
+    .step.active .step-label{color:var(--green)}
+
+    /* BOTONES */
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.7rem 1.4rem;
+      border-radius:.7rem;font-family:inherit;font-size:.88rem;font-weight:600;
+      cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+    .btn-primary{background:var(--green);color:#fff}
+    .btn-primary:hover{background:var(--green-mid)}
+    .btn-ghost{background:none;color:var(--ink-soft);border:1px solid var(--line)}
+    .btn-ghost:hover{border-color:var(--green);color:var(--green)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn-block{width:100%;justify-content:center}
+
+    /* OPCIÓN DE MESES */
+    .meses-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;margin-bottom:1.25rem}
+    @media(min-width:500px){.meses-grid{grid-template-columns:repeat(4,1fr)}}
+    .mes-opt{border:2px solid var(--line);border-radius:.85rem;padding:.85rem .5rem;
+      text-align:center;cursor:pointer;transition:all .2s;background:var(--white)}
+    .mes-opt:hover{border-color:var(--green);background:var(--green-light)}
+    .mes-opt.selected{border-color:var(--green);background:var(--green-light)}
+    .mes-opt .mes-n{font-size:1.3rem;font-weight:800;color:var(--green)}
+    .mes-opt .mes-lbl{font-size:.68rem;color:var(--ink-faint);margin:.1rem 0}
+    .mes-opt .mes-precio{font-size:.85rem;font-weight:700}
+    .mes-opt .mes-ahorro{font-size:.65rem;color:var(--green-mid);font-weight:600;
+      background:var(--green-light);padding:.1rem .4rem;border-radius:999px;
+      display:inline-block;margin-top:.2rem}
+
+    /* MÉTODOS DE PAGO */
+    .metodos{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.25rem}
+    .metodo{border:2px solid var(--line);border-radius:.85rem;padding:1rem 1.15rem;
+      cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.85rem}
+    .metodo:hover,.metodo.selected{border-color:var(--green);background:var(--green-light)}
+    .metodo-icon{font-size:1.5rem;flex-shrink:0}
+    .metodo-nombre{font-weight:700;font-size:.9rem}
+    .metodo-desc{font-size:.75rem;color:var(--ink-soft)}
+
+    /* DATOS DE PAGO */
+    .datos-pago{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
+      padding:1.15rem;margin-bottom:1.1rem}
+    .datos-pago p{font-size:.85rem;margin-bottom:.4rem}
+    .datos-pago strong{color:var(--green)}
+    .datos-pago .numero{font-size:1.2rem;font-weight:800;color:var(--green);
+      letter-spacing:.05em;display:block;margin:.25rem 0}
+
+    /* UPLOAD */
+    .upload-zone{border:2px dashed var(--line);border-radius:.85rem;padding:2rem;
+      text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1rem}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--green);background:var(--green-light)}
+    .upload-zone input{display:none}
+    .upload-icon{font-size:2rem;margin-bottom:.5rem}
+    .upload-text{font-size:.85rem;color:var(--ink-soft)}
+    .upload-preview{background:#f9fafb;border:1px solid var(--line);border-radius:.65rem;
+      padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;margin-top:.75rem}
+    .upload-preview-icon{font-size:1.5rem}
+    .upload-preview-name{font-size:.82rem;font-weight:600;flex:1}
+    .upload-preview-size{font-size:.72rem;color:var(--ink-faint)}
+
+    /* FORMULARIO */
+    .form-group{margin-bottom:1rem}
+    label.flabel{display:block;font-size:.72rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:.35rem}
+    input.finput,select.finput{width:100%;border:1.5px solid var(--line);border-radius:.65rem;
+      padding:.6rem .9rem;font-size:.88rem;font-family:inherit;outline:none;
+      transition:border-color .15s;background:var(--white)}
+    input.finput:focus,select.finput:focus{border-color:var(--green)}
+
+    /* TABLA HISTORIAL */
+    .htable{width:100%;border-collapse:collapse;font-size:.82rem}
+    .htable th{padding:.6rem .85rem;text-align:left;font-size:.65rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);
+      border-bottom:1px solid var(--line);background:#f9fafb}
+    .htable td{padding:.8rem .85rem;border-bottom:1px solid var(--line);vertical-align:middle}
+    .htable tr:last-child td{border-bottom:none}
+
+    /* BADGES */
+    .badge{display:inline-flex;align-items:center;gap:.25rem;font-size:.68rem;
+      font-weight:700;padding:.2rem .6rem;border-radius:999px}
+    .badge-green{background:#dcfce7;color:#166534}
+    .badge-yellow{background:#fef9c3;color:#854d0e}
+    .badge-red{background:#fee2e2;color:#991b1b}
+    .badge-blue{background:#dbeafe;color:#1e40af}
+    .badge-gray{background:#f3f4f6;color:#6b7280}
+
+    /* TABS NAV */
+    .tabs{display:flex;gap:.15rem;border-bottom:2px solid var(--line);margin-bottom:1.5rem;
+      overflow-x:auto}
+    .tab-btn{padding:.65rem 1rem;border:none;background:none;cursor:pointer;
+      font-family:inherit;font-size:.84rem;font-weight:600;color:var(--ink-faint);
+      border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;
+      transition:all .15s}
+    .tab-btn.active{color:var(--green);border-bottom-color:var(--green)}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block}
+
+    /* RESUMEN PAGO */
+    .resumen-pago{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
+      padding:1.1rem;margin-bottom:1.1rem}
+    .resumen-row{display:flex;justify-content:space-between;font-size:.85rem;padding:.2rem 0}
+    .resumen-total{font-size:1.1rem;font-weight:800;color:var(--green);
+      border-top:1px solid #bbf7d0;padding-top:.5rem;margin-top:.35rem}
+
+    /* ÉXITO */
+    .success-box{text-align:center;padding:2rem}
+    .success-icon{font-size:3.5rem;margin-bottom:1rem}
+    .success-title{font-size:1.3rem;font-weight:800;color:var(--green);margin-bottom:.5rem}
+    .success-text{font-size:.88rem;color:var(--ink-soft);max-width:350px;margin:0 auto}
+
+    /* LOADER */
+    .spinner{width:20px;height:20px;border:2px solid var(--line);
+      border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;
+      display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* LOGIN */
+    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:1rem}
+    .login-card{background:var(--white);border-radius:1.25rem;padding:2.5rem 2rem;
+      width:100%;max-width:400px;box-shadow:var(--shadow-md)}
+    .login-logo{text-align:center;margin-bottom:1.75rem}
+    .login-logo span{font-size:2.5rem}
+    .login-logo h1{font-size:1.25rem;font-weight:800;color:var(--green);margin-top:.5rem}
+    .login-logo p{font-size:.8rem;color:var(--ink-soft);margin-top:.2rem}
+    .login-error{background:#fee2e2;border:1px solid #fecaca;border-radius:.65rem;
+      padding:.75rem 1rem;font-size:.82rem;color:var(--red);margin-bottom:1rem}
+
+    @media(max-width:600px){
+      .stats-grid{grid-template-columns:repeat(2,1fr)}
+      .main{padding:1.25rem .85rem}
+    }
+    @media(max-width:400px){
+      .stats-grid{grid-template-columns:1fr}
+      .meses-grid{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="pantalla-login" class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <span>🐾</span>
+      <h1>VetNetcodip</h1>
+      <p>Portal de pagos y suscripción</p>
+    </div>
+    <div id="login-error" class="login-error" style="display:none"></div>
+    <div class="form-group">
+      <label class="flabel">Email</label>
+      <input id="l-email" type="email" class="finput" placeholder="tu@clinica.com"
+        onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="form-group">
+      <label class="flabel">Contraseña</label>
+      <input id="l-pass" type="password" class="finput" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button onclick="doLogin()" id="btn-login" class="btn btn-primary btn-block" style="margin-top:.5rem">
+      Ingresar
+    </button>
+    <p style="text-align:center;margin-top:1rem">
+      <a href="#" onclick="mostrarRecuperar()" style="font-size:.8rem;color:var(--green)">
+        ¿Olvidaste tu contraseña?
+      </a>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════ APP ══════════ -->
+<div id="pantalla-app" style="display:none">
+
+  <!-- Navbar -->
+  <nav class="nav">
+    <a href="#" class="nav-brand"><span>🐾</span> VetNetcodip</a>
+    <div class="nav-user">
+      <span class="nav-clinica" id="nav-clinica-nombre"></span>
+      <button onclick="logout()" class="btn-logout">Salir</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <h1 class="page-title">Mi suscripción</h1>
+    <p class="page-sub">Gestiona tu plan y realiza pagos de forma segura</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('inicio')">🏠 Inicio</button>
+      <button class="tab-btn" onclick="showTab('pagar')">💳 Realizar pago</button>
+      <button class="tab-btn" onclick="showTab('historial')">📋 Historial</button>
+    </div>
+
+    <!-- Tab: INICIO -->
+    <div id="tab-inicio" class="tab-pane active">
+      <!-- Status card -->
+      <div class="status-card" id="status-card">
+        <div class="status-badge" id="status-badge">⏳ Cargando...</div>
+        <div class="status-clinica" id="status-clinica">—</div>
+        <div class="status-plan" id="status-plan">—</div>
+        <div class="dias-bar-wrap" id="dias-wrap">
+          <div class="dias-bar-label">
+            <span id="dias-label">— días restantes</span>
+            <span id="dias-vence">Vence: —</span>
+          </div>
+          <div class="dias-bar"><div class="dias-bar-fill" id="dias-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-val" id="stat-pagos">—</div>
+          <div class="stat-lbl">Pagos realizados</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-dias">—</div>
+          <div class="stat-lbl">Días restantes</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-plan">—</div>
+          <div class="stat-lbl">Plan actual</div>
+        </div>
+      </div>
+
+      <!-- Cobro pendiente -->
+      <div id="cobro-pendiente-box" class="card" style="display:none">
+        <div class="card-title">⚠️ Pago pendiente</div>
+        <div id="cobro-pendiente-content"></div>
+      </div>
+
+      <!-- Acceso rápido -->
+      <div class="card" style="margin-top:.85rem">
+        <div class="card-title">Acciones rápidas</div>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+          <button onclick="showTab('pagar');irAPaso(1)" class="btn btn-primary">
+            💳 Realizar un pago
+          </button>
+          <button onclick="showTab('historial')" class="btn btn-ghost">
+            📋 Ver historial de pagos
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: PAGAR -->
+    <div id="tab-pagar" class="tab-pane">
+      <!-- Stepper -->
+      <div class="stepper" id="stepper">
+        <div class="step active" id="stp-1"><div class="step-num">1</div><div class="step-label">Período</div></div>
+        <div class="step" id="stp-2"><div class="step-num">2</div><div class="step-label">Método</div></div>
+        <div class="step" id="stp-3"><div class="step-num">3</div><div class="step-label">Comprobante</div></div>
+        <div class="step" id="stp-4"><div class="step-num">4</div><div class="step-label">Confirmación</div></div>
+      </div>
+
+      <!-- Paso 1: Seleccionar meses -->
+      <div id="paso-1" class="card">
+        <div class="card-title">Paso 1 — ¿Cuántos meses deseas pagar?</div>
+        <p style="font-size:.85rem;color:var(--ink-soft);margin-bottom:1rem">
+          Mientras más meses pagues, mayor es tu descuento.
+        </p>
+        <div class="meses-grid" id="meses-grid">
+          <!-- Se renderiza dinámicamente -->
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button onclick="irAPaso(2)" id="btn-paso2" class="btn btn-primary" disabled>
+            Continuar →
+          </button>
+        </div>
+      </div>
+
+      <!-- Paso 2: Método de pago -->
+      <div id="paso-2" class="card" style="display:none">
+        <div class="card-title">Paso 2 — Elige cómo pagar</div>
+        <div class="metodos" id="metodos-list">
+          <div class="metodo" onclick="selMetodo('yape',this)">
+            <div class="metodo-icon">💚</div>
+            <div><div class="metodo-nombre">Yape / Plin</div><div class="metodo-desc">Pago inmediato al número registrado</div></div>
+          </div>
+          <div class="metodo" onclick="selMetodo('transferencia',this)">
+            <div class="metodo-icon">🏦</div>
+            <div><div class="metodo-nombre">Transferencia bancaria</div><div class="metodo-desc">Transfiere a nuestra cuenta BCP o Interbank</div></div>
+          </div>
+          <div class="metodo" onclick="selMetodo('deposito',this)">
+            <div class="metodo-icon">💵</div>
+            <div><div class="metodo-nombre">Depósito en cuenta</div><div class="metodo-desc">Deposita en cualquier agencia bancaria</div></div>
+          </div>
+        </div>
+
+        <!-- Datos de pago según método -->
+        <div id="datos-yape" class="datos-pago" style="display:none">
+          <p>Realiza el pago por <strong id="yape-monto"></strong> a:</p>
+          <p>📱 Yape/Plin al número: <strong class="numero" id="yape-numero">—</strong></p>
+          <p>👤 A nombre de: <strong id="yape-nombre">—</strong></p>
+        </div>
+
+        <div id="datos-transferencia" class="datos-pago" style="display:none">
+          <p>Transfiere <strong id="trans-monto"></strong> a:</p>
+          <p>🏦 Banco: <strong id="trans-banco">—</strong></p>
+          <p>📋 Cuenta: <strong class="numero" id="trans-cuenta">—</strong></p>
+          <p>🔢 CCI: <strong id="trans-cci">—</strong></p>
+          <p>👤 Titular: <strong id="trans-titular">—</strong></p>
+        </div>
+
+        <div id="datos-deposito" class="datos-pago" style="display:none">
+          <p>Deposita <strong id="dep-monto"></strong> en:</p>
+          <p>🏦 Banco: <strong id="dep-banco">—</strong></p>
+          <p>📋 Cuenta: <strong class="numero" id="dep-cuenta">—</strong></p>
+          <p>👤 Titular: <strong id="dep-titular">—</strong></p>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:1rem">
+          <button onclick="irAPaso(1)" class="btn btn-ghost">← Atrás</button>
+          <button onclick="irAPaso(3)" id="btn-paso3" class="btn btn-primary" disabled>
+            Ya realicé el pago →
+          </button>
+        </div>
+      </div>
+
+      <!-- Paso 3: Subir comprobante -->
+      <div id="paso-3" class="card" style="display:none">
+        <div class="card-title">Paso 3 — Sube tu comprobante</div>
+        <p style="font-size:.85rem;color:var(--ink-soft);margin-bottom:1rem">
+          Sube una foto o captura de pantalla del comprobante de pago.
+        </p>
+
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+          ondragover="event.preventDefault();this.classList.add('dragover')"
+          ondragleave="this.classList.remove('dragover')"
+          ondrop="onDrop(event)">
+          <input type="file" id="file-input" accept="image/*,.pdf" onchange="onFileSelect(event)"/>
+          <div class="upload-icon">📎</div>
+          <p class="upload-text">Arrastra aquí o <strong style="color:var(--green)">haz clic</strong> para seleccionar</p>
+          <p style="font-size:.72rem;color:var(--ink-faint);margin-top:.25rem">JPG, PNG o PDF · Máx. 10MB</p>
+        </div>
+
+        <div id="file-preview" class="upload-preview" style="display:none">
+          <div class="upload-preview-icon" id="prev-icon">📄</div>
+          <div class="upload-preview-name" id="prev-name"></div>
+          <div class="upload-preview-size" id="prev-size"></div>
+          <button onclick="quitarArchivo()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:1rem">✕</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.85rem">
+          <div class="form-group">
+            <label class="flabel">N° de operación (opcional)</label>
+            <input id="num-operacion" type="text" class="finput" placeholder="123456789"/>
+          </div>
+          <div class="form-group">
+            <label class="flabel">Fecha del pago</label>
+            <input id="fecha-operacion" type="date" class="finput"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="flabel">Notas adicionales (opcional)</label>
+          <input id="notas-cliente" type="text" class="finput" placeholder="Banco de origen, referencia, etc."/>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:1rem">
+          <button onclick="irAPaso(2)" class="btn btn-ghost">← Atrás</button>
+          <button onclick="enviarPago()" id="btn-enviar" class="btn btn-primary" disabled>
+            📤 Enviar comprobante
+          </button>
+        </div>
+      </div>
+
+      <!-- Paso 4: Confirmación -->
+      <div id="paso-4" class="card" style="display:none">
+        <div class="success-box">
+          <div class="success-icon">✅</div>
+          <div class="success-title">¡Comprobante enviado!</div>
+          <p class="success-text">
+            Tu comprobante está en revisión. Validaremos tu pago en menos de <strong>24 horas</strong>
+            y recibirás una confirmación por email.
+          </p>
+          <div style="margin-top:1.5rem">
+            <button onclick="showTab('inicio');cargarCuenta()" class="btn btn-primary">
+              🏠 Volver al inicio
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: HISTORIAL -->
+    <div id="tab-historial" class="tab-pane">
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="htable">
+            <thead>
+              <tr>
+                <th>Período</th>
+                <th>Cobro</th>
+                <th>Meses</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Comprobante</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-historial">
+              <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink-faint)">
+                <div class="spinner"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+const API = window.location.hostname === 'localhost'
+  ? 'http://localhost:3030/api'
+  : '/api';
+
+var _token    = null;
+var _user     = null;
+var _cuenta   = null;
+var _config   = {};
+var _pasoActual = 1;
+var _mesesSel   = null;
+var _metodSel   = null;
+var _archivoSel = null;
+var _cobroId    = null;
+
+// ── Helpers ──────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.skipJson ? {} : {}),
+      ...(opts.headers || {}),
+      ...(_token ? { 'Authorization': 'Bearer ' + _token } : {}),
+    },
+    body: opts.body && !opts.isFormData ? JSON.stringify(opts.body) : opts.body,
+  });
+  return res;
+}
+
+function fDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Login ─────────────────────────────────────────────────────
+async function doLogin() {
+  var email = document.getElementById('l-email').value.trim();
+  var pass  = document.getElementById('l-pass').value;
+  var errEl = document.getElementById('login-error');
+  var btn   = document.getElementById('btn-login');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Ingresando...';
+
+  try {
+    var res  = await apiFetch('/auth/login', { method:'POST', body: { email, password: pass } });
+    var data = await res.json();
+    if (!res.ok) { errEl.textContent = data.message; errEl.style.display='block'; return; }
+
+    _token = data.token;
+    _user  = data.user;
+    localStorage.setItem('pagos_token', _token);
+    localStorage.setItem('pagos_user',  JSON.stringify(_user));
+    mostrarApp();
+  } catch(e) {
+    errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Ingresar';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('pagos_token');
+  localStorage.removeItem('pagos_user');
+  _token = null; _user = null;
+  document.getElementById('pantalla-app').style.display   = 'none';
+  document.getElementById('pantalla-login').style.display = 'flex';
+}
+
+function mostrarRecuperar() {
+  var email = prompt('Ingresa tu email para recuperar tu contraseña:');
+  if (!email) return;
+  apiFetch('/auth/recuperar', { method:'POST', body:{ email } })
+    .then(r => r.json())
+    .then(d => alert(d.message || 'Email enviado si existe la cuenta.'));
+}
+
+// ── App ───────────────────────────────────────────────────────
+function mostrarApp() {
+  document.getElementById('pantalla-login').style.display = 'none';
+  document.getElementById('pantalla-app').style.display   = 'block';
+  document.getElementById('nav-clinica-nombre').textContent = _user.clinica_nombre || '';
+  cargarCuenta();
+  cargarConfig();
+  cargarHistorial();
+}
+
+async function cargarCuenta() {
+  try {
+    var res  = await apiFetch('/cobros/mi-cuenta');
+    var data = (await res.json()).data;
+    _cuenta = data;
+
+    var sus  = data.suscripcion;
+    var dias = data.diasRestantes || 0;
+
+    // Status card
+    var estadoLabel = dias > 0 ? '✅ Activa' : '⚠️ Vencida';
+    var estadoColor = dias > 7 ? '' : dias > 0 ? 'background:rgba(217,119,6,.25)' : 'background:rgba(220,38,38,.25)';
+    document.getElementById('status-badge').innerHTML = estadoLabel;
+    document.getElementById('status-badge').style.cssText += estadoColor;
+    document.getElementById('status-clinica').textContent = _user.clinica_nombre || '—';
+    document.getElementById('status-plan').textContent = 'Plan ' + (sus?.plan_nombre || '—');
+
+    if (sus?.fecha_vencimiento) {
+      var vence = new Date(sus.fecha_vencimiento);
+      var inicio = new Date(sus.fecha_inicio || sus.fecha_vencimiento);
+      var total  = Math.max(1, Math.ceil((vence - inicio) / (1000*60*60*24)));
+      var pct    = Math.max(0, Math.min(100, Math.round((dias / total) * 100)));
+      document.getElementById('dias-label').textContent = dias + ' días restantes';
+      document.getElementById('dias-vence').textContent = 'Vence: ' + fDate(vence);
+      document.getElementById('dias-fill').style.width = pct + '%';
+    }
+
+    document.getElementById('stat-dias').textContent = Math.max(0, dias);
+    document.getElementById('stat-plan').textContent = sus?.plan_codigo?.toUpperCase() || '—';
+
+    // Cobro pendiente
+    if (data.cobroPendiente) {
+      _cobroId = data.cobroPendiente.id;
+      document.getElementById('cobro-pendiente-box').style.display = 'block';
+      document.getElementById('cobro-pendiente-content').innerHTML =
+        '<p style="font-size:.88rem;margin-bottom:.85rem">Tienes un cobro pendiente de <strong>S/. ' +
+        parseFloat(data.cobroPendiente.monto_final).toFixed(2) + '</strong> para el período ' +
+        data.cobroPendiente.periodo + '.</p>' +
+        '<button onclick="showTab(\'pagar\')" class="btn btn-primary" style="font-size:.84rem">💳 Pagar ahora</button>';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function cargarConfig() {
+  try {
+    var res  = await apiFetch('/cobros/planes');
+    var data = (await res.json()).data || [];
+    // También cargar config de pago (pública)
+    var res2 = await apiFetch('/public/config-pago');
+    if (res2.ok) _config = (await res2.json()).data || {};
+  } catch {}
+}
+
+async function cargarHistorial() {
+  try {
+    var res  = await apiFetch('/cobros/historial');
+    var rows = (await res.json()).data || [];
+    var tbody = document.getElementById('tbody-historial');
+
+    // Contar pagos
+    var pagados = rows.filter(function(r){ return r.cobro_estado==='pagado'; }).length;
+    document.getElementById('stat-pagos').textContent = pagados;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink-faint)">Sin historial de cobros</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function(r) {
+      var estadoBadge = r.cobro_estado === 'pagado'
+        ? '<span class="badge badge-green">✅ Pagado</span>'
+        : r.pago_estado === 'pendiente_validacion'
+        ? '<span class="badge badge-yellow">⏳ En revisión</span>'
+        : r.pago_estado === 'rechazado'
+        ? '<span class="badge badge-red">❌ Rechazado</span>'
+        : '<span class="badge badge-gray">⏰ Pendiente</span>';
+
+      var compBtn = r.comprobante_url
+        ? '<a href="' + r.comprobante_url + '" target="_blank" class="btn btn-ghost" style="font-size:.75rem;padding:.3rem .65rem">📄 Ver</a>'
+        : r.cobro_estado !== 'pagado'
+        ? '<button onclick="showTab(\'pagar\')" class="btn btn-primary" style="font-size:.75rem;padding:.3rem .65rem">💳 Pagar</button>'
+        : '—';
+
+      return '<tr>' +
+        '<td style="font-weight:600">' + esc(r.periodo) + '</td>' +
+        '<td style="font-size:.75rem;color:var(--ink-soft)">' + esc(r.numero_cobro) + '</td>' +
+        '<td>' + (r.meses || 1) + ' mes' + (r.meses > 1 ? 'es' : '') + '</td>' +
+        '<td style="font-weight:700">S/. ' + parseFloat(r.monto_final||0).toFixed(2) + '</td>' +
+        '<td>' + estadoBadge + '</td>' +
+        '<td>' + compBtn + '</td>' +
+      '</tr>';
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  var tabs = {'inicio':0,'pagar':1,'historial':2};
+  document.querySelectorAll('.tab-btn')[tabs[tab] || 0].classList.add('active');
+
+  if (tab === 'pagar') renderMeses();
+  if (tab === 'historial') cargarHistorial();
+}
+
+// ── Pago — paso a paso ────────────────────────────────────────
+function irAPaso(n) {
+  for (var i = 1; i <= 4; i++) {
+    document.getElementById('paso-' + i).style.display = i === n ? 'block' : 'none';
+    var stp = document.getElementById('stp-' + i);
+    stp.classList.remove('active','done');
+    if (i < n) stp.classList.add('done');
+    if (i === n) stp.classList.add('active');
+  }
+  _pasoActual = n;
+}
+
+async function renderMeses() {
+  var grid = document.getElementById('meses-grid');
+  grid.innerHTML = '<p style="color:var(--ink-faint);font-size:.85rem">Cargando...</p>';
+
+  try {
+    var precioMes = parseFloat(_cuenta?.suscripcion?.precio_acordado || 0);
+    if (!precioMes) {
+      var res = await apiFetch('/cobros/mi-cuenta');
+      var d   = (await res.json()).data;
+      precioMes = parseFloat(d?.suscripcion?.precio_acordado || 150);
+    }
+
+    var opciones = [
+      { meses: 1,  desc: 0  },
+      { meses: 3,  desc: 10 },
+      { meses: 6,  desc: 13 },
+      { meses: 12, desc: 20 },
+    ];
+
+    grid.innerHTML = opciones.map(function(o) {
+      var base  = precioMes * o.meses;
+      var total = base - (base * o.desc / 100);
+      var ahorro = base - total;
+      return '<div class="mes-opt" onclick="selMeses(' + o.meses + ',this)">' +
+        '<div class="mes-n">' + o.meses + '</div>' +
+        '<div class="mes-lbl">' + (o.meses === 1 ? 'mes' : 'meses') + '</div>' +
+        '<div class="mes-precio">S/. ' + total.toFixed(2) + '</div>' +
+        (o.desc > 0 ? '<div class="mes-ahorro">Ahorra ' + o.desc + '%</div>' : '') +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    grid.innerHTML = '<p style="color:var(--ink-faint)">Error cargando opciones</p>';
+  }
+}
+
+function selMeses(n, el) {
+  document.querySelectorAll('.mes-opt').forEach(function(o){ o.classList.remove('selected'); });
+  el.classList.add('selected');
+  _mesesSel = n;
+  document.getElementById('btn-paso2').disabled = false;
+}
+
+function selMetodo(m, el) {
+  document.querySelectorAll('.metodo').forEach(function(o){ o.classList.remove('selected'); });
+  el.classList.add('selected');
+  _metodSel = m;
+
+  // Ocultar todos los datos
+  ['yape','transferencia','deposito'].forEach(function(t){
+    document.getElementById('datos-' + t).style.display = 'none';
+  });
+
+  // Calcular monto
+  var precioMes = parseFloat(_cuenta?.suscripcion?.precio_acordado || 150);
+  var descs = { 1:0, 3:10, 6:13, 12:20 };
+  var base  = precioMes * _mesesSel;
+  var total = base - (base * (descs[_mesesSel] || 0) / 100);
+  var montoStr = 'S/. ' + total.toFixed(2);
+
+  // Mostrar datos del método seleccionado
+  if (m === 'yape') {
+    document.getElementById('yape-monto').textContent  = montoStr;
+    document.getElementById('yape-numero').textContent = _config.yape_numero || '—';
+    document.getElementById('yape-nombre').textContent = _config.yape_nombre || '—';
+    document.getElementById('datos-yape').style.display = 'block';
+  } else if (m === 'transferencia') {
+    document.getElementById('trans-monto').textContent  = montoStr;
+    document.getElementById('trans-banco').textContent  = _config.banco_nombre || '—';
+    document.getElementById('trans-cuenta').textContent = _config.banco_cuenta || '—';
+    document.getElementById('trans-cci').textContent    = _config.banco_cci    || '—';
+    document.getElementById('trans-titular').textContent= _config.banco_titular|| '—';
+    document.getElementById('datos-transferencia').style.display = 'block';
+  } else {
+    document.getElementById('dep-monto').textContent   = montoStr;
+    document.getElementById('dep-banco').textContent   = _config.banco_nombre  || '—';
+    document.getElementById('dep-cuenta').textContent  = _config.banco_cuenta  || '—';
+    document.getElementById('dep-titular').textContent = _config.banco_titular || '—';
+    document.getElementById('datos-deposito').style.display = 'block';
+  }
+
+  document.getElementById('btn-paso3').disabled = false;
+}
+
+function onFileSelect(e) {
+  var file = e.target.files[0];
+  if (file) mostrarPreview(file);
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dragover');
+  var file = e.dataTransfer.files[0];
+  if (file) mostrarPreview(file);
+}
+
+function mostrarPreview(file) {
+  _archivoSel = file;
+  document.getElementById('upload-zone').style.display = 'none';
+  var prev = document.getElementById('file-preview');
+  prev.style.display = 'flex';
+  document.getElementById('prev-icon').textContent = file.type.includes('pdf') ? '📄' : '🖼️';
+  document.getElementById('prev-name').textContent = file.name;
+  document.getElementById('prev-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
+  document.getElementById('btn-enviar').disabled = false;
+  // Poner fecha de hoy
+  document.getElementById('fecha-operacion').value = new Date().toISOString().split('T')[0];
+}
+
+function quitarArchivo() {
+  _archivoSel = null;
+  document.getElementById('file-preview').style.display = 'none';
+  document.getElementById('upload-zone').style.display  = 'block';
+  document.getElementById('btn-enviar').disabled = true;
+  document.getElementById('file-input').value = '';
+}
+
+async function enviarPago() {
+  if (!_archivoSel || !_cobroId) return;
+  var btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Enviando...';
+
+  try {
+    var fd = new FormData();
+    fd.append('comprobante',     _archivoSel);
+    fd.append('metodo',          _metodSel);
+    fd.append('meses',           String(_mesesSel));
+    fd.append('numero_operacion',document.getElementById('num-operacion').value);
+    fd.append('fecha_operacion', document.getElementById('fecha-operacion').value);
+    fd.append('notas_cliente',   document.getElementById('notas-cliente').value);
+
+    var res = await fetch(API + '/cobros/' + _cobroId + '/pagar', {
+      method : 'POST',
+      headers: { 'Authorization': 'Bearer ' + _token },
+      body   : fd,
+    });
+    var data = await res.json();
+    if (!res.ok) { alert(data.message || 'Error al enviar'); return; }
+    irAPaso(4);
+  } catch(e) {
+    alert('Error de conexión. Intenta de nuevo.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📤 Enviar comprobante';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────
+(function init() {
+  _token = localStorage.getItem('pagos_token');
+  var u  = localStorage.getItem('pagos_user');
+  if (_token && u) {
+    try { _user = JSON.parse(u); mostrarApp(); return; } catch {}
+  }
+  // Mostrar login
+  document.getElementById('pantalla-login').style.display = 'flex';
+})();
+</script>
+</body>
+</html>
