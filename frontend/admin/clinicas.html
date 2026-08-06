@@ -38,6 +38,12 @@
     .checkbox-group{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}
     .checkbox-item{display:flex;align-items:center;gap:.4rem;background:#0f172a;border:1px solid #334155;padding:.4rem .75rem;border-radius:.65rem;cursor:pointer;font-size:.8rem;font-weight:500;color:#94a3b8}
     .checkbox-item input{width:auto;accent-color:#6366f1}
+
+    .ptab{background:transparent;color:#64748b;border:none;padding:.55rem .9rem;
+      border-bottom:2.5px solid transparent;margin-bottom:-1px;font-size:.8rem;
+      font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+    .ptab.active{color:#6366f1;border-bottom-color:#6366f1}
+    .ptab:hover{color:#818cf8}
     .hidden{display:none!important}
     .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -392,6 +398,129 @@
     </div>
   </div>
 </div>
+
+<!-- ════ Modal Pagos / Suscripción ════ -->
+<div id="modal-pagos" class="modal-bg hidden">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-head">
+      <div>
+        <h3 style="font-weight:700;color:#f1f5f9">💳 Suscripción y pagos</h3>
+        <p id="pagos-subtitulo" style="font-size:.75rem;color:#64748b;margin-top:.15rem"></p>
+      </div>
+      <button onclick="cerrarPagos()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pagos-tenant-id"/>
+
+      <!-- Tabs internos -->
+      <div style="display:flex;gap:.15rem;border-bottom:1px solid #334155;margin-bottom:1.25rem">
+        <button onclick="pagoTab('resumen')"  id="ptab-resumen"  class="ptab active">📊 Resumen</button>
+        <button onclick="pagoTab('validar')"  id="ptab-validar"  class="ptab">✅ Validar pago</button>
+        <button onclick="pagoTab('historial')" id="ptab-historial" class="ptab">📋 Historial</button>
+        <button onclick="pagoTab('ajustar')"  id="ptab-ajustar"  class="ptab">⚙️ Ajustar</button>
+      </div>
+
+      <!-- TAB: Resumen -->
+      <div id="ptab-content-resumen">
+        <div id="pagos-resumen-content">
+          <div style="text-align:center;padding:1.5rem"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: Validar pago -->
+      <div id="ptab-content-validar" style="display:none">
+        <div id="pagos-validar-content">
+          <p style="font-size:.82rem;color:#64748b;margin-bottom:1rem">Comprobantes pendientes de validación para esta clínica.</p>
+          <div id="cola-validacion-list"></div>
+        </div>
+      </div>
+
+      <!-- TAB: Historial -->
+      <div id="ptab-content-historial" style="display:none">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+            <thead>
+              <tr style="background:#0f172a">
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Período</th>
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Cobro</th>
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Meses</th>
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Monto</th>
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Estado</th>
+                <th style="padding:.6rem .85rem;text-align:left;font-size:.63rem;font-weight:700;text-transform:uppercase;color:#475569">Comprobante</th>
+              </tr>
+            </thead>
+            <tbody id="pagos-historial-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: Ajustar suscripción -->
+      <div id="ptab-content-ajustar" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div>
+            <label>Plan</label>
+            <select id="aj-plan" style="background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;width:100%">
+              <option value="basico">Básico</option>
+              <option value="profesional">Profesional</option>
+              <option value="clinica_pro">Clínica PRO</option>
+            </select>
+          </div>
+          <div>
+            <label>Precio acordado (S/.)/mes</label>
+            <input id="aj-precio" type="number" step="0.01" style="background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;width:100%"/>
+          </div>
+          <div>
+            <label>Nueva fecha de vencimiento</label>
+            <input id="aj-vencimiento" type="date" style="background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;width:100%"/>
+          </div>
+          <div>
+            <label>Estado</label>
+            <select id="aj-estado" style="background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;width:100%">
+              <option value="activa">✅ Activa</option>
+              <option value="trial">🔄 Trial</option>
+              <option value="vencida">⚠️ Vencida</option>
+              <option value="cancelada">❌ Cancelada</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1">
+            <label>Notas internas</label>
+            <textarea id="aj-notas" rows="2" style="background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;width:100%;resize:vertical" placeholder="Descuento especial, acuerdo, etc."></textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:.5rem">
+          <button onclick="enviarRecordatorio()" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem">
+            📧 Enviar recordatorio
+          </button>
+          <button onclick="guardarAjusteSuscripcion()" class="btn-primary" style="font-size:.84rem">
+            💾 Guardar ajuste
+          </button>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button onclick="cerrarPagos()" class="btn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal validar comprobante -->
+<div id="modal-comp" class="modal-bg hidden">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <h3 id="comp-titulo" style="font-weight:700;color:#f1f5f9">Validar comprobante</h3>
+      <button onclick="cerrarModalComp()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="modal-body" id="comp-body"></div>
+    <div class="modal-foot">
+      <button onclick="cerrarModalComp()" class="btn-ghost">Cancelar</button>
+      <button onclick="rechazarPagoAdmin()" id="btn-rechazar-comp" class="btn-danger" style="padding:.55rem 1.1rem">❌ Rechazar</button>
+      <button onclick="aprobarPagoAdmin()" id="btn-aprobar-comp" class="btn-primary" style="padding:.55rem 1.1rem">✅ Aprobar</button>
+    </div>
+  </div>
+</div>
 <script src="admin_shared.js"></script>
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
@@ -465,6 +594,7 @@
           <div style="display:flex;gap:.4rem;flex-wrap:wrap">
             <button onclick="abrirModalEditar(${c.id})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem">✏️ Editar</button>
             <button onclick="abrirIntegraciones(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#a78bfa;border-color:#6d28d9">🔌</button>
+            <button onclick="abrirPagos(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#059669;border-color:#10b981">💳</button>
             ${c.activo
               ? `<button onclick="abrirSuspender(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-danger" style="padding:.35rem .7rem">🚫</button>`
               : `<button onclick="reactivar(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-success" style="padding:.35rem .7rem">✅</button>`}
