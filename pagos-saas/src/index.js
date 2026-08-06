@@ -17,9 +17,7 @@ const { masterPool } = require('./db');
 
 const authRoutes    = require('./routes/auth.routes');
 const cobrosRoutes  = require('./routes/cobros.routes');
-const pagosRoutes   = require('./routes/pagos.routes');
 const adminRoutes   = require('./routes/admin.routes');
-const publicRoutes  = require('./routes/public.routes');
 const cronService   = require('./services/cron.service');
 
 const app  = express();
@@ -41,9 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── API Routes ────────────────────────────────────────────────
 app.use('/api/auth',   authRoutes);
 app.use('/api/cobros', cobrosRoutes);
-app.use('/api/pagos',  pagosRoutes);
 app.use('/api/admin',  adminRoutes);
-app.use('/api/public', publicRoutes);
 
 // ── Frontend — SPA fallback ───────────────────────────────────
 app.get('/admin*', (req, res) => {
