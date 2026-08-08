@@ -199,6 +199,81 @@ router.post('/tenants', async (req, res) => {
     ).catch(() => {});
 
     logger.info(`✅ Tenant creado: ${slug} → ${dbName}`);
+
+    // ── Crear usuario del portal de pagos automáticamente ────────
+    try {
+      const bcrypt = require('bcryptjs');
+      const hash   = await bcrypt.hash(body.admin_password || 'Vet2024!', 10);
+      await masterQuery(
+        `INSERT IGNORE INTO saas_portal_usuarios (tenant_id, nombre, email, password, activo)
+         VALUES (?,?,?,?,1)`,
+        [tenantId, body.admin_nombre || 'Administrador', body.admin_email, hash]
+      );
+      // Suscripción inicial (30 días trial)
+      const [planRow] = await masterQuery(
+        'SELECT id, precio_mensual FROM saas_planes WHERE codigo=? AND activo=1 LIMIT 1',
+        [body.plan || 'profesional']
+      );
+      if (planRow) {
+        const hoy   = new Date().toISOString().split('T')[0];
+        const vence = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        // Crear suscripción trial 30 días
+        await masterQuery(
+          `INSERT IGNORE INTO saas_suscripciones
+             (tenant_id, plan_id, precio_acordado, fecha_inicio, fecha_vencimiento, estado)
+           VALUES (?,?,?,?,?,'trial')`,
+          [tenantId, planRow.id, planRow.precio_mensual, hoy, vence]
+        );
+
+        // Obtener la suscripción recién creada
+        const [sus] = await masterQuery(
+          'SELECT id FROM saas_suscripciones WHERE tenant_id=? LIMIT 1',
+          [tenantId]
+        );
+
+        // Generar primer cobro (vence al finalizar el trial)
+        if (sus) {
+          const anio      = new Date().getFullYear();
+          const [lastCob] = await masterQuery(
+            `SELECT numero_cobro FROM saas_cobros WHERE numero_cobro LIKE ? ORDER BY id DESC LIMIT 1`,
+            [`VN-${anio}-%`]
+          ).catch(() => [null]);
+          const siguiente = lastCob
+            ? parseInt(lastCob.numero_cobro.split('-')[2]) + 1 : 1;
+          const numeroCobro = `VN-${anio}-${String(siguiente).padStart(4,'0')}`;
+          const periodo     = vence.slice(0,7); // mes de vencimiento
+
+          await masterQuery(
+            `INSERT IGNORE INTO saas_cobros
+               (tenant_id, suscripcion_id, periodo, meses, monto_base, descuento_pct,
+                monto_final, estado, fecha_emision, fecha_vencimiento, numero_cobro)
+             VALUES (?,?,?,1,?,0,?,'pendiente',?,?,?)`,
+            [tenantId, sus.id, periodo, planRow.precio_mensual,
+             planRow.precio_mensual, hoy, vence, numeroCobro]
+          );
+        }
+      }
+
+      // Enviar email de bienvenida si el módulo de pagos está disponible
+      try {
+        const emailPath = require('path').join(__dirname, '../../../pagos-saas/src/services/email.service');
+        const emailSvc  = require(emailPath);
+        await emailSvc.enviarBienvenida({
+          email             : body.admin_email,
+          nombre            : body.admin_nombre || 'Administrador',
+          clinica_nombre    : nombre_clinica,
+          password_temporal : body.admin_password,
+        });
+      } catch(emailErr) {
+        // El módulo de pagos puede no estar disponible aún, no es crítico
+        console.warn('[Admin] Email de bienvenida no enviado:', emailErr.message);
+      }
+
+    } catch(e) {
+      console.warn('[Admin] Error creando usuario portal:', e.message);
+    }
+
     return res.status(201).json({
       success: true,
       message: `Clínica "${nombre_clinica}" creada correctamente.`,
