@@ -637,7 +637,7 @@ async function cargarConfig() {
     var res  = await apiFetch('/cobros/planes');
     var data = (await res.json()).data || [];
     // También cargar config de pago (pública)
-    var res2 = await apiFetch('/public/config-pago');
+    var res2 = await apiFetch('/cobros/config-pago');
     if (res2.ok) _config = (await res2.json()).data || {};
   } catch {}
 }

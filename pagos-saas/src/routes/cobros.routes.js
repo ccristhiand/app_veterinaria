@@ -186,4 +186,21 @@ router.get('/planes', authCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── GET /api/cobros/config-pago — datos públicos para el portal ──
+// No requiere autenticación — solo devuelve datos de pago configurados
+router.get('/config-pago', async (req, res, next) => {
+  try {
+    const claves = ['yape_numero','yape_nombre','banco_nombre','banco_cuenta',
+                    'banco_cci','banco_titular','empresa_nombre'];
+    const rows   = await query(
+      `SELECT clave, valor FROM saas_config WHERE clave IN (${claves.map(() => '?').join(',')})`,
+      claves
+    );
+    const cfg = {};
+    rows.forEach(r => { cfg[r.clave] = r.valor; });
+    return res.json({ success: true, data: cfg });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
