@@ -627,7 +627,7 @@ async function cargarCuenta() {
         '<p style="font-size:.88rem;margin-bottom:.85rem">Tienes un cobro pendiente de <strong>S/. ' +
         parseFloat(data.cobroPendiente.monto_final).toFixed(2) + '</strong> para el período ' +
         data.cobroPendiente.periodo + '.</p>' +
-        '<button onclick="showTab(\'pagar\')" class="btn btn-primary" style="font-size:.84rem">💳 Pagar ahora</button>';
+        '<button onclick="seleccionarCobroYPagar(' + data.cobroPendiente.id + ')" class="btn btn-primary" style="font-size:.84rem">💳 Pagar ahora</button>';
     }
   } catch(e) { console.error(e); }
 }
@@ -669,7 +669,7 @@ async function cargarHistorial() {
       var compBtn = r.comprobante_url
         ? '<a href="' + r.comprobante_url + '" target="_blank" class="btn btn-ghost" style="font-size:.75rem;padding:.3rem .65rem">📄 Ver</a>'
         : r.cobro_estado !== 'pagado'
-        ? '<button onclick="showTab(\'pagar\')" class="btn btn-primary" style="font-size:.75rem;padding:.3rem .65rem">💳 Pagar</button>'
+        ? '<button onclick="seleccionarCobroYPagar(' + r.id + ')" class="btn btn-primary" style="font-size:.75rem;padding:.3rem .65rem">💳 Pagar</button>'
         : '—';
 
       return '<tr>' +
@@ -685,6 +685,13 @@ async function cargarHistorial() {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────
+
+function seleccionarCobroYPagar(cobroId) {
+  _cobroId = cobroId;
+  showTab('pagar');
+  irAPaso(1);
+}
+
 function showTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
