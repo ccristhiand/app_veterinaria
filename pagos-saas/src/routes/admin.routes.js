@@ -148,7 +148,7 @@ router.get('/clientes/:id', async (req, res, next) => {
 // ── POST /api/admin/pagos/:id/aprobar ─────────────────────────
 router.post('/pagos/:id/aprobar', async (req, res, next) => {
   try {
-    const { notas_admin } = req.body;
+    const { notas_admin, monto_ajustado, metodo_ajustado } = req.body;
     const pago = await queryOne(
       `SELECT p.*, c.tenant_id, c.meses, c.numero_cobro, c.periodo
        FROM saas_pagos p JOIN saas_cobros c ON c.id = p.cobro_id
@@ -161,6 +161,13 @@ router.post('/pagos/:id/aprobar', async (req, res, next) => {
 
     await withTransaction(async (conn) => {
       // Aprobar pago
+      // Actualizar monto y método si el admin los ajustó
+      if (monto_ajustado && monto_ajustado !== pago.monto) {
+        await conn.execute('UPDATE saas_pagos SET monto=? WHERE id=?', [monto_ajustado, pago.id]);
+      }
+      if (metodo_ajustado) {
+        await conn.execute('UPDATE saas_pagos SET metodo=? WHERE id=?', [metodo_ajustado, pago.id]);
+      }
       await conn.execute(
         `UPDATE saas_pagos SET estado='aprobado', aprobado_por=?, fecha_aprobacion=NOW(),
            numero_comprobante=?, notas_admin=? WHERE id=?`,

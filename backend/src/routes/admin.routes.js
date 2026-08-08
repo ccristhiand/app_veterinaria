@@ -218,21 +218,27 @@ router.post('/tenants', async (req, res) => {
         [planCodigo]
       );
       if (planRow) {
-        const hoy   = new Date().toISOString().split('T')[0];
-        const vence = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const hoy    = new Date();
+        const hoyStr = hoy.toISOString().split('T')[0];
 
-        // Crear suscripción trial 30 días
+        // Opción B: sin trial — acceso al pagar el mes actual
+        // Vencimiento: fin del mes actual
+        const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
+          .toISOString().split('T')[0];
+        const periodo = hoyStr.slice(0, 7); // mes actual ej: '2026-08'
+
+        // Crear suscripción activa (sin trial)
         await masterQuery(
           `INSERT IGNORE INTO saas_suscripciones
              (tenant_id, plan_id, precio_acordado, fecha_inicio, fecha_vencimiento, estado)
-           VALUES (?,?,?,?,?,'trial')`,
-          [tenantId, planRow.id, planRow.precio_mensual, hoy, vence]
+           VALUES (?,?,?,?,?,'activa')`,
+          [tenantId, planRow.id, planRow.precio_mensual, hoyStr, finMes]
         );
 
-        // Sincronizar trial_hasta en tenants para acceso al sistema
+        // Sincronizar trial_hasta = fin del mes actual
         await masterQuery(
           'UPDATE tenants SET trial_hasta=? WHERE id=?',
-          [vence, tenantId]
+          [finMes, tenantId]
         );
 
         // Obtener la suscripción recién creada
@@ -241,17 +247,16 @@ router.post('/tenants', async (req, res) => {
           [tenantId]
         );
 
-        // Generar primer cobro (vence al finalizar el trial)
+        // Generar cobro del mes actual (pendiente de pago)
         if (sus) {
           const anio      = new Date().getFullYear();
           const [lastCob] = await masterQuery(
             `SELECT numero_cobro FROM saas_cobros WHERE numero_cobro LIKE ? ORDER BY id DESC LIMIT 1`,
             [`VN-${anio}-%`]
           ).catch(() => [null]);
-          const siguiente = lastCob
+          const siguiente   = lastCob
             ? parseInt(lastCob.numero_cobro.split('-')[2]) + 1 : 1;
           const numeroCobro = `VN-${anio}-${String(siguiente).padStart(4,'0')}`;
-          const periodo     = vence.slice(0,7); // mes de vencimiento
 
           await masterQuery(
             `INSERT IGNORE INTO saas_cobros
@@ -259,7 +264,7 @@ router.post('/tenants', async (req, res) => {
                 monto_final, estado, fecha_emision, fecha_vencimiento, numero_cobro)
              VALUES (?,?,?,1,?,0,?,'pendiente',?,?,?)`,
             [tenantId, sus.id, periodo, planRow.precio_mensual,
-             planRow.precio_mensual, hoy, vence, numeroCobro]
+             planRow.precio_mensual, hoyStr, finMes, numeroCobro]
           );
         }
       }
