@@ -3,22 +3,21 @@
 /**
  * VetNetcodip SaaS — Sistema de Pagos
  * Puerto: 3030
- * Subdominio: pagos.vetnetcodip.com
+ * Subdominio: pagos.netcodip.com
  */
 
-const express    = require('express');
-const cors       = require('cors');
-const morgan     = require('morgan');
-const path       = require('path');
-const rateLimit  = require('express-rate-limit');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const express   = require('express');
+const cors      = require('cors');
+const morgan    = require('morgan');
+const path      = require('path');
+const rateLimit = require('express-rate-limit');
 
-const { masterPool } = require('./db');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const authRoutes    = require('./routes/auth.routes');
-const cobrosRoutes  = require('./routes/cobros.routes');
-const adminRoutes   = require('./routes/admin.routes');
-const cronService   = require('./services/cron.service');
+const authRoutes   = require('./routes/auth.routes');
+const cobrosRoutes = require('./routes/cobros.routes');
+const adminRoutes  = require('./routes/admin.routes');
+const cronService  = require('./services/cron.service');
 
 const app  = express();
 const PORT = process.env.PAGOS_PORT || 3030;
@@ -34,7 +33,7 @@ app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }));
 app.use('/api',      rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 
 // Static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '../../public')));
 
 // ── API Routes ────────────────────────────────────────────────
 app.use('/api/auth',   authRoutes);
@@ -43,10 +42,10 @@ app.use('/api/admin',  adminRoutes);
 
 // ── Frontend — SPA fallback ───────────────────────────────────
 app.get('/admin*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
+  res.sendFile(path.join(__dirname, '../../public/admin/index.html'));
 });
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '../../public/index.html'));
 });
 
 // ── Error handler ─────────────────────────────────────────────
