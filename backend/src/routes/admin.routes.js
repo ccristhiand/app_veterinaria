@@ -229,9 +229,9 @@ router.post('/tenants', async (req, res) => {
           [tenantId, planRow.id, planRow.precio_mensual, hoy, vence]
         );
 
-        // Sincronizar trial_hasta en tenant_config para acceso al sistema
+        // Sincronizar trial_hasta en tenants para acceso al sistema
         await masterQuery(
-          'UPDATE tenant_config SET trial_hasta=? WHERE tenant_id=?',
+          'UPDATE tenants SET trial_hasta=? WHERE id=?',
           [vence, tenantId]
         );
 

@@ -197,7 +197,7 @@ router.post('/pagos/:id/aprobar', async (req, res, next) => {
       );
       if (sus2?.fecha_vencimiento) {
         await conn.execute(
-          'UPDATE tenant_config SET trial_hasta=? WHERE tenant_id=?',
+          'UPDATE tenants SET trial_hasta=? WHERE id=?',
           [sus2.fecha_vencimiento, pago.tenant_id]
         );
       }
