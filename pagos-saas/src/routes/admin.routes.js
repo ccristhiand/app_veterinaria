@@ -128,10 +128,13 @@ router.get('/clientes/:id', async (req, res, next) => {
 
     const historial = await query(
       `SELECT c.*, p.id AS pago_id, p.estado AS pago_estado, p.metodo,
+              p.numero_operacion, p.monto AS pago_monto,
               p.numero_comprobante, p.fecha_aprobacion, p.notas_admin,
+              p.created_at AS pago_fecha,
               comp.url_blob AS comprobante_url
        FROM saas_cobros c
        LEFT JOIN saas_pagos p ON p.cobro_id = c.id
+         AND p.estado != 'rechazado'
        LEFT JOIN saas_comprobantes comp ON comp.pago_id = p.id
        WHERE c.tenant_id = ?
        ORDER BY c.id DESC`,

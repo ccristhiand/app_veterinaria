@@ -622,24 +622,30 @@
     var el = document.getElementById('cola-validacion-list');
     el.innerHTML = '<div style="text-align:center;padding:1rem"><div class="spinner"></div></div>';
     try {
-      var res  = await pagosFetch('/admin/dashboard');
-      if (!res || !res.ok) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error</p>'; return; }
-      var cola = (await res.json()).data.colaValidacion || [];
-      var misCola = cola.filter(function(p) { return String(p.tenant_id) === String(_pagosTenantId); });
+      // Llamar directamente al detalle del cliente que ya filtra por tenant
+      var res  = await pagosFetch('/admin/clientes/' + _pagosTenantId);
+      if (!res || !res.ok) { el.innerHTML = '<p style="color:#f87171;font-size:.82rem">Error al cargar</p>'; return; }
+      var data = (await res.json()).data;
+      // Filtrar historial por pagos pendientes de validación
+      var misCola = (data.historial || []).filter(function(r) {
+        return r.pago_estado === 'pendiente_validacion';
+      });
+
       if (!misCola.length) {
         el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#475569;font-size:.82rem">✅ Sin pagos pendientes</div>';
         return;
       }
+
       el.innerHTML = misCola.map(function(p) {
         return '<div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;margin-bottom:.75rem">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">' +
             '<div>' +
               '<p style="font-weight:700;font-size:.88rem">'+esc(p.numero_cobro)+' — '+esc(p.periodo)+'</p>' +
-              '<p style="font-size:.75rem;color:#64748b;margin-top:.15rem">S/. '+parseFloat(p.monto).toFixed(2)+' · '+esc(p.metodo)+' · '+pFDate(p.created_at)+'</p>' +
+              '<p style="font-size:.75rem;color:#64748b;margin-top:.15rem">S/. '+parseFloat(p.monto_final||0).toFixed(2)+' · '+pFDate(p.created_at)+'</p>' +
             '</div>' +
             '<div style="display:flex;gap:.4rem">' +
               (p.comprobante_url ? '<a href="'+p.comprobante_url+'" target="_blank" style="padding:.35rem .7rem;font-size:.72rem;color:#60a5fa;border:1px solid #1d4ed8;border-radius:.5rem;text-decoration:none;background:none">👁️ Ver</a>' : '') +
-              '<button onclick="abrirValidarComp('+p.id+')" class="btn-success" style="padding:.35rem .7rem;font-size:.72rem">✅ Validar</button>' +
+              '<button onclick="abrirValidarComp('+p.pago_id+')" style="background:#166534;color:#fff;border:none;padding:.35rem .7rem;font-size:.72rem;border-radius:.5rem;cursor:pointer">✅ Validar</button>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -714,11 +720,17 @@
 
   async function abrirValidarComp(pagoId) {
     _pagoValidandoId = pagoId;
-    var res  = await pagosFetch('/admin/dashboard');
+    // Cargar datos del pago desde el historial del cliente
+    var res  = await pagosFetch('/admin/clientes/' + _pagosTenantId);
     if (!res) return;
-    var cola = (await res.json()).data.colaValidacion || [];
-    var pago = cola.find(function(p) { return p.id === pagoId; });
+    var data = (await res.json()).data;
+    var pago = (data.historial || []).find(function(p) { return p.pago_id === pagoId; });
     if (!pago) return;
+    // Normalizar campos
+    pago.monto        = pago.monto_final;
+    pago.numero_cobro = pago.numero_cobro;
+    pago.metodo       = pago.metodo || '—';
+    pago.numero_operacion = pago.numero_operacion || null;
     document.getElementById('comp-titulo').textContent = 'Validar — ' + esc(pago.numero_cobro);
     document.getElementById('comp-body').innerHTML =
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">' +
