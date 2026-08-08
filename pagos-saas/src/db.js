@@ -1,13 +1,15 @@
 'use strict';
 
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
 const mysql = require('mysql2/promise');
 
 const masterPool = mysql.createPool({
-  host              : process.env.MASTER_DB_HOST     || 'localhost',
-  port              : process.env.MASTER_DB_PORT     || 3306,
-  user              : process.env.MASTER_DB_USER     || 'vetnetcodip',
-  password          : process.env.MASTER_DB_PASS     || '',
-  database          : process.env.MASTER_DB_NAME     || 'vet_master',
+  host              : process.env.MASTER_DB_HOST || 'localhost',
+  port              : process.env.MASTER_DB_PORT || 3306,
+  user              : process.env.MASTER_DB_USER || 'vetnetcodip',
+  password          : process.env.MASTER_DB_PASS || '',
+  database          : process.env.MASTER_DB_NAME || 'vet_master',
   waitForConnections: true,
   connectionLimit   : 10,
   timezone          : '-05:00',
@@ -38,7 +40,6 @@ async function withTransaction(fn) {
   }
 }
 
-// Generar número de cobro único: VN-2026-0001
 async function generarNumeroCobro() {
   const anio  = new Date().getFullYear();
   const [last] = await query(
@@ -52,7 +53,6 @@ async function generarNumeroCobro() {
   return `VN-${anio}-${String(siguiente).padStart(4, '0')}`;
 }
 
-// Generar número de comprobante de pago: VNP-2026-0001
 async function generarNumeroComprobante() {
   const anio  = new Date().getFullYear();
   const [last] = await query(

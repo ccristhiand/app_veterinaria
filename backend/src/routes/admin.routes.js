@@ -203,16 +203,16 @@ router.post('/tenants', async (req, res) => {
     // ── Crear usuario del portal de pagos automáticamente ────────
     try {
       const bcrypt = require('bcryptjs');
-      const hash   = await bcrypt.hash(body.admin_password || 'Vet2024!', 10);
+      const hash   = await bcrypt.hash(admin_password || 'Vet2024!', 10);
       await masterQuery(
         `INSERT IGNORE INTO saas_portal_usuarios (tenant_id, nombre, email, password, activo)
          VALUES (?,?,?,?,1)`,
-        [tenantId, body.admin_nombre || 'Administrador', body.admin_email, hash]
+        [tenantId, admin_nombre || 'Administrador', admin_email, hash]
       );
       // Suscripción inicial (30 días trial)
       const [planRow] = await masterQuery(
         'SELECT id, precio_mensual FROM saas_planes WHERE codigo=? AND activo=1 LIMIT 1',
-        [body.plan || 'profesional']
+        [plan || 'profesional']
       );
       if (planRow) {
         const hoy   = new Date().toISOString().split('T')[0];
@@ -260,10 +260,10 @@ router.post('/tenants', async (req, res) => {
         const emailPath = require('path').join(__dirname, '../../../pagos-saas/src/services/email.service');
         const emailSvc  = require(emailPath);
         await emailSvc.enviarBienvenida({
-          email             : body.admin_email,
-          nombre            : body.admin_nombre || 'Administrador',
+          email             : admin_email,
+          nombre            : admin_nombre || 'Administrador',
           clinica_nombre    : nombre_clinica,
-          password_temporal : body.admin_password,
+          password_temporal : admin_password,
         });
       } catch(emailErr) {
         // El módulo de pagos puede no estar disponible aún, no es crítico
