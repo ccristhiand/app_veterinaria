@@ -652,43 +652,117 @@ async function cargarConfig() {
   } catch {}
 }
 
+// Modal para ver/editar comprobante
+var _compEditCobroId = null;
+
+function abrirModalComp(cobroId, compUrl) {
+  if (!compUrl) compUrl = window['_compUrl_' + cobroId] || null;
+  _compEditCobroId = cobroId;
+  var modal = document.getElementById('modal-comp-cliente');
+  document.getElementById('comp-preview-img').src = '';
+  document.getElementById('comp-preview-embed').src = '';
+  document.getElementById('comp-preview-img').style.display   = 'none';
+  document.getElementById('comp-preview-embed').style.display = 'none';
+  document.getElementById('comp-edit-preview').style.display  = 'none';
+  document.getElementById('comp-edit-input').value = '';
+
+  if (compUrl) {
+    if (compUrl.toLowerCase().includes('.pdf')) {
+      document.getElementById('comp-preview-embed').src = compUrl;
+      document.getElementById('comp-preview-embed').style.display = 'block';
+    } else {
+      document.getElementById('comp-preview-img').src = compUrl;
+      document.getElementById('comp-preview-img').style.display = 'block';
+    }
+    document.getElementById('comp-link').href = compUrl;
+    document.getElementById('comp-link').style.display = 'inline-flex';
+  } else {
+    document.getElementById('comp-link').style.display = 'none';
+  }
+  modal.style.display = 'flex';
+}
+
+function cerrarModalComp() {
+  document.getElementById('modal-comp-cliente').style.display = 'none';
+}
+
+function onCompEditSelect(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var prev = document.getElementById('comp-edit-preview');
+  prev.style.display = 'flex';
+  document.getElementById('comp-edit-name').textContent = file.name;
+  document.getElementById('comp-edit-size').textContent = (file.size/1024).toFixed(0) + ' KB';
+}
+
+async function subirNuevoComp() {
+  var input = document.getElementById('comp-edit-input');
+  if (!input.files[0]) { alert('Selecciona un archivo'); return; }
+  var btn = document.getElementById('btn-subir-comp');
+  btn.disabled = true; btn.textContent = 'Subiendo...';
+  try {
+    var fd = new FormData();
+    fd.append('comprobante', input.files[0]);
+    var res = await fetch(API + '/cobros/' + _compEditCobroId + '/comprobante', {
+      method : 'PUT',
+      headers: { 'Authorization': 'Bearer ' + _token },
+      body   : fd,
+    });
+    var data = await res.json();
+    if (!res.ok) { alert(data.message || 'Error'); return; }
+    alert('✅ ' + data.message);
+    cerrarModalComp();
+    cargarHistorial();
+  } catch(e) { alert('Error de conexión'); }
+  finally { btn.disabled = false; btn.textContent = '📤 Subir nuevo comprobante'; }
+}
+
 async function cargarHistorial() {
   try {
     var res  = await apiFetch('/cobros/historial');
     var rows = (await res.json()).data || [];
     var tbody = document.getElementById('tbody-historial');
 
-    // Contar pagos
     var pagados = rows.filter(function(r){ return r.cobro_estado==='pagado'; }).length;
     document.getElementById('stat-pagos').textContent = pagados;
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink-faint)">Sin historial de cobros</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink-faint)">Sin cobros aún</td></tr>';
       return;
     }
 
     tbody.innerHTML = rows.map(function(r) {
-      var estadoBadge = r.cobro_estado === 'pagado'
+      var esPagado   = r.cobro_estado === 'pagado';
+      var enRevision = r.pago_estado  === 'pendiente_validacion';
+      var rechazado  = r.pago_estado  === 'rechazado';
+
+      var estadoBadge = esPagado
         ? '<span class="badge badge-green">✅ Pagado</span>'
-        : r.pago_estado === 'pendiente_validacion'
+        : enRevision
         ? '<span class="badge badge-yellow">⏳ En revisión</span>'
-        : r.pago_estado === 'rechazado'
+        : rechazado
         ? '<span class="badge badge-red">❌ Rechazado</span>'
         : '<span class="badge badge-gray">⏰ Pendiente</span>';
 
-      var compBtn = r.comprobante_url
-        ? '<a href="' + r.comprobante_url + '" target="_blank" class="btn btn-ghost" style="font-size:.75rem;padding:.3rem .65rem">📄 Ver</a>'
-        : r.cobro_estado !== 'pagado'
-        ? '<button onclick="seleccionarCobroYPagar(' + r.id + ')" class="btn btn-primary" style="font-size:.75rem;padding:.3rem .65rem">💳 Pagar</button>'
-        : '—';
+      // Botones de acción
+      var btns = '';
+            if (r.comprobante_url) {
+        var compId = 'comp-' + r.id;
+        window['_compUrl_' + r.id] = r.comprobante_url;
+        btns += '<button onclick="abrirModalComp(' + r.id + ')" class="btn btn-ghost" style="font-size:.72rem;padding:.3rem .6rem">👁️ Ver</button> ';
+      }
+      if (!esPagado) {
+        var label = enRevision ? '📎 Cambiar' : '💳 Pagar';
+        btns += '<button onclick="seleccionarCobroYPagar(' + r.id + ')" class="btn btn-primary" style="font-size:.72rem;padding:.3rem .65rem">' + label + '</button>';
+      }
+      if (!btns) btns = '—';
 
       return '<tr>' +
-        '<td style="font-weight:600">' + esc(r.periodo) + '</td>' +
-        '<td style="font-size:.75rem;color:var(--ink-soft)">' + esc(r.numero_cobro) + '</td>' +
-        '<td>' + (r.meses || 1) + ' mes' + (r.meses > 1 ? 'es' : '') + '</td>' +
+        '<td style="font-weight:700">' + esc(r.periodo) + '</td>' +
+        '<td style="font-size:.72rem;color:var(--ink-soft);font-family:monospace">' + esc(r.numero_cobro) + '</td>' +
         '<td style="font-weight:700">S/. ' + parseFloat(r.monto_final||0).toFixed(2) + '</td>' +
         '<td>' + estadoBadge + '</td>' +
-        '<td>' + compBtn + '</td>' +
+        '<td>' + btns + '</td>' +
       '</tr>';
     }).join('');
   } catch(e) { console.error(e); }
@@ -907,5 +981,46 @@ async function enviarPago() {
   document.getElementById('pantalla-login').style.display = 'flex';
 })();
 </script>
+
+<!-- Modal ver/editar comprobante -->
+<div id="modal-comp-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:300;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:1rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+      <h3 style="font-size:.95rem;font-weight:700">📎 Comprobante de pago</h3>
+      <button onclick="cerrarModalComp()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--ink-soft)">✕</button>
+    </div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem">
+      <!-- Preview -->
+      <div style="background:#f9fafb;border:1px solid var(--line);border-radius:.75rem;overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center">
+        <img id="comp-preview-img" src="" style="max-width:100%;max-height:300px;object-fit:contain" alt="Comprobante"/>
+        <embed id="comp-preview-embed" src="" type="application/pdf" style="width:100%;height:300px"/>
+      </div>
+      <a id="comp-link" href="" target="_blank" class="btn btn-ghost" style="justify-content:center;font-size:.82rem">
+        ↗ Abrir en nueva pestaña
+      </a>
+      <!-- Subir nuevo -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <p style="font-size:.78rem;font-weight:700;margin-bottom:.5rem">Reemplazar comprobante</p>
+        <label style="display:block;border:2px dashed var(--line);border-radius:.75rem;padding:1rem;
+          text-align:center;cursor:pointer;font-size:.82rem;color:var(--ink-soft)">
+          <input id="comp-edit-input" type="file" accept="image/*,.pdf" style="display:none" onchange="onCompEditSelect(event)"/>
+          📎 Seleccionar archivo (imagen o PDF)
+        </label>
+        <div id="comp-edit-preview" style="display:none;align-items:center;gap:.75rem;
+          background:#f9fafb;border:1px solid var(--line);border-radius:.65rem;padding:.65rem;margin-top:.5rem">
+          <span style="font-size:1.3rem">📄</span>
+          <div style="flex:1">
+            <p id="comp-edit-name" style="font-size:.82rem;font-weight:600"></p>
+            <p id="comp-edit-size" style="font-size:.72rem;color:var(--ink-faint)"></p>
+          </div>
+        </div>
+        <button id="btn-subir-comp" onclick="subirNuevoComp()" class="btn btn-primary btn-block" style="margin-top:.75rem">
+          📤 Subir nuevo comprobante
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

@@ -274,4 +274,58 @@ router.post('/generar-adelantado', authCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── PUT /api/cobros/:id/comprobante — reemplazar comprobante ──
+router.put('/:id/comprobante', authCliente, upload.single('comprobante'), async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenant_id;
+
+    // Verificar que el cobro pertenece al tenant y el pago no está aprobado
+    const cobro = await queryOne(
+      `SELECT c.*, p.id AS pago_id, p.estado AS pago_estado
+       FROM saas_cobros c
+       LEFT JOIN saas_pagos p ON p.cobro_id = c.id
+       WHERE c.id=? AND c.tenant_id=?`,
+      [req.params.id, tenantId]
+    );
+
+    if (!cobro) return res.status(404).json({ success: false, message: 'Cobro no encontrado.' });
+    if (cobro.pago_estado === 'aprobado')
+      return res.status(422).json({ success: false, message: 'No puedes modificar un pago ya aprobado.' });
+    if (!req.file)
+      return res.status(422).json({ success: false, message: 'Debes subir el comprobante.' });
+
+    // Subir nuevo comprobante a Azure
+    let urlBlob = null;
+    try {
+      const { BlobServiceClient } = require('@azure/storage-blob');
+      const blobService = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+      const container   = blobService.getContainerClient(process.env.AZURE_PAGOS_CONTAINER || 'vet-comprobantes');
+      await container.createIfNotExists({ access: 'private' });
+      const ext      = req.file.originalname.split('.').pop();
+      const blobName = `comprobantes/${tenantId}/${cobro.numero_cobro}-${Date.now()}.${ext}`;
+      const blob     = container.getBlockBlobClient(blobName);
+      await blob.uploadData(req.file.buffer, { blobHTTPHeaders: { blobContentType: req.file.mimetype } });
+      urlBlob = blob.url;
+    } catch(e) {
+      console.error('[Pagos] Error subiendo comprobante:', e.message);
+      return res.status(500).json({ success: false, message: 'Error al subir el archivo.' });
+    }
+
+    if (cobro.pago_id) {
+      // Actualizar comprobante existente y resetear estado a pendiente_validacion
+      await query(
+        `UPDATE saas_pagos SET estado='pendiente_validacion', motivo_rechazo=NULL WHERE id=?`,
+        [cobro.pago_id]
+      );
+      await query(
+        'UPDATE saas_comprobantes SET url_blob=?, nombre_archivo=?, mime_type=?, tamanio_bytes=? WHERE pago_id=?',
+        [urlBlob, req.file.originalname, req.file.mimetype, req.file.size, cobro.pago_id]
+      );
+    }
+
+    return res.json({ success: true, message: '✅ Comprobante actualizado correctamente.', url: urlBlob });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
