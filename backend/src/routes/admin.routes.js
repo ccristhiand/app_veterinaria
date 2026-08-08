@@ -210,9 +210,12 @@ router.post('/tenants', async (req, res) => {
         [tenantId, admin_nombre || 'Administrador', admin_email, hash]
       );
       // Suscripción inicial (30 días trial)
+      // Mapear códigos viejos a los nuevos
+      const planMap = { basic: 'basico', pro: 'profesional', enterprise: 'clinica_pro' };
+      const planCodigo = planMap[plan] || plan || 'profesional';
       const [planRow] = await masterQuery(
         'SELECT id, precio_mensual FROM saas_planes WHERE codigo=? AND activo=1 LIMIT 1',
-        [plan || 'profesional']
+        [planCodigo]
       );
       if (planRow) {
         const hoy   = new Date().toISOString().split('T')[0];
