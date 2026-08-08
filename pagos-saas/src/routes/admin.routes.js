@@ -190,6 +190,18 @@ router.post('/pagos/:id/aprobar', async (req, res, next) => {
         [pago.tenant_id]
       );
 
+      // Sincronizar trial_hasta en tenant_config para el acceso al sistema veterinario
+      const [[sus2]] = await conn.execute(
+        'SELECT fecha_vencimiento FROM saas_suscripciones WHERE tenant_id=?',
+        [pago.tenant_id]
+      );
+      if (sus2?.fecha_vencimiento) {
+        await conn.execute(
+          'UPDATE tenant_config SET trial_hasta=? WHERE tenant_id=?',
+          [sus2.fecha_vencimiento, pago.tenant_id]
+        );
+      }
+
       // Auditoría
       await conn.execute(
         `INSERT INTO saas_auditoria (admin_id, accion, entidad, entidad_id, detalle, ip)

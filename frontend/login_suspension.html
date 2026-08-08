@@ -204,7 +204,12 @@
           if (data.code === 'TENANT_SUSPENDED') {
             showError(data.message || 'Esta clínica ha sido suspendida.', 'suspension');
           } else if (data.code === 'TRIAL_EXPIRED') {
-            showError('El período de prueba ha vencido. Contacta al administrador.', 'warning');
+            const dominioPagos2 = 'https://pagos.' + window.location.hostname.split('.').slice(-2).join('.');
+            showError(
+              '⏰ Tu suscripción ha vencido. <a href="' + dominioPagos2 + '" target="_blank" ' +
+              'style="color:#f59e0b;font-weight:700;text-decoration:underline">Renueva aquí →</a>',
+              'warning'
+            );
           } else {
             showError(data.message || 'Credenciales inválidas.');
           }

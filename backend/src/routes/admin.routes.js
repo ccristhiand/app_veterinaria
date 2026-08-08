@@ -229,6 +229,12 @@ router.post('/tenants', async (req, res) => {
           [tenantId, planRow.id, planRow.precio_mensual, hoy, vence]
         );
 
+        // Sincronizar trial_hasta en tenant_config para acceso al sistema
+        await masterQuery(
+          'UPDATE tenant_config SET trial_hasta=? WHERE tenant_id=?',
+          [vence, tenantId]
+        );
+
         // Obtener la suscripción recién creada
         const [sus] = await masterQuery(
           'SELECT id FROM saas_suscripciones WHERE tenant_id=? LIMIT 1',
