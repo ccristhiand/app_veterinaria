@@ -704,18 +704,24 @@ function seleccionarCobroYPagar(cobroId) {
 
 // Al ir al tab pagar desde acciones rápidas, cargar el cobro del historial
 async function irAPagar() {
-  // Si ya tenemos el cobroId no hacer nada
-  if (!_cobroId) {
-    try {
-      var res  = await apiFetch('/cobros/historial');
-      var rows = (await res.json()).data || [];
-      // Buscar el cobro más reciente que no esté pagado
-      var cobro = rows.find(function(r) {
-        return r.cobro_estado !== 'pagado' && r.cobro_estado !== 'anulado';
-      });
-      if (cobro) _cobroId = cobro.id;
-    } catch(e) { console.error(e); }
-  }
+  // Buscar cobro pendiente en historial
+  try {
+    var res  = await apiFetch('/cobros/historial');
+    var rows = (await res.json()).data || [];
+    var cobro = rows.find(function(r) {
+      return r.cobro_estado !== 'pagado' && r.cobro_estado !== 'anulado';
+    });
+    if (cobro) {
+      _cobroId = cobro.id;
+    } else {
+      // No hay cobro pendiente — generar uno adelantado
+      var res2  = await apiFetch('/cobros/generar-adelantado', { method: 'POST' });
+      var data2 = await res2.json();
+      if (data2.success) {
+        _cobroId = data2.data.id;
+      }
+    }
+  } catch(e) { console.error(e); }
   showTab('pagar');
   irAPaso(1);
 }

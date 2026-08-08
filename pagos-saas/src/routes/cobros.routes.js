@@ -203,4 +203,75 @@ router.get('/config-pago', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── POST /api/cobros/generar-adelantado ──────────────────────
+// Genera un cobro para el próximo período si no hay uno pendiente
+router.post('/generar-adelantado', authCliente, async (req, res, next) => {
+  try {
+    const tenantId = req.user.tenant_id;
+
+    // Ver si ya tiene cobro pendiente o en revisión
+    const [cobroExistente] = await query(
+      `SELECT id FROM saas_cobros
+       WHERE tenant_id=? AND estado IN ('pendiente','en_revision')
+       ORDER BY id DESC LIMIT 1`,
+      [tenantId]
+    );
+    if (cobroExistente) {
+      return res.json({ success: true, data: cobroExistente, message: 'Cobro ya existe.' });
+    }
+
+    // Obtener suscripción
+    const [sus] = await query(
+      `SELECT ss.id, ss.precio_acordado, ss.fecha_vencimiento
+       FROM saas_suscripciones ss WHERE ss.tenant_id=?`,
+      [tenantId]
+    );
+    if (!sus) return res.status(404).json({ success: false, message: 'Sin suscripción activa.' });
+
+    // Calcular próximo período
+    const vence     = new Date(sus.fecha_vencimiento);
+    const hoy       = new Date();
+    const base      = vence > hoy ? vence : hoy;
+    const proximoMes = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+    const periodo   = `${proximoMes.getFullYear()}-${String(proximoMes.getMonth() + 1).padStart(2,'0')}`;
+    const fechaVence = new Date(base.getFullYear(), base.getMonth() + 2, 5).toISOString().split('T')[0];
+    const hoyStr    = new Date().toISOString().split('T')[0];
+
+    // Verificar que no exista ya ese período
+    const [yaExiste] = await query(
+      'SELECT id FROM saas_cobros WHERE tenant_id=? AND periodo=?',
+      [tenantId, periodo]
+    );
+    if (yaExiste) {
+      return res.json({ success: true, data: yaExiste, message: 'Cobro del período ya existe.' });
+    }
+
+    // Generar número de cobro
+    const anio      = new Date().getFullYear();
+    const [lastCob] = await query(
+      `SELECT numero_cobro FROM saas_cobros WHERE numero_cobro LIKE ? ORDER BY id DESC LIMIT 1`,
+      [`VN-${anio}-%`]
+    );
+    const siguiente   = lastCob ? parseInt(lastCob.numero_cobro.split('-')[2]) + 1 : 1;
+    const numeroCobro = `VN-${anio}-${String(siguiente).padStart(4,'0')}`;
+
+    // Crear cobro
+    const result = await query(
+      `INSERT INTO saas_cobros
+         (tenant_id, suscripcion_id, periodo, meses, monto_base, descuento_pct,
+          monto_final, estado, fecha_emision, fecha_vencimiento, numero_cobro)
+       VALUES (?,?,?,1,?,0,?,'pendiente',?,?,?)`,
+      [tenantId, sus.id, periodo, sus.precio_acordado, sus.precio_acordado,
+       hoyStr, fechaVence, numeroCobro]
+    );
+
+    return res.json({
+      success: true,
+      data   : { id: result.insertId, numero_cobro: numeroCobro, periodo, monto_final: sus.precio_acordado },
+      message: 'Cobro generado correctamente.',
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
