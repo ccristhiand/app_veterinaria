@@ -101,7 +101,7 @@ router.post('/:id/pagar', authCliente, upload.single('comprobante'), async (req,
   try {
     const { metodo, numero_operacion, banco_origen, fecha_operacion, notas_cliente, meses } = req.body;
     const cobro = await queryOne(
-      'SELECT * FROM saas_cobros WHERE id=? AND tenant_id=? AND estado=\'pendiente\'',
+      `SELECT * FROM saas_cobros WHERE id=? AND tenant_id=? AND estado NOT IN ('pagado','anulado')`,
       [req.params.id, req.user.tenant_id]
     );
     if (!cobro) return res.status(404).json({ success: false, message: 'Cobro no encontrado.' });
