@@ -316,7 +316,7 @@
       <div class="card" style="margin-top:.85rem">
         <div class="card-title">Acciones rápidas</div>
         <div style="display:flex;flex-direction:column;gap:.6rem">
-          <button onclick="showTab('pagar');irAPaso(1)" class="btn btn-primary">
+          <button onclick="irAPagar()" class="btn btn-primary">
             💳 Realizar un pago
           </button>
           <button onclick="showTab('historial')" class="btn btn-ghost">
@@ -620,6 +620,16 @@ async function cargarCuenta() {
     document.getElementById('stat-plan').textContent = sus?.plan_codigo?.toUpperCase() || '—';
 
     // Cobro pendiente
+    // Siempre cargar cobro activo desde historial (puede estar en revisión)
+    try {
+      var hRes2  = await apiFetch('/cobros/historial');
+      var hRows  = (await hRes2.json()).data || [];
+      var cobActivo = hRows.find(function(r) {
+        return r.cobro_estado !== 'pagado' && r.cobro_estado !== 'anulado';
+      });
+      if (cobActivo) _cobroId = cobActivo.id;
+    } catch(e) {}
+
     if (data.cobroPendiente) {
       _cobroId = data.cobroPendiente.id;
       document.getElementById('cobro-pendiente-box').style.display = 'block';
@@ -688,6 +698,24 @@ async function cargarHistorial() {
 
 function seleccionarCobroYPagar(cobroId) {
   _cobroId = cobroId;
+  showTab('pagar');
+  irAPaso(1);
+}
+
+// Al ir al tab pagar desde acciones rápidas, cargar el cobro del historial
+async function irAPagar() {
+  // Si ya tenemos el cobroId no hacer nada
+  if (!_cobroId) {
+    try {
+      var res  = await apiFetch('/cobros/historial');
+      var rows = (await res.json()).data || [];
+      // Buscar el cobro más reciente que no esté pagado
+      var cobro = rows.find(function(r) {
+        return r.cobro_estado !== 'pagado' && r.cobro_estado !== 'anulado';
+      });
+      if (cobro) _cobroId = cobro.id;
+    } catch(e) { console.error(e); }
+  }
   showTab('pagar');
   irAPaso(1);
 }
