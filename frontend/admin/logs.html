@@ -210,8 +210,7 @@
 
       tbody.innerHTML = data.map((log, i) => {
         const fechaStr = fDate(log.created_at);
-        // const horaStr  = new Date(log.created_at).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: ADMIN_TZ });
-        const horaStr  = new Date(log.created_at);
+        const horaStr  = new Date(log.created_at).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: ADMIN_TZ });
         const moduloIcons = {
           autenticacion:'🔐', mascotas:'🐾', propietarios:'👥', citas:'📅',
           historia_clinica:'📋', facturacion:'💰', inventario:'📦', vacunas:'💉',

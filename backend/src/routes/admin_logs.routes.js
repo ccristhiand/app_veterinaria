@@ -34,8 +34,7 @@ router.get('/', async (req, res) => {
     const logs = await masterQuery(
       `SELECT id, tenant_id, tenant_nombre, usuario_id, usuario_nombre, usuario_rol,
               accion, modulo, metodo_http, endpoint, ip,
-              data_anterior, data_nueva, resultado, error_mensaje, duracion_ms,
-             CONVERT_TZ(created_at,'+00:00','-05:00') AS created_at
+              data_anterior, data_nueva, resultado, error_mensaje, duracion_ms, created_at
        FROM tenant_logs ${where}
        ORDER BY created_at DESC
        LIMIT ${limitN} OFFSET ${offsetN}`,
