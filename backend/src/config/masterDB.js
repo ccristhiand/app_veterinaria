@@ -15,7 +15,7 @@ const masterPool = mysql.createPool({
   waitForConnections   : true,
   connectionLimit      : 5,
   queueLimit           : 0,
-  timezone             : 'Z',
+  timezone             : '-05:00',
   // ── Prevenir ECONNRESET por conexiones idle ──────────────────
   enableKeepAlive      : true,
   keepAliveInitialDelay: 30000,   // 30 seg antes del primer keepalive
