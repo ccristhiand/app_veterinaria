@@ -49,10 +49,10 @@ const ADMIN_TZ = 'America/Lima';
 function parseServerDate(iso) {
   if (!iso) return null;
   var s = String(iso);
-  // mysql2 agrega Z pero la fecha ya está en Lima — reemplazar Z por -05:00
-  if (s.indexOf('Z') !== -1) return new Date(s.replace('Z', '-05:00'));
+  // Quitar Z — la fecha ya está en Lima, no convertir
+  if (s.indexOf('Z') !== -1) return new Date(s.replace('Z', ''));
   if (s.indexOf('+') !== -1) return new Date(s);
-  return new Date(s.replace(' ', 'T') + '-05:00');
+  return new Date(s.replace(' ', 'T'));
 }
 
 const fDate    = function(iso) { var d = parseServerDate(iso); return d ? d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone: ADMIN_TZ }) : '—'; };
