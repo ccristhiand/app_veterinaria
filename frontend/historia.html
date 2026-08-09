@@ -440,6 +440,8 @@
         <textarea id="ec-diagnostico" rows="2" class="vinput"></textarea></div>
       <div><label class="vlabel">Tratamiento</label>
         <textarea id="ec-tratamiento" rows="2" class="vinput"></textarea></div>
+      <div><label class="vlabel">Pruebas complementarias</label>
+        <textarea id="ec-pruebas" rows="4" class="vinput" placeholder="Resultados de laboratorio, radiografías, ecografías…"></textarea></div>
       <div><label class="vlabel">Observaciones</label>
         <textarea id="ec-obs" rows="2" class="vinput"></textarea></div>
       <!-- Recetas -->
@@ -1322,7 +1324,7 @@ function limpiarFormEstetica() {
 }
 
 function limpiarForm() {
-  ['co-motivo','co-peso','co-temp','co-anamnesis','co-exploracion','co-diagnostico','co-tratamiento','co-obs'].forEach(id=>document.getElementById(id).value='');
+  ['co-motivo','co-peso','co-temp','co-anamnesis','co-exploracion','co-diagnostico','co-tratamiento','co-pruebas','co-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('recetas').innerHTML='';
   document.getElementById('toggle-vacuna-rapida').checked=false;
   document.getElementById('vacuna-rapida-form').style.display='none';
@@ -1384,6 +1386,7 @@ async function abrirEditarConsulta(id) {
     document.getElementById('ec-exploracion').value = c.exploracion || '';
     document.getElementById('ec-diagnostico').value = c.diagnostico || '';
     document.getElementById('ec-tratamiento').value = c.tratamiento || '';
+    document.getElementById('ec-pruebas').value    = c.pruebas_complementarias || '';
     document.getElementById('ec-obs').value        = c.observaciones || '';
     // Cargar recetas existentes
     (c.recetas||[]).forEach(r => addRecetaEdit(r));
@@ -1436,6 +1439,7 @@ async function guardarEditConsulta() {
     exploracion  : document.getElementById('ec-exploracion').value.trim(),
     diagnostico  : document.getElementById('ec-diagnostico').value.trim(),
     tratamiento  : document.getElementById('ec-tratamiento').value.trim(),
+    pruebas_complementarias: document.getElementById('ec-pruebas').value.trim(),
     observaciones: document.getElementById('ec-obs').value.trim(),
     recetas,
   };
