@@ -445,7 +445,7 @@ function badgeEstado(estado) {
 }
 
 function badgeEspecie(especie) {
-  const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', roedor:'🐹', otro:'🐾' };
+  const icons = { canino:'🐕', felino:'🐈', ave:'🦜', reptil:'🦎', roedor:'🐹', otro:'🐾' };
   return icons[especie] || '🐾';
 }
 

@@ -414,12 +414,12 @@ function renderCitas(d) {
 // ── MASCOTAS ──────────────────────────────────────────────────────
 function renderMascotas(d) {
   const r = d.resumen;
-  const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
+  const icons = { canino:'🐕', felino:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
   return `
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" style="margin-bottom:1.3rem">
       ${kpi(r.total||0, 'Total mascotas', '#15803d')}
-      ${kpi(r.perros||0, '🐕 Perros', '#b45309')}
-      ${kpi(r.gatos||0, '🐈 Gatos', '#6d28d9')}
+      ${kpi(r.perros||0, '🐕 Caninos', '#b45309')}
+      ${kpi(r.gatos||0, '🐈 Felinos', '#6d28d9')}
       ${kpi(r.aves||0, '🦜 Aves', '#0369a1')}
       ${kpi(r.reptiles||0, '🦎 Reptiles', '#047857')}
       ${kpi(r.otros||0, '🐾 Otros', '#78716c')}
