@@ -44,9 +44,17 @@ function toast(msg, tipo = 'success', ms = 3500) {
 
 function setNavActive(page) { document.querySelectorAll('.nav-item').forEach(el => { el.classList.toggle('active', el.dataset.page === page); }); }
 const esc      = s => String(s ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const ADMIN_TZ = 'America/Lima'; // Zona horaria del panel admin
-const fDate    = iso => iso ? new Date(iso).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone: ADMIN_TZ }) : '—';
-const fDateTime= iso => iso ? new Date(iso).toLocaleString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: ADMIN_TZ }) : '—';
+const ADMIN_TZ = 'America/Lima';
+
+function parseServerDate(iso) {
+  if (!iso) return null;
+  var s = String(iso);
+  if (s.indexOf('Z') !== -1 || s.indexOf('+') !== -1) return new Date(s);
+  return new Date(s.replace(' ', 'T') + 'Z');
+}
+
+const fDate    = function(iso) { var d = parseServerDate(iso); return d ? d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone: ADMIN_TZ }) : '—'; };
+const fDateTime= function(iso) { var d = parseServerDate(iso); return d ? d.toLocaleString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: ADMIN_TZ }) : '—'; };
 const fNum     = n => Number(n||0).toLocaleString('es-PE');
 const fMoney   = n => 'S/. '+Number(n||0).toFixed(2);
 function badgePlan(plan) { const map = { basic:{label:'Basic',bg:'#1e3a5f',color:'#93c5fd'}, pro:{label:'Pro',bg:'#3b0764',color:'#d8b4fe'}, enterprise:{label:'Enterprise',bg:'#451a03',color:'#fed7aa'} }; const p = map[plan] || {label:plan,bg:'#1e293b',color:'#94a3b8'}; return `<span style="background:${p.bg};color:${p.color};font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px">${p.label}</span>`; }
