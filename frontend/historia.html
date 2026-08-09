@@ -190,6 +190,7 @@
       <div><label class="vlabel">Exploración física</label><textarea id="co-exploracion" rows="2" class="vinput" placeholder="Hallazgos del examen físico…"></textarea></div>
       <div><label class="vlabel">Diagnóstico</label><textarea id="co-diagnostico" rows="2" class="vinput" placeholder="Diagnóstico definitivo o presuntivo…"></textarea></div>
       <div><label class="vlabel">Tratamiento</label><textarea id="co-tratamiento" rows="2" class="vinput" placeholder="Plan de tratamiento indicado…"></textarea></div>
+      <div><label class="vlabel">Pruebas complementarias</label><textarea id="co-pruebas" rows="4" class="vinput" placeholder="Resultados de laboratorio, radiografías, ecografías, hemograma, análisis, estudios diagnósticos…"></textarea></div>
       <div><label class="vlabel">Observaciones</label><textarea id="co-obs" rows="2" class="vinput" placeholder="Notas adicionales…"></textarea></div>
       <!-- Recetas -->
       <div style="border-top:1px solid var(--line);padding-top:1.1rem">
@@ -1127,7 +1128,7 @@ async function verConsulta(id) {
         ${c.temperatura_c?ib('🌡️ Temperatura',c.temperatura_c+' °C'):''}
         ${c.cita_id?'<div style="background:#ecfdf5;border-radius:.9rem;padding:.7rem .9rem;border:1px solid #a7f3d0;grid-column:span 2"><p style="font-size:.6rem;color:#059669;text-transform:uppercase;letter-spacing:.1em;font-weight:700">🔗 Vinculada a</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">Cita #'+c.cita_id+'</p></div>':''}
       </div>
-      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Observaciones',c.observaciones)}
+      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Pruebas complementarias',c.pruebas_complementarias,'#1d4ed8')}${sec('Observaciones',c.observaciones)}
       ${c.recetas?.length?`<div style="margin-top:1.2rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:1.1rem;padding:1.15rem"><h4 style="font-family:'Playfair Display',serif;font-weight:700;color:#0c4a6e;margin-bottom:.85rem;font-size:.92rem">💊 Recetas (${c.recetas.length})</h4><div style="display:flex;flex-direction:column;gap:.55rem">${c.recetas.map(r=>`<div style="background:#fff;border-radius:.85rem;padding:.85rem 1rem;font-size:.8rem"><p style="font-weight:700">${esc(r.medicamento)}</p><p style="color:var(--ink-soft);margin-top:.2rem">${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias?' · '+r.duracion_dias+' días':''}</p>${r.instrucciones?'<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">📝 '+esc(r.instrucciones)+'</p>':''}</div>`).join('')}</div></div>`:''}`;
   } catch { document.getElementById('ver-body').innerHTML='<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; }
 }
@@ -1151,7 +1152,7 @@ async function guardarConsulta() {
     if (!vrN||!vrF) { toast('Completa nombre y fecha de la vacuna.','warning'); return; }
     vacunaData={mascota_id:mascotaId,nombre:vrN,fabricante:document.getElementById('vr-fabricante').value.trim()||null,lote:document.getElementById('vr-lote').value.trim()||null,fecha_aplicacion:vrF,proxima_dosis:document.getElementById('vr-proxima').value||null,notas:document.getElementById('vr-notas').value.trim()||null};
   }
-  const body={mascota_id:mascotaId,cita_id:citaId||null,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
+  const body={mascota_id:mascotaId,cita_id:citaId||null,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),pruebas_complementarias:document.getElementById('co-pruebas').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
   const btn=document.getElementById('btn-guardar-consulta');
   btn.disabled=true; btn.textContent='Guardando…';
   try {

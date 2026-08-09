@@ -61,7 +61,9 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', auditMiddleware('historia_clinica:creado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { mascota_id, cita_id, fecha, motivo, anamnesis, exploracion,
-            diagnostico, tratamiento, observaciones, peso_kg, temperatura_c, recetas } = req.body;
+            diagnostico, tratamiento, pruebas_complementarias,
+            observaciones, peso_kg, temperatura_c, recetas } = req.body;
+
     if (!mascota_id || !motivo)
       return res.status(422).json({ success: false, message: 'mascota_id y motivo requeridos.' });
 
@@ -69,11 +71,13 @@ router.post('/', auditMiddleware('historia_clinica:creado', 'historia_clinica'),
       const [ins] = await conn.execute(
         `INSERT INTO historia_clinica
            (mascota_id, veterinario_id, cita_id, fecha, motivo, anamnesis,
-            exploracion, diagnostico, tratamiento, observaciones, peso_kg, temperatura_c)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            exploracion, diagnostico, tratamiento, pruebas_complementarias,
+            observaciones, peso_kg, temperatura_c)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [mascota_id, req.user.id, cita_id||null, fecha||new Date(), motivo,
          anamnesis||null, exploracion||null, diagnostico||null, tratamiento||null,
-         observaciones||null, peso_kg||null, temperatura_c||null]
+         pruebas_complementarias||null, observaciones||null,
+         peso_kg||null, temperatura_c||null]
       );
       const hId = ins.insertId;
       if (recetas?.length) {
@@ -97,14 +101,17 @@ router.post('/', auditMiddleware('historia_clinica:creado', 'historia_clinica'),
 router.put('/:id', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { motivo, anamnesis, exploracion, diagnostico, tratamiento,
-            observaciones, peso_kg, temperatura_c, recetas } = req.body;
+            pruebas_complementarias, observaciones, peso_kg, temperatura_c, recetas } = req.body;
+
     await req.db.withTransaction(async (conn) => {
       await conn.execute(
         `UPDATE historia_clinica SET motivo=?, anamnesis=?, exploracion=?,
-         diagnostico=?, tratamiento=?, observaciones=?, peso_kg=?, temperatura_c=?
+         diagnostico=?, tratamiento=?, pruebas_complementarias=?,
+         observaciones=?, peso_kg=?, temperatura_c=?
          WHERE id=?`,
         [motivo, anamnesis||null, exploracion||null, diagnostico||null,
-         tratamiento||null, observaciones||null, peso_kg||null, temperatura_c||null, req.params.id]
+         tratamiento||null, pruebas_complementarias||null,
+         observaciones||null, peso_kg||null, temperatura_c||null, req.params.id]
       );
       if (recetas) {
         await conn.execute('DELETE FROM recetas WHERE historia_clinica_id = ?', [req.params.id]);
@@ -140,14 +147,10 @@ router.get('/:id/seguimientos', async (req, res, next) => {
 router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
-
     if (!evolucion?.trim())
       return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
-
-    // Verificar que la consulta existe
     const [historia] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
     if (!historia) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
-
     const result = await req.db.query(
       `INSERT INTO historia_seguimientos
          (historia_id, veterinario_id, fecha, evolucion, tratamiento, observaciones, peso_kg, temperatura_c)
@@ -156,7 +159,6 @@ router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado',
        evolucion.trim(), tratamiento?.trim()||null, observaciones?.trim()||null,
        peso_kg||null, temperatura_c||null]
     );
-
     return res.status(201).json({
       success: true,
       message: 'Seguimiento agregado correctamente.',
@@ -165,20 +167,17 @@ router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado',
   } catch (err) { next(err); }
 });
 
-
 // PUT /api/v1/historia/:id/seguimientos/:segId
 router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
     const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
     if (!evolucion?.trim())
       return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
-
     const [seg] = await req.db.query(
       'SELECT id FROM historia_seguimientos WHERE id = ? AND historia_id = ?',
       [req.params.segId, req.params.id]
     );
     if (!seg) return res.status(404).json({ success: false, message: 'Seguimiento no encontrado.' });
-
     await req.db.query(
       `UPDATE historia_seguimientos SET
          fecha=?, evolucion=?, tratamiento=?, observaciones=?, peso_kg=?, temperatura_c=?
@@ -187,7 +186,6 @@ router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actuali
        tratamiento?.trim()||null, observaciones?.trim()||null,
        peso_kg||null, temperatura_c||null, req.params.segId]
     );
-
     return res.json({ success: true, message: 'Seguimiento actualizado.' });
   } catch (err) { next(err); }
 });
@@ -203,19 +201,16 @@ router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), asy
   } catch (err) { next(err); }
 });
 
-
 // DELETE /api/v1/historia/:id
 router.delete('/:id', authorize('admin', 'veterinario'), auditMiddleware('historia_clinica:eliminado', 'historia_clinica'), async (req, res, next) => {
   try {
     const [h] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
     if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
-
     await req.db.withTransaction(async (conn) => {
       await conn.execute('DELETE FROM historia_seguimientos WHERE historia_id = ?', [req.params.id]);
       await conn.execute('DELETE FROM recetas WHERE historia_clinica_id = ?', [req.params.id]);
       await conn.execute('DELETE FROM historia_clinica WHERE id = ?', [req.params.id]);
     });
-
     return res.json({ success: true, message: 'Consulta eliminada correctamente.' });
   } catch (err) { next(err); }
 });
