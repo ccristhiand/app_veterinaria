@@ -1,8 +1,4 @@
 'use strict';
-// Configuración via variables de entorno (.env)
-// DESARROLLO: MASTER_DB_HOST=161.132.39.207, MASTER_DB_USER=cadc
-// PRODUCCIÓN: configurar en .env del VPS
-
 const mysql  = require('mysql2/promise');
 const logger = require('./logger');
 
@@ -15,14 +11,12 @@ const masterPool = mysql.createPool({
   waitForConnections   : true,
   connectionLimit      : 5,
   queueLimit           : 0,
-  timezone             : '-05:00',
-  // ── Prevenir ECONNRESET por conexiones idle ──────────────────
+  timezone             : '+00:00',  // No convertir — fechas vienen en Lima desde nowTz()
   enableKeepAlive      : true,
-  keepAliveInitialDelay: 30000,   // 30 seg antes del primer keepalive
-  connectTimeout       : 10000,   // 10 seg timeout de conexión
+  keepAliveInitialDelay: 30000,
+  connectTimeout       : 10000,
 });
 
-// Manejar errores del pool sin crashear el servidor
 masterPool.on('error', (err) => {
   logger.error(`Error en pool master: ${err.message}`);
 });
@@ -32,7 +26,6 @@ async function masterQuery(sql, params = []) {
     const [rows] = await masterPool.execute(sql, params);
     return rows;
   } catch (err) {
-    // Si la conexión se perdió, reintentar una vez
     if (err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ENOTFOUND') {
       logger.warn(`[masterDB] Reconectando tras error: ${err.code}`);
       const [rows] = await masterPool.execute(sql, params);

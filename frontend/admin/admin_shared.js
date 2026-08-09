@@ -49,14 +49,9 @@ const ADMIN_TZ = 'America/Lima';
 function parseServerDate(iso) {
   if (!iso) return null;
   var s = String(iso);
-  // Con mysql2 timezone:-05:00, fechas vienen sin Z como hora Lima
-  // Agregar offset Lima explícito para que JS lo interprete correcto
-  if (s.indexOf('Z') !== -1) {
-    // Viene con Z (UTC) — convertir a Lima
-    return new Date(s);
-  }
-  if (s.indexOf('+') !== -1 || / -\d{2}/.test(s)) return new Date(s);
-  // Sin offset → hora Lima del servidor
+  // mysql2 agrega Z pero la fecha ya está en Lima — reemplazar Z por -05:00
+  if (s.indexOf('Z') !== -1) return new Date(s.replace('Z', '-05:00'));
+  if (s.indexOf('+') !== -1) return new Date(s);
   return new Date(s.replace(' ', 'T') + '-05:00');
 }
 
