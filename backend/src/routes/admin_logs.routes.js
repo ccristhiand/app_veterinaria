@@ -23,8 +23,8 @@ router.get('/', async (req, res) => {
     if (accion?.trim())               { where += ' AND accion LIKE ?';          params.push(`%${accion}%`); }
     if (resultado?.trim())            { where += ' AND resultado = ?';          params.push(resultado); }
     if (usuario?.trim())              { where += ' AND usuario_nombre LIKE ?';  params.push(`%${usuario}%`); }
-    if (desde?.trim())                { where += ' AND created_at >= ?';        params.push(desde); }
-    if (hasta?.trim())                { where += ' AND created_at <= ?';        params.push(hasta + ' 23:59:59'); }
+    if (desde?.trim())                { where += " AND CONVERT_TZ(created_at,'+00:00','-05:00') >= ?"; params.push(desde); }
+    if (hasta?.trim())                { where += " AND CONVERT_TZ(created_at,'+00:00','-05:00') <= ?"; params.push(hasta + ' 23:59:59'); }
 
     const countResult = await masterQuery(
       `SELECT COUNT(*) AS total FROM tenant_logs ${where}`, params
@@ -34,7 +34,8 @@ router.get('/', async (req, res) => {
     const logs = await masterQuery(
       `SELECT id, tenant_id, tenant_nombre, usuario_id, usuario_nombre, usuario_rol,
               accion, modulo, metodo_http, endpoint, ip,
-              data_anterior, data_nueva, resultado, error_mensaje, duracion_ms, created_at
+              data_anterior, data_nueva, resultado, error_mensaje, duracion_ms,
+             CONVERT_TZ(created_at,'+00:00','-05:00') AS created_at
        FROM tenant_logs ${where}
        ORDER BY created_at DESC
        LIMIT ${limitN} OFFSET ${offsetN}`,
@@ -57,7 +58,7 @@ router.get('/stats', async (req, res) => {
     const stats = await masterQuery(`
       SELECT modulo, accion, resultado, COUNT(*) AS total, DATE(created_at) AS fecha
       FROM tenant_logs
-      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      WHERE created_at >= DATE_SUB(CONVERT_TZ(NOW(),'+00:00','-05:00'), INTERVAL 7 DAY)
       GROUP BY modulo, accion, resultado, DATE(created_at)
       ORDER BY fecha DESC, total DESC
     `);
@@ -65,7 +66,7 @@ router.get('/stats', async (req, res) => {
     const errores = await masterQuery(`
       SELECT tenant_nombre, accion, error_mensaje, COUNT(*) AS total
       FROM tenant_logs
-      WHERE resultado = 'error' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      WHERE resultado = 'error' AND created_at >= DATE_SUB(CONVERT_TZ(NOW(),'+00:00','-05:00'), INTERVAL 24 HOUR)
       GROUP BY tenant_nombre, accion, error_mensaje
       ORDER BY total DESC
       LIMIT 10
@@ -75,7 +76,7 @@ router.get('/stats', async (req, res) => {
       SELECT tenant_nombre, COUNT(*) AS acciones,
              COUNT(DISTINCT usuario_id) AS usuarios_activos
       FROM tenant_logs
-      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      WHERE created_at >= DATE_SUB(CONVERT_TZ(NOW(),'+00:00','-05:00'), INTERVAL 24 HOUR)
       GROUP BY tenant_nombre
       ORDER BY acciones DESC
     `);
