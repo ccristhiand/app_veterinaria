@@ -1,5 +1,13 @@
 'use strict';
 
+// Fecha actual en la zona horaria del tenant (o Lima por defecto)
+function nowTz(ianaZone) {
+  return new Date().toLocaleString('sv-SE', {
+    timeZone: ianaZone || 'America/Lima'
+  }).replace('T', ' ');
+}
+
+
 const { masterQuery } = require('../config/masterDB');
 
 // ── Mapeo de módulos por ruta ──────────────────────────────────
@@ -65,8 +73,8 @@ async function auditLog(req, res, accionOverride = null, moduloOverride = null, 
       `INSERT INTO tenant_logs
         (tenant_id, tenant_nombre, usuario_id, usuario_nombre, usuario_rol,
          accion, modulo, metodo_http, endpoint, ip, user_agent,
-         data_anterior, data_nueva, resultado, error_mensaje, duracion_ms)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         data_anterior, data_nueva, resultado, error_mensaje, duracion_ms, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         tenant?.id             || null,
         tenant?.nombre_clinica || tenant?.slug || null,
@@ -82,6 +90,7 @@ async function auditLog(req, res, accionOverride = null, moduloOverride = null, 
         resultado,
         error ? String(error).substring(0, 1000) : null,
         duracion,
+        nowTz(req.tenant?.zona_horaria),
       ]
     );
   } catch (err) {
@@ -161,8 +170,8 @@ function auditAuth(accion, tenantId, tenantNombre, usuario, ip, userAgent, resul
   masterQuery(
     `INSERT INTO tenant_logs
       (tenant_id, tenant_nombre, usuario_id, usuario_nombre, usuario_rol,
-       accion, modulo, ip, user_agent, resultado, error_mensaje)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+       accion, modulo, ip, user_agent, resultado, error_mensaje, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       tenantId, tenantNombre,
       usuario?.id    || null,
@@ -171,6 +180,7 @@ function auditAuth(accion, tenantId, tenantNombre, usuario, ip, userAgent, resul
       accion, 'autenticacion',
       ip, userAgent?.substring(0, 500),
       resultado, error,
+      nowTz('America/Lima'),
     ]
   ).catch(err => console.error('[audit] Auth log error:', err.message));
 }
