@@ -49,8 +49,11 @@ const ADMIN_TZ = 'America/Lima';
 function parseServerDate(iso) {
   if (!iso) return null;
   var s = String(iso);
+  // Si tiene Z o offset ya viene en UTC — parsear directo
   if (s.indexOf('Z') !== -1 || s.indexOf('+') !== -1) return new Date(s);
-  return new Date(s.replace(' ', 'T') + 'Z');
+  // Sin offset → viene como hora Lima del servidor (timezone: local)
+  // NO agregar Z — dejar que JS lo interprete como hora local del navegador
+  return new Date(s.replace(' ', 'T'));
 }
 
 const fDate    = function(iso) { var d = parseServerDate(iso); return d ? d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone: ADMIN_TZ }) : '—'; };
