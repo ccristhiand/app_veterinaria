@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS notificaciones (
 CREATE TABLE IF NOT EXISTS servicios_catalogo (
   id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre      VARCHAR(150)  NOT NULL,
-  categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio','medicamento','otro','eutanasia') NOT NULL DEFAULT 'consulta',
+  categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio','medicamento','otro','eutanasia','internamiento') NOT NULL DEFAULT 'consulta',
   precio      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   descripcion VARCHAR(255)  NULL,
   activo      TINYINT(1)    NOT NULL DEFAULT 1,
