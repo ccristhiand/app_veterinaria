@@ -414,7 +414,7 @@ function renderCitas(d) {
 // ── MASCOTAS ──────────────────────────────────────────────────────
 function renderMascotas(d) {
   const r = d.resumen;
-  const icons = { canino:'🐕', felino:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
+  const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
   return `
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" style="margin-bottom:1.3rem">
       ${kpi(r.total||0, 'Total mascotas', '#15803d')}
