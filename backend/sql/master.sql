@@ -398,12 +398,12 @@ CREATE TABLE IF NOT EXISTS saas_config (
 ) ENGINE=InnoDB;
 
 INSERT IGNORE INTO saas_config (clave, valor, descripcion) VALUES
-('yape_numero',       '927064045',          'Número Yape para pagos'),
-('yape_nombre',       'Cristhian Alex Dipas',     'Nombre en Yape'),
+('yape_numero',       '999999999',          'Número Yape para pagos'),
+('yape_nombre',       'VetNetcodip SAC',     'Nombre en Yape'),
 ('banco_nombre',      'BCP',                 'Banco para transferencias'),
-('banco_cuenta',      '',     'Número de cuenta'),
-('banco_cci',         '','CCI interbancario'),
-('banco_titular',     '',     'Titular de la cuenta'),
+('banco_cuenta',      '123-456789-0-12',     'Número de cuenta'),
+('banco_cci',         '00212312345678901234','CCI interbancario'),
+('banco_titular',     'VetNetcodip SAC',     'Titular de la cuenta'),
 ('dias_gracia',       '5',                   'Días de gracia tras vencimiento'),
 ('smtp_host',         'smtp.gmail.com',      'Servidor SMTP'),
 ('smtp_port',         '587',                 'Puerto SMTP'),

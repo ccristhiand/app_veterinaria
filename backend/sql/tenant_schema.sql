@@ -1,11 +1,15 @@
--- VETNETCODIP SaaS — TENANT SCHEMA v7
+-- ============================================================
+-- VETNETCODIP SaaS — TENANT SCHEMA v8
 -- v6: + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7: + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
+-- v8: + pruebas_complementarias en historia_clinica
+--     + eutanasia + internamiento en servicios_catalogo
+--     + consentimientos_plantillas + consentimientos_generados
 -- Ejecutar al crear nueva clinica
 -- Compatible MySQL 8+
+-- ============================================================
 
--- ── Tabla de sedes ────────────────────────────────────────────────
--- PRIMERO: se crea sedes para que las FK funcionen
+-- ── Tabla de sedes ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS sedes (
   id           INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre       VARCHAR(150)  NOT NULL,
@@ -19,17 +23,16 @@ CREATE TABLE IF NOT EXISTS sedes (
   updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Sede principal por defecto (el admin la edita con los datos reales)
 INSERT INTO sedes (nombre, es_principal, activo) VALUES ('Sede Principal', 1, 1);
 
--- ── Usuarios ──────────────────────────────────────────────────────
+-- ── Usuarios ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS usuarios (
   id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre               VARCHAR(100) NOT NULL,
   email                VARCHAR(150) NOT NULL UNIQUE,
   password             VARCHAR(255) NOT NULL,
   rol                  ENUM('admin','veterinario','recepcionista') NOT NULL DEFAULT 'recepcionista',
-  sede_id              INT UNSIGNED NULL DEFAULT NULL,        -- NULL = todas las sedes (admin)
+  sede_id              INT UNSIGNED NULL DEFAULT NULL,
   activo               TINYINT(1)   NOT NULL DEFAULT 1,
   must_change_password TINYINT(1)   NOT NULL DEFAULT 1,
   last_password_change TIMESTAMP    NULL DEFAULT NULL,
@@ -37,7 +40,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   INDEX idx_sede (sede_id)
 ) ENGINE=InnoDB;
 
--- ── Propietarios — SIN sede_id (datos de la clínica, compartidos) ─
+-- ── Propietarios ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS propietarios (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tipo_documento   ENUM('DNI','RUC','CE','PASAPORTE','OTRO') NOT NULL DEFAULT 'DNI',
@@ -53,7 +56,7 @@ CREATE TABLE IF NOT EXISTS propietarios (
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ── Mascotas — SIN sede_id (sigue a la mascota, no al local) ──────
+-- ── Mascotas ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mascotas (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   propietario_id   INT UNSIGNED NOT NULL,
@@ -71,13 +74,13 @@ CREATE TABLE IF NOT EXISTS mascotas (
   FOREIGN KEY (propietario_id) REFERENCES propietarios(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
--- ── Citas — CON sede_id (ocurre en un local físico) ──────────────
+-- ── Citas ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS citas (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id     INT UNSIGNED NOT NULL,
   veterinario_id INT UNSIGNED NOT NULL,
   creada_por_id  INT UNSIGNED NOT NULL,
-  sede_id        INT UNSIGNED NULL DEFAULT NULL,              -- sede donde se atiende
+  sede_id        INT UNSIGNED NULL DEFAULT NULL,
   fecha_hora     DATETIME     NOT NULL,
   duracion_min   SMALLINT     NOT NULL DEFAULT 30,
   motivo         VARCHAR(255) NOT NULL,
@@ -92,28 +95,47 @@ CREATE TABLE IF NOT EXISTS citas (
   INDEX idx_sede   (sede_id)
 ) ENGINE=InnoDB;
 
--- ── Historia clínica — SIN sede_id (sigue a la mascota) ──────────
+-- ── Historia clínica ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS historia_clinica (
-  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  mascota_id     INT UNSIGNED NOT NULL,
-  veterinario_id INT UNSIGNED NOT NULL,
-  cita_id        INT UNSIGNED NULL,
-  fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  motivo         VARCHAR(255) NOT NULL,
-  anamnesis      TEXT         NULL,
-  exploracion    TEXT         NULL,
-  diagnostico    TEXT         NULL,
-  tratamiento    TEXT         NULL,
-  observaciones  TEXT         NULL,
-  peso_kg        DECIMAL(6,2) NULL,
-  temperatura_c  DECIMAL(4,1) NULL,
-  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  mascota_id              INT UNSIGNED NOT NULL,
+  veterinario_id          INT UNSIGNED NOT NULL,
+  cita_id                 INT UNSIGNED NULL,
+  fecha                   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  motivo                  VARCHAR(255) NOT NULL,
+  anamnesis               TEXT         NULL,
+  exploracion             TEXT         NULL,
+  diagnostico             TEXT         NULL,
+  tratamiento             TEXT         NULL,
+  pruebas_complementarias MEDIUMTEXT   NULL,
+  observaciones           TEXT         NULL,
+  peso_kg                 DECIMAL(6,2) NULL,
+  temperatura_c           DECIMAL(4,1) NULL,
+  created_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (mascota_id)     REFERENCES mascotas(id) ON DELETE RESTRICT,
   FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
   FOREIGN KEY (cita_id)        REFERENCES citas(id)    ON DELETE SET NULL,
   INDEX idx_mascota (mascota_id)
 ) ENGINE=InnoDB;
 
+-- ── Seguimientos de consulta ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS historia_seguimientos (
+  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  historia_id    INT UNSIGNED  NOT NULL,
+  veterinario_id INT UNSIGNED  NOT NULL,
+  fecha          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  evolucion      TEXT          NOT NULL,
+  tratamiento    TEXT          NULL,
+  observaciones  TEXT          NULL,
+  peso_kg        DECIMAL(6,2)  NULL,
+  temperatura_c  DECIMAL(4,1)  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (historia_id)    REFERENCES historia_clinica(id) ON DELETE CASCADE,
+  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id)         ON DELETE RESTRICT,
+  INDEX idx_historia (historia_id)
+) ENGINE=InnoDB;
+
+-- ── Recetas ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS recetas (
   id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   historia_clinica_id INT UNSIGNED NOT NULL,
@@ -125,7 +147,7 @@ CREATE TABLE IF NOT EXISTS recetas (
   FOREIGN KEY (historia_clinica_id) REFERENCES historia_clinica(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ── Vacunas — SIN sede_id (sigue a la mascota) ───────────────────
+-- ── Vacunas ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS vacunas (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id       INT UNSIGNED NOT NULL,
@@ -144,7 +166,27 @@ CREATE TABLE IF NOT EXISTS vacunas (
   INDEX idx_proxima (proxima_dosis)
 ) ENGINE=InnoDB;
 
--- ── Inventario — CON sede_id (stock por local) ───────────────────
+-- ── Desparasitaciones ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS desparasitaciones (
+  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  mascota_id       INT UNSIGNED NOT NULL,
+  veterinario_id   INT UNSIGNED NOT NULL,
+  tipo             ENUM('interna','externa','interna_externa') NOT NULL DEFAULT 'interna',
+  producto         VARCHAR(150) NOT NULL,
+  dosis            VARCHAR(100) NULL,
+  fecha_aplicacion DATE         NOT NULL,
+  proxima_dosis    DATE         NULL,
+  notas            TEXT         NULL,
+  notificado       TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mascota_id)     REFERENCES mascotas(id) ON DELETE RESTRICT,
+  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+  INDEX idx_mascota (mascota_id),
+  INDEX idx_proxima (proxima_dosis),
+  INDEX idx_notif   (notificado)
+) ENGINE=InnoDB;
+
+-- ── Inventario ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS inventario (
   id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre            VARCHAR(200)  NOT NULL,
@@ -156,13 +198,13 @@ CREATE TABLE IF NOT EXISTS inventario (
   proveedor         VARCHAR(150)  NULL,
   stock_minimo      DECIMAL(10,2) NOT NULL DEFAULT 5,
   fecha_vencimiento DATE          NULL,
-  sede_id           INT UNSIGNED  NULL DEFAULT NULL,           -- NULL = stock general
+  sede_id           INT UNSIGNED  NULL DEFAULT NULL,
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_sede (sede_id)
 ) ENGINE=InnoDB;
 
--- ── Estética — SIN sede_id por simplicidad (se puede agregar luego)
+-- ── Estética ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS servicios_estetica (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id      INT UNSIGNED NOT NULL,
@@ -182,6 +224,19 @@ CREATE TABLE IF NOT EXISTS servicios_estetica (
   FOREIGN KEY (cita_id)         REFERENCES citas(id)    ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- ── Fotos de estética ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS estetica_fotos (
+  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  estetica_id    INT UNSIGNED  NOT NULL,
+  momento        ENUM('antes','despues') NOT NULL,
+  url            VARCHAR(500)  NOT NULL,
+  nombre_archivo VARCHAR(200)  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (estetica_id) REFERENCES servicios_estetica(id) ON DELETE CASCADE,
+  INDEX idx_estetica (estetica_id)
+) ENGINE=InnoDB;
+
+-- ── Notificaciones ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notificaciones (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT UNSIGNED NULL,
@@ -194,7 +249,7 @@ CREATE TABLE IF NOT EXISTS notificaciones (
   INDEX idx_leida   (leida)
 ) ENGINE=InnoDB;
 
--- ── Servicios catálogo — SIN sede_id (compartido por todas las sedes)
+-- ── Catálogo de servicios ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS servicios_catalogo (
   id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre      VARCHAR(150)  NOT NULL,
@@ -205,7 +260,7 @@ CREATE TABLE IF NOT EXISTS servicios_catalogo (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ── Empresa config — SIN sede_id (config global de la clínica) ───
+-- ── Empresa config ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS empresa_config (
   id                 INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre             VARCHAR(150)  NOT NULL DEFAULT 'VetClinic',
@@ -241,7 +296,7 @@ CREATE TABLE IF NOT EXISTS empresa_config (
   updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ── Facturas — CON sede_id (para reportes financieros por local) ──
+-- ── Facturas ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS facturas (
   id                       INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   numero                   VARCHAR(20)   NOT NULL UNIQUE,
@@ -250,7 +305,7 @@ CREATE TABLE IF NOT EXISTS facturas (
   mascota_id               INT UNSIGNED  NULL,
   cita_id                  INT UNSIGNED  NULL,
   emitido_por_id           INT UNSIGNED  NOT NULL,
-  sede_id                  INT UNSIGNED  NULL DEFAULT NULL,   -- sede que emite
+  sede_id                  INT UNSIGNED  NULL DEFAULT NULL,
   fecha                    DATE          NOT NULL,
   subtotal                 DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   igv                      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -306,13 +361,13 @@ CREATE TABLE IF NOT EXISTS factura_pagos (
   INDEX idx_factura (factura_id)
 ) ENGINE=InnoDB;
 
--- ── Caja cierres — CON sede_id (cierre por local) ────────────────
+-- ── Caja ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS caja_cierres (
   id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   fecha                 DATE         NOT NULL,
   turno                 ENUM('mañana','tarde','dia_completo') NOT NULL DEFAULT 'dia_completo',
   realizado_por_id      INT UNSIGNED NOT NULL,
-  sede_id               INT UNSIGNED NULL DEFAULT NULL,         -- sede del cierre
+  sede_id               INT UNSIGNED NULL DEFAULT NULL,
   monto_inicial         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_efectivo      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_tarjeta       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -343,6 +398,7 @@ CREATE TABLE IF NOT EXISTS caja_gastos (
   FOREIGN KEY (cierre_id) REFERENCES caja_cierres(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Carnets digitales ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS carnets_digitales (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mascota_id INT UNSIGNED NOT NULL UNIQUE,
@@ -356,6 +412,7 @@ CREATE TABLE IF NOT EXISTS carnets_digitales (
   FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Consentimientos ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS consentimientos_plantillas (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(150) NOT NULL,
@@ -382,27 +439,7 @@ CREATE TABLE IF NOT EXISTS consentimientos_generados (
   INDEX idx_mascota (mascota_id)
 ) ENGINE=InnoDB;
 
--- ── Desparasitaciones — SIN sede_id (sigue a la mascota) ─────────
-CREATE TABLE IF NOT EXISTS desparasitaciones (
-  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  mascota_id       INT UNSIGNED NOT NULL,
-  veterinario_id   INT UNSIGNED NOT NULL,
-  tipo             ENUM('interna','externa','interna_externa') NOT NULL DEFAULT 'interna',
-  producto         VARCHAR(150) NOT NULL,
-  dosis            VARCHAR(100) NULL,
-  fecha_aplicacion DATE         NOT NULL,
-  proxima_dosis    DATE         NULL,
-  notas            TEXT         NULL,
-  notificado       TINYINT(1)   NOT NULL DEFAULT 0,
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (mascota_id)     REFERENCES mascotas(id) ON DELETE RESTRICT,
-  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-  INDEX idx_mascota (mascota_id),
-  INDEX idx_proxima (proxima_dosis),
-  INDEX idx_notif   (notificado)
-) ENGINE=InnoDB;
-
--- ── WhatsApp — SIN sede_id (config global) ───────────────────────
+-- ── WhatsApp ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS wa_config (
   id                                    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   activo                                TINYINT(1)    NOT NULL DEFAULT 0,
@@ -477,37 +514,7 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
   FOREIGN KEY (campana_id) REFERENCES wa_campanas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-
--- ── Seguimientos de consulta (tratamiento multi-día) ─────────────
-CREATE TABLE IF NOT EXISTS historia_seguimientos (
-  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  historia_id    INT UNSIGNED  NOT NULL,
-  veterinario_id INT UNSIGNED  NOT NULL,
-  fecha          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  evolucion      TEXT          NOT NULL,
-  tratamiento    TEXT          NULL,
-  observaciones  TEXT          NULL,
-  peso_kg        DECIMAL(6,2)  NULL,
-  temperatura_c  DECIMAL(4,1)  NULL,
-  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (historia_id)    REFERENCES historia_clinica(id) ON DELETE CASCADE,
-  FOREIGN KEY (veterinario_id) REFERENCES usuarios(id)         ON DELETE RESTRICT,
-  INDEX idx_historia (historia_id)
-) ENGINE=InnoDB;
-
--- ── Fotos de estética (Azure Blob Storage) ────────────────────────
-CREATE TABLE IF NOT EXISTS estetica_fotos (
-  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  estetica_id    INT UNSIGNED  NOT NULL,
-  momento        ENUM('antes','despues') NOT NULL,
-  url            VARCHAR(500)  NOT NULL,
-  nombre_archivo VARCHAR(200)  NULL,
-  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (estetica_id) REFERENCES servicios_estetica(id) ON DELETE CASCADE,
-  INDEX idx_estetica (estetica_id)
-) ENGINE=InnoDB;
-
--- ── Datos iniciales ───────────────────────────────────────────────
+-- ── Datos iniciales ──────────────────────────────────────────
 INSERT INTO empresa_config (nombre) VALUES ('VetClinic');
 
 INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
@@ -533,4 +540,9 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 ('Campaña general', 'campana',
  '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v7 ✅ (multi-sedes + seguimientos + fotos + tipo_documento)' AS resultado;
+INSERT INTO consentimientos_plantillas (nombre, tipo, contenido) VALUES
+('Consentimiento de Cirugía General', 'cirugia', '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:2rem"><div style="text-align:center;border-bottom:2px solid #166534;padding-bottom:1rem;margin-bottom:1.5rem"><h1 style="color:#166534;font-size:1.3rem;margin:0">CONSENTIMIENTO INFORMADO PARA CIRUGÍA</h1><p style="color:#666;margin:.3rem 0 0">{{nombre_clinica}}</p></div><p>Yo, <strong>{{nombre_propietario}}</strong>, identificado(a) con DNI <strong>{{dni_propietario}}</strong>, en calidad de propietario(a) de la mascota <strong>{{nombre_mascota}}</strong> ({{especie}}, {{raza}}), declaro:</p><ol style="line-height:2;margin:1rem 0"><li>He sido informado(a) sobre el procedimiento quirúrgico a realizarse.</li><li>Comprendo que todo procedimiento quirúrgico conlleva riesgos inherentes incluyendo reacciones a la anestesia y complicaciones post-operatorias.</li><li>Autorizo al equipo veterinario de <strong>{{nombre_clinica}}</strong> a realizar el procedimiento necesario.</li><li>Me comprometo a seguir las indicaciones post-operatorias indicadas por el veterinario.</li></ol><div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem"><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>{{nombre_propietario}}</strong></p><p style="margin:0;font-size:.75rem;color:#666">Propietario(a)</p></div></div><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>{{nombre_veterinario}}</strong></p><p style="margin:0;font-size:.75rem;color:#666">Médico Veterinario</p></div></div></div><p style="text-align:center;color:#999;font-size:.75rem;margin-top:2rem">Fecha: {{fecha}} · {{nombre_clinica}}</p></div>'),
+('Consentimiento de Anestesia', 'anestesia', '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:2rem"><div style="text-align:center;border-bottom:2px solid #166534;padding-bottom:1rem;margin-bottom:1.5rem"><h1 style="color:#166534;font-size:1.3rem;margin:0">CONSENTIMIENTO PARA ANESTESIA GENERAL</h1><p style="color:#666;margin:.3rem 0 0">{{nombre_clinica}}</p></div><p>Yo, <strong>{{nombre_propietario}}</strong>, DNI <strong>{{dni_propietario}}</strong>, autorizo la aplicación de anestesia general a mi mascota <strong>{{nombre_mascota}}</strong> ({{especie}}, {{raza}}, {{peso_kg}} kg).</p><div style="background:#fff8e1;border-left:4px solid #f59e0b;padding:1rem;margin:1rem 0;border-radius:4px"><p style="margin:0;font-weight:bold">⚠️ Riesgos informados:</p><ul style="margin:.5rem 0 0;line-height:1.8"><li>Reacciones alérgicas a los agentes anestésicos</li><li>Depresión cardiorrespiratoria</li><li>Hipotermia durante el procedimiento</li><li>Recuperación prolongada</li></ul></div><p>Confirmo que mi mascota ha cumplido con el ayuno previo indicado.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem"><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>{{nombre_propietario}}</strong></p><p style="margin:0;font-size:.75rem;color:#666">Propietario(a) · DNI: {{dni_propietario}}</p></div></div><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>{{nombre_veterinario}}</strong></p><p style="margin:0;font-size:.75rem;color:#666">Médico Veterinario</p></div></div></div><p style="text-align:center;color:#999;font-size:.75rem;margin-top:2rem">Fecha: {{fecha}} · {{nombre_clinica}}</p></div>'),
+('Consentimiento de Estética / Baño', 'estetica', '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:2rem"><div style="text-align:center;border-bottom:2px solid #166534;padding-bottom:1rem;margin-bottom:1.5rem"><h1 style="color:#166534;font-size:1.3rem;margin:0">AUTORIZACIÓN DE SERVICIOS DE ESTÉTICA</h1><p style="color:#666;margin:.3rem 0 0">{{nombre_clinica}}</p></div><p>Yo, <strong>{{nombre_propietario}}</strong>, autorizo a {{nombre_clinica}} a realizar los servicios de estética y/o baño a mi mascota <strong>{{nombre_mascota}}</strong> ({{especie}}, {{raza}}).</p><p style="margin-top:.75rem">Declaro que mi mascota se encuentra en buen estado de salud y no presenta enfermedades contagiosas.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem"><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>{{nombre_propietario}}</strong></p><p style="margin:0;font-size:.75rem;color:#666">Propietario(a)</p></div></div><div style="text-align:center"><div style="border-top:1px solid #333;padding-top:.5rem"><p style="margin:0;font-size:.85rem"><strong>Recepcionista</strong></p><p style="margin:0;font-size:.75rem;color:#666">{{nombre_clinica}}</p></div></div></div><p style="text-align:center;color:#999;font-size:.75rem;margin-top:2rem">Fecha: {{fecha}} · {{nombre_clinica}}</p></div>');
+
+SELECT 'tenant_schema v8 ✅' AS resultado;
