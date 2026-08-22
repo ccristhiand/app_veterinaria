@@ -167,17 +167,19 @@ async function procesarCampanas() {
 
         // Obtener campañas activas
         const [campanas] = await conn.execute(
-          `SELECT *, ? AS tenant_id, ? AS slug, ? AS nombre_clinica
-           FROM wa_campanas WHERE estado='enviando' LIMIT 3`,
-          [tenant.id, tenant.slug, tenant.nombre_clinica]
+          `SELECT * FROM wa_campanas WHERE estado='enviando' LIMIT 3`
         );
 
         for (const campana of campanas) {
-          campana.db_host = tenant.db_host;
-          campana.db_port = tenant.db_port;
-          campana.db_user = tenant.db_user;
-          campana.db_pass = tenant.db_pass;
-          campana.db_name = tenant.db_name;
+          // Inyectar datos del tenant manualmente (evita bug de mysql2 con strings en execute)
+          campana.tenant_id    = tenant.id;
+          campana.slug         = tenant.slug;
+          campana.nombre_clinica = tenant.nombre_clinica;
+          campana.db_host      = tenant.db_host;
+          campana.db_port      = tenant.db_port;
+          campana.db_user      = tenant.db_user;
+          campana.db_pass      = tenant.db_pass;
+          campana.db_name      = tenant.db_name;
           await procesarCampana(campana, conn);
         }
       } catch (e) {
