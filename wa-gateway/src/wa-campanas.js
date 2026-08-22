@@ -198,10 +198,11 @@ async function procesarCampana(campana, conn) {
 
   try {
     // Obtener lote de contactos pendientes (respetar LOTE_MAX)
+    // Nota: LIMIT no acepta prepared statement param en mysql2 — se interpola directo (valor numérico seguro)
     const [contactosPendientes] = await conn.execute(
       `SELECT id, propietario_id, telefono, nombre FROM wa_campana_contactos
-       WHERE campana_id=? AND estado='pendiente' ORDER BY id ASC LIMIT ?`,
-      [campana.id, LOTE_MAX]
+       WHERE campana_id=? AND estado='pendiente' ORDER BY id ASC LIMIT ${parseInt(LOTE_MAX)}`,
+      [campana.id]
     );
 
     if (!contactosPendientes.length) {
@@ -273,8 +274,8 @@ async function procesarCampana(campana, conn) {
         console.log(`[WA Campanas] ✅ → ${contacto.telefono}`);
       } catch (e) {
         await conn.execute(
-          'UPDATE wa_campana_contactos SET estado=?, error=? WHERE id=?',
-          ['fallido', e.message.substring(0, 255), contacto.id]
+          `UPDATE wa_campana_contactos SET estado='fallido', error=? WHERE id=?`,
+          [e.message.substring(0, 255), contacto.id]
         );
         await conn.execute(
           'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?', [campana.id]
@@ -301,6 +302,9 @@ async function procesarCampana(campana, conn) {
     }
   } catch (e) {
     console.error(`[WA Campanas] Error campaña ${campana.id}: ${e.message}`);
+    console.error(`[WA Campanas] STACK: ${e.stack}`);
+    console.error(`[WA Campanas] SQL: ${e.sql || "(no sql)"}`);
+    console.error(`[WA Campanas] campana.id=${campana.id} tipo_id=${typeof campana.id} LOTE_MAX=${LOTE_MAX} tipo_lote=${typeof LOTE_MAX}`);
   }
 }
 
