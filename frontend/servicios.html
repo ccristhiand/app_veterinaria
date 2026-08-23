@@ -308,9 +308,9 @@ async function toggleServicio(id, nombre, activo) {
   });
   if (!ok) return;
   try {
-    const res  = await api(`/servicios/${id}`, {
-      method: 'PUT',
-      body  : { activo: !activo, nombre, categoria: '', precio: 0 }
+    const res  = await api(`/servicios/${id}/toggle`, {
+      method: 'PATCH',
+      body  : { activo: !activo }
     });
     if (!res) return;
     const data = await res.json();

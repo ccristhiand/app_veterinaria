@@ -44,6 +44,17 @@ router.put('/:id', authorize('admin'), auditMiddleware('servicios:actualizado', 
   } catch (err) { next(err); }
 });
 
+router.patch('/:id/toggle', authorize('admin'), async (req, res, next) => {
+  try {
+    const { activo } = req.body;
+    await req.db.query(
+      'UPDATE servicios_catalogo SET activo=? WHERE id=?',
+      [activo ? 1 : 0, req.params.id]
+    );
+    return res.json({ success: true, message: activo ? 'Servicio activado.' : 'Servicio desactivado.' });
+  } catch (err) { next(err); }
+});
+
 router.delete('/:id', authorize('admin'), auditMiddleware('servicios:eliminado', 'servicios'), async (req, res, next) => {
   try {
     await req.db.query('UPDATE servicios_catalogo SET activo=0 WHERE id=?', [req.params.id]);
