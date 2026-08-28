@@ -1,12 +1,15 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v8
+-- VETNETCODIP SaaS — TENANT SCHEMA v9
 -- v6: + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7: + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8: + pruebas_complementarias en historia_clinica
 --     + eutanasia + internamiento en servicios_catalogo
 --     + consentimientos_plantillas + consentimientos_generados
+-- v9: + descuento_pct / descuento_monto en factura_items
+--     + subtotal_bruto / descuento_items / descuento_global /
+--       descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
 -- Ejecutar al crear nueva clinica
--- Compatible MySQL 8+
+-- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
 
 -- ── Tabla de sedes ───────────────────────────────────────────
@@ -218,10 +221,12 @@ CREATE TABLE IF NOT EXISTS servicios_estetica (
   productos       VARCHAR(255) NULL,
   precio          DECIMAL(8,2) NULL,
   observaciones   TEXT         NULL,
+  sede_id         INT UNSIGNED NULL DEFAULT NULL,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (mascota_id)      REFERENCES mascotas(id) ON DELETE RESTRICT,
   FOREIGN KEY (atendido_por_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-  FOREIGN KEY (cita_id)         REFERENCES citas(id)    ON DELETE SET NULL
+  FOREIGN KEY (cita_id)         REFERENCES citas(id)    ON DELETE SET NULL,
+  INDEX idx_sede (sede_id)
 ) ENGINE=InnoDB;
 
 -- ── Fotos de estética ────────────────────────────────────────
@@ -307,17 +312,27 @@ CREATE TABLE IF NOT EXISTS facturas (
   emitido_por_id           INT UNSIGNED  NOT NULL,
   sede_id                  INT UNSIGNED  NULL DEFAULT NULL,
   fecha                    DATE          NOT NULL,
-  subtotal                 DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  -- Desglose de montos
+  subtotal_bruto           DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma bruta de items antes de descuentos',
+  descuento_items          DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma de descuentos aplicados por item',
+  descuento_global         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Descuento global sobre subtotal',
+  descuento_global_pct     DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Porcentaje de descuento global',
+  comision_tarjeta         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Comision bancaria informativa (no suma al total)',
+  comision_tarjeta_pct     DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Porcentaje de comision bancaria',
+  subtotal                 DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Base imponible sin IGV',
   igv                      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  total                    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  total                    DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Total final = subtotal + IGV (sin comision)',
+  -- Estado y pago
   estado                   ENUM('pendiente','pagado','anulado') NOT NULL DEFAULT 'pendiente',
   metodo_pago              ENUM('efectivo','tarjeta','transferencia','yape','plin') NULL,
   notas                    TEXT          NULL,
   observaciones            TEXT          NULL,
   anulado_por              VARCHAR(100)  NULL,
+  -- Datos factura
   cliente_ruc              VARCHAR(20)   NULL,
   cliente_razon_social     VARCHAR(200)  NULL,
   cliente_direccion_fiscal VARCHAR(255)  NULL,
+  -- SUNAT / FE
   sunat_estado             VARCHAR(20)   NULL DEFAULT NULL,
   sunat_hash               VARCHAR(100)  NULL,
   sunat_cdr                TEXT          NULL,
@@ -338,21 +353,25 @@ CREATE TABLE IF NOT EXISTS facturas (
   INDEX idx_sede         (sede_id)
 ) ENGINE=InnoDB;
 
+-- ── Items de factura ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS factura_items (
-  id            INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  factura_id    INT UNSIGNED  NOT NULL,
-  descripcion   VARCHAR(255)  NOT NULL,
-  cantidad      DECIMAL(8,2)  NOT NULL DEFAULT 1.00,
-  precio_unit   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  subtotal      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  inventario_id INT UNSIGNED  NULL DEFAULT NULL,
+  id              INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  factura_id      INT UNSIGNED  NOT NULL,
+  descripcion     VARCHAR(255)  NOT NULL,
+  cantidad        DECIMAL(8,2)  NOT NULL DEFAULT 1.00,
+  precio_unit     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  descuento_pct   DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Descuento por item en porcentaje',
+  descuento_monto DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto descontado en este item',
+  subtotal        DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Precio final despues del descuento',
+  inventario_id   INT UNSIGNED  NULL DEFAULT NULL,
   FOREIGN KEY (factura_id)    REFERENCES facturas(id)   ON DELETE CASCADE,
   FOREIGN KEY (inventario_id) REFERENCES inventario(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+-- ── Pagos de factura ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS factura_pagos (
-  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  factura_id  INT UNSIGNED NOT NULL,
+  id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  factura_id  INT UNSIGNED  NOT NULL,
   metodo_pago ENUM('efectivo','tarjeta','transferencia','yape','plin') NOT NULL,
   monto       DECIMAL(10,2) NOT NULL,
   referencia  VARCHAR(100)  NULL,
@@ -363,11 +382,11 @@ CREATE TABLE IF NOT EXISTS factura_pagos (
 
 -- ── Caja ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS caja_cierres (
-  id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  fecha                 DATE         NOT NULL,
+  id                    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  fecha                 DATE          NOT NULL,
   turno                 ENUM('mañana','tarde','dia_completo') NOT NULL DEFAULT 'dia_completo',
-  realizado_por_id      INT UNSIGNED NOT NULL,
-  sede_id               INT UNSIGNED NULL DEFAULT NULL,
+  realizado_por_id      INT UNSIGNED  NOT NULL,
+  sede_id               INT UNSIGNED  NULL DEFAULT NULL,
   monto_inicial         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_efectivo      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_tarjeta       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -379,9 +398,9 @@ CREATE TABLE IF NOT EXISTS caja_cierres (
   conteo_fisico         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   diferencia            DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   estado                ENUM('borrador','cerrado') NOT NULL DEFAULT 'borrador',
-  observaciones         TEXT         NULL,
-  created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  observaciones         TEXT          NULL,
+  created_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (realizado_por_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
   INDEX idx_fecha  (fecha),
   INDEX idx_estado (estado),
@@ -531,14 +550,13 @@ INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
 INSERT INTO wa_config (activo) VALUES (0);
 
 INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
-('Recordatorio de cita', 'recordatorio_cita',
- '🐾 Hola [nombre], te recordamos que tienes una cita para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Para más info llámanos al [telefono].'),
-('Recordatorio de vacuna', 'recordatorio_vacuna',
- '💉 Hola [nombre], *[mascota]* tiene pendiente su vacuna *[vacuna]* próximamente. Te recomendamos agendar su cita cuanto antes. Contáctanos en *[clinica]*.'),
-('Bienvenida', 'manual',
- '🐾 Hola [nombre], bienvenido/a a *[clinica]*. Estamos felices de cuidar a *[mascota]*. Ante cualquier consulta estamos a tu disposición.'),
-('Campaña general', 'campana',
- '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
+  ('Recordatorio de cita', 'recordatorio_cita',
+   '🐾 Hola [nombre], te recordamos que tienes una cita para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Para más info llámanos al [telefono].'),
+  ('Recordatorio de vacuna', 'recordatorio_vacuna',
+   '💉 Hola [nombre], *[mascota]* tiene pendiente su vacuna *[vacuna]* próximamente. Te recomendamos agendar su cita cuanto antes. Contáctanos en *[clinica]*.'),
+  ('Bienvenida', 'manual',
+   '🐾 Hola [nombre], bienvenido/a a *[clinica]*. Estamos felices de cuidar a *[mascota]*. Ante cualquier consulta estamos a tu disposición.'),
+  ('Campaña general', 'campana',
+   '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-
-SELECT 'tenant_schema v8 ✅' AS resultado;
+SELECT 'tenant_schema v9 ✅' AS resultado;
