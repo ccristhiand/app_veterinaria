@@ -8,16 +8,16 @@
 const MODULOS_POR_PLAN = {
   basic: [
     'dashboard','citas','propietarios','mascotas','historia','servicios',
-    'whatsapp',
+    'asistencia','whatsapp',
   ],
   pro: [
     'dashboard','citas','propietarios','mascotas','historia',
-    'inventario','reportes','servicios','whatsapp',
+    'inventario','reportes','servicios','asistencia','whatsapp',
   ],
   enterprise: [
     'dashboard','citas','propietarios','mascotas','historia',
     'inventario','facturacion','caja','reportes','servicios',
-    'consentimientos','usuarios','configuracion','whatsapp',
+    'consentimientos','usuarios','configuracion','asistencia','whatsapp',
   ],
 };
 
