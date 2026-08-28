@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Asistencia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    .tab-btn { padding:.55rem 1.1rem;border:none;background:none;cursor:pointer;font-family:inherit;
+               font-size:.84rem;font-weight:600;color:var(--ink-faint);
+               border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s; }
+    .tab-btn.active { color:var(--green-600);border-bottom-color:var(--green-500);font-weight:700; }
+
+    /* Calendario semanal */
+    .cal-grid { display:grid;grid-template-columns:80px repeat(7,1fr);border-left:1px solid var(--line);border-top:1px solid var(--line); }
+    .cal-head { background:#f0fdf4;font-size:.7rem;font-weight:700;text-align:center;
+                padding:.4rem .2rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line); }
+    .cal-head.hoy { background:var(--green-500);color:#fff; }
+    .cal-label { font-size:.7rem;color:var(--ink-faint);padding:.4rem .5rem;text-align:right;
+                 border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-weight:600; }
+    .cal-cell { border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+                padding:.25rem;min-height:54px;position:relative;cursor:pointer;transition:background .1s; }
+    .cal-cell:hover { background:#f0fdf4; }
+    .cal-evento { font-size:.65rem;border-radius:.4rem;padding:.15rem .35rem;margin-bottom:.15rem;
+                  line-height:1.3;cursor:pointer;transition:opacity .15s; }
+    .cal-evento:hover { opacity:.85; }
+    .ev-puntual    { background:#dcfce7;color:#15803d;border-left:3px solid #16a34a; }
+    .ev-tarde      { background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04; }
+    .ev-adelantado { background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed; }
+    .ev-sin-marcar { background:#f8faf8;color:var(--ink-soft);border-left:3px solid #d1d5db; }
+    .ev-ausente    { background:#fff1f2;color:#be123c;border-left:3px solid #f43f5e; }
+
+    /* Badge estado */
+    .badge-puntual    { background:#dcfce7;color:#15803d;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-tarde      { background:#fef9c3;color:#854d0e;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-adelantado { background:#ede9fe;color:#5b21b6;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-ausente    { background:#fff1f2;color:#be123c;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+    .badge-sin-marcar { background:#f3f4f6;color:#6b7280;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
+
+    /* Tarjeta marcado del empleado */
+    .marcar-card { background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #86efac;
+                   border-radius:1.2rem;padding:1.5rem;text-align:center; }
+    .marcar-reloj { font-size:2.8rem;font-weight:800;font-family:'Courier New',monospace;
+                    color:#15803d;letter-spacing:.05em;margin:.5rem 0; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head">
+    <div><h2>🕐 Asistencia del Personal</h2><p>Turnos y control de puntualidad</p></div>
+    <div id="head-actions" style="display:flex;gap:.6rem"></div>
+  </div>
+
+  <!-- Tabs (admin ve todo; empleado solo ve "Mi Turno") -->
+  <div id="tabs-bar" style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
+    <button class="tab-btn active" id="tab-mi-turno"  onclick="mostrarTab('mi-turno')">📌 Mi Turno</button>
+    <button class="tab-btn"        id="tab-calendario" onclick="mostrarTab('calendario')" style="display:none">📅 Calendario</button>
+    <button class="tab-btn"        id="tab-reporte"    onclick="mostrarTab('reporte')"    style="display:none">📊 Reporte</button>
+  </div>
+
+  <!-- ══ TAB MI TURNO ══════════════════════════════════════════ -->
+  <div id="contenido-mi-turno" style="overflow-y:auto;max-height:calc(100vh - 160px)">
+    <div style="max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:1.2rem">
+
+      <!-- Reloj en tiempo real -->
+      <div class="marcar-card">
+        <p style="font-size:.75rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.1em">Hora actual</p>
+        <div class="marcar-reloj" id="reloj-live">--:--:--</div>
+        <p style="font-size:.72rem;color:#15803d" id="fecha-live">—</p>
+      </div>
+
+      <!-- Info turno del día -->
+      <div id="turno-hoy-card" class="vcard vcard-pad">
+        <div class="vempty"><div class="vspinner"></div><p>Cargando turno…</p></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ TAB CALENDARIO ════════════════════════════════════════ -->
+  <div id="contenido-calendario" style="display:none;overflow-y:auto;max-height:calc(100vh - 160px)">
+
+    <!-- Controles semana -->
+    <div class="vcard vcard-pad" style="margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center">
+      <button onclick="semanaAnterior()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">◀</button>
+      <span id="label-semana" style="font-weight:700;font-size:.9rem;min-width:220px;text-align:center">—</span>
+      <button onclick="semanaSiguiente()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">▶</button>
+      <button onclick="semanaHoy()" class="vbtn vbtn-ghost">Hoy</button>
+      <div style="flex:1"></div>
+      <select id="cal-sede" class="vinput" style="width:auto;font-size:.82rem" onchange="cargarSemana()">
+        <option value="">Todas las sedes</option>
+      </select>
+      <button onclick="abrirModalTurno()" class="vbtn vbtn-primary">＋ Asignar turno</button>
+      <button onclick="abrirModalLote()"  class="vbtn" style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;font-weight:600">📋 Asignar en lote</button>
+    </div>
+
+    <!-- Leyenda -->
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem;font-size:.7rem">
+      <span class="ev-puntual cal-evento">✅ Puntual</span>
+      <span class="ev-tarde cal-evento">⚠️ Tarde</span>
+      <span class="ev-adelantado cal-evento">🌟 Adelantado</span>
+      <span class="ev-sin-marcar cal-evento">⏳ Sin marcar</span>
+      <span class="ev-ausente cal-evento">❌ Ausente</span>
+    </div>
+
+    <!-- Grid calendario -->
+    <div class="vcard" style="overflow-x:auto">
+      <div id="cal-wrap" style="min-width:600px">
+        <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ TAB REPORTE ═══════════════════════════════════════════ -->
+  <div id="contenido-reporte" style="display:none;overflow-y:auto;max-height:calc(100vh - 160px)">
+
+    <!-- Filtros -->
+    <div class="vcard vcard-pad" style="margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+      <div><label class="vlabel">Desde</label><input type="date" id="rep-desde" class="vinput" style="width:auto"/></div>
+      <div><label class="vlabel">Hasta</label><input type="date" id="rep-hasta" class="vinput" style="width:auto"/></div>
+      <div>
+        <label class="vlabel">Empleado</label>
+        <select id="rep-usuario" class="vinput" style="width:auto">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div>
+        <label class="vlabel">Sede</label>
+        <select id="rep-sede" class="vinput" style="width:auto">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <button onclick="cargarReporte()" class="vbtn vbtn-primary">Ver reporte</button>
+      <button onclick="setPeriodoRep('semana')" class="vbtn vbtn-ghost">Esta semana</button>
+      <button onclick="setPeriodoRep('mes')" class="vbtn vbtn-ghost">Este mes</button>
+    </div>
+
+    <!-- KPIs -->
+    <div id="rep-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.3rem"></div>
+
+    <!-- Por usuario -->
+    <div class="vcard" style="margin-bottom:1.3rem">
+      <div style="padding:1rem 1.2rem;border-bottom:1px solid var(--line)">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">👥 Por empleado</h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="vtable" id="rep-tabla-usuarios">
+          <thead><tr>
+            <th>Empleado</th><th>Rol</th><th>Sede</th>
+            <th style="text-align:center">Turnos</th>
+            <th style="text-align:center">Asistió</th>
+            <th style="text-align:center">Ausencias</th>
+            <th style="text-align:center">Puntuales</th>
+            <th style="text-align:center">Tardanzas</th>
+            <th style="text-align:center">Avg tardanza</th>
+            <th style="text-align:center">% Asistencia</th>
+          </tr></thead>
+          <tbody id="rep-tbody-usuarios">
+            <tr><td colspan="10"><div class="vempty">Selecciona un período</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Detalle diario -->
+    <div class="vcard">
+      <div style="padding:1rem 1.2rem;border-bottom:1px solid var(--line)">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">📋 Detalle diario</h3>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="vtable">
+          <thead><tr>
+            <th>Fecha</th><th>Empleado</th><th>Sede</th>
+            <th>Turno</th><th>Marcó a</th><th>Estado</th><th>Diferencia</th>
+          </tr></thead>
+          <tbody id="rep-tbody-detalle">
+            <tr><td colspan="7"><div class="vempty">—</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /main-content -->
+
+<!-- ══ Modal Asignar Turno ═══════════════════════════════════════ -->
+<div id="modal-turno" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3 id="modal-turno-titulo">📅 Asignar Turno</h3>
+      <button onclick="closeModal('modal-turno')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="turno-edit-id"/>
+
+      <div class="grid grid-cols-1 gap-3">
+        <div>
+          <label class="vlabel">Empleado *</label>
+          <select id="turno-usuario" class="vinput">
+            <option value="">Seleccionar empleado…</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Fecha *</label>
+          <input type="date" id="turno-fecha" class="vinput"/>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="vlabel">Hora inicio *</label>
+            <input type="time" id="turno-inicio" class="vinput" value="08:00"/>
+          </div>
+          <div>
+            <label class="vlabel">Hora fin *</label>
+            <input type="time" id="turno-fin" class="vinput" value="17:00"/>
+          </div>
+        </div>
+        <div>
+          <label class="vlabel">Sede</label>
+          <select id="turno-sede" class="vinput">
+            <option value="">Sin sede específica</option>
+          </select>
+        </div>
+        <div>
+          <label class="vlabel">Notas</label>
+          <input type="text" id="turno-notas" class="vinput" placeholder="Observaciones opcionales…"/>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-turno')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarTurno()" class="vbtn vbtn-primary">💾 Guardar turno</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Asignar en Lote ═════════════════════════════════════ -->
+<div id="modal-lote" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3>📋 Asignar Turnos en Lote</h3>
+      <button onclick="closeModal('modal-lote')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.75rem 1rem;font-size:.78rem;color:#0369a1">
+        💡 Asigna el mismo horario a varios empleados y/o varios días a la vez.
+      </div>
+
+      <div>
+        <label class="vlabel">Empleados *</label>
+        <div id="lote-usuarios-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:160px;overflow-y:auto;
+          border:1px solid var(--line);border-radius:.75rem;padding:.5rem"></div>
+      </div>
+
+      <div>
+        <label class="vlabel">Días de la semana *</label>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="lun" style="accent-color:var(--green-600)"/> Lun
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="mar" style="accent-color:var(--green-600)"/> Mar
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="mie" style="accent-color:var(--green-600)"/> Mié
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="jue" style="accent-color:var(--green-600)"/> Jue
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="vie" style="accent-color:var(--green-600)"/> Vie
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="sab" style="accent-color:var(--green-600)"/> Sáb
+          </label>
+          <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer">
+            <input type="checkbox" class="lote-dia" value="dom" style="accent-color:var(--green-600)"/> Dom
+          </label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="vlabel">Semana desde</label>
+          <input type="date" id="lote-desde" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Semana hasta</label>
+          <input type="date" id="lote-hasta" class="vinput"/>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="vlabel">Hora inicio *</label>
+          <input type="time" id="lote-inicio" class="vinput" value="08:00"/>
+        </div>
+        <div>
+          <label class="vlabel">Hora fin *</label>
+          <input type="time" id="lote-fin" class="vinput" value="17:00"/>
+        </div>
+      </div>
+
+      <div>
+        <label class="vlabel">Sede</label>
+        <select id="lote-sede" class="vinput">
+          <option value="">Sin sede específica</option>
+        </select>
+      </div>
+
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-lote')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarLote()" class="vbtn vbtn-primary">📋 Asignar turnos</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Ver turno (click en evento) ═════════════════════════ -->
+<div id="modal-ver-turno" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:400px">
+    <div class="vmodal-head">
+      <h3>📅 Detalle de Turno</h3>
+      <button onclick="closeModal('modal-ver-turno')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="ver-turno-body" style="display:flex;flex-direction:column;gap:.75rem"></div>
+    <div class="vmodal-foot" id="ver-turno-foot">
+      <button onclick="closeModal('modal-ver-turno')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado global ─────────────────────────────────────────────────
+var _userRol    = '';
+var _usuariosCache = [];
+var _sedesCache    = [];
+var _fechaBase     = new Date();   // semana actual
+var _turnosData    = [];           // datos de la semana cargada
+
+// ── Init ──────────────────────────────────────────────────────────
+initPage({ activePage:'asistencia', title:'Asistencia', subtitle:'Turnos y puntualidad del personal' });
+
+(async () => {
+  try {
+    var u = JSON.parse(localStorage.getItem('vet_user') || '{}');
+    _userRol = u.rol || '';
+  } catch {}
+
+  // Mostrar tabs según rol
+  if (_userRol === 'admin') {
+    document.getElementById('tab-calendario').style.display = '';
+    document.getElementById('tab-reporte').style.display    = '';
+    document.getElementById('head-actions').innerHTML =
+      '<button onclick="abrirModalTurno()" class="vbtn vbtn-primary">＋ Asignar turno</button>';
+  }
+
+  // Reloj en tiempo real
+  tickReloj();
+  setInterval(tickReloj, 1000);
+
+  // Cargar selects de usuario y sede
+  await Promise.all([cargarUsuariosSelect(), cargarSedesSelect()]);
+
+  // Cargar turno del día
+  await cargarMiTurno();
+
+  // Fechas reporte por defecto (semana actual)
+  setPeriodoRep('semana', false);
+})();
+
+// ── Reloj ─────────────────────────────────────────────────────────
+function tickReloj() {
+  var ahora = new Date();
+  var hora  = ahora.toLocaleTimeString('es-PE', { timeZone:'America/Lima', hour12:false });
+  var fecha = ahora.toLocaleDateString('es-PE', { timeZone:'America/Lima', weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  var el = document.getElementById('reloj-live');
+  var ef = document.getElementById('fecha-live');
+  if (el) el.textContent = hora;
+  if (ef) ef.textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────
+function mostrarTab(tab) {
+  ['mi-turno','calendario','reporte'].forEach(t => {
+    document.getElementById('tab-'+t)?.classList.toggle('active', t===tab);
+    var el = document.getElementById('contenido-'+t);
+    if (el) el.style.display = t===tab ? 'block' : 'none';
+  });
+  if (tab==='calendario') cargarSemana();
+  if (tab==='reporte')    cargarReporte();
+}
+
+// ── Helpers fecha ─────────────────────────────────────────────────
+function fmt(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,'0');
+  var dd= String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
+function lunesDe(base) {
+  var d   = new Date(base);
+  var dia = d.getDay();
+  d.setDate(d.getDate() - (dia===0 ? 6 : dia-1));
+  return d;
+}
+
+// ── Cargar selects ────────────────────────────────────────────────
+async function cargarUsuariosSelect() {
+  try {
+    var res = await api('/usuarios?activo=true');
+    if (!res||!res.ok) return;
+    _usuariosCache = (await res.json()).data || [];
+    var opts = '<option value="">Todos</option>' +
+      _usuariosCache.map(u => '<option value="'+u.id+'">'+esc(u.nombre)+' ('+u.rol+')</option>').join('');
+    ['rep-usuario','turno-usuario'].forEach(id => {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = (id==='rep-usuario'?'<option value="">Todos</option>':
+        '<option value="">Seleccionar…</option>') +
+        _usuariosCache.map(u=>'<option value="'+u.id+'">'+esc(u.nombre)+' ('+u.rol+')</option>').join('');
+    });
+    // Lista lote
+    var listEl = document.getElementById('lote-usuarios-list');
+    if (listEl) {
+      listEl.innerHTML = _usuariosCache.map(u =>
+        '<label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;cursor:pointer;padding:.2rem .3rem;border-radius:.4rem" '+
+        'onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'\'">' +
+          '<input type="checkbox" class="lote-usr" value="'+u.id+'" style="accent-color:var(--green-600)"/>' +
+          esc(u.nombre)+' <span style="font-size:.68rem;color:var(--ink-faint)">('+u.rol+')</span>' +
+        '</label>'
+      ).join('');
+    }
+  } catch {}
+}
+
+async function cargarSedesSelect() {
+  try {
+    var res = await api('/sedes?activo=true');
+    if (!res||!res.ok) return;
+    _sedesCache = (await res.json()).data || [];
+    var opts = '<option value="">Sin sede</option>' +
+      _sedesCache.map(s=>'<option value="'+s.id+'">'+esc(s.nombre)+'</option>').join('');
+    ['turno-sede','lote-sede','cal-sede','rep-sede'].forEach(id => {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = (id==='cal-sede'||id==='rep-sede'
+        ? '<option value="">Todas las sedes</option>'
+        : '<option value="">Sin sede específica</option>') +
+        _sedesCache.map(s=>'<option value="'+s.id+'">'+esc(s.nombre)+'</option>').join('');
+    });
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TAB MI TURNO
+// ══════════════════════════════════════════════════════════════════
+async function cargarMiTurno() {
+  var card = document.getElementById('turno-hoy-card');
+  card.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
+  try {
+    var res = await api('/asistencia/mi-turno');
+    if (!res||!res.ok) { card.innerHTML = '<div class="vempty">Error al cargar turno</div>'; return; }
+    var data = (await res.json());
+    var t    = data.data;
+
+    if (!t) {
+      card.innerHTML =
+        '<div style="text-align:center;padding:1.5rem">' +
+          '<p style="font-size:2rem;margin-bottom:.5rem">📭</p>' +
+          '<p style="font-weight:700;color:var(--ink-soft)">No tienes turno asignado hoy</p>' +
+          '<p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem">Contacta a tu administrador si crees que es un error.</p>' +
+        '</div>';
+      return;
+    }
+
+    // Ya marcó asistencia
+    if (t.asistencia_id) {
+      var badgeClass = 'badge-'+t.estado;
+      var estadoTxt  = { puntual:'✅ Puntual', tarde:'⚠️ Tarde', adelantado:'🌟 Adelantado' };
+      var diffTxt    = t.minutos_diff > 0
+        ? t.minutos_diff+' min tarde'
+        : t.minutos_diff < 0
+          ? Math.abs(t.minutos_diff)+' min antes'
+          : 'exacto';
+
+      card.innerHTML =
+        '<div style="text-align:center;padding:1rem 0">' +
+          '<p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em">Tu turno de hoy</p>' +
+          '<p style="font-size:1.5rem;font-weight:800;margin:.4rem 0">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</p>' +
+          (t.sede_nombre?'<p style="font-size:.78rem;color:var(--ink-soft)">🏥 '+esc(t.sede_nombre)+'</p>':'') +
+        '</div>' +
+        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:1rem;text-align:center;margin-top:.75rem">' +
+          '<p style="font-size:.72rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.1em">Asistencia registrada</p>' +
+          '<p style="font-size:1.8rem;font-weight:800;font-family:monospace;color:#15803d;margin:.3rem 0">'+esc(t.hora_marcada.substring(0,5))+'</p>' +
+          '<span class="'+badgeClass+'">'+estadoTxt[t.estado]+'</span>' +
+          '<p style="font-size:.72rem;color:#15803d;margin-top:.4rem">'+diffTxt+'</p>' +
+        '</div>';
+      return;
+    }
+
+    // Tiene turno pero no ha marcado
+    card.innerHTML =
+      '<div style="text-align:center;padding:1rem 0">' +
+        '<p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em">Tu turno de hoy</p>' +
+        '<p style="font-size:1.8rem;font-weight:800;margin:.4rem 0;color:#15803d">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</p>' +
+        (t.sede_nombre?'<p style="font-size:.78rem;color:var(--ink-soft);margin-bottom:.5rem">🏥 '+esc(t.sede_nombre)+'</p>':'') +
+        (t.notas?'<p style="font-size:.75rem;color:var(--ink-soft);font-style:italic;margin-bottom:.75rem">📝 '+esc(t.notas)+'</p>':'') +
+      '</div>' +
+      '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.9rem;padding:.85rem;text-align:center;margin-bottom:1rem">' +
+        '<p style="font-size:.78rem;font-weight:600;color:#b45309">⏳ Aún no has marcado asistencia hoy</p>' +
+        '<p style="font-size:.7rem;color:#b45309;margin-top:.2rem">Una vez que marques, no podrás modificarlo.</p>' +
+      '</div>' +
+      '<button onclick="marcarAsistencia()" class="vbtn vbtn-primary" style="width:100%;font-size:1rem;padding:.85rem;font-weight:700">' +
+        '✅ Marcar mi asistencia ahora' +
+      '</button>';
+
+  } catch { card.innerHTML = '<div class="vempty">Error de conexión</div>'; }
+}
+
+async function marcarAsistencia() {
+  var ok = await vconfirm({
+    titulo: '¿Marcar asistencia?',
+    mensaje: 'Esta acción es irreversible. Se registrará la hora actual como tu hora de llegada.',
+    labelOk: '✅ Confirmar', tipo: 'warning'
+  });
+  if (!ok) return;
+
+  try {
+    var res  = await api('/asistencia/marcar', { method:'POST', body:{} });
+    var data = await res.json();
+    if (res.ok) {
+      toast(data.message, 'success', 6000);
+      await cargarMiTurno();
+      if (_userRol === 'admin') cargarSemana();
+    } else {
+      toast(data.message || 'Error al marcar asistencia.', 'danger');
+    }
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TAB CALENDARIO
+// ══════════════════════════════════════════════════════════════════
+function semanaHoy()      { _fechaBase = new Date(); cargarSemana(); }
+function semanaAnterior() { _fechaBase.setDate(_fechaBase.getDate()-7); cargarSemana(); }
+function semanaSiguiente(){ _fechaBase.setDate(_fechaBase.getDate()+7); cargarSemana(); }
+
+async function cargarSemana() {
+  var lunes   = lunesDe(_fechaBase);
+  var domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
+  var sedeId  = document.getElementById('cal-sede')?.value || '';
+
+  // Label semana
+  var opts = { day:'numeric', month:'short' };
+  document.getElementById('label-semana').textContent =
+    lunes.toLocaleDateString('es-PE',opts) + ' – ' + domingo.toLocaleDateString('es-PE',opts) + ' ' + domingo.getFullYear();
+
+  document.getElementById('cal-wrap').innerHTML = '<div class="vempty" style="padding:2rem"><div class="vspinner"></div><p>Cargando…</p></div>';
+
+  try {
+    var url = '/asistencia/turnos/semana?fecha='+fmt(lunes)+(sedeId?'&sede_id='+sedeId:'');
+    var res = await api(url);
+    if (!res||!res.ok) return;
+    var data  = await res.json();
+    _turnosData = data.data || [];
+    renderCalendario(lunes, _turnosData);
+  } catch { document.getElementById('cal-wrap').innerHTML = '<div class="vempty">Error al cargar</div>'; }
+}
+
+function renderCalendario(lunes, turnos) {
+  var hoyStr = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Lima' });
+  var dias   = [];
+  for (var i=0; i<7; i++) {
+    var d = new Date(lunes); d.setDate(lunes.getDate()+i);
+    dias.push(d);
+  }
+  var nombDias = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+  // Agrupar turnos por usuario
+  var usuarios = {};
+  turnos.forEach(t => {
+    if (!usuarios[t.usuario_id]) usuarios[t.usuario_id] = { nombre: t.usuario_nombre, rol: t.usuario_rol };
+  });
+
+  if (!Object.keys(usuarios).length) {
+    document.getElementById('cal-wrap').innerHTML =
+      '<div class="vempty" style="padding:2rem">No hay turnos asignados esta semana</div>';
+    return;
+  }
+
+  var html = '<div class="cal-grid">';
+
+  // Encabezado
+  html += '<div class="cal-head">Empleado</div>';
+  dias.forEach((d,i) => {
+    var esHoy = fmt(d)===hoyStr;
+    html += '<div class="cal-head'+(esHoy?' hoy':'')+'">'+nombDias[i]+'<br/>'+d.getDate()+'</div>';
+  });
+
+  // Filas por usuario
+  Object.entries(usuarios).forEach(([uid, usr]) => {
+    html += '<div class="cal-label" style="display:flex;flex-direction:column;justify-content:center">' +
+              '<span style="font-weight:700;font-size:.72rem">'+esc(usr.nombre)+'</span>' +
+              '<span style="font-size:.6rem;color:var(--ink-faint)">'+usr.rol+'</span>' +
+            '</div>';
+
+    dias.forEach(d => {
+      var dStr  = fmt(d);
+      var turno = turnos.find(t => t.usuario_id == uid && t.fecha.substring(0,10) === dStr);
+      var esHoy = dStr === hoyStr;
+
+      html += '<div class="cal-cell'+(esHoy?' '+' style="background:#f0fdf4"':'')+'"'+
+        (turno?' onclick="verTurno('+turno.id+')"':'')+'>';
+
+      if (turno) {
+        var clase, etiqueta;
+        if (turno.asistencia_id) {
+          clase    = 'ev-'+turno.estado;
+          etiqueta = { puntual:'✅ Puntual', tarde:'⚠️ Tarde', adelantado:'🌟 Adelantado' }[turno.estado];
+        } else if (dStr < hoyStr) {
+          clase    = 'ev-ausente';
+          etiqueta = '❌ Ausente';
+        } else {
+          clase    = 'ev-sin-marcar';
+          etiqueta = '⏳ '+turno.hora_inicio.substring(0,5)+'-'+turno.hora_fin.substring(0,5);
+        }
+        html += '<div class="cal-evento '+clase+'" title="'+esc(usr.nombre)+' · '+turno.hora_inicio.substring(0,5)+'-'+turno.hora_fin.substring(0,5)+'">'+etiqueta+'</div>';
+        html += '<div style="font-size:.58rem;color:var(--ink-faint)">'+turno.hora_inicio.substring(0,5)+'-'+turno.hora_fin.substring(0,5)+'</div>';
+      }
+
+      html += '</div>';
+    });
+  });
+
+  html += '</div>';
+  document.getElementById('cal-wrap').innerHTML = html;
+}
+
+function verTurno(turnoId) {
+  var t = _turnosData.find(x => x.id == turnoId);
+  if (!t) return;
+
+  var hoyStr   = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Lima' });
+  var fechaStr = t.fecha.substring(0,10);
+
+  var estadoHtml = '';
+  if (t.asistencia_id) {
+    var badgeClass = 'badge-'+t.estado;
+    var estadoTxt  = { puntual:'✅ Puntual', tarde:'⚠️ Tarde', adelantado:'🌟 Adelantado' };
+    estadoHtml =
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;padding:.75rem 1rem">' +
+        '<p style="font-size:.68rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Asistencia registrada</p>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+          '<span style="font-weight:700;font-size:.88rem">🕐 '+esc(t.hora_marcada.substring(0,5))+'</span>' +
+          '<span class="'+badgeClass+'">'+estadoTxt[t.estado]+'</span>' +
+        '</div>' +
+        (t.minutos_diff!==0?'<p style="font-size:.72rem;color:#15803d;margin-top:.3rem">'+Math.abs(t.minutos_diff)+' min '+(t.minutos_diff>0?'tarde':'antes')+'</p>':'') +
+      '</div>';
+  } else if (fechaStr < hoyStr) {
+    estadoHtml = '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem;padding:.75rem 1rem;text-align:center">' +
+      '<span class="badge-ausente">❌ Ausente — no marcó asistencia</span></div>';
+  } else {
+    estadoHtml = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.75rem 1rem;text-align:center">' +
+      '<span class="badge-sin-marcar">⏳ Pendiente de marcar</span></div>';
+  }
+
+  document.getElementById('ver-turno-body').innerHTML =
+    '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem">' +
+      '<span style="color:var(--ink-faint);font-weight:600">Empleado:</span><span style="font-weight:700">'+esc(t.usuario_nombre)+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Rol:</span><span>'+esc(t.usuario_rol)+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Fecha:</span><span>'+new Date(fechaStr+'T12:00:00').toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'})+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Horario:</span><span style="font-weight:700">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</span>' +
+      (t.sede_nombre?'<span style="color:var(--ink-faint);font-weight:600">Sede:</span><span>🏥 '+esc(t.sede_nombre)+'</span>':'') +
+      (t.notas?'<span style="color:var(--ink-faint);font-weight:600">Notas:</span><span style="font-style:italic">'+esc(t.notas)+'</span>':'') +
+    '</div>' +
+    '<div style="margin-top:.5rem">'+estadoHtml+'</div>';
+
+  // Botones de acción (solo si no tiene asistencia)
+  var footHtml = '<button onclick="closeModal(\'modal-ver-turno\')" class="vbtn vbtn-ghost">Cerrar</button>';
+  if (!t.asistencia_id) {
+    footHtml +=
+      '<button onclick="editarTurno('+t.id+')" class="vbtn vbtn-ghost">✏️ Editar</button>' +
+      '<button onclick="eliminarTurno('+t.id+')" class="vbtn" style="background:#be123c;color:#fff;border:none;font-weight:600">🗑️ Eliminar</button>';
+  }
+  document.getElementById('ver-turno-foot').innerHTML = footHtml;
+
+  openModal('modal-ver-turno');
+}
+
+// ── Guardar turno ─────────────────────────────────────────────────
+function abrirModalTurno(fecha) {
+  document.getElementById('turno-edit-id').value = '';
+  document.getElementById('modal-turno-titulo').textContent = '📅 Asignar Turno';
+  document.getElementById('turno-usuario').value = '';
+  document.getElementById('turno-fecha').value   = fecha || fechaHoyInput();
+  document.getElementById('turno-inicio').value  = '08:00';
+  document.getElementById('turno-fin').value     = '17:00';
+  document.getElementById('turno-sede').value    = '';
+  document.getElementById('turno-notas').value   = '';
+  openModal('modal-turno');
+}
+
+function editarTurno(id) {
+  var t = _turnosData.find(x => x.id == id);
+  if (!t) return;
+  closeModal('modal-ver-turno');
+  document.getElementById('turno-edit-id').value = id;
+  document.getElementById('modal-turno-titulo').textContent = '✏️ Editar Turno';
+  document.getElementById('turno-usuario').value = t.usuario_id;
+  document.getElementById('turno-fecha').value   = t.fecha.substring(0,10);
+  document.getElementById('turno-inicio').value  = t.hora_inicio.substring(0,5);
+  document.getElementById('turno-fin').value     = t.hora_fin.substring(0,5);
+  document.getElementById('turno-sede').value    = t.sede_id || '';
+  document.getElementById('turno-notas').value   = t.notas || '';
+  openModal('modal-turno');
+}
+
+async function guardarTurno() {
+  var editId  = document.getElementById('turno-edit-id').value;
+  var usuario = document.getElementById('turno-usuario').value;
+  var fecha   = document.getElementById('turno-fecha').value;
+  var inicio  = document.getElementById('turno-inicio').value;
+  var fin     = document.getElementById('turno-fin').value;
+  var sede    = document.getElementById('turno-sede').value;
+  var notas   = document.getElementById('turno-notas').value;
+
+  if (!editId && !usuario) { toast('Selecciona un empleado.','warning'); return; }
+  if (!fecha)  { toast('Fecha requerida.','warning'); return; }
+  if (!inicio || !fin) { toast('Horario requerido.','warning'); return; }
+  if (fin <= inicio)   { toast('Hora fin debe ser mayor que hora inicio.','warning'); return; }
+
+  try {
+    var res, data;
+    if (editId) {
+      res  = await api('/asistencia/turnos/'+editId, { method:'PUT', body:{ hora_inicio:inicio, hora_fin:fin, sede_id:sede||null, notas } });
+    } else {
+      res  = await api('/asistencia/turnos', { method:'POST', body:{ usuario_id:parseInt(usuario), fecha, hora_inicio:inicio, hora_fin:fin, sede_id:sede||null, notas } });
+    }
+    data = await res.json();
+    if (res.ok) {
+      toast(data.message,'success');
+      closeModal('modal-turno');
+      cargarSemana();
+    } else { toast(data.message||'Error.','danger'); }
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+async function eliminarTurno(id) {
+  closeModal('modal-ver-turno');
+  var ok = await vconfirm({ titulo:'¿Eliminar turno?', mensaje:'Esta acción no se puede deshacer.', labelOk:'Eliminar', tipo:'danger' });
+  if (!ok) return;
+  try {
+    var res  = await api('/asistencia/turnos/'+id, { method:'DELETE' });
+    var data = await res.json();
+    if (res.ok) { toast(data.message,'success'); cargarSemana(); }
+    else { toast(data.message||'Error.','danger'); }
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── Modal lote ────────────────────────────────────────────────────
+function abrirModalLote() {
+  document.getElementById('lote-desde').value = fechaHoyInput();
+  document.getElementById('lote-hasta').value = fechaHoyInput();
+  document.querySelectorAll('.lote-dia').forEach(c => c.checked = false);
+  // Marcar Lun-Vie por defecto
+  document.querySelectorAll('.lote-dia').forEach(c => {
+    if (['lun','mar','mie','jue','vie'].includes(c.value)) c.checked = true;
+  });
+  openModal('modal-lote');
+}
+
+async function guardarLote() {
+  var usuarios = [...document.querySelectorAll('.lote-usr:checked')].map(c=>parseInt(c.value));
+  var diasSel  = [...document.querySelectorAll('.lote-dia:checked')].map(c=>c.value);
+  var desde    = document.getElementById('lote-desde').value;
+  var hasta    = document.getElementById('lote-hasta').value;
+  var inicio   = document.getElementById('lote-inicio').value;
+  var fin      = document.getElementById('lote-fin').value;
+  var sede     = document.getElementById('lote-sede').value;
+
+  if (!usuarios.length) { toast('Selecciona al menos un empleado.','warning'); return; }
+  if (!diasSel.length)  { toast('Selecciona al menos un día.','warning'); return; }
+  if (!desde || !hasta) { toast('Selecciona el rango de fechas.','warning'); return; }
+  if (fin <= inicio)    { toast('Hora fin debe ser mayor que hora inicio.','warning'); return; }
+
+  // Generar fechas del rango que coincidan con los días seleccionados
+  var mapDia = { dom:0, lun:1, mar:2, mie:3, jue:4, vie:5, sab:6 };
+  var diasNum = diasSel.map(d => mapDia[d]);
+  var fechas  = [];
+  var cur     = new Date(desde+'T12:00:00');
+  var end     = new Date(hasta+'T12:00:00');
+  while (cur <= end) {
+    if (diasNum.includes(cur.getDay())) fechas.push(fmt(cur));
+    cur.setDate(cur.getDate()+1);
+  }
+
+  if (!fechas.length) { toast('No hay fechas en el rango para los días seleccionados.','warning'); return; }
+
+  try {
+    var res  = await api('/asistencia/turnos/lote', { method:'POST',
+      body:{ usuarios, fechas, hora_inicio:inicio, hora_fin:fin, sede_id:sede||null }});
+    var data = await res.json();
+    if (res.ok) {
+      toast(data.message,'success');
+      closeModal('modal-lote');
+      cargarSemana();
+    } else { toast(data.message||'Error.','danger'); }
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TAB REPORTE
+// ══════════════════════════════════════════════════════════════════
+function setPeriodoRep(p, cargar) {
+  var hoy   = new Date();
+  var pad   = n => String(n).padStart(2,'0');
+  var fmtD  = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var desde, hasta;
+  if (p==='semana') {
+    var lunes = lunesDe(hoy);
+    desde = fmtD(lunes);
+    var dom = new Date(lunes); dom.setDate(lunes.getDate()+6);
+    hasta = fmtD(dom);
+  } else {
+    desde = fmtD(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    hasta = fmtD(hoy);
+  }
+  document.getElementById('rep-desde').value = desde;
+  document.getElementById('rep-hasta').value = hasta;
+  if (cargar !== false) cargarReporte();
+}
+
+async function cargarReporte() {
+  var desde   = document.getElementById('rep-desde').value;
+  var hasta   = document.getElementById('rep-hasta').value;
+  var usuario = document.getElementById('rep-usuario').value;
+  var sede    = document.getElementById('rep-sede').value;
+  var url     = '/asistencia/reporte?desde='+desde+'&hasta='+hasta+
+    (usuario?'&usuario_id='+usuario:'')+(sede?'&sede_id='+sede:'');
+
+  document.getElementById('rep-kpis').innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  document.getElementById('rep-tbody-usuarios').innerHTML = '<tr><td colspan="10"><div class="vempty"><div class="vspinner"></div></div></td></tr>';
+  document.getElementById('rep-tbody-detalle').innerHTML  = '<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div></div></td></tr>';
+
+  try {
+    var res = await api(url);
+    if (!res||!res.ok) return;
+    var data = (await res.json()).data;
+    renderKpis(data.kpis);
+    renderTablaUsuarios(data.porUsuario);
+    renderTablaDetalle(data.detalle);
+  } catch {}
+}
+
+function renderKpis(k) {
+  var pct = parseFloat(k.pct_asistencia||0);
+  var color = pct>=90?'#15803d':pct>=70?'#b45309':'#be123c';
+  document.getElementById('rep-kpis').innerHTML = [
+    { label:'Total turnos',   val: k.total_turnos||0,   sub:'', color:'#1d4ed8' },
+    { label:'Asistieron',     val: k.total_marcados||0, sub: k.total_turnos>0?((k.total_marcados/k.total_turnos*100).toFixed(0)+'%'):'', color:'#15803d' },
+    { label:'Ausencias',      val: k.total_ausentes||0, sub:'', color:'#be123c' },
+    { label:'Puntuales',      val: k.puntuales||0,      sub:'', color:'#15803d' },
+    { label:'Tardanzas',      val: k.tardanzas||0,      sub:'', color:'#b45309' },
+    { label:'% Asistencia',   val: pct.toFixed(1)+'%',  sub:'', color },
+  ].map(c =>
+    '<div class="vcard vcard-pad" style="text-align:center">' +
+      '<p style="font-size:.65rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">'+c.label+'</p>' +
+      '<p style="font-size:1.7rem;font-weight:800;color:'+c.color+';margin:.2rem 0">'+c.val+'</p>' +
+      (c.sub?'<p style="font-size:.7rem;color:var(--ink-faint)">'+c.sub+'</p>':'') +
+    '</div>'
+  ).join('');
+}
+
+function renderTablaUsuarios(rows) {
+  var tbody = document.getElementById('rep-tbody-usuarios');
+  if (!rows.length) { tbody.innerHTML='<tr><td colspan="10"><div class="vempty">Sin datos</div></td></tr>'; return; }
+  tbody.innerHTML = rows.map(u => {
+    var pct   = parseFloat(u.pct_asistencia||0);
+    var color = pct>=90?'#15803d':pct>=70?'#b45309':'#be123c';
+    var barra = '<div style="background:#f0f0f0;border-radius:999px;height:5px;margin-top:2px">' +
+      '<div style="background:'+color+';height:5px;border-radius:999px;width:'+Math.min(pct,100)+'%"></div></div>';
+    return '<tr>' +
+      '<td style="font-weight:700">'+esc(u.nombre)+'</td>' +
+      '<td style="font-size:.75rem;color:var(--ink-soft)">'+esc(u.rol)+'</td>' +
+      '<td style="font-size:.75rem">'+esc(u.sede_nombre||'—')+'</td>' +
+      '<td style="text-align:center">'+u.turnos+'</td>' +
+      '<td style="text-align:center;color:#15803d;font-weight:700">'+u.marcados+'</td>' +
+      '<td style="text-align:center;color:#be123c;font-weight:700">'+u.ausentes+'</td>' +
+      '<td style="text-align:center"><span class="badge-puntual">'+u.puntuales+'</span></td>' +
+      '<td style="text-align:center"><span class="badge-tarde">'+u.tardanzas+'</span></td>' +
+      '<td style="text-align:center;font-size:.78rem;color:#b45309">'+(u.avg_tardanza_min?u.avg_tardanza_min+' min':'—')+'</td>' +
+      '<td style="text-align:center"><div style="font-weight:700;color:'+color+'">'+pct.toFixed(1)+'%</div>'+barra+'</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderTablaDetalle(rows) {
+  var tbody = document.getElementById('rep-tbody-detalle');
+  if (!rows.length) { tbody.innerHTML='<tr><td colspan="7"><div class="vempty">Sin datos</div></td></tr>'; return; }
+  var badgeMap = {
+    puntual   : '<span class="badge-puntual">✅ Puntual</span>',
+    tarde     : '<span class="badge-tarde">⚠️ Tarde</span>',
+    adelantado: '<span class="badge-adelantado">🌟 Adelantado</span>',
+    ausente   : '<span class="badge-ausente">❌ Ausente</span>',
+  };
+  tbody.innerHTML = rows.map(r => {
+    var diffTxt = r.minutos_diff != null
+      ? (r.minutos_diff > 0 ? '+'+r.minutos_diff+' min' : r.minutos_diff < 0 ? r.minutos_diff+' min' : 'exacto')
+      : '—';
+    return '<tr>' +
+      '<td style="font-size:.78rem">'+new Date(r.fecha.substring(0,10)+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',day:'numeric',month:'short'})+'</td>' +
+      '<td style="font-weight:600">'+esc(r.usuario_nombre)+'</td>' +
+      '<td style="font-size:.75rem;color:var(--ink-soft)">'+esc(r.sede_nombre||'—')+'</td>' +
+      '<td style="font-size:.75rem;font-family:monospace">'+esc(r.hora_inicio.substring(0,5))+' – '+esc(r.hora_fin.substring(0,5))+'</td>' +
+      '<td style="font-size:.78rem;font-family:monospace;font-weight:600">'+(r.hora_marcada?r.hora_marcada.substring(0,5):'—')+'</td>' +
+      '<td>'+(badgeMap[r.estado_final]||'—')+'</td>' +
+      '<td style="font-size:.78rem;color:var(--ink-soft)">'+diffTxt+'</td>' +
+    '</tr>';
+  }).join('');
+}
+</script>
+</body>
+</html>

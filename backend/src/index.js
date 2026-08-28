@@ -37,6 +37,7 @@ const waRoutes               = require('./routes/wa.routes');
 const waCampanasRoutes       = require('./routes/wa-campanas.routes');
 const desparasitacionesRoutes = require('./routes/desparasitaciones.routes');
 const sedesRoutes             = require('./routes/sedes.routes');   // ← NUEVO
+const asistenciaRoutes        = require('./routes/asistencia.routes'); // ← NUEVO
 const integracionRoutes       = require('./routes/integracion.routes');
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
@@ -177,6 +178,7 @@ app.use(`${API}/wa/campanas`,      waCampanasRoutes);
 app.use(`${API}/wa`,               waRoutes);
 app.use(`${API}/desparasitaciones`, desparasitacionesRoutes);
 app.use(`${API}/sedes`,            sedesRoutes);             // ← NUEVO
+app.use(`${API}/asistencia`,      asistenciaRoutes);         // ← NUEVO
 app.use(`${API}/integracion`,      integracionRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────

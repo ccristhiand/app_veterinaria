@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v9
+-- VETNETCODIP SaaS — TENANT SCHEMA v10
 -- v6: + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7: + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8: + pruebas_complementarias en historia_clinica
@@ -8,6 +8,7 @@
 -- v9: + descuento_pct / descuento_monto en factura_items
 --     + subtotal_bruto / descuento_items / descuento_global /
 --       descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
+-- v10: + turnos y asistencias (módulo de asistencia del personal)
 -- Ejecutar al crear nueva clinica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
@@ -533,6 +534,42 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
   FOREIGN KEY (campana_id) REFERENCES wa_campanas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ── Turnos del personal ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS turnos (
+  id           INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  usuario_id   INT UNSIGNED  NOT NULL,
+  sede_id      INT UNSIGNED  NULL DEFAULT NULL,
+  fecha        DATE          NOT NULL,
+  hora_inicio  TIME          NOT NULL,
+  hora_fin     TIME          NOT NULL,
+  notas        VARCHAR(255)  NULL,
+  created_by   INT UNSIGNED  NOT NULL,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE RESTRICT,
+  UNIQUE KEY uk_usuario_fecha (usuario_id, fecha),
+  INDEX idx_fecha (fecha),
+  INDEX idx_sede  (sede_id)
+) ENGINE=InnoDB;
+
+-- ── Asistencias del personal ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS asistencias (
+  id              INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  turno_id        INT UNSIGNED  NOT NULL,
+  usuario_id      INT UNSIGNED  NOT NULL,
+  fecha           DATE          NOT NULL,
+  hora_marcada    TIME          NOT NULL,
+  estado          ENUM('puntual','tarde','adelantado') NOT NULL DEFAULT 'puntual',
+  minutos_diff    SMALLINT      NOT NULL DEFAULT 0,
+  ip              VARCHAR(45)   NULL,
+  created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (turno_id)   REFERENCES turnos(id)   ON DELETE CASCADE,
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_asistencia_usuario_fecha (usuario_id, fecha),
+  INDEX idx_fecha (fecha)
+) ENGINE=InnoDB;
+
 -- ── Datos iniciales ──────────────────────────────────────────
 INSERT INTO empresa_config (nombre) VALUES ('VetClinic');
 
@@ -559,4 +596,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
   ('Campaña general', 'campana',
    '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v9 ✅' AS resultado;
+SELECT 'tenant_schema v10 ✅' AS resultado;

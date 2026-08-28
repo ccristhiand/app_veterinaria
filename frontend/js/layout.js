@@ -34,6 +34,7 @@ const TODOS_LOS_LINKS = [
   { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja',           roles:['admin','recepcionista'] },
   { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios',      roles:['admin','recepcionista'] },
   { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
+  { id:'asistencia',     icon:'🕐', label:'Asistencia',        href:'asistencia',     roles:['admin','veterinario','recepcionista'] },
   { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos',roles:['admin','veterinario'] },
   { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios',       roles:['admin'] },
   { id:'sedes',          icon:'🏥', label:'Sedes',            href:'sedes',          roles:['admin'] },
