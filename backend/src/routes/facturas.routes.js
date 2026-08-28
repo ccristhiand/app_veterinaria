@@ -261,11 +261,13 @@ router.post('/', async (req, res, next) => {
         totalBase = parseFloat((subtotal + igv).toFixed(2));
       }
 
-      // ── Comisión bancaria (solo si algún pago es tarjeta) ─────
-      const hayTarjeta      = pagos.some(p => p.metodo_pago === 'tarjeta' && parseFloat(p.monto) > 0);
-      const comisionPct     = hayTarjeta ? Math.min(Math.max(parseFloat(comision_tarjeta_pct) || 0, 0), 20) : 0;
-      const comisionMonto   = hayTarjeta ? parseFloat((totalBase * comisionPct / 100).toFixed(2)) : 0;
-      const total           = parseFloat((totalBase + comisionMonto).toFixed(2));
+      // ── Comisión bancaria — solo sobre el monto pagado con tarjeta
+      const pagoTarjeta   = pagos.filter(p => p.metodo_pago === 'tarjeta' && parseFloat(p.monto) > 0);
+      const montoTarjeta  = pagoTarjeta.reduce((a, p) => a + parseFloat(p.monto), 0);
+      const hayTarjeta    = montoTarjeta > 0;
+      const comisionPct   = hayTarjeta ? Math.min(Math.max(parseFloat(comision_tarjeta_pct) || 0, 0), 20) : 0;
+      const comisionMonto = hayTarjeta ? parseFloat((montoTarjeta * comisionPct / 100).toFixed(2)) : 0;
+      const total         = parseFloat((totalBase + comisionMonto).toFixed(2));
 
       // ── Estado de pago ────────────────────────────────────────
       const pagosValidos    = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);

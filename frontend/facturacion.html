@@ -321,7 +321,7 @@
           </div>
         </div>
         <p style="font-size:.68rem;color:#5b21b6;margin-top:.3rem" id="comision-monto-txt">
-          Monto de comisión: S/. 0.00 — se agrega al total final.
+          Se aplica solo sobre el monto pagado con tarjeta. Comisión: S/. 0.00
         </p>
       </div>
 
@@ -869,35 +869,53 @@ var propFacSel = null;
 
 async function buscarPropFac() {
   var q = document.getElementById('nf-prop-q').value.trim();
-  if (!q) return;
-  var res = await api('/propietarios?q='+encodeURIComponent(q));
-  if (!res||!res.ok) return;
-  var lista = (await res.json()).data || [];
-  var cont  = document.getElementById('nf-prop-resultados');
-  if (!lista.length) { cont.innerHTML='<p style="font-size:.75rem;color:var(--ink-faint);padding:.4rem">Sin resultados</p>'; return; }
-  cont.innerHTML = lista.slice(0,8).map(p=>'<div onclick="selPropFac('+JSON.stringify(JSON.stringify(p))+')" '+
-    'style="padding:.5rem .75rem;border-radius:.6rem;cursor:pointer;font-size:.8rem;background:#f8faf8;border:1px solid var(--line)">' +
-    '<span style="font-weight:700">'+esc(p.nombre+' '+p.apellido)+'</span>' +
-    '<span style="color:var(--ink-faint);font-size:.72rem"> · '+esc(p.dni||p.ruc||'sin doc.')+'</span>' +
-    '</div>').join('');
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  var cont = document.getElementById('nf-prop-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.3rem">Buscando…</div>';
+  try {
+    var res = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=6');
+    if (!res) return;
+    var rows = (await res.json()).data || [];
+    cont.innerHTML = rows.length
+      ? rows.map(p =>
+          '<button onclick="selPropFac('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" '+
+          'style="display:flex;align-items:center;gap:.7rem;padding:.6rem .85rem;background:#fff;border:1px solid var(--line);border-radius:.8rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
+          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
+            '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
+            '<div style="flex:1"><p style="font-weight:700;font-size:.83rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.68rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+'📞 '+esc(p.telefono||'')+'</p></div>' +
+          '</button>'
+        ).join('')
+      : '<div style="font-size:.78rem;color:var(--ink-faint);text-align:center;padding:.5rem">Sin resultados</div>';
+  } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.3rem">Error al buscar</div>'; }
 }
 
-function selPropFac(pStr) {
-  var p = JSON.parse(pStr);
-  propFacSel = p;
+async function selPropFac(id, nombre, apellido, dni, telefono) {
+  propFacSel = { id: id };
   document.getElementById('nf-prop-resultados').innerHTML = '';
+  document.getElementById('nf-prop-q').value              = '';
   document.getElementById('nf-prop-sel').style.display    = 'flex';
-  document.getElementById('nf-prop-avatar').textContent   = (p.nombre||'?')[0].toUpperCase();
-  document.getElementById('nf-prop-nombre').textContent   = p.nombre+' '+p.apellido;
-  document.getElementById('nf-prop-info').textContent     = (p.dni?'DNI: '+p.dni:'')+(p.telefono?' · '+p.telefono:'');
-  // Autocompletar datos empresa si tiene RUC
-  if (p.ruc) {
-    document.getElementById('nf-ruc').value   = p.ruc;
-    document.getElementById('nf-razon').value = p.razon_social||'';
-    document.getElementById('nf-dir-fiscal').value = p.direccion_fiscal||'';
-  }
-  // Cargar mascotas
-  cargarMascotasFac(p.id);
+  document.getElementById('nf-prop-avatar').textContent   = nombre.charAt(0) + apellido.charAt(0);
+  document.getElementById('nf-prop-nombre').textContent   = nombre + ' ' + apellido;
+  document.getElementById('nf-prop-info').textContent     = (dni ? '🪪 ' + dni + ' · ' : '') + '📞 ' + telefono;
+  try {
+    var res = await api('/propietarios/' + id);
+    if (!res) return;
+    var data = (await res.json()).data;
+    propFacSel._data = data;
+    // Cargar mascotas
+    var masc = data.mascotas || [];
+    var sel  = document.getElementById('nf-mascota');
+    sel.innerHTML = '<option value="">Sin mascota específica</option>' +
+      masc.map(m => '<option value="'+m.id+'">'+badgeEspecie(m.especie)+' '+esc(m.nombre)+'</option>').join('');
+    document.getElementById('nf-mascotas-wrap').style.display = masc.length ? 'block' : 'none';
+    // Autocompletar datos empresa si tipo=factura
+    if (document.getElementById('nf-tipo').value === 'factura' && data.ruc) {
+      document.getElementById('nf-ruc').value         = data.ruc || '';
+      document.getElementById('nf-razon').value       = data.razon_social || '';
+      document.getElementById('nf-dir-fiscal').value  = data.direccion_fiscal || '';
+    }
+  } catch {}
 }
 
 function limpiarPropFac() {
@@ -913,17 +931,7 @@ function validarRUC(inp) {
   document.getElementById('nf-ruc-err').style.display = !ok && inp.value.length>0 ? 'flex' : 'none';
 }
 
-async function cargarMascotasFac(propId) {
-  try {
-    var res = await api('/mascotas?propietario_id='+propId);
-    if (!res||!res.ok) return;
-    var mascotas = (await res.json()).data || [];
-    var sel = document.getElementById('nf-mascota');
-    sel.innerHTML = '<option value="">Sin mascota específica</option>' +
-      mascotas.map(m=>'<option value="'+m.id+'">'+esc(m.nombre)+' ('+esc(m.especie)+')</option>').join('');
-    document.getElementById('nf-mascotas-wrap').style.display = mascotas.length ? 'block' : 'none';
-  } catch {}
-}
+
 
 // ── Agregar ítem con autocompletado ──────────────────────────────
 var itemN = 0;
@@ -1056,8 +1064,15 @@ function calcularTotales() {
     totalBase = parseFloat((subtotal + igv).toFixed(2));
   }
 
-  // ── Comisión bancaria ─────────────────────────────────────────
-  var comisionMonto = parseFloat((totalBase * comisionPct / 100).toFixed(2));
+  // ── Comisión bancaria — solo sobre el monto pagado con tarjeta ──
+  var montoTarjeta = 0;
+  document.querySelectorAll('#nf-pagos > div').forEach(div => {
+    if (div.querySelector('[data-f="metodo"]')?.value === 'tarjeta')
+      montoTarjeta += parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
+  });
+  // Si no hay monto asignado aún, usar el total base como referencia
+  if (montoTarjeta === 0 && hayTarjeta) montoTarjeta = totalBase;
+  var comisionMonto = parseFloat((montoTarjeta * comisionPct / 100).toFixed(2));
   var total         = parseFloat((totalBase + comisionMonto).toFixed(2));
 
   // ── Actualizar DOM ────────────────────────────────────────────
@@ -1091,7 +1106,7 @@ function calcularTotales() {
     document.getElementById('lbl-comision').textContent = '+ Comisión tarjeta ('+comisionPct.toFixed(1)+'%):';
     document.getElementById('tot-comision').textContent = '+S/. '+comisionMonto.toFixed(2);
     document.getElementById('comision-monto-txt').textContent =
-      'Monto de comisión: S/. '+comisionMonto.toFixed(2)+' — se agrega al total final.';
+      'Tarjeta: S/. '+montoTarjeta.toFixed(2)+' × '+comisionPct.toFixed(1)+'% = comisión S/. '+comisionMonto.toFixed(2);
   } else { rowCom.style.display = 'none'; }
 
   actualizarPagoRestante(total);
