@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditMiddleware } = require('../middlewares/audit.middleware');
 
 const router = Router();
 router.use(authenticate);
@@ -155,7 +156,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ── POST /api/v1/facturas — crear ────────────────────────────────
-router.post('/', async (req, res, next) => {
+router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (req, res, next) => {
   try {
     const {
       tipo = 'boleta', propietario_id, mascota_id, cita_id, fecha,
@@ -363,7 +364,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // ── PATCH /api/v1/facturas/:id/pagar ─────────────────────────────
-router.patch('/:id/pagar', async (req, res, next) => {
+router.patch('/:id/pagar', auditMiddleware('facturacion:pago_registrado', 'facturacion'), async (req, res, next) => {
   try {
     const { pagos = [], metodo_pago } = req.body;
     const [fac] = await req.db.query('SELECT id, estado, total FROM facturas WHERE id = ?', [req.params.id]);
@@ -402,7 +403,7 @@ router.patch('/:id/pagar', async (req, res, next) => {
 });
 
 // ── PATCH /api/v1/facturas/:id/anular — solo admin ───────────────
-router.patch('/:id/anular', authorize('admin'), async (req, res, next) => {
+router.patch('/:id/anular', authorize('admin'), auditMiddleware('facturacion:anulado', 'facturacion'), async (req, res, next) => {
   try {
     const { observaciones } = req.body;
     if (!observaciones?.trim())
