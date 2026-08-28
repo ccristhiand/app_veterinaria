@@ -1417,7 +1417,9 @@ function renderPDF(f, emp) {
 function imprimirTicket() {
   if (!facActualData) return;
   var f   = facActualData;
-  var emp = empresa;
+  var emp = empresa; // objeto global cargado al init
+  // Seguridad: si logo_url viene en la factura anidada (tenant_config), usarlo
+  if (!emp.logo_url && f.logo_url) emp = Object.assign({}, emp, { logo_url: f.logo_url });
 
   var igvPct  = parseFloat(emp.igv_porcentaje||18);
   var tipoLbl = f.tipo==='factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA';
@@ -1532,17 +1534,18 @@ function imprimirTicket() {
     // ── Cabecera clínica ──
     (emp.logo_url
       ? '<div style="text-align:center;margin-bottom:4px">' +
-          '<img src="'+esc(emp.logo_url)+'" style="max-width:160px;max-height:60px;object-fit:contain" ' +
+          '<img src="'+esc(emp.logo_url)+'" ' +
+          'style="max-width:180px;max-height:70px;object-fit:contain;display:block;margin:0 auto" ' +
           'onerror="this.style.display=\'none\'"/>' +
         '</div>'
-      : '') +
+      : '<div style="text-align:center;margin-bottom:2px;font-size:24px">🐾</div>') +
     '<div class="cab-clinica">'+esc(emp.nombre||'VetClinic')+'</div>' +
     (emp.ruc    ? '<div class="cab-sub">RUC: '+esc(emp.ruc)+'</div>' : '') +
     (emp.direccion ? '<div class="cab-sub">'+esc(emp.direccion.substring(0,38))+'</div>' : '') +
     (emp.telefono  ? '<div class="cab-sub">Tel: '+esc(emp.telefono)+'</div>' : '') +
     '<div style="text-align:center;margin:3px 0"><div class="cab-tipo">'+tipoLblT+'</div></div>' +
     '<div class="cab-numero">'+esc(f.numero)+'</div>' +
-    '<div class="cab-fecha">'+new Date(f.fecha+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'})+'</div>' +
+    '<div class="cab-fecha">'+new Date(String(f.fecha).substring(0,10)+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'})+'</div>' +
 
     '<span class="sep">'+linea('─',38)+'</span>' +
 
@@ -1578,7 +1581,7 @@ function imprimirTicket() {
 
     // ── Pie ──
     '<div class="pie-gracias">'+(emp.pie_documento||'¡Gracias por su preferencia!')+'</div>' +
-    '<div class="pie">'+esc(emp.nombre||'VetClinic')+' · '+new Date(f.fecha+'T12:00:00').toLocaleDateString('es-PE')+'</div>' +
+    '<div class="pie">'+esc(emp.nombre||'VetClinic')+' · '+new Date(String(f.fecha).substring(0,10)+'T12:00:00').toLocaleDateString('es-PE')+'</div>' +
     (f.enlace_pdf ? '<div class="pie" style="font-size:9px;word-break:break-all">'+esc(f.enlace_pdf)+'</div>' : '') +
 
     '<div class="btn-wrap no-print">' +
