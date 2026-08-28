@@ -32,9 +32,10 @@ router.get('/resumen', async (req, res, next) => {
 
     const [totales] = await req.db.query(
       `SELECT
-         COUNT(*)                                                             AS total_docs,
-         COALESCE(SUM(CASE WHEN estado='pagado'    THEN total ELSE 0 END),0) AS ingresos,
-         COALESCE(SUM(CASE WHEN estado='pendiente' THEN total ELSE 0 END),0) AS pendiente,
+         COUNT(*)                                                                        AS total_docs,
+         COALESCE(SUM(CASE WHEN estado='pagado'    THEN total ELSE 0 END),0)            AS ingresos,
+         COALESCE(SUM(CASE WHEN estado='pendiente' THEN total ELSE 0 END),0)            AS pendiente,
+         COALESCE(SUM(CASE WHEN estado='pagado'    THEN comision_tarjeta ELSE 0 END),0) AS total_comisiones,
          COUNT(CASE WHEN estado='pagado'    THEN 1 END) AS docs_pagados,
          COUNT(CASE WHEN estado='pendiente' THEN 1 END) AS docs_pendientes,
          COUNT(CASE WHEN estado='anulado'   THEN 1 END) AS docs_anulados
@@ -262,13 +263,13 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
         totalBase = parseFloat((subtotal + igv).toFixed(2));
       }
 
-      // ── Comisión bancaria — solo sobre el monto pagado con tarjeta
+      // ── Comisión bancaria — informativa, no suma al total ────────
       const pagoTarjeta   = pagos.filter(p => p.metodo_pago === 'tarjeta' && parseFloat(p.monto) > 0);
       const montoTarjeta  = pagoTarjeta.reduce((a, p) => a + parseFloat(p.monto), 0);
       const hayTarjeta    = montoTarjeta > 0;
       const comisionPct   = hayTarjeta ? Math.min(Math.max(parseFloat(comision_tarjeta_pct) || 0, 0), 20) : 0;
       const comisionMonto = hayTarjeta ? parseFloat((montoTarjeta * comisionPct / 100).toFixed(2)) : 0;
-      const total         = parseFloat((totalBase + comisionMonto).toFixed(2));
+      const total         = totalBase; // total NO incluye comisión
 
       // ── Estado de pago ────────────────────────────────────────
       const pagosValidos    = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);

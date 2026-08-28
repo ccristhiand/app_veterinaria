@@ -320,8 +320,12 @@
             <span style="font-size:.82rem;font-weight:700;color:#6d28d9">%</span>
           </div>
         </div>
-        <p style="font-size:.68rem;color:#5b21b6;margin-top:.3rem" id="comision-monto-txt">
-          Se aplica solo sobre el monto pagado con tarjeta. Comisión: S/. 0.00
+        <div id="comision-info-box" style="margin-top:.6rem;background:#ede9fe;border:1px solid #c4b5fd;border-radius:.6rem;padding:.5rem .75rem;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:.78rem;color:#5b21b6;font-weight:600">💡 Cobrar adicional en POS:</span>
+          <span style="font-size:.88rem;font-weight:800;color:#5b21b6" id="comision-monto-txt">S/. 0.00</span>
+        </div>
+        <p style="font-size:.66rem;color:#7c3aed;margin-top:.35rem">
+          Este monto <strong>no se suma al total</strong> de la factura — es referencial para el cobro en el POS.
         </p>
       </div>
 
@@ -354,12 +358,7 @@
             <span style="color:var(--ink-soft)" id="tot-igv-label">IGV (18%):</span>
             <span style="font-weight:600;min-width:90px;text-align:right" id="tot-igv">S/. 0.00</span>
           </div>
-          <!-- Comisión bancaria (oculto si es 0) -->
-          <div id="row-comision" style="display:none;display:flex;gap:3rem;font-size:.8rem">
-            <span style="color:#6d28d9" id="lbl-comision">+ Comisión tarjeta (0%):</span>
-            <span style="font-weight:600;min-width:90px;text-align:right;color:#6d28d9" id="tot-comision">+S/. 0.00</span>
-          </div>
-          <!-- TOTAL -->
+          <!-- TOTAL — sin comisión -->
           <div style="display:flex;gap:3rem;font-size:.96rem;font-weight:800;color:#15803d;padding-top:.3rem;border-top:2px solid #a7f3d0;margin-top:.2rem">
             <span>TOTAL:</span>
             <span style="min-width:90px;text-align:right" id="tot-total">S/. 0.00</span>
@@ -1064,14 +1063,14 @@ function calcularTotales() {
     totalBase = parseFloat((subtotal + igv).toFixed(2));
   }
 
-  // ── Comisión bancaria — solo sobre el monto pagado con tarjeta ──
+  // ── Comisión bancaria — informativa, no suma al total ────────
   var montoTarjeta = 0;
   document.querySelectorAll('#nf-pagos > div').forEach(div => {
     if (div.querySelector('[data-f="metodo"]')?.value === 'tarjeta')
       montoTarjeta += parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
   });
   var comisionMonto = parseFloat((montoTarjeta * comisionPct / 100).toFixed(2));
-  var total         = parseFloat((totalBase + comisionMonto).toFixed(2));
+  var total         = totalBase; // total NO incluye comisión
 
   // ── Actualizar DOM ────────────────────────────────────────────
   var S = n => 'S/. ' + parseFloat(n).toFixed(2);
@@ -1097,15 +1096,13 @@ function calcularTotales() {
     document.getElementById('tot-desc-global').textContent  = '−S/. '+descGlobalMonto.toFixed(2);
   } else { rowDG.style.display = 'none'; }
 
-  // Fila comisión
-  var rowCom = document.getElementById('row-comision');
+  // Comisión — solo actualizar caja informativa
   if (comisionPct > 0) {
-    rowCom.style.display = 'flex';
-    document.getElementById('lbl-comision').textContent = '+ Comisión tarjeta ('+comisionPct.toFixed(1)+'%):';
-    document.getElementById('tot-comision').textContent = '+S/. '+comisionMonto.toFixed(2);
-    document.getElementById('comision-monto-txt').textContent =
-      'Tarjeta: S/. '+montoTarjeta.toFixed(2)+' × '+comisionPct.toFixed(1)+'% = comisión S/. '+comisionMonto.toFixed(2);
-  } else { rowCom.style.display = 'none'; }
+    document.getElementById('comision-monto-txt').textContent = 'S/. ' + comisionMonto.toFixed(2);
+    document.getElementById('comision-info-box').style.display = montoTarjeta > 0 ? 'flex' : 'none';
+  } else {
+    document.getElementById('comision-monto-txt').textContent = 'S/. 0.00';
+  }
 
   actualizarPagoRestante(total);
 }
@@ -1372,10 +1369,15 @@ function renderPDF(f, emp) {
           '<span style="color:#4b5f57">Base imponible (sin IGV):</span><span style="font-weight:600">S/. '+parseFloat(f.subtotal).toFixed(2)+'</span></div>' +
         '<div style="display:flex;justify-content:space-between;font-size:.76rem"><span style="color:#4b5f57">IGV ('+igvPct+'%):</span><span style="font-weight:600">S/. '+parseFloat(f.igv).toFixed(2)+'</span></div>' +
         (comision>0
-          ? '<div style="display:flex;justify-content:space-between;font-size:.76rem"><span style="color:#6d28d9">+ Comisión tarjeta ('+comisionPct.toFixed(1)+'%):</span><span style="font-weight:600;color:#6d28d9">+S/. '+comision.toFixed(2)+'</span></div>'
-          : '') +
+          ? '' : '') +
         '<div style="display:flex;justify-content:space-between;background:#166534;color:#fff;padding:.5rem .85rem;border-radius:.5rem;font-weight:800;font-size:.92rem;margin-top:.25rem">' +
           '<span>TOTAL:</span><span>S/. '+parseFloat(f.total).toFixed(2)+'</span></div>' +
+        (comision>0
+          ? '<div style="margin-top:.35rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.5rem;padding:.38rem .75rem;display:flex;justify-content:space-between;font-size:.72rem">' +
+              '<span style="color:#6d28d9;font-weight:600">💳 Comisión POS ('+comisionPct.toFixed(1)+'%):</span>' +
+              '<span style="color:#6d28d9;font-weight:700">S/. '+comision.toFixed(2)+'</span>' +
+            '</div>'
+          : '') +
         (f.metodo_pago?'<p style="text-align:right;font-size:.7rem;color:#15803d;font-weight:600;margin-top:.2rem">'+(metodos[f.metodo_pago]||f.metodo_pago)+'</p>':'') +
       '</div>' +
     '</div>' +
@@ -1510,6 +1512,8 @@ function imprimirTicket() {
       '.tot-fila.com{color:#6d28d9}' +
       '.total-box{border:2px solid #111;padding:3px 4px;margin:4px 0 2px;' +
         'white-space:pre;font-size:13px;font-weight:bold;letter-spacing:.3px}' +
+      '.com-pos{white-space:pre;font-size:11px;font-weight:bold;color:#5b21b6;' +
+        'border:1px dashed #7c3aed;border-radius:3px;padding:2px 4px;margin-bottom:3px}' +
       /* Pago */
       '.pago-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-top:3px}' +
       '.pago-valor{font-size:11px;font-weight:bold;word-break:break-word}' +
@@ -1564,6 +1568,9 @@ function imprimirTicket() {
     // ── Totales ──
     totalesHTML +
     '<div class="total-box">'+esc(fila2('TOTAL:', 'S/.'+parseFloat(f.total).toFixed(2), 32))+'</div>' +
+    (com>0
+      ? '<div class="com-pos">'+esc(fila2('Com. POS ('+cop.toFixed(1)+'%):', 'S/.'+com.toFixed(2), 32))+'</div>'
+      : '') +
 
     // ── Pago ──
     (pagoHTML ? '<div class="pago-label">Forma de pago</div><div class="pago-valor">'+esc(pagoHTML)+'</div>' : '') +
