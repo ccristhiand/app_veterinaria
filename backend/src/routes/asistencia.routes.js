@@ -195,7 +195,7 @@ router.delete('/turnos/:id', authorize('admin'), auditMiddleware('asistencia:tur
 
 // ── POST /api/v1/asistencia/turnos/lote — crear turnos en lote ───
 // Asignar el mismo horario a múltiples usuarios y/o múltiples fechas
-router.post('/turnos/lote', authorize('admin'), async (req, res, next) => {
+router.post('/turnos/lote', authorize('admin'), auditMiddleware('asistencia:lote_creado', 'asistencia'), async (req, res, next) => {
   try {
     const { usuarios, fechas, sede_id, hora_inicio, hora_fin, notas } = req.body;
     if (!usuarios?.length) return res.status(422).json({ success: false, message: 'Selecciona al menos un usuario.' });
@@ -244,7 +244,7 @@ router.get('/mi-turno', async (req, res, next) => {
 
 // ── POST /api/v1/asistencia/marcar — marcar asistencia ───────────
 // Irreversible: solo se puede marcar una vez por día
-router.post('/marcar', async (req, res, next) => {
+router.post('/marcar', auditMiddleware('asistencia:marcado', 'asistencia'), async (req, res, next) => {
   try {
     const hoy  = hoyLima();
     const hora = horaLima().substring(0, 8); // HH:MM:SS

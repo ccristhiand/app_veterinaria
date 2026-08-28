@@ -27,6 +27,7 @@ const MODULO_MAP = {
   '/empresa'         : 'configuracion',
   '/servicios'       : 'servicios',
   '/auth'            : 'autenticacion',
+  '/asistencia'      : 'asistencia',
 };
 
 // ── Mapeo tabla por módulo ─────────────────────────────────────
@@ -44,6 +45,7 @@ const TABLA_MAP = {
   'consentimientos'  : 'consentimientos_plantillas',
   'servicios'        : 'servicios_catalogo',
   'configuracion'    : 'empresa_config',
+  'asistencia'       : 'asistencias',
 };
 
 /**
