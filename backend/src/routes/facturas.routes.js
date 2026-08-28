@@ -14,7 +14,6 @@ function getSedeFiltro(req) {
   return user.sede_id || header || null;
 }
 
-// Construye el fragmento SQL para filtrar por sede
 function sedeSQL(sedeId, col = 'sede_id') {
   if (!sedeId) return { sql: '', params: [] };
   return { sql: `AND ${col} = ?`, params: [sedeId] };
@@ -87,7 +86,10 @@ router.get('/', async (req, res, next) => {
     const sedeId  = getSedeFiltro(req);
 
     let sql = `
-      SELECT f.id, f.numero, f.tipo, f.fecha, f.subtotal, f.igv, f.total,
+      SELECT f.id, f.numero, f.tipo, f.fecha,
+             f.subtotal_bruto, f.descuento_items, f.descuento_global, f.descuento_global_pct,
+             f.comision_tarjeta, f.comision_tarjeta_pct,
+             f.subtotal, f.igv, f.total,
              f.estado, f.metodo_pago, f.created_at, f.updated_at,
              f.observaciones, f.anulado_por,
              f.sunat_estado, f.sunat_mensaje, f.enlace_pdf, f.enlace_xml, f.sunat_enviado_at,
@@ -159,6 +161,8 @@ router.post('/', async (req, res, next) => {
       tipo = 'boleta', propietario_id, mascota_id, cita_id, fecha,
       items = [], igv_incluido = true, pagos = [], notas,
       cliente_ruc, cliente_razon_social, cliente_direccion_fiscal,
+      descuento_global_pct = 0,   // % de descuento global sobre subtotal bruto
+      comision_tarjeta_pct = 0,   // % de comisión bancaria (solo tarjeta)
     } = req.body;
 
     if (!propietario_id) return res.status(422).json({ success: false, message: 'propietario_id requerido.' });
@@ -173,11 +177,11 @@ router.post('/', async (req, res, next) => {
         return res.status(422).json({ success: false, message: 'Para emitir una factura se requiere la razón social.' });
     }
 
-    // Sede del usuario que emite
     const sedeId = req.user.sede_id ||
                    (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
 
     const result = await req.db.withTransaction(async (conn) => {
+      // ── Validar stock ─────────────────────────────────────────
       for (const it of items) {
         if (it.inventario_id) {
           const [[inv]] = await conn.execute(
@@ -197,6 +201,7 @@ router.post('/', async (req, res, next) => {
 
       const igvPct = parseFloat(cfg.igv_porcentaje) / 100;
 
+      // ── Número correlativo ────────────────────────────────────
       let numero;
       if (tipo === 'factura') {
         numero = `${cfg.serie_factura}-${String(cfg.correlativo_f).padStart(5, '0')}`;
@@ -206,27 +211,63 @@ router.post('/', async (req, res, next) => {
         await conn.execute('UPDATE empresa_config SET correlativo_b = correlativo_b + 1 WHERE id = ?', [cfg.id]);
       }
 
-      let totalPrecios = 0;
-      const itemsCalc = items.map(it => {
-        const cant = parseFloat(it.cantidad) || 1;
-        const pu   = parseFloat(it.precio_unit) || 0;
-        const sub  = parseFloat((cant * pu).toFixed(2));
-        totalPrecios += sub;
-        return { descripcion: it.descripcion, cantidad: cant, precio_unit: pu, subtotal: sub, inventario_id: it.inventario_id || null };
-      });
-      totalPrecios = parseFloat(totalPrecios.toFixed(2));
+      // ── Calcular ítems con descuento por ítem ─────────────────
+      // descuento_pct viene por ítem desde el frontend (0–100)
+      let subtotalBruto = 0;      // suma precio * cant sin ningún descuento
+      let totalDescItems = 0;     // suma de descuentos ítem a ítem
 
-      let subtotal, igv, total;
+      const itemsCalc = items.map(it => {
+        const cant       = parseFloat(it.cantidad)       || 1;
+        const pu         = parseFloat(it.precio_unit)    || 0;
+        const descPct    = Math.min(Math.max(parseFloat(it.descuento_pct) || 0, 0), 100);
+        const bruto      = parseFloat((cant * pu).toFixed(2));
+        const descMonto  = parseFloat((bruto * descPct / 100).toFixed(2));
+        const sub        = parseFloat((bruto - descMonto).toFixed(2));
+
+        subtotalBruto   += bruto;
+        totalDescItems  += descMonto;
+
+        return {
+          descripcion   : it.descripcion,
+          cantidad      : cant,
+          precio_unit   : pu,
+          descuento_pct : descPct,
+          descuento_monto: descMonto,
+          subtotal      : sub,
+          inventario_id : it.inventario_id || null,
+        };
+      });
+
+      subtotalBruto  = parseFloat(subtotalBruto.toFixed(2));
+      totalDescItems = parseFloat(totalDescItems.toFixed(2));
+
+      // ── Descuento global (sobre subtotal bruto después de ítems)
+      const descGlobalPct   = Math.min(Math.max(parseFloat(descuento_global_pct) || 0, 0), 100);
+      const subtotalConDescItems = parseFloat((subtotalBruto - totalDescItems).toFixed(2));
+      const descGlobalMonto = parseFloat((subtotalConDescItems * descGlobalPct / 100).toFixed(2));
+      const precioFinalAntesIgv = parseFloat((subtotalConDescItems - descGlobalMonto).toFixed(2));
+
+      // ── Desglose IGV ─────────────────────────────────────────
+      let subtotal, igv, totalBase;
       if (igv_incluido) {
-        subtotal = parseFloat((totalPrecios / (1 + igvPct)).toFixed(2));
-        igv      = parseFloat((totalPrecios - subtotal).toFixed(2));
-        total    = totalPrecios;
+        // Los precios YA incluyen IGV → extraer
+        subtotal  = parseFloat((precioFinalAntesIgv / (1 + igvPct)).toFixed(2));
+        igv       = parseFloat((precioFinalAntesIgv - subtotal).toFixed(2));
+        totalBase = precioFinalAntesIgv;
       } else {
-        subtotal = totalPrecios;
-        igv      = parseFloat((subtotal * igvPct).toFixed(2));
-        total    = parseFloat((subtotal + igv).toFixed(2));
+        // Los precios NO incluyen IGV → sumar encima
+        subtotal  = precioFinalAntesIgv;
+        igv       = parseFloat((subtotal * igvPct).toFixed(2));
+        totalBase = parseFloat((subtotal + igv).toFixed(2));
       }
 
+      // ── Comisión bancaria (solo si algún pago es tarjeta) ─────
+      const hayTarjeta      = pagos.some(p => p.metodo_pago === 'tarjeta' && parseFloat(p.monto) > 0);
+      const comisionPct     = hayTarjeta ? Math.min(Math.max(parseFloat(comision_tarjeta_pct) || 0, 0), 20) : 0;
+      const comisionMonto   = hayTarjeta ? parseFloat((totalBase * comisionPct / 100).toFixed(2)) : 0;
+      const total           = parseFloat((totalBase + comisionMonto).toFixed(2));
+
+      // ── Estado de pago ────────────────────────────────────────
       const pagosValidos    = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);
       const totalPagado     = pagosValidos.reduce((a, p) => a + parseFloat(p.monto), 0);
       const estado          = totalPagado >= total || pagosValidos.length > 0 ? 'pagado' : 'pendiente';
@@ -234,28 +275,40 @@ router.post('/', async (req, res, next) => {
         ? pagosValidos.reduce((a, b) => parseFloat(b.monto) > parseFloat(a.monto) ? b : a).metodo_pago
         : null;
 
-      // INSERT con sede_id
+      // ── INSERT factura ────────────────────────────────────────
       const [ins] = await conn.execute(
         `INSERT INTO facturas
            (numero, tipo, propietario_id, mascota_id, cita_id, emitido_por_id, sede_id,
-            fecha, subtotal, igv, total, estado, metodo_pago, notas,
+            fecha, subtotal_bruto, descuento_items, descuento_global, descuento_global_pct,
+            comision_tarjeta, comision_tarjeta_pct,
+            subtotal, igv, total, estado, metodo_pago, notas,
             cliente_ruc, cliente_razon_social, cliente_direccion_fiscal)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           numero, tipo, propietario_id, mascota_id || null, cita_id || null,
           req.user.id, sedeId,
-          fecha, subtotal, igv, total, estado, metodoPrincipal, notas?.trim() || null,
+          fecha,
+          subtotalBruto, totalDescItems, descGlobalMonto, descGlobalPct,
+          comisionMonto, comisionPct,
+          subtotal, igv, total,
+          estado, metodoPrincipal, notas?.trim() || null,
           cliente_ruc?.trim() || null, cliente_razon_social?.trim() || null, cliente_direccion_fiscal?.trim() || null,
         ]
       );
       const facturaId = ins.insertId;
 
+      // ── INSERT ítems ─────────────────────────────────────────
       for (const it of itemsCalc) {
         const invId = it.inventario_id ? parseInt(it.inventario_id) : null;
         await conn.execute(
-          'INSERT INTO factura_items (factura_id, descripcion, cantidad, precio_unit, subtotal, inventario_id) VALUES (?,?,?,?,?,?)',
-          [facturaId, it.descripcion, it.cantidad, it.precio_unit, it.subtotal, invId]
+          `INSERT INTO factura_items
+             (factura_id, descripcion, cantidad, precio_unit, descuento_pct, descuento_monto, subtotal, inventario_id)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [facturaId, it.descripcion, it.cantidad, it.precio_unit,
+           it.descuento_pct, it.descuento_monto, it.subtotal, invId]
         );
+
+        // Descontar stock
         if (invId) {
           await conn.execute(
             'UPDATE inventario SET cantidad = GREATEST(0, cantidad - ?) WHERE id = ?',
@@ -282,6 +335,7 @@ router.post('/', async (req, res, next) => {
         }
       }
 
+      // ── INSERT pagos ─────────────────────────────────────────
       for (const pago of pagosValidos) {
         await conn.execute(
           'INSERT INTO factura_pagos (factura_id, metodo_pago, monto, referencia) VALUES (?,?,?,?)',
@@ -289,7 +343,17 @@ router.post('/', async (req, res, next) => {
         );
       }
 
-      return { id: facturaId, numero, subtotal, igv, total, estado, pagos: pagosValidos.length };
+      return {
+        id: facturaId, numero,
+        subtotal_bruto: subtotalBruto,
+        descuento_items: totalDescItems,
+        descuento_global: descGlobalMonto,
+        descuento_global_pct: descGlobalPct,
+        comision_tarjeta: comisionMonto,
+        comision_tarjeta_pct: comisionPct,
+        subtotal, igv, total, estado,
+        pagos: pagosValidos.length,
+      };
     });
 
     return res.status(201).json({ success: true, data: result, message: 'Documento emitido correctamente.' });
@@ -356,6 +420,7 @@ router.patch('/:id/anular', authorize('admin'), async (req, res, next) => {
       [observaciones.trim(), req.user.nombre, req.params.id]
     );
 
+    // Devolver stock
     const items = await req.db.query(
       'SELECT inventario_id, cantidad FROM factura_items WHERE factura_id = ? AND inventario_id IS NOT NULL',
       [req.params.id]
