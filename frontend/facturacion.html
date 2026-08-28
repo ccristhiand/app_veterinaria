@@ -1133,7 +1133,7 @@ function addPagoFila(metodo, monto) {
     '</select>' +
     '<input type="number" class="vinput" data-f="monto" placeholder="S/. 0.00" min="0" step="0.50"' +
       ' value="'+monto+'" style="font-size:.82rem;text-align:right"' +
-      ' oninput="actualizarPagoRestante()"/>' +
+      ' oninput="calcularTotales();actualizarPagoRestante()"/>' +
     (pagoN>1
       ? '<button onclick="document.getElementById(\'pago-'+id+'\').remove();calcularTotales();actualizarPagoRestante()"' +
           ' style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem">✕</button>'
