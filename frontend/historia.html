@@ -871,7 +871,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-nombre').textContent = m.nombre;
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
-    if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
+    if (citaId&&motivoCita&&ssTab==='consultas') { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
     const rh = await api('/historia?mascota_id='+id);
     if (!rh) return;
     const consultas = (await rh.json()).data||[];
