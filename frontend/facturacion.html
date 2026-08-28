@@ -1070,8 +1070,6 @@ function calcularTotales() {
     if (div.querySelector('[data-f="metodo"]')?.value === 'tarjeta')
       montoTarjeta += parseFloat(div.querySelector('[data-f="monto"]')?.value) || 0;
   });
-  // Si no hay monto asignado aún, usar el total base como referencia
-  if (montoTarjeta === 0 && hayTarjeta) montoTarjeta = totalBase;
   var comisionMonto = parseFloat((montoTarjeta * comisionPct / 100).toFixed(2));
   var total         = parseFloat((totalBase + comisionMonto).toFixed(2));
 
