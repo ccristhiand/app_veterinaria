@@ -8,6 +8,24 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
+  <style>
+    /* Badges tipo cita */
+    .tipo-medica        { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
+    .tipo-vacuna        { background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe; }
+    .tipo-desparasitacion { background:#fefce8;color:#854d0e;border:1px solid #fde68a; }
+    .tipo-estetica      { background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8; }
+    .tipo-badge { font-size:.63rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;white-space:nowrap; }
+
+    /* Selector tipo cita visual */
+    .tipo-btn { display:flex;flex-direction:column;align-items:center;gap:.35rem;
+                padding:.7rem .5rem;border:2px solid var(--line);border-radius:.9rem;
+                cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;
+                background:#fff;color:var(--ink);transition:all .15s;flex:1;min-width:70px; }
+    .tipo-btn.sel-medica        { border-color:#16a34a;background:#f0fdf4;color:#15803d; }
+    .tipo-btn.sel-vacuna        { border-color:#7c3aed;background:#f5f3ff;color:#6d28d9; }
+    .tipo-btn.sel-desparasitacion { border-color:#ca8a04;background:#fefce8;color:#854d0e; }
+    .tipo-btn.sel-estetica      { border-color:#db2777;background:#fdf2f8;color:#be185d; }
+  </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
 
@@ -17,7 +35,7 @@
     <div id="selector-sede-citas" style="display:none"></div>
     <div>
       <h2>Gestión de Citas</h2>
-      <p>Panel en tiempo real · Usa <strong>🩺 Atender</strong> para registrar la consulta médica</p>
+      <p>Panel en tiempo real · Usa <strong>🩺 Atender</strong> para registrar la atención</p>
     </div>
     <button onclick="abrirModalCita()" class="vbtn vbtn-primary">＋ Nueva Cita</button>
   </div>
@@ -39,6 +57,16 @@
         <option value="cancelada">Cancelada</option>
       </select>
     </div>
+    <div>
+      <label class="vlabel">Tipo</label>
+      <select id="f-tipo" class="vinput" style="width:auto">
+        <option value="">Todos</option>
+        <option value="medica">🩺 Atención médica</option>
+        <option value="vacuna">💉 Vacunación</option>
+        <option value="desparasitacion">🪱 Desparasitación</option>
+        <option value="estetica">✂️ Estética</option>
+      </select>
+    </div>
     <button onclick="cargarCitas()" class="vbtn vbtn-primary">Filtrar</button>
     <button onclick="limpiarFiltros()" class="vbtn vbtn-ghost">Limpiar</button>
   </div>
@@ -51,6 +79,7 @@
           <tr>
             <th>#</th>
             <th>Fecha · Hora</th>
+            <th>Tipo</th>
             <th>Paciente</th>
             <th class="hidden sm:table-cell">Motivo</th>
             <th class="hidden md:table-cell">Veterinario</th>
@@ -59,7 +88,7 @@
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="7">
+          <tr><td colspan="8">
             <div class="vempty"><div class="vspinner"></div><p>Cargando citas…</p></div>
           </td></tr>
         </tbody>
@@ -70,7 +99,7 @@
 
 <!-- ══ Modal Nueva Cita ══════════════════════════════════════════ -->
 <div id="modal-cita" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:600px">
+  <div class="vmodal" style="max-width:620px">
     <div class="vmodal-head">
       <h3>📅 Nueva Cita</h3>
       <button onclick="cerrarModalCita()" class="vmodal-close">✕</button>
@@ -95,11 +124,9 @@
           </div>
           <button onclick="buscarProp()" class="vbtn vbtn-primary" style="flex-shrink:0">Buscar</button>
         </div>
-        <!-- Resultados -->
         <div id="prop-resultados"
           style="margin-top:.75rem;display:flex;flex-direction:column;gap:.4rem;
           max-height:180px;overflow-y:auto"></div>
-        <!-- Propietario seleccionado -->
         <div id="prop-seleccionado" style="display:none;margin-top:.75rem;
           background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;
           padding:.75rem 1rem;align-items:center;gap:.75rem">
@@ -140,6 +167,34 @@
           <button onclick="limpiarMascota()"
             style="background:none;border:none;cursor:pointer;color:var(--ink-faint);
             font-size:1.1rem;margin-left:auto" title="Cambiar mascota">✕</button>
+        </div>
+
+        <!-- ── TIPO DE CITA ── -->
+        <div style="margin-bottom:1rem">
+          <label class="vlabel" style="margin-bottom:.5rem">Tipo de atención *</label>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="tipo-btn sel-medica" id="tipo-btn-medica"
+              onclick="selTipo('medica')">
+              <span style="font-size:1.4rem">🩺</span>
+              <span>Atención<br/>Médica</span>
+            </button>
+            <button class="tipo-btn" id="tipo-btn-vacuna"
+              onclick="selTipo('vacuna')">
+              <span style="font-size:1.4rem">💉</span>
+              <span>Vacuna-<br/>ción</span>
+            </button>
+            <button class="tipo-btn" id="tipo-btn-desparasitacion"
+              onclick="selTipo('desparasitacion')">
+              <span style="font-size:1.4rem">🪱</span>
+              <span>Desparasi-<br/>tación</span>
+            </button>
+            <button class="tipo-btn" id="tipo-btn-estetica"
+              onclick="selTipo('estetica')">
+              <span style="font-size:1.4rem">✂️</span>
+              <span>Estética</span>
+            </button>
+          </div>
+          <input type="hidden" id="c-tipo" value="medica"/>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -189,7 +244,6 @@
       <button onclick="closeModal('modal-editar-cita')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
-
       <input type="hidden" id="edit-cita-id"/>
 
       <!-- Info mascota (solo lectura) -->
@@ -201,12 +255,34 @@
         </div>
       </div>
 
+      <!-- Tipo de cita editable -->
+      <div>
+        <label class="vlabel" style="margin-bottom:.5rem">Tipo de atención</label>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="tipo-btn" id="edit-tipo-btn-medica"
+            onclick="selTipoEdit('medica')">
+            <span style="font-size:1.2rem">🩺</span><span style="font-size:.72rem">Médica</span>
+          </button>
+          <button class="tipo-btn" id="edit-tipo-btn-vacuna"
+            onclick="selTipoEdit('vacuna')">
+            <span style="font-size:1.2rem">💉</span><span style="font-size:.72rem">Vacunación</span>
+          </button>
+          <button class="tipo-btn" id="edit-tipo-btn-desparasitacion"
+            onclick="selTipoEdit('desparasitacion')">
+            <span style="font-size:1.2rem">🪱</span><span style="font-size:.72rem">Desparasitación</span>
+          </button>
+          <button class="tipo-btn" id="edit-tipo-btn-estetica"
+            onclick="selTipoEdit('estetica')">
+            <span style="font-size:1.2rem">✂️</span><span style="font-size:.72rem">Estética</span>
+          </button>
+        </div>
+        <input type="hidden" id="edit-cita-tipo" value="medica"/>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="vlabel">Veterinario *</label>
-          <select id="edit-cita-vet" class="vinput">
-            <option value="">Cargando…</option>
-          </select>
+          <select id="edit-cita-vet" class="vinput"><option value="">Cargando…</option></select>
         </div>
         <div>
           <label class="vlabel">Fecha y Hora *</label>
@@ -262,10 +338,11 @@
 <div id="modal-atender" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:460px">
     <div class="vmodal-head">
-      <h3>🩺 Iniciar Atención</h3>
+      <h3 id="atender-titulo">🩺 Iniciar Atención</h3>
       <button onclick="closeModal('modal-atender')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body">
+      <!-- Info cita -->
       <div style="background:var(--green-50);border:1px solid var(--green-100);
         border-radius:1rem;padding:1.1rem;margin-bottom:1.2rem">
         <p style="font-size:.72rem;color:var(--green-600);font-weight:700;
@@ -277,170 +354,174 @@
         <p style="font-size:.8rem;color:var(--ink-soft);margin-top:.1rem" id="atender-motivo">—</p>
         <p style="font-size:.75rem;color:var(--ink-faint);margin-top:.2rem" id="atender-fecha">—</p>
       </div>
-      <p style="font-size:.85rem;color:var(--ink-soft);line-height:1.6">
-        Serás redirigido a la <strong>Historia Clínica</strong> del paciente.
-        Al guardar la consulta, la cita quedará marcada como
-        <strong style="color:#047857">completada</strong> automáticamente.
-      </p>
+
+      <!-- Destino de redirección según tipo -->
+      <div id="atender-destino" style="border-radius:.9rem;padding:1rem;font-size:.85rem;line-height:1.6"></div>
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-atender')" class="vbtn vbtn-ghost">Cancelar</button>
-      <button onclick="irAAtender()" class="vbtn vbtn-primary">🩺 Ir a Atender</button>
+      <button onclick="irAAtender()" class="vbtn vbtn-primary" id="btn-ir-atender">🩺 Ir a Atender</button>
     </div>
   </div>
 </div>
 
 <script>
 // ── Estado ────────────────────────────────────────────────────────
-let propietarioSel  = null;
-let mascotaSel      = null;
-let citaAtenderData = null;
+var propietarioSel  = null;
+var mascotaSel      = null;
+var citaAtenderData = null;
+var _tipoCitaSel    = 'medica'; // tipo seleccionado en modal nueva cita
+
+// ── Configuración de tipos ────────────────────────────────────────
+var TIPOS_CITA = {
+  medica:         { label:'Atención Médica',  icon:'🩺', tab:'consultas',        color:'#15803d', bg:'#f0fdf4', border:'#bbf7d0' },
+  vacuna:         { label:'Vacunación',       icon:'💉', tab:'vacunas',          color:'#6d28d9', bg:'#f5f3ff', border:'#ddd6fe' },
+  desparasitacion:{ label:'Desparasitación',  icon:'🪱', tab:'desparasitaciones',color:'#854d0e', bg:'#fefce8', border:'#fde68a' },
+  estetica:       { label:'Estética',         icon:'✂️', tab:'estetica',         color:'#be185d', bg:'#fdf2f8', border:'#fbcfe8' },
+};
 
 // ── Init ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  initPage({ activePage: 'citas', title: 'Citas', subtitle: 'Agenda y programación' });
-  // Preseleccionar fecha de hoy en el filtro de la tabla
+  initPage({ activePage:'citas', title:'Citas', subtitle:'Agenda y programación' });
   document.getElementById('f-fecha').value = fechaHoyInput();
   cargarCitas();
-  // NO llamar cargarVets() aquí — se llama al abrir el modal
   getSocket().on('cita:nueva',       msg => nuevaFilaRT(msg.payload));
   getSocket().on('cita:actualizada', msg => actualizarEstadoFila(msg.id, msg.estado));
 });
 
-// ── Abrir modal nueva cita (carga vets en este momento) ───────────
+// ── Selector de tipo de cita ──────────────────────────────────────
+function selTipo(tipo) {
+  _tipoCitaSel = tipo;
+  document.getElementById('c-tipo').value = tipo;
+  Object.keys(TIPOS_CITA).forEach(t => {
+    var btn = document.getElementById('tipo-btn-'+t);
+    if (!btn) return;
+    btn.className = 'tipo-btn' + (t===tipo ? ' sel-'+t : '');
+  });
+}
+
+function selTipoEdit(tipo) {
+  document.getElementById('edit-cita-tipo').value = tipo;
+  Object.keys(TIPOS_CITA).forEach(t => {
+    var btn = document.getElementById('edit-tipo-btn-'+t);
+    if (!btn) return;
+    btn.className = 'tipo-btn' + (t===tipo ? ' sel-'+t : '');
+  });
+}
+
+// ── Abrir modal nueva cita ────────────────────────────────────────
 async function abrirModalCita() {
   openModal('modal-cita');
-  // Preseleccionar fecha y hora actual al abrir el modal
   document.getElementById('c-fecha').value = fechaHoraAhoraInput();
+  selTipo('medica'); // tipo por defecto
   await cargarVets();
 }
 
-// ── Cargar veterinarios ───────────────────────────────────────────
 async function cargarVets() {
-  const sel = document.getElementById('c-vet');
+  var sel = document.getElementById('c-vet');
   if (!sel) return;
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    const res  = await api('/usuarios?rol=veterinario');
+    var res  = await api('/usuarios?rol=veterinario');
     if (!res) return;
-    const vets = (await res.json()).data || [];
+    var vets = (await res.json()).data || [];
     sel.innerHTML = vets.length
       ? '<option value="">Seleccionar veterinario…</option>' +
-        vets.map(v => `<option value="${v.id}">🩺 ${esc(v.nombre)}</option>`).join('')
+        vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('')
       : '<option value="">Sin veterinarios registrados</option>';
-  } catch {
-    sel.innerHTML = '<option value="">Error al cargar</option>';
-  }
+  } catch { sel.innerHTML = '<option value="">Error al cargar</option>'; }
 }
 
 // ── Filtros ───────────────────────────────────────────────────────
 function limpiarFiltros() {
   document.getElementById('f-fecha').value  = '';
   document.getElementById('f-estado').value = '';
+  document.getElementById('f-tipo').value   = '';
   cargarCitas();
 }
 
 // ── Cargar tabla ──────────────────────────────────────────────────
 async function cargarCitas() {
-  let url = '/citas?limit=100';
-  const f = document.getElementById('f-fecha').value;
-  const e = document.getElementById('f-estado').value;
-  if (f) url += `&fecha=${f}`;
-  if (e) url += `&estado=${e}`;
+  var url = '/citas?limit=100';
+  var f = document.getElementById('f-fecha').value;
+  var e = document.getElementById('f-estado').value;
+  var t = document.getElementById('f-tipo').value;
+  if (f) url += '&fecha='+f;
+  if (e) url += '&estado='+e;
+  if (t) url += '&tipo_cita='+t;
 
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = `<tr><td colspan="7">
-    <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
-  </td></tr>`;
+  var tbody = document.getElementById('tbody');
+  tbody.innerHTML = '<tr><td colspan="8"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></td></tr>';
 
   try {
-    const res   = await api(url);
+    var res   = await api(url);
     if (!res) return;
-    const citas = (await res.json()).data || [];
+    var citas = (await res.json()).data || [];
     tbody.innerHTML = citas.length
       ? citas.map(c => rowHTML(c)).join('')
-      : `<tr><td colspan="7">
-          <div class="vempty"><span class="icon">📭</span>
-          <p>Sin citas con esos filtros</p></div>
-         </td></tr>`;
+      : '<tr><td colspan="8"><div class="vempty"><span class="icon">📭</span><p>Sin citas con esos filtros</p></div></td></tr>';
   } catch {
-    tbody.innerHTML = `<tr><td colspan="7">
-      <div class="vempty"><span class="icon">😿</span>
-        <p>Error al cargar.
-          <button class="vlink" onclick="cargarCitas()">Reintentar</button>
-        </p>
-      </div></td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="8"><div class="vempty"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="cargarCitas()">Reintentar</button></p></div></td></tr>';
   }
+}
+
+// ── Badge tipo ────────────────────────────────────────────────────
+function badgeTipo(tipo) {
+  var t = TIPOS_CITA[tipo] || TIPOS_CITA.medica;
+  return '<span class="tipo-badge tipo-'+tipo+'">'+t.icon+' '+t.label+'</span>';
 }
 
 // ── Fila de tabla ─────────────────────────────────────────────────
 function rowHTML(c) {
-  const puedAtender = ['pendiente','confirmada','en_curso'].includes(c.estado);
-  const esHoy = c.fecha_hora &&
+  var puedAtender = ['pendiente','confirmada','en_curso'].includes(c.estado);
+  var esHoy = c.fecha_hora &&
     new Date(c.fecha_hora).toDateString() === new Date().toDateString();
+  var tipo = c.tipo_cita || 'medica';
 
-  return `<tr data-id="${c.id}"
-    style="${esHoy && puedAtender ? 'background:#f0fdf4' : ''}">
-    <td style="color:var(--ink-faint);font-size:.7rem;font-family:monospace">#${c.id}</td>
-    <td>
-      <p style="font-weight:600;${esHoy?'color:var(--green-600)':''}">${fDate(c.fecha_hora)}</p>
-      <p style="font-size:.7rem;color:var(--ink-faint)">${fTime(c.fecha_hora)} · ${c.duracion_min||30} min</p>
-    </td>
-    <td>
-      <div style="display:flex;align-items:center;gap:.6rem">
-        <span style="font-size:1.25rem">${badgeEspecie(c.especie)}</span>
-        <div>
-          <p style="font-weight:700;font-size:.85rem">${esc(c.mascota_nombre)}</p>
-          <p style="font-size:.7rem;color:var(--ink-faint)">${esc(c.propietario_nombre||'')}</p>
-        </div>
-      </div>
-    </td>
-    <td class="hidden sm:table-cell"
-      style="color:var(--ink-soft);font-size:.82rem;max-width:160px;
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-      ${esc(c.motivo)}
-    </td>
-    <td class="hidden md:table-cell"
-      style="color:var(--ink-soft);font-size:.82rem">
-      ${esc(c.veterinario_nombre||'—')}</td>
-          <td class="hide-mobile">${badgeSede(c.sede_nombre)}
-    </td>
-    <td class="estado-cell">${badgeEstado(c.estado)}</td>
-    <td>
-      <div style="display:flex;flex-direction:column;gap:.4rem;align-items:flex-start">
-        ${puedAtender ? `
-          <button
-            onclick="abrirAtender(${c.id},'${esc(c.mascota_nombre)}',
-              '${esc(c.propietario_nombre||'')}','${esc(c.motivo)}',
-              '${esc(c.fecha_hora)}',${c.mascota_id})"
-            style="display:inline-flex;align-items:center;gap:.35rem;
-            background:linear-gradient(135deg,#10b981,#059669);color:#fff;
-            border:none;padding:.35rem .8rem;border-radius:.65rem;
-            font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;
-            transition:opacity .15s"
-            onmouseover="this.style.opacity='.85'"
-            onmouseout="this.style.opacity='1'">
-            🩺 Atender
-          </button>` : ''}
-        ${puedAtender ? `
-          <button class="vlink" onclick="abrirEditarCita(${c.id})"
-            style="font-size:.7rem;color:var(--sky)">
-            ✏️ Editar
-          </button>` : ''}
-        <button class="vlink" onclick="abrirEstado(${c.id},'${c.estado}')"
-          style="font-size:.7rem">
-          Cambiar estado
-        </button>
-      </div>
-    </td>
-  </tr>`;
+  return '<tr data-id="'+c.id+'" style="'+(esHoy && puedAtender ? 'background:#f0fdf4' : '')+'">' +
+    '<td style="color:var(--ink-faint);font-size:.7rem;font-family:monospace">#'+c.id+'</td>' +
+    '<td>' +
+      '<p style="font-weight:600;'+(esHoy?'color:var(--green-600)':'')+'">'+fDate(c.fecha_hora)+'</p>' +
+      '<p style="font-size:.7rem;color:var(--ink-faint)">'+fTime(c.fecha_hora)+' · '+(c.duracion_min||30)+' min</p>' +
+    '</td>' +
+    '<td>'+badgeTipo(tipo)+'</td>' +
+    '<td>' +
+      '<div style="display:flex;align-items:center;gap:.6rem">' +
+        '<span style="font-size:1.25rem">'+badgeEspecie(c.especie)+'</span>' +
+        '<div>' +
+          '<p style="font-weight:700;font-size:.85rem">'+esc(c.mascota_nombre)+'</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-faint)">'+esc(c.propietario_nombre||'')+'</p>' +
+        '</div>' +
+      '</div>' +
+    '</td>' +
+    '<td class="hidden sm:table-cell" style="color:var(--ink-soft);font-size:.82rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.motivo)+'</td>' +
+    '<td class="hidden md:table-cell" style="color:var(--ink-soft);font-size:.82rem">'+esc(c.veterinario_nombre||'—')+'</td>' +
+    '<td class="estado-cell">'+badgeEstado(c.estado)+'</td>' +
+    '<td>' +
+      '<div style="display:flex;flex-direction:column;gap:.4rem;align-items:flex-start">' +
+        (puedAtender ?
+          '<button onclick="abrirAtender('+c.id+',\''+esc(c.mascota_nombre)+'\',\''+esc(c.propietario_nombre||'')+'\',\''+esc(c.motivo)+'\',\''+esc(c.fecha_hora)+'\','+c.mascota_id+',\''+tipo+'\')" '+
+          'style="display:inline-flex;align-items:center;gap:.35rem;'+
+          'background:linear-gradient(135deg,#10b981,#059669);color:#fff;'+
+          'border:none;padding:.35rem .8rem;border-radius:.65rem;'+
+          'font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" '+
+          'onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">'+
+          (TIPOS_CITA[tipo]?.icon||'🩺')+' Atender</button>'
+        : '') +
+        (puedAtender ?
+          '<button class="vlink" onclick="abrirEditarCita('+c.id+')" style="font-size:.7rem;color:var(--sky)">✏️ Editar</button>'
+        : '') +
+        '<button class="vlink" onclick="abrirEstado('+c.id+',\''+c.estado+'\')" style="font-size:.7rem">Cambiar estado</button>' +
+      '</div>' +
+    '</td>' +
+  '</tr>';
 }
 
 // ── Tiempo real ───────────────────────────────────────────────────
 function nuevaFilaRT(c) {
-  const tbody = document.getElementById('tbody');
+  var tbody = document.getElementById('tbody');
   if (tbody.querySelector('.vempty')) tbody.innerHTML = '';
-  const tr = document.createElement('tr');
+  var tr = document.createElement('tr');
   tr.className  = 'row-new';
   tr.dataset.id = c.id;
   tr.innerHTML  = rowHTML(c).replace(/^<tr[^>]*>/, '').replace(/<\/tr>$/, '');
@@ -449,8 +530,8 @@ function nuevaFilaRT(c) {
 }
 
 function actualizarEstadoFila(id, estado) {
-  const tr   = document.querySelector(`tr[data-id="${id}"]`);
-  const cell = tr?.querySelector('.estado-cell');
+  var tr   = document.querySelector('tr[data-id="'+id+'"]');
+  var cell = tr?.querySelector('.estado-cell');
   if (cell) cell.innerHTML = badgeEstado(estado);
   if (tr && ['completada','cancelada'].includes(estado)) {
     tr.querySelector('button[onclick^="abrirAtender"]')?.remove();
@@ -460,143 +541,96 @@ function actualizarEstadoFila(id, estado) {
 // ══ FLUJO NUEVA CITA ════════════════════════════════════════════
 
 async function buscarProp() {
-  const q = document.getElementById('buscar-prop-input').value.trim();
+  var q = document.getElementById('buscar-prop-input').value.trim();
   if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
-
-  const cont = document.getElementById('prop-resultados');
+  var cont = document.getElementById('prop-resultados');
   cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
-
   try {
-    // Buscar propietarios Y mascotas en paralelo
-    const [resProp, resMasc] = await Promise.all([
-      api(`/propietarios?search=${encodeURIComponent(q)}&limit=6`),
-      api(`/mascotas?search=${encodeURIComponent(q)}&limit=4`),
+    var [resProp, resMasc] = await Promise.all([
+      api('/propietarios?search='+encodeURIComponent(q)+'&limit=6'),
+      api('/mascotas?search='+encodeURIComponent(q)+'&limit=4'),
     ]);
-    const propRows = resProp ? (await resProp.json()).data || [] : [];
-    const mascRows = resMasc ? (await resMasc.json()).data || [] : [];
-
-    // Propietarios desde mascotas encontradas (sin duplicados)
-    const propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id))];
-    const propFromMasc = [];
-    for (const pid of propIdsFromMasc) {
+    var propRows = resProp ? (await resProp.json()).data || [] : [];
+    var mascRows = resMasc ? (await resMasc.json()).data || [] : [];
+    var propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id))];
+    var propFromMasc = [];
+    for (var pid of propIdsFromMasc) {
       if (!propRows.find(p => p.id === pid)) {
-        const rp = await api(`/propietarios/${pid}`);
-        if (rp?.ok) { const d = (await rp.json()).data; propFromMasc.push(d); }
+        var rp = await api('/propietarios/'+pid);
+        if (rp?.ok) { var d = (await rp.json()).data; propFromMasc.push(d); }
       }
     }
-    const rows = [...propRows, ...propFromMasc];
-
-    cont.innerHTML = rows.length ? rows.map(p => `
-      <button onclick="seleccionarProp(${p.id},'${esc(p.nombre)}','${esc(p.apellido)}',
-        '${esc(p.dni||'')}','${esc(p.telefono)}')"
-        style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;
-        background:#fff;border:1px solid var(--line);border-radius:.85rem;
-        cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
-        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
-        onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
-        <div style="width:34px;height:34px;border-radius:50%;
-          background:linear-gradient(135deg,#ede9fe,#ddd6fe);
-          color:#6d28d9;font-weight:700;font-size:.78rem;
-          display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          ${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}
-        </div>
-        <div style="flex:1;min-width:0">
-          <p style="font-weight:700;font-size:.85rem">${esc(p.nombre)} ${esc(p.apellido)}</p>
-          <p style="font-size:.7rem;color:var(--ink-faint)">
-            ${p.dni ? `🪪 ${esc(p.dni)} · ` : ''}📞 ${esc(p.telefono)}
-          </p>
-        </div>
-        <span style="font-size:.7rem;background:#ecfdf5;color:#047857;
-          padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">
-          🐾 ${p.total_mascotas}
-        </span>
-      </button>`).join('')
-    : `<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">
-        No se encontraron propietarios
-       </div>`;
-  } catch {
-    cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>';
-  }
+    var rows = [...propRows, ...propFromMasc];
+    cont.innerHTML = rows.length ? rows.map(p =>
+      '<button onclick="seleccionarProp('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono)+'\')" '+
+      'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;'+
+      'background:#fff;border:1px solid var(--line);border-radius:.85rem;'+
+      'cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
+      'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+      'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
+        '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
+        '<div style="flex:1;min-width:0"><p style="font-weight:700;font-size:.85rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+' 📞 '+esc(p.telefono)+'</p></div>' +
+        '<span style="font-size:.7rem;background:#ecfdf5;color:#047857;padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
+      '</button>'
+    ).join('')
+    : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">No se encontraron propietarios</div>';
+  } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>'; }
 }
 
 async function seleccionarProp(id, nombre, apellido, dni, telefono) {
-  propietarioSel = { id, nombre:`${nombre} ${apellido}`, dni, telefono };
-
+  propietarioSel = { id, nombre: nombre+' '+apellido, dni, telefono };
   document.getElementById('prop-resultados').innerHTML = '';
   document.getElementById('buscar-prop-input').value   = '';
-
-  const sel = document.getElementById('prop-seleccionado');
+  var sel = document.getElementById('prop-seleccionado');
   sel.style.display = 'flex';
-  document.getElementById('prop-sel-avatar').textContent  = nombre.charAt(0)+apellido.charAt(0);
-  document.getElementById('prop-sel-nombre').textContent  = `${nombre} ${apellido}`;
-  document.getElementById('prop-sel-info').textContent    =
-    `${dni?'🪪 '+dni+' · ':''}📞 ${telefono}`;
-
-  // Cargar mascotas
+  document.getElementById('prop-sel-avatar').textContent = nombre.charAt(0)+apellido.charAt(0);
+  document.getElementById('prop-sel-nombre').textContent = nombre+' '+apellido;
+  document.getElementById('prop-sel-info').textContent   = (dni?'🪪 '+dni+' · ':'')+' 📞 '+telefono;
   document.getElementById('paso-mascota').style.display = 'block';
-  document.getElementById('mascotas-lista').innerHTML   =
-    '<div style="font-size:.78rem;color:var(--ink-faint)">Cargando mascotas…</div>';
-
+  document.getElementById('mascotas-lista').innerHTML   = '<div style="font-size:.78rem;color:var(--ink-faint)">Cargando mascotas…</div>';
   try {
-    const res  = await api(`/propietarios/${id}`);
+    var res      = await api('/propietarios/'+id);
     if (!res) return;
-    const mascotas = (await res.json()).data?.mascotas || [];
-
+    var mascotas = (await res.json()).data?.mascotas || [];
     document.getElementById('mascotas-lista').innerHTML = mascotas.length
-      ? mascotas.map(m => `
-          <button onclick="seleccionarMascota(${m.id},'${esc(m.nombre)}',
-            '${esc(m.especie)}','${esc(m.raza||m.especie)}')"
-            style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;
-            background:#fff;border:1px solid var(--line);border-radius:.85rem;
-            cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
-            onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
-            onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
-            <span style="font-size:1.5rem">${badgeEspecie(m.especie)}</span>
-            <div style="flex:1">
-              <p style="font-weight:700;font-size:.85rem">${esc(m.nombre)}</p>
-              <p style="font-size:.7rem;color:var(--ink-faint)">
-                ${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}
-              </p>
-            </div>
-            ${m.alertas_medicas ? `
-              <span style="font-size:.62rem;background:#fff1f2;color:#be123c;
-                padding:.2rem .5rem;border-radius:999px;font-weight:700;
-                border:1px solid #fecdd3">⚠️ Alerta</span>` : ''}
-          </button>`).join('')
-      : `<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">
-          Este propietario no tiene mascotas.
-          <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar mascota</a>
-         </div>`;
-  } catch {
-    document.getElementById('mascotas-lista').innerHTML =
-      '<div style="font-size:.78rem;color:#e11d48">Error al cargar mascotas</div>';
-  }
+      ? mascotas.map(m =>
+          '<button onclick="seleccionarMascota('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
+          'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
+          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
+            '<span style="font-size:1.5rem">'+badgeEspecie(m.especie)+'</span>' +
+            '<div style="flex:1"><p style="font-weight:700;font-size:.85rem">'+esc(m.nombre)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'Sin raza')+' · '+esc(m.sexo)+'</p></div>' +
+            (m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3">⚠️ Alerta</span>':'') +
+          '</button>'
+        ).join('')
+      : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">Este propietario no tiene mascotas. <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar mascota</a></div>';
+  } catch { document.getElementById('mascotas-lista').innerHTML = '<div style="font-size:.78rem;color:#e11d48">Error al cargar mascotas</div>'; }
 }
 
 function seleccionarMascota(id, nombre, especie, raza) {
   mascotaSel = { id, nombre, especie };
-  document.getElementById('paso-mascota').style.display       = 'none';
-  document.getElementById('paso-cita').style.display          = 'block';
-  document.getElementById('btn-guardar-cita').style.display   = 'inline-flex';
-  document.getElementById('masc-sel-icon').textContent        = badgeEspecie(especie);
-  document.getElementById('masc-sel-nombre').textContent      = nombre;
-  document.getElementById('masc-sel-info').textContent        = `${especie} · ${raza}`;
+  document.getElementById('paso-mascota').style.display      = 'none';
+  document.getElementById('paso-cita').style.display         = 'block';
+  document.getElementById('btn-guardar-cita').style.display  = 'inline-flex';
+  document.getElementById('masc-sel-icon').textContent       = badgeEspecie(especie);
+  document.getElementById('masc-sel-nombre').textContent     = nombre;
+  document.getElementById('masc-sel-info').textContent       = especie+' · '+raza;
 }
 
 function limpiarPropietario() {
   propietarioSel = null; mascotaSel = null;
-  document.getElementById('prop-seleccionado').style.display  = 'none';
-  document.getElementById('paso-mascota').style.display       = 'none';
-  document.getElementById('paso-cita').style.display          = 'none';
-  document.getElementById('btn-guardar-cita').style.display   = 'none';
-  document.getElementById('prop-resultados').innerHTML        = '';
+  document.getElementById('prop-seleccionado').style.display = 'none';
+  document.getElementById('paso-mascota').style.display      = 'none';
+  document.getElementById('paso-cita').style.display         = 'none';
+  document.getElementById('btn-guardar-cita').style.display  = 'none';
+  document.getElementById('prop-resultados').innerHTML       = '';
 }
 
 function limpiarMascota() {
   mascotaSel = null;
-  document.getElementById('paso-mascota').style.display       = 'block';
-  document.getElementById('paso-cita').style.display          = 'none';
-  document.getElementById('btn-guardar-cita').style.display   = 'none';
+  document.getElementById('paso-mascota').style.display      = 'block';
+  document.getElementById('paso-cita').style.display         = 'none';
+  document.getElementById('btn-guardar-cita').style.display  = 'none';
 }
 
 function cerrarModalCita() {
@@ -605,6 +639,7 @@ function cerrarModalCita() {
   document.getElementById('buscar-prop-input').value = '';
   ['c-fecha','c-motivo','c-notas'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('c-duracion').value = '30';
+  selTipo('medica');
 }
 
 // ── Guardar cita ──────────────────────────────────────────────────
@@ -612,107 +647,143 @@ async function guardarCita() {
   if (!propietarioSel) { toast('Selecciona un propietario','warning'); return; }
   if (!mascotaSel)     { toast('Selecciona una mascota','warning');    return; }
 
-  const veterinario_id = parseInt(document.getElementById('c-vet').value);
-  const fecha_hora     = document.getElementById('c-fecha').value;
-  const motivo         = document.getElementById('c-motivo').value.trim();
+  var veterinario_id = parseInt(document.getElementById('c-vet').value);
+  var fecha_hora     = document.getElementById('c-fecha').value;
+  var motivo         = document.getElementById('c-motivo').value.trim();
+  var tipo_cita      = document.getElementById('c-tipo').value || 'medica';
 
   if (!veterinario_id) { toast('Selecciona un veterinario','warning'); return; }
   if (!fecha_hora)     { toast('Ingresa la fecha y hora','warning');   return; }
   if (!motivo)         { toast('Ingresa el motivo','warning');         return; }
 
-  const body = {
+  var body = {
     mascota_id    : mascotaSel.id,
     veterinario_id,
     fecha_hora,
     duracion_min  : parseInt(document.getElementById('c-duracion').value)||30,
     motivo,
     notas         : document.getElementById('c-notas').value.trim(),
+    tipo_cita,
   };
 
   try {
-    const res  = await api('/citas', { method:'POST', body });
+    var res  = await api('/citas', { method:'POST', body });
     if (!res) return;
-    const data = await res.json();
+    var data = await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
-    toast(`✅ Cita agendada para ${mascotaSel.nombre}`, 'success');
+    var tipoInfo = TIPOS_CITA[tipo_cita];
+    toast('✅ Cita agendada para '+mascotaSel.nombre+' · '+tipoInfo.icon+' '+tipoInfo.label, 'success');
     cerrarModalCita();
     cargarCitas();
   } catch { toast('Error de conexión.','danger'); }
 }
 
 // ── Modal Atender ─────────────────────────────────────────────────
-function abrirAtender(id, mascotaNombre, propietarioNombre, motivo, fechaHora, mascotaId) {
-  citaAtenderData = { id, mascotaId, motivo };
+function abrirAtender(id, mascotaNombre, propietarioNombre, motivo, fechaHora, mascotaId, tipoCita) {
+  tipoCita = tipoCita || 'medica';
+  citaAtenderData = { id, mascotaId, motivo, tipoCita };
+
+  var tipo = TIPOS_CITA[tipoCita] || TIPOS_CITA.medica;
+
+  // Actualizar título del modal
+  document.getElementById('atender-titulo').textContent = tipo.icon+' Iniciar Atención';
+
+  // Info de la cita
   document.getElementById('atender-paciente').textContent    = mascotaNombre;
-  document.getElementById('atender-propietario').textContent = `👤 ${propietarioNombre}`;
-  document.getElementById('atender-motivo').textContent      = `📋 ${motivo}`;
-  document.getElementById('atender-fecha').textContent       = `🕐 ${fDateTime(fechaHora)}`;
+  document.getElementById('atender-propietario').textContent = '👤 '+propietarioNombre;
+  document.getElementById('atender-motivo').textContent      = '📋 '+motivo;
+  document.getElementById('atender-fecha').textContent       = '🕐 '+fDateTime(fechaHora);
+
+  // Mensaje de destino según tipo
+  var tabLabel = {
+    medica:          'Historia Clínica → pestaña <strong>Consultas</strong>',
+    vacuna:          'Historia Clínica → pestaña <strong>Vacunas</strong>',
+    desparasitacion: 'Historia Clínica → pestaña <strong>Desparasitaciones</strong>',
+    estetica:        'Historia Clínica → pestaña <strong>Estética</strong>',
+  };
+
+  document.getElementById('atender-destino').innerHTML =
+    '<div style="background:'+tipo.bg+';border:1px solid '+tipo.border+';border-radius:.75rem;padding:.85rem 1rem">' +
+      '<p style="font-size:.82rem;color:'+tipo.color+';line-height:1.6">' +
+        tipo.icon+' Serás redirigido a <strong>'+tabLabel[tipoCita]+'</strong>.<br/>' +
+        'El modal se abrirá automáticamente con los datos de la cita precargados.<br/>' +
+        'Al guardar, la cita quedará marcada como <strong>completada</strong>.' +
+      '</p>' +
+    '</div>';
+
+  // Botón con color del tipo
+  var btnAtender = document.getElementById('btn-ir-atender');
+  btnAtender.textContent = tipo.icon+' Ir a Atender';
+
   openModal('modal-atender');
 }
 
+// ── Ir a atender — guarda en sessionStorage y redirige ────────────
 function irAAtender() {
   if (!citaAtenderData) return;
+  var tipo = citaAtenderData.tipoCita || 'medica';
+  var tab  = TIPOS_CITA[tipo]?.tab || 'consultas';
+
+  // Guardar datos para historia.html
   sessionStorage.setItem('historia_mascota_id', citaAtenderData.mascotaId);
   sessionStorage.setItem('historia_cita_id',    citaAtenderData.id);
   sessionStorage.setItem('historia_motivo',     citaAtenderData.motivo);
+  sessionStorage.setItem('historia_tab',        tab);   // ← NUEVO: tab destino
+
   window.location.href = 'historia.html';
 }
 
 // ── Editar cita ───────────────────────────────────────────────────
 async function abrirEditarCita(id) {
-  document.getElementById('edit-cita-id-label').textContent = `#${id}`;
+  document.getElementById('edit-cita-id-label').textContent = '#'+id;
   document.getElementById('edit-cita-id').value = id;
   openModal('modal-editar-cita');
 
-  // Cargar vets en el select
-  const sel = document.getElementById('edit-cita-vet');
+  var sel = document.getElementById('edit-cita-vet');
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    const rv   = await api('/usuarios?rol=veterinario');
-    const vets = rv ? (await rv.json()).data || [] : [];
+    var rv   = await api('/usuarios?rol=veterinario');
+    var vets = rv ? (await rv.json()).data || [] : [];
     sel.innerHTML = '<option value="">Seleccionar…</option>' +
-      vets.map(v => `<option value="${v.id}">🩺 ${esc(v.nombre)}</option>`).join('');
+      vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
   } catch { sel.innerHTML = '<option value="">Error</option>'; }
 
-  // Cargar datos actuales de la cita
   try {
-    const res  = await api(`/citas/${id}`);
+    var res = await api('/citas/'+id);
     if (!res || !res.ok) { toast('No se pudo cargar la cita.','danger'); return; }
-    const c    = (await res.json()).data;
+    var c   = (await res.json()).data;
 
     document.getElementById('edit-cita-mascota-icon').textContent   = badgeEspecie(c.especie);
-    document.getElementById('edit-cita-mascota-nombre').textContent =
-      `${esc(c.mascota_nombre)} · ${esc(c.propietario_nombre||'')}`;
+    document.getElementById('edit-cita-mascota-nombre').textContent = esc(c.mascota_nombre)+' · '+esc(c.propietario_nombre||'');
 
-    // Formatear fecha para datetime-local
-    const fLocal = new Date(c.fecha_hora);
-    const pad    = n => String(n).padStart(2,'0');
-    document.getElementById('edit-cita-fecha').value =
-      `${fLocal.getFullYear()}-${pad(fLocal.getMonth()+1)}-${pad(fLocal.getDate())}T${pad(fLocal.getHours())}:${pad(fLocal.getMinutes())}`;
-
+    var fLocal = new Date(c.fecha_hora);
+    var pad    = n => String(n).padStart(2,'0');
+    document.getElementById('edit-cita-fecha').value    = fLocal.getFullYear()+'-'+pad(fLocal.getMonth()+1)+'-'+pad(fLocal.getDate())+'T'+pad(fLocal.getHours())+':'+pad(fLocal.getMinutes());
     document.getElementById('edit-cita-vet').value      = c.veterinario_id;
     document.getElementById('edit-cita-duracion').value = c.duracion_min || 30;
     document.getElementById('edit-cita-motivo').value   = c.motivo || '';
     document.getElementById('edit-cita-notas').value    = c.notas  || '';
+    selTipoEdit(c.tipo_cita || 'medica');
   } catch { toast('Error al cargar datos de la cita.','danger'); }
 }
 
 async function guardarEditCita() {
-  const id             = document.getElementById('edit-cita-id').value;
-  const veterinario_id = parseInt(document.getElementById('edit-cita-vet').value);
-  const fecha_hora     = document.getElementById('edit-cita-fecha').value;
-  const duracion_min   = parseInt(document.getElementById('edit-cita-duracion').value) || 30;
-  const motivo         = document.getElementById('edit-cita-motivo').value.trim();
-  const notas          = document.getElementById('edit-cita-notas').value.trim();
+  var id             = document.getElementById('edit-cita-id').value;
+  var veterinario_id = parseInt(document.getElementById('edit-cita-vet').value);
+  var fecha_hora     = document.getElementById('edit-cita-fecha').value;
+  var duracion_min   = parseInt(document.getElementById('edit-cita-duracion').value) || 30;
+  var motivo         = document.getElementById('edit-cita-motivo').value.trim();
+  var notas          = document.getElementById('edit-cita-notas').value.trim();
+  var tipo_cita      = document.getElementById('edit-cita-tipo').value || 'medica';
 
   if (!veterinario_id) { toast('Selecciona un veterinario.','warning'); return; }
   if (!fecha_hora)     { toast('Ingresa la fecha y hora.','warning'); return; }
   if (!motivo)         { toast('El motivo es obligatorio.','warning'); return; }
 
   try {
-    const res  = await api(`/citas/${id}`, { method:'PUT', body:{ veterinario_id, fecha_hora, duracion_min, motivo, notas } });
+    var res  = await api('/citas/'+id, { method:'PUT', body:{ veterinario_id, fecha_hora, duracion_min, motivo, notas, tipo_cita } });
     if (!res) return;
-    const data = await res.json();
+    var data = await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
     toast('✅ Cita actualizada correctamente','success');
     closeModal('modal-editar-cita');
@@ -728,10 +799,10 @@ function abrirEstado(id, actual) {
 }
 
 async function cambiarEstado() {
-  const id     = document.getElementById('estado-id').value;
-  const estado = document.getElementById('nuevo-estado').value;
+  var id     = document.getElementById('estado-id').value;
+  var estado = document.getElementById('nuevo-estado').value;
   try {
-    const res = await api(`/citas/${id}/estado`, { method:'PATCH', body:{ estado } });
+    var res = await api('/citas/'+id+'/estado', { method:'PATCH', body:{ estado } });
     if (!res) return;
     if (!res.ok) { toast('Error al actualizar.','danger'); return; }
     toast('Estado actualizado','success');

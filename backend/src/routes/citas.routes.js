@@ -8,23 +8,17 @@ const router = Router();
 router.use(authenticate);
 
 // ── Helper: filtro de sede ────────────────────────────────────────
-// Admin sin X-Sede-Id → ve todas las sedes
-// Admin con X-Sede-Id → ve solo esa sede
-// Veterinario/Recepcionista → siempre su sede (del JWT o del header)
 function getSedeFiltro(req) {
   const user   = req.user;
   const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (user.rol === 'admin') {
-    return header || null; // null = todas las sedes
-  }
-  // Para otros roles: su sede_id del token (guardado en JWT) o del header
+  if (user.rol === 'admin') return header || null;
   return user.sede_id || header || null;
 }
 
 // GET /api/v1/citas
 router.get('/', async (req, res, next) => {
   try {
-    const { fecha, estado, veterinario_id, mascota_id } = req.query;
+    const { fecha, estado, veterinario_id, mascota_id, tipo_cita } = req.query;
     const sedeId = getSedeFiltro(req);
 
     let sql = `
@@ -40,12 +34,13 @@ router.get('/', async (req, res, next) => {
       WHERE 1=1`;
     const params = [];
 
-    if (sedeId)         { sql += ' AND c.sede_id = ?';          params.push(sedeId); }
+    if (sedeId)         { sql += ' AND c.sede_id = ?';        params.push(sedeId); }
     const tz = req.tzOffset || '-05:00';
     if (fecha)          { sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) = ?'; params.push(tz, fecha); }
-    if (estado)         { sql += ' AND c.estado = ?';           params.push(estado); }
-    if (veterinario_id) { sql += ' AND c.veterinario_id = ?';   params.push(veterinario_id); }
-    if (mascota_id)     { sql += ' AND c.mascota_id = ?';       params.push(mascota_id); }
+    if (estado)         { sql += ' AND c.estado = ?';          params.push(estado); }
+    if (veterinario_id) { sql += ' AND c.veterinario_id = ?';  params.push(veterinario_id); }
+    if (mascota_id)     { sql += ' AND c.mascota_id = ?';      params.push(mascota_id); }
+    if (tipo_cita)      { sql += ' AND c.tipo_cita = ?';       params.push(tipo_cita); }
 
     sql += ' ORDER BY c.fecha_hora ASC';
     const rows = await req.db.query(sql, params);
@@ -76,12 +71,15 @@ router.get('/:id', async (req, res, next) => {
 // POST /api/v1/citas
 router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next) => {
   try {
-    const { mascota_id, veterinario_id, fecha_hora, duracion_min, motivo, notas } = req.body;
+    const { mascota_id, veterinario_id, fecha_hora, duracion_min, motivo, notas,
+            tipo_cita = 'medica' } = req.body;
+
     if (!mascota_id || !veterinario_id || !fecha_hora || !motivo)
       return res.status(422).json({ success: false, message: 'Campos obligatorios faltantes.' });
 
-    // La cita se registra con la sede del usuario que la crea
-    // Si no tiene sede, usa la sede del veterinario asignado
+    const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
+    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
+
     let sedeId = req.user.sede_id ||
                  (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
 
@@ -93,9 +91,11 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
     }
 
     const result = await req.db.query(
-      `INSERT INTO citas (mascota_id, veterinario_id, creada_por_id, sede_id, fecha_hora, duracion_min, motivo, notas)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [mascota_id, veterinario_id, req.user.id, sedeId, fecha_hora, duracion_min || 30, motivo, notas || null]
+      `INSERT INTO citas
+         (mascota_id, veterinario_id, creada_por_id, sede_id, fecha_hora, duracion_min, motivo, notas, tipo_cita)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [mascota_id, veterinario_id, req.user.id, sedeId,
+       fecha_hora, duracion_min || 30, motivo, notas || null, tipoCitaFinal]
     );
 
     const io = req.app.get('io');
@@ -118,12 +118,21 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
 // PUT /api/v1/citas/:id
 router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
-    const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id } = req.body;
+    const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id,
+            tipo_cita } = req.body;
+
+    const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
+    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
+
     await req.db.query(
-      `UPDATE citas SET fecha_hora=?, duracion_min=?, motivo=?, notas=?, estado=?, veterinario_id=?
+      `UPDATE citas
+         SET fecha_hora=?, duracion_min=?, motivo=?, notas=?, estado=?,
+             veterinario_id=?, tipo_cita=?
        WHERE id=?`,
-      [fecha_hora, duracion_min || 30, motivo, notas || null, estado || 'pendiente', veterinario_id, req.params.id]
+      [fecha_hora, duracion_min || 30, motivo, notas || null,
+       estado || 'pendiente', veterinario_id, tipoCitaFinal, req.params.id]
     );
+
     const io = req.app.get('io');
     if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id } });
     return res.json({ success: true, message: 'Cita actualizada.' });

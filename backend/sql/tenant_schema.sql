@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS citas (
   fecha_hora     DATETIME     NOT NULL,
   duracion_min   SMALLINT     NOT NULL DEFAULT 30,
   motivo         VARCHAR(255) NOT NULL,
+  tipo_cita      ENUM('medica','vacuna','desparasitacion','estetica') NOT NULL DEFAULT 'medica' COMMENT 'Tipo de atencion para redireccion automatica',
   notas          TEXT         NULL,
   estado         ENUM('pendiente','confirmada','en_curso','completada','cancelada') NOT NULL DEFAULT 'pendiente',
   created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

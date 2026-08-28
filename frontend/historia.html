@@ -605,14 +605,50 @@ let recetaN    = 0;
 const ssMascotaId = sessionStorage.getItem('historia_mascota_id');
 const ssCitaId    = sessionStorage.getItem('historia_cita_id');
 const ssMotivo    = sessionStorage.getItem('historia_motivo');
+const ssTab       = sessionStorage.getItem('historia_tab') || 'consultas'; // ← tab destino
 sessionStorage.removeItem('historia_mascota_id');
 sessionStorage.removeItem('historia_cita_id');
 sessionStorage.removeItem('historia_motivo');
+sessionStorage.removeItem('historia_tab');
 
 initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
 
 if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
-if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
+if (ssMascotaId) {
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    cargarHistoria(parseInt(ssMascotaId));
+    // ── Abrir tab y modal correcto según tipo de cita ──────────
+    if (ssTab && ssTab !== 'consultas') {
+      // Esperar a que la mascota cargue antes de cambiar el tab
+      setTimeout(() => {
+        mostrarTab(ssTab);
+        // Abrir modal correspondiente con motivo precargado
+        if (ssTab === 'vacunas') {
+          setTimeout(() => {
+            abrirModalVacuna();
+            if (ssMotivo) {
+              var vNombre = document.getElementById('v-nombre');
+              if (vNombre && !vNombre.value) vNombre.value = ssMotivo;
+            }
+          }, 400);
+        } else if (ssTab === 'desparasitaciones') {
+          setTimeout(() => {
+            abrirModalDesparasitacion();
+            if (ssMotivo) {
+              var dNotas = document.getElementById('d-notas');
+              if (dNotas && !dNotas.value) dNotas.value = ssMotivo;
+            }
+          }, 400);
+        } else if (ssTab === 'estetica') {
+          setTimeout(() => {
+            abrirModalEstetica();
+          }, 400);
+        }
+      }, 600);
+    }
+    // Tab consultas: el comportamiento original ya abre el modal
+  }));
+}
 
 function mostrarTab(tab) {
   const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
@@ -911,10 +947,19 @@ async function guardarVacuna() {
     if (!res) return;
     const data=await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
-    toast('💉 Vacuna registrada correctamente','success');
+    toast('💉 Vacuna registrada correctamente'+(citaId?' · Cita #'+citaId+' completada':''),'success');
     closeModal('modal-vacuna');
     ['v-nombre','v-fabricante','v-lote','v-proxima','v-notas'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('v-fecha').value=fechaHoyInput();
+    // Marcar cita como completada si venimos desde atender
+    if (citaId) {
+      await api('/citas/'+citaId+'/estado',{method:'PATCH',body:{estado:'completada'}});
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      const mcb=document.getElementById('modal-cita-banner');
+      if(mcb) mcb.style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
     mostrarTab('vacunas');
   } catch { toast('Error de conexión.','danger'); }
 }
@@ -1007,8 +1052,17 @@ async function guardarDesparasitacion() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
-    toast('🐛 Desparasitación registrada correctamente', 'success');
+    toast('🐛 Desparasitación registrada correctamente'+(citaId?' · Cita #'+citaId+' completada':''), 'success');
     closeModal('modal-desparasitacion');
+    // Marcar cita como completada si venimos desde atender
+    if (citaId) {
+      await api('/citas/'+citaId+'/estado',{method:'PATCH',body:{estado:'completada'}});
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      const mcb=document.getElementById('modal-cita-banner');
+      if(mcb) mcb.style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
     mostrarTab('desparasitaciones');
   } catch { toast('Error de conexión.', 'danger'); }
 }
@@ -1297,10 +1351,19 @@ async function guardarEstetica() {
     if (_fotasAntes.length || _fotosDespues.length) {
       await subirFotosEstetica(esteticaId);
     } else {
-      toast('✂️ Servicio de estética registrado', 'success');
+      toast('✂️ Servicio de estética registrado'+(citaId?' · Cita #'+citaId+' completada':''), 'success');
     }
     closeModal('modal-estetica');
     limpiarFormEstetica();
+    // Marcar cita como completada si venimos desde atender
+    if (citaId) {
+      await api('/citas/'+citaId+'/estado',{method:'PATCH',body:{estado:'completada'}});
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      const mcb=document.getElementById('modal-cita-banner');
+      if(mcb) mcb.style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
     mostrarTab('estetica');
   } catch { toast('Error de conexión.','danger'); }
 }
