@@ -524,8 +524,8 @@ function renderEstructuraSemana(cont) {
     grid.appendChild(head);
   });
 
-  // Horas 7–21
-  for (var h=7; h<=21; h++) {
+  // Horas 0–23
+  for (var h=0; h<=23; h++) {
     var hora = document.createElement('div');
     hora.className   = 'sem-hora';
     hora.textContent = (h<10?'0':'')+h+':00';
@@ -547,6 +547,16 @@ function renderEstructuraSemana(cont) {
   wrap.appendChild(inner);
   cont.innerHTML = '';
   cont.appendChild(wrap);
+
+  // Scroll automático a la hora actual
+  setTimeout(() => scrollAHoraActual(wrap, 52), 50);
+}
+
+function scrollAHoraActual(wrapper, alturaFila) {
+  var ahora = new Date();
+  var h     = ahora.getHours();
+  var scrollY = Math.max(0, (h - 1) * alturaFila); // 1 hora antes de la actual
+  wrapper.scrollTop = scrollY;
 }
 
 // ── Vista DÍA ─────────────────────────────────────────────────────
@@ -559,7 +569,7 @@ function renderEstructuraDia(cont) {
   var grid = document.createElement('div');
   grid.className = 'dia-grid';
 
-  for (var h=7; h<=21; h++) {
+  for (var h=0; h<=23; h++) {
     var hStr = String(h).padStart(2,'0');
 
     var hora = document.createElement('div');
@@ -577,6 +587,9 @@ function renderEstructuraDia(cont) {
   wrap.appendChild(grid);
   cont.innerHTML = '';
   cont.appendChild(wrap);
+
+  // Scroll automático a la hora actual
+  setTimeout(() => scrollAHoraActual(wrap, 60), 50);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -670,7 +683,7 @@ function renderEventosSemana() {
     eventos.forEach((ev, i) => {
       var d    = new Date(ev.c.fecha_hora);
       var h    = d.getHours();
-      if (h < 7 || h > 21) return;
+      if (h < 0 || h > 23) return;
       var hStr = String(h).padStart(2,'0');
       var cell = document.getElementById('sem-ev-'+dStr+'-'+hStr);
       if (!cell) return;
