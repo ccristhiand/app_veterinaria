@@ -1,19 +1,21 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v10
--- v6: + sedes (multi-sedes) + sede_id en tablas operativas
--- v7: + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
--- v8: + pruebas_complementarias en historia_clinica
---     + eutanasia + internamiento en servicios_catalogo
---     + consentimientos_plantillas + consentimientos_generados
--- v9: + descuento_pct / descuento_monto en factura_items
---     + subtotal_bruto / descuento_items / descuento_global /
---       descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
+-- VETNETCODIP SaaS — TENANT SCHEMA v11
+-- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
+-- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
+-- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
+--       + consentimientos_plantillas + consentimientos_generados
+-- v9:  + descuento_pct / descuento_monto en factura_items
+--       + subtotal_bruto / descuento_items / descuento_global /
+--         descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
 -- v10: + turnos y asistencias (módulo de asistencia del personal)
--- Ejecutar al crear nueva clinica
+-- v11: + tipo_cita en citas (redirección automática)
+--       + precio_compra en inventario (rentabilidad)
+--       + precio_compra_snapshot en factura_items (historial rentabilidad)
+-- Ejecutar al crear nueva clínica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
 
--- ── Tabla de sedes ───────────────────────────────────────────
+-- ── Sedes ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS sedes (
   id           INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre       VARCHAR(150)  NOT NULL,
@@ -88,16 +90,18 @@ CREATE TABLE IF NOT EXISTS citas (
   fecha_hora     DATETIME     NOT NULL,
   duracion_min   SMALLINT     NOT NULL DEFAULT 30,
   motivo         VARCHAR(255) NOT NULL,
-  tipo_cita      ENUM('medica','vacuna','desparasitacion','estetica') NOT NULL DEFAULT 'medica' COMMENT 'Tipo de atencion para redireccion automatica',
+  tipo_cita      ENUM('medica','vacuna','desparasitacion','estetica') NOT NULL DEFAULT 'medica'
+                 COMMENT 'Tipo de atencion — define redireccion automatica al atender',
   notas          TEXT         NULL,
   estado         ENUM('pendiente','confirmada','en_curso','completada','cancelada') NOT NULL DEFAULT 'pendiente',
   created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (mascota_id)     REFERENCES mascotas(id) ON DELETE RESTRICT,
   FOREIGN KEY (veterinario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
   FOREIGN KEY (creada_por_id)  REFERENCES usuarios(id) ON DELETE RESTRICT,
-  INDEX idx_fecha  (fecha_hora),
-  INDEX idx_estado (estado),
-  INDEX idx_sede   (sede_id)
+  INDEX idx_fecha     (fecha_hora),
+  INDEX idx_estado    (estado),
+  INDEX idx_tipo_cita (tipo_cita),
+  INDEX idx_sede      (sede_id)
 ) ENGINE=InnoDB;
 
 -- ── Historia clínica ─────────────────────────────────────────
@@ -125,16 +129,16 @@ CREATE TABLE IF NOT EXISTS historia_clinica (
 
 -- ── Seguimientos de consulta ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS historia_seguimientos (
-  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  historia_id    INT UNSIGNED  NOT NULL,
-  veterinario_id INT UNSIGNED  NOT NULL,
-  fecha          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  evolucion      TEXT          NOT NULL,
-  tratamiento    TEXT          NULL,
-  observaciones  TEXT          NULL,
-  peso_kg        DECIMAL(6,2)  NULL,
-  temperatura_c  DECIMAL(4,1)  NULL,
-  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  historia_id    INT UNSIGNED NOT NULL,
+  veterinario_id INT UNSIGNED NOT NULL,
+  fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  evolucion      TEXT         NOT NULL,
+  tratamiento    TEXT         NULL,
+  observaciones  TEXT         NULL,
+  peso_kg        DECIMAL(6,2) NULL,
+  temperatura_c  DECIMAL(4,1) NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (historia_id)    REFERENCES historia_clinica(id) ON DELETE CASCADE,
   FOREIGN KEY (veterinario_id) REFERENCES usuarios(id)         ON DELETE RESTRICT,
   INDEX idx_historia (historia_id)
@@ -199,14 +203,18 @@ CREATE TABLE IF NOT EXISTS inventario (
   descripcion       TEXT          NULL,
   cantidad          DECIMAL(10,2) NOT NULL DEFAULT 0,
   unidad            VARCHAR(30)   NOT NULL DEFAULT 'unidad',
-  precio_unitario   DECIMAL(10,2) NULL,
+  precio_compra     DECIMAL(10,2) NOT NULL DEFAULT 0.00
+                    COMMENT 'Precio de compra al proveedor (costo)',
+  precio_unitario   DECIMAL(10,2) NULL
+                    COMMENT 'Precio de venta al cliente',
   proveedor         VARCHAR(150)  NULL,
   stock_minimo      DECIMAL(10,2) NOT NULL DEFAULT 5,
   fecha_vencimiento DATE          NULL,
   sede_id           INT UNSIGNED  NULL DEFAULT NULL,
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_sede (sede_id)
+  INDEX idx_sede        (sede_id),
+  INDEX idx_vencimiento (fecha_vencimiento)
 ) ENGINE=InnoDB;
 
 -- ── Estética ─────────────────────────────────────────────────
@@ -233,12 +241,12 @@ CREATE TABLE IF NOT EXISTS servicios_estetica (
 
 -- ── Fotos de estética ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS estetica_fotos (
-  id             INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  estetica_id    INT UNSIGNED  NOT NULL,
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  estetica_id    INT UNSIGNED NOT NULL,
   momento        ENUM('antes','despues') NOT NULL,
-  url            VARCHAR(500)  NOT NULL,
-  nombre_archivo VARCHAR(200)  NULL,
-  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  url            VARCHAR(500) NOT NULL,
+  nombre_archivo VARCHAR(200) NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (estetica_id) REFERENCES servicios_estetica(id) ON DELETE CASCADE,
   INDEX idx_estetica (estetica_id)
 ) ENGINE=InnoDB;
@@ -260,7 +268,8 @@ CREATE TABLE IF NOT EXISTS notificaciones (
 CREATE TABLE IF NOT EXISTS servicios_catalogo (
   id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre      VARCHAR(150)  NOT NULL,
-  categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio','medicamento','otro','eutanasia','internamiento') NOT NULL DEFAULT 'consulta',
+  categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio',
+                   'medicamento','otro','eutanasia','internamiento') NOT NULL DEFAULT 'consulta',
   precio      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   descripcion VARCHAR(255)  NULL,
   activo      TINYINT(1)    NOT NULL DEFAULT 1,
@@ -315,26 +324,26 @@ CREATE TABLE IF NOT EXISTS facturas (
   sede_id                  INT UNSIGNED  NULL DEFAULT NULL,
   fecha                    DATE          NOT NULL,
   -- Desglose de montos
-  subtotal_bruto           DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma bruta de items antes de descuentos',
-  descuento_items          DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma de descuentos aplicados por item',
+  subtotal_bruto           DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma bruta antes de descuentos',
+  descuento_items          DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Suma de descuentos por item',
   descuento_global         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Descuento global sobre subtotal',
   descuento_global_pct     DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Porcentaje de descuento global',
-  comision_tarjeta         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Comision bancaria informativa (no suma al total)',
+  comision_tarjeta         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Comision bancaria (informativa, no suma al total)',
   comision_tarjeta_pct     DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Porcentaje de comision bancaria',
   subtotal                 DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Base imponible sin IGV',
   igv                      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  total                    DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Total final = subtotal + IGV (sin comision)',
+  total                    DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Total = subtotal + IGV',
   -- Estado y pago
   estado                   ENUM('pendiente','pagado','anulado') NOT NULL DEFAULT 'pendiente',
   metodo_pago              ENUM('efectivo','tarjeta','transferencia','yape','plin') NULL,
   notas                    TEXT          NULL,
   observaciones            TEXT          NULL,
   anulado_por              VARCHAR(100)  NULL,
-  -- Datos factura
+  -- Datos para factura con RUC
   cliente_ruc              VARCHAR(20)   NULL,
   cliente_razon_social     VARCHAR(200)  NULL,
   cliente_direccion_fiscal VARCHAR(255)  NULL,
-  -- SUNAT / FE
+  -- SUNAT / Facturación electrónica
   sunat_estado             VARCHAR(20)   NULL DEFAULT NULL,
   sunat_hash               VARCHAR(100)  NULL,
   sunat_cdr                TEXT          NULL,
@@ -345,10 +354,10 @@ CREATE TABLE IF NOT EXISTS facturas (
   enlace_xml               VARCHAR(500)  NULL,
   created_at               TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TIMESTAMP     NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (propietario_id)  REFERENCES propietarios(id) ON DELETE RESTRICT,
-  FOREIGN KEY (mascota_id)      REFERENCES mascotas(id)     ON DELETE SET NULL,
-  FOREIGN KEY (cita_id)         REFERENCES citas(id)        ON DELETE SET NULL,
-  FOREIGN KEY (emitido_por_id)  REFERENCES usuarios(id)     ON DELETE RESTRICT,
+  FOREIGN KEY (propietario_id) REFERENCES propietarios(id) ON DELETE RESTRICT,
+  FOREIGN KEY (mascota_id)     REFERENCES mascotas(id)     ON DELETE SET NULL,
+  FOREIGN KEY (cita_id)        REFERENCES citas(id)        ON DELETE SET NULL,
+  FOREIGN KEY (emitido_por_id) REFERENCES usuarios(id)     ON DELETE RESTRICT,
   INDEX idx_fecha        (fecha),
   INDEX idx_estado       (estado),
   INDEX idx_sunat_estado (sunat_estado),
@@ -357,15 +366,20 @@ CREATE TABLE IF NOT EXISTS facturas (
 
 -- ── Items de factura ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS factura_items (
-  id              INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  factura_id      INT UNSIGNED  NOT NULL,
-  descripcion     VARCHAR(255)  NOT NULL,
-  cantidad        DECIMAL(8,2)  NOT NULL DEFAULT 1.00,
-  precio_unit     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  descuento_pct   DECIMAL(5,2)  NOT NULL DEFAULT 0.00 COMMENT 'Descuento por item en porcentaje',
-  descuento_monto DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Monto descontado en este item',
-  subtotal        DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Precio final despues del descuento',
-  inventario_id   INT UNSIGNED  NULL DEFAULT NULL,
+  id                      INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  factura_id              INT UNSIGNED  NOT NULL,
+  descripcion             VARCHAR(255)  NOT NULL,
+  cantidad                DECIMAL(8,2)  NOT NULL DEFAULT 1.00,
+  precio_unit             DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  descuento_pct           DECIMAL(5,2)  NOT NULL DEFAULT 0.00
+                          COMMENT 'Descuento por item en porcentaje',
+  descuento_monto         DECIMAL(10,2) NOT NULL DEFAULT 0.00
+                          COMMENT 'Monto descontado en este item',
+  subtotal                DECIMAL(10,2) NOT NULL DEFAULT 0.00
+                          COMMENT 'Precio final despues del descuento por item',
+  inventario_id           INT UNSIGNED  NULL DEFAULT NULL,
+  precio_compra_snapshot  DECIMAL(10,2) NOT NULL DEFAULT 0.00
+                          COMMENT 'Precio de compra al momento de la venta (para reportes de rentabilidad)',
   FOREIGN KEY (factura_id)    REFERENCES facturas(id)   ON DELETE CASCADE,
   FOREIGN KEY (inventario_id) REFERENCES inventario(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -437,7 +451,8 @@ CREATE TABLE IF NOT EXISTS carnets_digitales (
 CREATE TABLE IF NOT EXISTS consentimientos_plantillas (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(150) NOT NULL,
-  tipo       ENUM('cirugia','anestesia','procedimiento','estetica','vacunacion','otro') NOT NULL DEFAULT 'procedimiento',
+  tipo       ENUM('cirugia','anestesia','procedimiento','estetica','vacunacion','otro')
+             NOT NULL DEFAULT 'procedimiento',
   contenido  LONGTEXT     NOT NULL,
   activo     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -462,23 +477,24 @@ CREATE TABLE IF NOT EXISTS consentimientos_generados (
 
 -- ── WhatsApp ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS wa_config (
-  id                                    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  activo                                TINYINT(1)    NOT NULL DEFAULT 0,
-  codigo_pais                           VARCHAR(5)    NOT NULL DEFAULT '+51',
-  recordatorio_citas_activo             TINYINT(1)    NOT NULL DEFAULT 1,
-  recordatorio_citas_horas              INT UNSIGNED  NOT NULL DEFAULT 24,
-  recordatorio_citas_horas2             INT UNSIGNED  NULL DEFAULT 2,
-  recordatorio_vacunas_activo           TINYINT(1)    NOT NULL DEFAULT 1,
-  recordatorio_vacunas_dias             INT UNSIGNED  NOT NULL DEFAULT 7,
-  recordatorio_vacunas_dias2            INT UNSIGNED  NULL DEFAULT 1,
-  recordatorio_desparasitaciones_activo TINYINT(1)    NOT NULL DEFAULT 1,
-  updated_at                            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  id                                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  activo                                TINYINT(1)   NOT NULL DEFAULT 0,
+  codigo_pais                           VARCHAR(5)   NOT NULL DEFAULT '+51',
+  recordatorio_citas_activo             TINYINT(1)   NOT NULL DEFAULT 1,
+  recordatorio_citas_horas              INT UNSIGNED NOT NULL DEFAULT 24,
+  recordatorio_citas_horas2             INT UNSIGNED NULL DEFAULT 2,
+  recordatorio_vacunas_activo           TINYINT(1)   NOT NULL DEFAULT 1,
+  recordatorio_vacunas_dias             INT UNSIGNED NOT NULL DEFAULT 7,
+  recordatorio_vacunas_dias2            INT UNSIGNED NULL DEFAULT 1,
+  recordatorio_desparasitaciones_activo TINYINT(1)   NOT NULL DEFAULT 1,
+  updated_at                            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS wa_plantillas (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(100) NOT NULL,
-  tipo       ENUM('recordatorio_cita','recordatorio_vacuna','manual','campana','otro') NOT NULL DEFAULT 'manual',
+  tipo       ENUM('recordatorio_cita','recordatorio_vacuna','manual','campana','otro')
+             NOT NULL DEFAULT 'manual',
   contenido  TEXT         NOT NULL,
   activo     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -505,9 +521,11 @@ CREATE TABLE IF NOT EXISTS wa_campanas (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre         VARCHAR(150)   NOT NULL,
   mensaje        TEXT           NOT NULL,
-  segmento       ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d') NOT NULL DEFAULT 'todos',
+  segmento       ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
+                 NOT NULL DEFAULT 'todos',
   segmento_valor VARCHAR(50)    NULL,
-  estado         ENUM('borrador','programada','enviando','pausada','completada','cancelada') NOT NULL DEFAULT 'borrador',
+  estado         ENUM('borrador','programada','enviando','pausada','completada','cancelada')
+                 NOT NULL DEFAULT 'borrador',
   total          INT UNSIGNED   NOT NULL DEFAULT 0,
   enviados       INT UNSIGNED   NOT NULL DEFAULT 0,
   fallidos       INT UNSIGNED   NOT NULL DEFAULT 0,
@@ -537,16 +555,16 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
 
 -- ── Turnos del personal ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS turnos (
-  id           INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  usuario_id   INT UNSIGNED  NOT NULL,
-  sede_id      INT UNSIGNED  NULL DEFAULT NULL,
-  fecha        DATE          NOT NULL,
-  hora_inicio  TIME          NOT NULL,
-  hora_fin     TIME          NOT NULL,
-  notas        VARCHAR(255)  NULL,
-  created_by   INT UNSIGNED  NOT NULL,
-  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_id  INT UNSIGNED NOT NULL,
+  sede_id     INT UNSIGNED NULL DEFAULT NULL,
+  fecha       DATE         NOT NULL,
+  hora_inicio TIME         NOT NULL,
+  hora_fin    TIME         NOT NULL,
+  notas       VARCHAR(255) NULL,
+  created_by  INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE RESTRICT,
   UNIQUE KEY uk_usuario_fecha (usuario_id, fecha),
@@ -556,15 +574,15 @@ CREATE TABLE IF NOT EXISTS turnos (
 
 -- ── Asistencias del personal ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS asistencias (
-  id              INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-  turno_id        INT UNSIGNED  NOT NULL,
-  usuario_id      INT UNSIGNED  NOT NULL,
-  fecha           DATE          NOT NULL,
-  hora_marcada    TIME          NOT NULL,
-  estado          ENUM('puntual','tarde','adelantado') NOT NULL DEFAULT 'puntual',
-  minutos_diff    SMALLINT      NOT NULL DEFAULT 0,
-  ip              VARCHAR(45)   NULL,
-  created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  turno_id     INT UNSIGNED NOT NULL,
+  usuario_id   INT UNSIGNED NOT NULL,
+  fecha        DATE         NOT NULL,
+  hora_marcada TIME         NOT NULL,
+  estado       ENUM('puntual','tarde','adelantado') NOT NULL DEFAULT 'puntual',
+  minutos_diff SMALLINT     NOT NULL DEFAULT 0,
+  ip           VARCHAR(45)  NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (turno_id)   REFERENCES turnos(id)   ON DELETE CASCADE,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
   UNIQUE KEY uk_asistencia_usuario_fecha (usuario_id, fecha),
@@ -597,4 +615,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
   ('Campaña general', 'campana',
    '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v10 ✅' AS resultado;
+SELECT 'tenant_schema v11 ✅' AS resultado;
