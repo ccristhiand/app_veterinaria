@@ -559,56 +559,115 @@ function renderEventosMes() {
 function renderEventosSemana() {
   document.querySelectorAll('[id^="sem-ev-"]').forEach(el => { el.innerHTML=''; el.style.position='relative'; });
 
+  // Agrupar por día
+  var porDia = {};
   _citas.forEach(c => {
     var d    = new Date(c.fecha_hora);
     var dStr = fmt(d);
-    var h    = d.getHours();
-    if (h < 7 || h > 21) return;
-    var hStr = String(h).padStart(2,'0');
-    var cell = document.getElementById('sem-ev-'+dStr+'-'+hStr);
-    if (!cell) return;
-
-    var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
-    var min  = d.getMinutes();
-    var top  = (min / 60) * 52;
-    var dur  = Math.max((c.duracion_min||30) / 60 * 52, 20);
-
-    var div  = document.createElement('div');
-    div.className = 'sem-evento '+clsEvento(c);
-    div.style.cssText = 'top:'+top+'px;height:'+dur+'px';
-    div.title     = tipo.icon+' '+esc(c.mascota_nombre)+' '+fTime(c.fecha_hora);
-    div.innerHTML = '<strong>'+fTime(c.fecha_hora)+'</strong> '+tipo.icon+' '+esc(c.mascota_nombre);
-    div.onclick   = e => { e.stopPropagation(); verCita(c); };
-    cell.appendChild(div);
+    if (!porDia[dStr]) porDia[dStr] = [];
+    porDia[dStr].push({
+      c,
+      inicio: d.getHours()*60 + d.getMinutes(),
+      fin:    d.getHours()*60 + d.getMinutes() + (c.duracion_min||30),
+    });
   });
+
+  Object.entries(porDia).forEach(([dStr, eventos]) => {
+    var columnas = asignarColumnas(eventos);
+
+    eventos.forEach((ev, i) => {
+      var d    = new Date(ev.c.fecha_hora);
+      var h    = d.getHours();
+      if (h < 7 || h > 21) return;
+      var hStr = String(h).padStart(2,'0');
+      var cell = document.getElementById('sem-ev-'+dStr+'-'+hStr);
+      if (!cell) return;
+
+      var tipo  = TIPOS[ev.c.tipo_cita] || TIPOS.medica;
+      var min   = d.getMinutes();
+      var top   = (min / 60) * 52;
+      var dur   = Math.max((ev.c.duracion_min||30) / 60 * 52, 20);
+      var col   = columnas[i].col;
+      var total = columnas[i].total;
+      var width = 100 / total;
+      var left  = col * width;
+
+      var div = document.createElement('div');
+      div.className = 'sem-evento '+clsEvento(ev.c);
+      div.style.cssText = 'top:'+top+'px;height:'+dur+'px;left:'+left+'%;width:'+(width-1)+'%;right:auto';
+      div.title     = tipo.icon+' '+esc(ev.c.mascota_nombre)+' '+fTime(ev.c.fecha_hora);
+      div.innerHTML = '<strong>'+fTime(ev.c.fecha_hora)+'</strong> '+tipo.icon+' '+esc(ev.c.mascota_nombre);
+      div.onclick   = e => { e.stopPropagation(); verCita(ev.c); };
+      cell.appendChild(div);
+    });
+  });
+}
+
+// ── Helper: asignar columnas a eventos que se solapan ────────────
+function asignarColumnas(eventos) {
+  var result = eventos.map(() => ({ col:0, total:1 }));
+  // Para cada evento encontrar cuántos se solapan con él
+  for (var i=0; i<eventos.length; i++) {
+    var grupo = [i];
+    for (var j=0; j<eventos.length; j++) {
+      if (i===j) continue;
+      // Hay solapamiento si los rangos se intersectan
+      if (eventos[i].inicio < eventos[j].fin && eventos[i].fin > eventos[j].inicio) {
+        grupo.push(j);
+      }
+    }
+    // Asignar columna a cada uno del grupo
+    grupo.forEach((idx, pos) => {
+      result[idx].col   = pos;
+      result[idx].total = grupo.length;
+    });
+  }
+  return result;
 }
 
 // ── Eventos DÍA ───────────────────────────────────────────────────
 function renderEventosDia() {
   document.querySelectorAll('[id^="dia-ev-"]').forEach(el => { el.innerHTML=''; el.style.position='relative'; });
 
-  _citas.forEach(c => {
-    var d    = new Date(c.fecha_hora);
-    var dStr = fmt(d);
+  var dStr    = fmt(_fechaBase);
+  var eventos = _citas
+    .filter(c => {
+      var d = new Date(c.fecha_hora);
+      return fmt(d)===dStr && d.getHours()>=7 && d.getHours()<=21;
+    })
+    .map(c => {
+      var d = new Date(c.fecha_hora);
+      return { c, inicio: d.getHours()*60+d.getMinutes(), fin: d.getHours()*60+d.getMinutes()+(c.duracion_min||30) };
+    });
+
+  var columnas = asignarColumnas(eventos);
+
+  eventos.forEach((ev, i) => {
+    var d    = new Date(ev.c.fecha_hora);
     var h    = d.getHours();
-    if (h < 7 || h > 21) return;
     var hStr = String(h).padStart(2,'0');
     var cell = document.getElementById('dia-ev-'+dStr+'-'+hStr);
     if (!cell) return;
 
-    var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
-    var min  = d.getMinutes();
-    var top  = (min / 60) * 60;
-    var dur  = Math.max((c.duracion_min||30) / 60 * 60, 24);
+    var tipo   = TIPOS[ev.c.tipo_cita] || TIPOS.medica;
+    var min    = d.getMinutes();
+    var top    = (min / 60) * 60;
+    var dur    = Math.max((ev.c.duracion_min||30) / 60 * 60, 28);
+    var col    = columnas[i].col;
+    var total  = columnas[i].total;
+    var width  = 100 / total;
+    var left   = col * width;
 
-    var div  = document.createElement('div');
-    div.className = 'dia-evento '+clsEvento(c);
-    div.style.cssText = 'top:'+top+'px;height:'+dur+'px';
+    var div = document.createElement('div');
+    div.className = 'dia-evento '+clsEvento(ev.c);
+    div.style.cssText = 'top:'+top+'px;height:'+dur+'px;left:'+left+'%;width:'+(width-1)+'%;right:auto';
     div.innerHTML =
-      '<p style="font-weight:700;font-size:.72rem">'+tipo.icon+' '+fTime(c.fecha_hora)+' · '+esc(c.mascota_nombre)+'</p>'+
-      '<p style="font-size:.65rem;opacity:.85">'+esc(c.propietario_nombre||'')+'</p>'+
-      '<p style="font-size:.65rem;opacity:.75">🩺 '+esc(c.veterinario_nombre||'')+'</p>';
-    div.onclick = e => { e.stopPropagation(); verCita(c); };
+      '<p style="font-weight:700;font-size:.72rem">'+tipo.icon+' '+fTime(ev.c.fecha_hora)+' · '+esc(ev.c.mascota_nombre)+'</p>'+
+      (total===1
+        ? '<p style="font-size:.65rem;opacity:.85">'+esc(ev.c.propietario_nombre||'')+'</p>'+
+          '<p style="font-size:.65rem;opacity:.75">🩺 '+esc(ev.c.veterinario_nombre||'')+'</p>'
+        : '');
+    div.onclick = e => { e.stopPropagation(); verCita(ev.c); };
     cell.appendChild(div);
   });
 }
