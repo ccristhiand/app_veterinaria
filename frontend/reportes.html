@@ -187,7 +187,13 @@ function sedeStatCard(icon, valor, label, pct, color) {
 }
 
 
-var _reporteSedeActiva = null;
+var _filtroRent = 'todos';
+
+function cambiarFiltroRent(filtro) {
+  _filtroRent = filtro;
+  delete datosReporte['rentabilidad'];
+  cargarTab('rentabilidad');
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'reportes', title:'Reportes', subtitle:'Análisis y estadísticas' });
@@ -247,8 +253,9 @@ async function cargarTab(tab) {
 
   try {
     let endpoint = tab === 'veterinarios' ? 'veterinarios' : tab;
-    const sedeParam = _reporteSedeActiva ? `&sede_id=${_reporteSedeActiva}` : '';
-    const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}${sedeParam}`);
+    const sedeParam   = _reporteSedeActiva ? `&sede_id=${_reporteSedeActiva}` : '';
+    const filtroParam = tab === 'rentabilidad' ? `&filtro=${_filtroRent}` : '';
+    const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}${sedeParam}${filtroParam}`);
     if (!res?.ok) { cont.innerHTML=`<div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div>`; return; }
     const d = (await res.json()).data;
     datosReporte[tab] = d;
@@ -1141,79 +1148,114 @@ function descargarPDF() {
 
 // ── RENTABILIDAD ──────────────────────────────────────────────────
 function renderRentabilidad(d) {
-  const k        = d.kpis || {};
-  const ingreso  = parseFloat(k.ingreso_total || 0);
-  const costo    = parseFloat(k.costo_total   || 0);
-  const ganancia = parseFloat(k.ganancia_neta || 0);
-  const margen   = parseFloat(k.margen_pct    || 0);
-  const colorM   = margen>=50?'#15803d':margen>=20?'#b45309':'#be123c';
-  const maxGan   = Math.max(...(d.porDia||[]).map(x=>parseFloat(x.ganancia)||0), 1);
+  var k       = d.kpis || {};
+  var ingreso  = parseFloat(k.ingreso_total || 0);
+  var costo    = parseFloat(k.costo_total   || 0);
+  var ganancia = parseFloat(k.ganancia_neta || 0);
+  var margen   = parseFloat(k.margen_pct    || 0);
+  var colorM   = margen>=50?'#15803d':margen>=20?'#b45309':'#be123c';
+  var maxGan   = Math.max.apply(null, (d.porDia||[]).map(function(x){ return parseFloat(x.ganancia)||0; }).concat([1]));
+  var filtro   = d.filtro || 'todos';
 
-  return `
-    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:.85rem;
-      padding:.75rem 1rem;margin-bottom:1.3rem;font-size:.78rem;color:#c2410c">
-      ℹ️ Solo incluye productos de inventario con <strong>precio de compra</strong> registrado.
-      Servicios sin costo registrado no se contabilizan en el costo total.
-    </div>
+  var avisos = {
+    todos     : 'Mostrando <strong>todos los ítems</strong>. El costo aplica solo a productos con precio de compra; los servicios se muestran con ganancia al 100%.',
+    productos : 'Mostrando solo <strong>productos de inventario</strong> con precio de compra registrado.',
+    servicios : 'Mostrando solo <strong>servicios</strong> (consultas, vacunas, baños, etc.).',
+  };
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
-      ${kpi('S/. '+ingreso.toFixed(2),   'Ingreso total',   '#1d4ed8')}
-      ${kpi('S/. '+costo.toFixed(2),     'Costo total',     '#be123c')}
-      ${kpi('S/. '+ganancia.toFixed(2),  'Ganancia neta',   '#15803d')}
-      ${kpi(margen.toFixed(1)+'%',       'Margen promedio', colorM)}
-    </div>
+  var html = '';
 
-    <div class="vcard vcard-pad" style="margin-bottom:1.3rem">
-      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">📈 Ganancia por día</h3>
-      <div style="display:flex;flex-direction:column;gap:.5rem">
-        ${(d.porDia||[]).map(dia => {
-          var ing = parseFloat(dia.ingreso||0);
-          var cos = parseFloat(dia.costo||0);
-          var gan = parseFloat(dia.ganancia||0);
-          var pct = maxGan > 0 ? Math.max((gan/maxGan)*100, 2).toFixed(0) : 0;
-          var col = gan >= 0 ? '#15803d' : '#be123c';
-          return `<div style="display:flex;align-items:center;gap:.75rem">
-            <span style="font-size:.72rem;color:var(--ink-faint);font-family:monospace;min-width:70px">${fDate(dia.dia)}</span>
-            <div style="flex:1"><div style="background:#f0f0f0;border-radius:999px;height:8px;overflow:hidden">
-              <div style="height:100%;border-radius:999px;background:${col};width:${pct}%"></div>
-            </div></div>
-            <div style="text-align:right;min-width:130px">
-              <span style="font-size:.78rem;font-weight:700;color:${col}">S/. ${gan.toFixed(2)}</span>
-              <span style="font-size:.65rem;color:var(--ink-faint);display:block">Ing: S/.${ing.toFixed(2)} · Costo: S/.${cos.toFixed(2)}</span>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
+  // ── Filtros ──
+  html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">';
+  ['todos','productos','servicios'].forEach(function(f) {
+    var labels = { todos:'📊 Todos', productos:'📦 Solo productos', servicios:'🩺 Solo servicios' };
+    var cls = filtro===f ? 'vbtn vbtn-primary' : 'vbtn vbtn-ghost';
+    html += '<button onclick="cambiarFiltroRent(\''+f+'\')" class="'+cls+'" style="font-size:.8rem;padding:.4rem .9rem">'+labels[f]+'</button>';
+  });
+  html += '</div>';
 
-    <div class="vcard vcard-pad">
-      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">🏆 Productos más rentables</h3>
-      ${d.topProductos?.length ? `
-      <table class="rep-table">
-        <thead><tr>
-          <th>Producto</th>
-          <th style="text-align:right">Cantidad</th>
-          <th style="text-align:right">Ingreso</th>
-          <th style="text-align:right">Costo</th>
-          <th style="text-align:right">Ganancia</th>
-          <th style="text-align:right">Margen</th>
-        </tr></thead>
-        <tbody>
-          ${(d.topProductos||[]).map(p => {
-            var mar = parseFloat(p.margen_pct||0);
-            var colM = mar>=50?'#15803d':mar>=20?'#b45309':'#be123c';
-            return `<tr>
-              <td style="font-weight:600">${esc(p.descripcion)}</td>
-              <td style="text-align:right">${parseFloat(p.cantidad_total).toFixed(2)}</td>
-              <td style="text-align:right">S/. ${parseFloat(p.ingreso_total).toFixed(2)}</td>
-              <td style="text-align:right;color:#be123c">S/. ${parseFloat(p.costo_total).toFixed(2)}</td>
-              <td style="text-align:right;font-weight:700;color:#15803d">S/. ${parseFloat(p.ganancia).toFixed(2)}</td>
-              <td style="text-align:right;font-weight:700;color:${colM}">${mar.toFixed(1)}%</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>` : '<div class="vempty" style="padding:2rem">Sin datos de rentabilidad para el período.<br/><small style="color:var(--ink-faint)">Registra precios de compra en el inventario para ver este reporte.</small></div>'}
-    </div>`;
+  // ── Aviso ──
+  html += '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:.85rem;padding:.75rem 1rem;margin-bottom:1.3rem;font-size:.78rem;color:#c2410c">ℹ️ '+(avisos[filtro]||'')+'</div>';
+
+  // ── KPIs ──
+  html += '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem">';
+  html += kpi('S/. '+ingreso.toFixed(2),  'Ingreso total',   '#1d4ed8');
+  html += kpi('S/. '+costo.toFixed(2),    'Costo total',     '#be123c');
+  html += kpi('S/. '+ganancia.toFixed(2), 'Ganancia neta',   '#15803d');
+  html += kpi(margen.toFixed(1)+'%',      'Margen promedio', colorM);
+  html += '</div>';
+
+  // ── Ganancia por día ──
+  html += '<div class="vcard vcard-pad" style="margin-bottom:1.3rem">';
+  html += '<h3 style="font-family:\'Playfair Display\',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">📈 Ganancia por día</h3>';
+  html += '<div style="display:flex;flex-direction:column;gap:.5rem">';
+  (d.porDia||[]).forEach(function(dia) {
+    var ing = parseFloat(dia.ingreso||0);
+    var cos = parseFloat(dia.costo||0);
+    var gan = parseFloat(dia.ganancia||0);
+    var pct = maxGan > 0 ? Math.max((gan/maxGan)*100, 2).toFixed(0) : 0;
+    var col = gan >= 0 ? '#15803d' : '#be123c';
+    html += '<div style="display:flex;align-items:center;gap:.75rem">';
+    html += '<span style="font-size:.72rem;color:var(--ink-faint);font-family:monospace;min-width:70px">'+fDate(dia.dia)+'</span>';
+    html += '<div style="flex:1"><div style="background:#f0f0f0;border-radius:999px;height:8px;overflow:hidden">';
+    html += '<div style="height:100%;border-radius:999px;background:'+col+';width:'+pct+'%"></div></div></div>';
+    html += '<div style="text-align:right;min-width:140px">';
+    html += '<span style="font-size:.78rem;font-weight:700;color:'+col+'">S/. '+gan.toFixed(2)+'</span>';
+    html += '<span style="font-size:.65rem;color:var(--ink-faint);display:block">Ing: S/.'+ing.toFixed(2)+' · Costo: S/.'+cos.toFixed(2)+'</span>';
+    html += '</div></div>';
+  });
+  html += '</div></div>';
+
+  // ── Top productos ──
+  if (filtro !== 'servicios') {
+    html += '<div class="vcard vcard-pad" style="margin-bottom:1.3rem">';
+    html += '<h3 style="font-family:\'Playfair Display\',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">🏆 Productos más rentables</h3>';
+    if (d.topProductos && d.topProductos.length) {
+      html += '<table class="rep-table"><thead><tr>';
+      html += '<th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Ingreso</th>';
+      html += '<th style="text-align:right">Costo</th><th style="text-align:right">Ganancia</th><th style="text-align:right">Margen</th>';
+      html += '</tr></thead><tbody>';
+      (d.topProductos||[]).forEach(function(p) {
+        var mar  = parseFloat(p.margen_pct||0);
+        var colM = mar>=50?'#15803d':mar>=20?'#b45309':'#be123c';
+        html += '<tr>';
+        html += '<td style="font-weight:600">'+esc(p.descripcion)+'</td>';
+        html += '<td style="text-align:right">'+parseFloat(p.cantidad_total).toFixed(2)+'</td>';
+        html += '<td style="text-align:right">S/. '+parseFloat(p.ingreso_total).toFixed(2)+'</td>';
+        html += '<td style="text-align:right;color:#be123c">S/. '+parseFloat(p.costo_total).toFixed(2)+'</td>';
+        html += '<td style="text-align:right;font-weight:700;color:#15803d">S/. '+parseFloat(p.ganancia).toFixed(2)+'</td>';
+        html += '<td style="text-align:right;font-weight:700;color:'+colM+'">'+mar.toFixed(1)+'%</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<div class="vempty" style="padding:1.5rem">Sin productos con precio de compra registrado.<br/>';
+      html += '<small style="color:var(--ink-faint)">Actualiza los precios de compra en el inventario.</small></div>';
+    }
+    html += '</div>';
+  }
+
+  // ── Top servicios ──
+  if (filtro !== 'productos' && d.topServicios && d.topServicios.length) {
+    html += '<div class="vcard vcard-pad">';
+    html += '<h3 style="font-family:\'Playfair Display\',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">🩺 Servicios más facturados</h3>';
+    html += '<table class="rep-table"><thead><tr>';
+    html += '<th>Servicio</th><th style="text-align:right">Cant.</th>';
+    html += '<th style="text-align:right">Ingreso total</th><th style="text-align:right">Ganancia</th>';
+    html += '</tr></thead><tbody>';
+    (d.topServicios||[]).forEach(function(s) {
+      html += '<tr>';
+      html += '<td style="font-weight:600">'+esc(s.descripcion)+'</td>';
+      html += '<td style="text-align:right">'+parseFloat(s.cantidad_total).toFixed(2)+'</td>';
+      html += '<td style="text-align:right">S/. '+parseFloat(s.ingreso_total).toFixed(2)+'</td>';
+      html += '<td style="text-align:right;font-weight:700;color:#15803d">S/. '+parseFloat(s.ingreso_total).toFixed(2);
+      html += '<span style="font-size:.65rem;color:var(--ink-faint);display:block">100% margen</span></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  return html;
 }
 </script>
 </body>
