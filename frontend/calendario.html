@@ -48,9 +48,10 @@
                 height:52px;position:relative;cursor:pointer;transition:background .1s; }
     .sem-cell:hover { background:#f0fdf4; }
     .sem-cell.hoy-col { background:#f8fffe; }
-    .sem-evento { position:absolute;left:2px;right:2px;border-radius:.35rem;padding:.15rem .35rem;
+    .sem-evento { position:absolute;left:2px;right:2px;border-radius:.35rem;padding:.12rem .35rem;
                   font-size:.62rem;overflow:hidden;cursor:pointer;z-index:5;line-height:1.3;
-                  transition:opacity .12s;border:1px solid rgba(0,0,0,.08); }
+                  transition:opacity .12s;border:1px solid rgba(0,0,0,.08);
+                  display:flex;align-items:center;gap:.2rem;white-space:nowrap; }
     .sem-evento:hover { opacity:.85;z-index:10; }
 
     /* DÍA */
@@ -60,16 +61,38 @@
                 position:relative;top:-10px; }
     .dia-cell { border-bottom:1px solid #f0f0f0;height:60px;position:relative;cursor:pointer;transition:background .1s; }
     .dia-cell:hover { background:#f0fdf4; }
-    .dia-evento { position:absolute;left:4px;right:4px;border-radius:.45rem;padding:.25rem .5rem;
-                  font-size:.72rem;cursor:pointer;z-index:5;line-height:1.4;border:1px solid rgba(0,0,0,.08);
-                  transition:all .12s; }
+    .dia-evento { position:absolute;left:4px;right:4px;border-radius:.45rem;padding:.2rem .45rem;
+                  font-size:.72rem;cursor:pointer;z-index:5;line-height:1.35;border:1px solid rgba(0,0,0,.08);
+                  transition:all .12s;overflow:hidden;display:flex;flex-direction:column;justify-content:center; }
     .dia-evento:hover { opacity:.85;z-index:10;transform:translateX(2px); }
+
+    /* LISTA (móvil) */
+    .lista-item { display:flex;align-items:flex-start;gap:.75rem;padding:.9rem 1rem;
+                  border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s; }
+    .lista-item:hover { background:#f8fdf8; }
+    .lista-item:last-child { border-bottom:none; }
+    .lista-hora { font-size:.78rem;font-weight:700;font-family:monospace;min-width:48px;
+                  color:var(--ink-soft);padding-top:.15rem; }
+    .lista-dot  { width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:.35rem; }
+    .lista-info { flex:1;min-width:0; }
 
     /* Botones vista */
     .vista-btn { padding:.4rem .85rem;border:1.5px solid var(--line);border-radius:.7rem;
                  font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;
                  background:#fff;color:var(--ink);transition:all .15s; }
     .vista-btn.activa { background:#15803d;color:#fff;border-color:#15803d; }
+
+    /* Ocultar vistas semana/día en móvil */
+    @media (max-width:639px) {
+      #vbtn-semana, #vbtn-dia { display:none; }
+      .mes-cell { min-height:54px; }
+      .mes-evento { display:none; } /* en móvil solo puntos */
+      .mes-dot-wrap { display:flex;gap:2px;flex-wrap:wrap;margin-top:2px; }
+      .mes-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+    }
+    @media (min-width:640px) {
+      .mes-dot-wrap { display:none; }
+    }
 
     /* Tipo selector en modal */
     .tipo-btn-cal { display:flex;flex-direction:column;align-items:center;gap:.3rem;
@@ -93,27 +116,26 @@
 <div id="main-content" class="page" style="overflow:hidden;display:flex;flex-direction:column">
 
   <!-- ── Cabecera ── -->
-  <div class="page-head" style="flex-wrap:wrap;gap:.75rem;flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
-      <!-- Navegación -->
-      <button onclick="navAnterior()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">◀</button>
-      <button onclick="navSiguiente()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">▶</button>
-      <button onclick="irHoy()" class="vbtn vbtn-ghost" style="font-size:.8rem">Hoy</button>
-      <h3 id="cal-titulo" style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;min-width:220px">—</h3>
+  <div class="page-head" style="flex-wrap:wrap;gap:.6rem;flex-shrink:0;padding-bottom:.6rem">
+    <!-- Fila 1: navegación + título -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;flex:1;min-width:0">
+      <button onclick="navAnterior()" class="vbtn vbtn-ghost" style="padding:.4rem .75rem">◀</button>
+      <button onclick="navSiguiente()" class="vbtn vbtn-ghost" style="padding:.4rem .75rem">▶</button>
+      <button onclick="irHoy()" class="vbtn vbtn-ghost" style="font-size:.78rem;padding:.4rem .7rem">Hoy</button>
+      <h3 id="cal-titulo" style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</h3>
     </div>
-    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-left:auto">
-      <!-- Filtros -->
-      <select id="f-vet" class="vinput" style="width:auto;font-size:.78rem" onchange="cargarCitas()">
+    <!-- Fila 2: filtros + vistas + botón -->
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%">
+      <select id="f-vet" class="vinput" style="flex:1;min-width:140px;font-size:.78rem" onchange="cargarCitas()">
         <option value="">Todos los veterinarios</option>
       </select>
-      <div id="f-sede-wrap"></div>
-      <!-- Vistas -->
-      <div style="display:flex;gap:.3rem">
-        <button class="vista-btn activa" id="vbtn-mes"    onclick="cambiarVista('mes')">Mes</button>
-        <button class="vista-btn"        id="vbtn-semana" onclick="cambiarVista('semana')">Semana</button>
-        <button class="vista-btn"        id="vbtn-dia"    onclick="cambiarVista('dia')">Día</button>
+      <div id="f-sede-wrap" style="flex:1;min-width:120px"></div>
+      <div style="display:flex;gap:.25rem;flex-shrink:0">
+        <button class="vista-btn activa" id="vbtn-mes"    onclick="cambiarVista('mes')"    style="font-size:.75rem;padding:.35rem .7rem">Mes</button>
+        <button class="vista-btn"        id="vbtn-semana" onclick="cambiarVista('semana')" style="font-size:.75rem;padding:.35rem .7rem">Semana</button>
+        <button class="vista-btn"        id="vbtn-dia"    onclick="cambiarVista('dia')"    style="font-size:.75rem;padding:.35rem .7rem">Día</button>
       </div>
-      <button onclick="abrirNuevaCita()" class="vbtn vbtn-primary">＋ Nueva Cita</button>
+      <button onclick="abrirNuevaCita()" class="vbtn vbtn-primary" style="font-size:.8rem;padding:.45rem .9rem;flex-shrink:0">＋ Cita</button>
     </div>
   </div>
 
@@ -304,6 +326,13 @@ initPage({ activePage:'calendario', title:'Calendario de Citas', subtitle:'Vista
   // Cargar veterinarios para filtro y modal
   await cargarVets();
 
+  // Re-render al cambiar tamaño de ventana (desktop ↔ móvil)
+  var _resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => { renderCalendario(); renderEventos(); }, 200);
+  });
+
   // Socket tiempo real
   getSocket().on('cita:nueva',       () => cargarCitas());
   getSocket().on('cita:actualizada', () => cargarCitas());
@@ -401,9 +430,12 @@ function renderCalendario() {
   document.getElementById('cal-loading').style.display = 'none';
   cont.style.display = 'block';
 
-  if (_vista === 'mes')    renderEstructuraMes(cont);
-  else if (_vista === 'semana') renderEstructuraSemana(cont);
-  else                     renderEstructuraDia(cont);
+  var esMobil = window.innerWidth < 640;
+
+  if (_vista === 'mes')         renderEstructuraMes(cont);
+  else if (_vista === 'semana' && !esMobil) renderEstructuraSemana(cont);
+  else if (_vista === 'dia'    && !esMobil) renderEstructuraDia(cont);
+  else                          renderEstructuraLista(cont); // semana/día en móvil → lista
 }
 
 function actualizarTitulo() {
@@ -508,9 +540,11 @@ function renderEstructuraDia(cont) {
 // RENDER EVENTOS SOBRE LA ESTRUCTURA
 // ══════════════════════════════════════════════════════════════════
 function renderEventos() {
-  if (_vista === 'mes')    renderEventosMes();
-  else if (_vista === 'semana') renderEventosSemana();
-  else                     renderEventosDia();
+  var esMobil = window.innerWidth < 640;
+  if (_vista === 'mes')                          renderEventosMes();
+  else if (_vista === 'semana' && !esMobil)      renderEventosSemana();
+  else if (_vista === 'dia'    && !esMobil)      renderEventosDia();
+  else                                           renderEventosLista();
 }
 
 function clsEvento(c) {
@@ -518,39 +552,54 @@ function clsEvento(c) {
   return 'ev-'+(c.tipo_cita||'medica');
 }
 
-// ── Eventos MES ───────────────────────────────────────────────────
 function renderEventosMes() {
-  // Limpiar todos los contenedores de eventos
   document.querySelectorAll('[id^="mes-ev-"]').forEach(el => el.innerHTML = '');
 
-  // Agrupar por fecha
+  var esMobil = window.innerWidth < 640;
   var porFecha = {};
   _citas.forEach(c => {
-    var d = new Date(c.fecha_hora);
-    var dStr = fmt(d);
+    var dStr = fmt(new Date(c.fecha_hora));
     if (!porFecha[dStr]) porFecha[dStr] = [];
     porFecha[dStr].push(c);
   });
 
+  var dotColor = { medica:'#16a34a', vacuna:'#7c3aed', desparasitacion:'#ca8a04', estetica:'#db2777', completada:'#9ca3af', cancelada:'#f43f5e' };
+
   Object.entries(porFecha).forEach(([dStr, citas]) => {
     var cont = document.getElementById('mes-ev-'+dStr);
     if (!cont) return;
-    var MAX = 3;
-    citas.slice(0,MAX).forEach(c => {
-      var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
-      var div  = document.createElement('div');
-      div.className = 'mes-evento '+clsEvento(c);
-      div.title     = tipo.icon+' '+esc(c.mascota_nombre)+' · '+fTime(c.fecha_hora);
-      div.textContent = tipo.icon+' '+fTime(c.fecha_hora)+' '+esc(c.mascota_nombre);
-      div.onclick   = e => { e.stopPropagation(); verCita(c); };
-      cont.appendChild(div);
-    });
-    if (citas.length > MAX) {
-      var mas = document.createElement('div');
-      mas.className = 'mes-mas';
-      mas.textContent = '+'+( citas.length-MAX)+' más';
-      mas.onclick = e => { e.stopPropagation(); mostrarTodasDia(dStr, citas); };
-      cont.appendChild(mas);
+
+    if (esMobil) {
+      // Móvil: puntos de color
+      var dotWrap = document.createElement('div');
+      dotWrap.className = 'mes-dot-wrap';
+      citas.slice(0,4).forEach(c => {
+        var color = ['completada','cancelada'].includes(c.estado) ? dotColor[c.estado] : dotColor[c.tipo_cita||'medica'];
+        var dot   = document.createElement('div');
+        dot.className   = 'mes-dot';
+        dot.style.background = color;
+        dotWrap.appendChild(dot);
+      });
+      cont.appendChild(dotWrap);
+    } else {
+      // Desktop: etiquetas de texto
+      var MAX = 3;
+      citas.slice(0,MAX).forEach(c => {
+        var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
+        var div  = document.createElement('div');
+        div.className   = 'mes-evento '+clsEvento(c);
+        div.title       = tipo.icon+' '+esc(c.mascota_nombre)+' · '+fTime(c.fecha_hora);
+        div.textContent = tipo.icon+' '+fTime(c.fecha_hora)+' '+esc(c.mascota_nombre);
+        div.onclick     = e => { e.stopPropagation(); verCita(c); };
+        cont.appendChild(div);
+      });
+      if (citas.length > MAX) {
+        var mas = document.createElement('div');
+        mas.className   = 'mes-mas';
+        mas.textContent = '+'+(citas.length-MAX)+' más';
+        mas.onclick     = e => { e.stopPropagation(); mostrarTodasDia(dStr, citas); };
+        cont.appendChild(mas);
+      }
     }
   });
 }
@@ -661,21 +710,101 @@ function renderEventosDia() {
     var div = document.createElement('div');
     div.className = 'dia-evento '+clsEvento(ev.c);
     div.style.cssText = 'top:'+top+'px;height:'+dur+'px;left:'+left+'%;width:'+(width-1)+'%;right:auto';
-    div.innerHTML =
-      '<p style="font-weight:700;font-size:.72rem">'+tipo.icon+' '+fTime(ev.c.fecha_hora)+' · '+esc(ev.c.mascota_nombre)+'</p>'+
-      (total===1
-        ? '<p style="font-size:.65rem;opacity:.85">'+esc(ev.c.propietario_nombre||'')+'</p>'+
-          '<p style="font-size:.65rem;opacity:.75">🩺 '+esc(ev.c.veterinario_nombre||'')+'</p>'
-        : '');
+
+    // Mostrar más info solo si hay espacio suficiente
+    var linea1 = '<p style="font-weight:700;font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tipo.icon+' '+fTime(ev.c.fecha_hora)+' · '+esc(ev.c.mascota_nombre)+'</p>';
+    var linea2 = dur >= 40 ? '<p style="font-size:.63rem;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ev.c.propietario_nombre||'')+'</p>' : '';
+    var linea3 = dur >= 54 && total===1 ? '<p style="font-size:.63rem;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🩺 '+esc(ev.c.veterinario_nombre||'')+'</p>' : '';
+    div.innerHTML = linea1 + linea2 + linea3;
     div.onclick = e => { e.stopPropagation(); verCita(ev.c); };
     cell.appendChild(div);
   });
 }
 
-// ══════════════════════════════════════════════════════════════════
-// CLIC EN CELDA VACÍA → NUEVA CITA
-// ══════════════════════════════════════════════════════════════════
-function clicCeldaMes(fecha) { abrirNuevaCita(fecha, '09:00'); }
+// ── Vista LISTA (móvil — semana/día) ─────────────────────────────
+function renderEstructuraLista(cont) {
+  var hoy  = hoyStr();
+  var dStr = _vista==='dia' ? fmt(_fechaBase) : hoy;
+  _listaFecha = dStr;
+
+  var d    = new Date(dStr+'T12:00:00');
+  var label = d.toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  label = label.charAt(0).toUpperCase()+label.slice(1);
+
+  cont.innerHTML =
+    '<div style="padding:.75rem 1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:.5rem">' +
+      '<button onclick="navListaDia(-1)" style="background:none;border:1px solid var(--line);border-radius:.5rem;padding:.3rem .7rem;cursor:pointer;font-size:.88rem">◀</button>' +
+      '<p style="font-size:.82rem;font-weight:700;color:var(--ink);text-align:center;flex:1">'+esc(label)+'</p>' +
+      '<button onclick="navListaDia(1)" style="background:none;border:1px solid var(--line);border-radius:.5rem;padding:.3rem .7rem;cursor:pointer;font-size:.88rem">▶</button>' +
+    '</div>' +
+    '<div id="lista-eventos" style="overflow-y:auto;max-height:calc(100vh - 260px)">' +
+      '<div class="vempty" style="padding:2rem"><div class="vspinner"></div></div>' +
+    '</div>' +
+    '<div style="padding:.75rem 1rem;border-top:1px solid var(--line)">' +
+      '<button onclick="abrirNuevaCita(\''+dStr+'\')" class="vbtn vbtn-primary" style="width:100%;font-size:.84rem">＋ Nueva cita para hoy</button>' +
+    '</div>';
+}
+
+var _listaFecha = '';
+
+function navListaDia(dir) {
+  var d = new Date(_listaFecha+'T12:00:00');
+  d.setDate(d.getDate()+dir);
+  _fechaBase = d;
+  renderCalendario();
+  cargarCitas();
+}
+
+function renderEventosLista() {
+  var cont = document.getElementById('lista-eventos');
+  if (!cont) return;
+
+  var citasHoy = _citas
+    .filter(c => fmt(new Date(c.fecha_hora)) === _listaFecha)
+    .sort((a,b) => new Date(a.fecha_hora) - new Date(b.fecha_hora));
+
+  if (!citasHoy.length) {
+    cont.innerHTML =
+      '<div style="text-align:center;padding:2.5rem 1rem;color:var(--ink-faint)">' +
+        '<p style="font-size:2rem;margin-bottom:.5rem">📭</p>' +
+        '<p style="font-size:.85rem;font-weight:600">Sin citas para este día</p>' +
+        '<p style="font-size:.75rem;margin-top:.3rem">Toca el botón para agendar una.</p>' +
+      '</div>';
+    return;
+  }
+
+  var dotColor = { medica:'#16a34a', vacuna:'#7c3aed', desparasitacion:'#ca8a04', estetica:'#db2777', completada:'#9ca3af', cancelada:'#f43f5e' };
+
+  cont.innerHTML = citasHoy.map(c => {
+    var tipo  = TIPOS[c.tipo_cita] || TIPOS.medica;
+    var color = ['completada','cancelada'].includes(c.estado) ? dotColor[c.estado] : dotColor[c.tipo_cita||'medica'];
+    var cls   = ['completada','cancelada'].includes(c.estado) ? 'ev-'+c.estado : 'ev-'+(c.tipo_cita||'medica');
+    return '<div class="lista-item '+cls+'" onclick="verCita('+JSON.stringify(JSON.stringify(c))+')" '+
+      'style="border-left:none;background:none">' +
+      '<div class="lista-hora">'+fTime(c.fecha_hora)+'</div>' +
+      '<div class="lista-dot" style="background:'+color+'"></div>' +
+      '<div class="lista-info">' +
+        '<p style="font-weight:700;font-size:.88rem">'+tipo.icon+' '+esc(c.mascota_nombre)+'</p>' +
+        '<p style="font-size:.75rem;color:var(--ink-soft)">👤 '+esc(c.propietario_nombre||'')+'</p>' +
+        '<p style="font-size:.72rem;color:var(--ink-faint)">🩺 '+esc(c.veterinario_nombre||'')+'</p>' +
+        (c.motivo?'<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.1rem">📋 '+esc(c.motivo)+'</p>':'') +
+      '</div>' +
+      '<div>'+badgeEstado(c.estado)+'</div>' +
+    '</div>';
+  }).join('');
+}
+function clicCeldaMes(fecha) {
+  if (window.innerWidth < 640) {
+    // Móvil: cambiar a lista del día
+    _fechaBase = new Date(fecha+'T12:00:00');
+    _vista = 'dia';
+    ['mes','semana','dia'].forEach(x => document.getElementById('vbtn-'+x)?.classList.toggle('activa', x==='dia'));
+    renderCalendario();
+    cargarCitas();
+  } else {
+    abrirNuevaCita(fecha, '09:00');
+  }
+}
 function clicCeldaSemana(fecha, hora) { abrirNuevaCita(fecha, String(hora).padStart(2,'0')+':00'); }
 function clicCeldaDia(fecha, hora)    { abrirNuevaCita(fecha, String(hora).padStart(2,'0')+':00'); }
 
@@ -689,6 +818,7 @@ function mostrarTodasDia(dStr, citas) {
 // VER DETALLE DE CITA
 // ══════════════════════════════════════════════════════════════════
 function verCita(c) {
+  if (typeof c === 'string') c = JSON.parse(c);
   var tipo        = TIPOS[c.tipo_cita] || TIPOS.medica;
   var puedAtender = ['pendiente','confirmada','en_curso'].includes(c.estado);
 
