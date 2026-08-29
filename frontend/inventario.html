@@ -692,17 +692,17 @@ async function actualizarStock() {
 function descargarTemplate() {
   const wb = XLSX.utils.book_new();
   const data = [
-    ['nombre','categoria','cantidad','unidad','stock_minimo','precio_unitario','proveedor','fecha_vencimiento'],
-    ['Amoxicilina 250mg','medicamento',100,'caja',20,15.50,'FarmaVet','2027-06-01'],
-    ['Vacuna Antirrábica','vacuna',50,'dosis',10,35.00,'BioVet','2026-12-01'],
-    ['Jeringas 5ml','insumo',200,'unidad',50,0.80,'MedSupply',''],
+    ['nombre','categoria','cantidad','unidad','stock_minimo','precio_compra','precio_unitario','proveedor','fecha_vencimiento'],
+    ['Amoxicilina 250mg','medicamento',100,'caja',20,12.00,15.50,'FarmaVet','2027-06-01'],
+    ['Vacuna Antirrábica','vacuna',50,'dosis',10,28.00,35.00,'BioVet','2026-12-01'],
+    ['Jeringas 5ml','insumo',200,'unidad',50,0.50,0.80,'MedSupply',''],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   // Estilo encabezados
   ws['!cols'] = [
-    {wch:25},{wch:15},{wch:12},{wch:12},{wch:15},{wch:18},{wch:20},{wch:20}
+    {wch:25},{wch:15},{wch:12},{wch:12},{wch:15},{wch:16},{wch:16},{wch:20},{wch:20}
   ];
 
   // Congelar primera fila
@@ -720,7 +720,8 @@ function descargarTemplate() {
     ['cantidad','Cantidad inicial en stock (número)'],
     ['unidad','caja, dosis, unidad, frasco, etc.'],
     ['stock_minimo','Cantidad mínima antes de alerta'],
-    ['precio_unitario','Precio en S/. (opcional)'],
+    ['precio_compra','Precio de compra al proveedor en S/. (opcional)'],
+    ['precio_unitario','Precio de venta al cliente en S/. (opcional)'],
     ['proveedor','Nombre del proveedor (opcional)'],
     ['fecha_vencimiento','Formato: YYYY-MM-DD (opcional)'],
     [''],
@@ -769,6 +770,7 @@ function procesarExcel(input) {
           cantidad         : parseFloat(row.cantidad) || 0,
           unidad           : String(row.unidad||'unidad').trim(),
           stock_minimo     : parseFloat(row.stock_minimo) || 5,
+          precio_compra    : parseFloat(row.precio_compra) || 0,
           precio_unitario  : parseFloat(row.precio_unitario) || null,
           proveedor        : String(row.proveedor||'').trim() || null,
           fecha_vencimiento: String(row.fecha_vencimiento||'').trim() || null,
@@ -805,16 +807,24 @@ function mostrarPreviewMasiva(validos, errores) {
     </div>` : ''}
     <div style="max-height:280px;overflow-y:auto">
       <table class="vtable">
-        <thead><tr><th>Nombre</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Precio</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>P. Compra</th><th>P. Venta</th><th>Margen</th></tr></thead>
         <tbody>
-          ${validos.slice(0,50).map(v=>`<tr>
-            <td style="font-weight:600;font-size:.8rem">${esc(v.nombre)}</td>
-            <td style="font-size:.75rem">${v.categoria}</td>
-            <td style="font-size:.8rem">${v.cantidad}</td>
-            <td style="font-size:.75rem">${esc(v.unidad)}</td>
-            <td style="font-size:.8rem">${v.precio_unitario?`S/. ${v.precio_unitario.toFixed(2)}`:'—'}</td>
-          </tr>`).join('')}
-          ${validos.length>50?`<tr><td colspan="5" style="text-align:center;color:var(--ink-faint);font-size:.75rem">...y ${validos.length-50} más</td></tr>`:''}
+          ${validos.slice(0,50).map(v=>{
+            var pc = v.precio_compra || 0;
+            var pv = v.precio_unitario || 0;
+            var mg = (pc>0 && pv>0) ? ((pv-pc)/pv*100).toFixed(1)+'%' : '—';
+            var colMg = (pc>0&&pv>0) ? (parseFloat(mg)>=50?'#15803d':parseFloat(mg)>=20?'#b45309':'#be123c') : 'var(--ink-faint)';
+            return `<tr>
+              <td style="font-weight:600;font-size:.8rem">${esc(v.nombre)}</td>
+              <td style="font-size:.75rem">${v.categoria}</td>
+              <td style="font-size:.8rem">${v.cantidad} ${esc(v.unidad)}</td>
+              <td style="font-size:.75rem">${esc(v.unidad)}</td>
+              <td style="font-size:.8rem">${pc>0?'S/. '+pc.toFixed(2):'—'}</td>
+              <td style="font-size:.8rem">${pv>0?'S/. '+pv.toFixed(2):'—'}</td>
+              <td style="font-size:.8rem;font-weight:700;color:${colMg}">${mg}</td>
+            </tr>`;
+          }).join('')}
+          ${validos.length>50?`<tr><td colspan="7" style="text-align:center;color:var(--ink-faint);font-size:.75rem">...y ${validos.length-50} más</td></tr>`:''}
         </tbody>
       </table>
     </div>`;
