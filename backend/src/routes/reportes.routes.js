@@ -122,7 +122,6 @@ router.get('/financiero', authorize('admin'), async (req, res, next) => {
          COALESCE(SUM(CASE WHEN estado='pagado'    THEN total END),0) AS ingresos,
          COALESCE(SUM(CASE WHEN estado='pendiente' THEN total END),0) AS por_cobrar,
          COALESCE(SUM(CASE WHEN estado='pagado'    THEN igv   END),0) AS total_igv,
-         COALESCE(SUM(CASE WHEN estado='pagado'    THEN comision_tarjeta END),0) AS total_comisiones,
          COALESCE(SUM(CASE WHEN estado='pagado' AND tipo='boleta'  THEN total END),0) AS boletas,
          COALESCE(SUM(CASE WHEN estado='pagado' AND tipo='factura' THEN total END),0) AS facturas
        FROM facturas WHERE fecha BETWEEN ? AND ? ${sf.sql}`,
@@ -132,7 +131,6 @@ router.get('/financiero', authorize('admin'), async (req, res, next) => {
     const porDia = await req.db.query(
       `SELECT fecha AS dia,
               SUM(CASE WHEN estado='pagado' THEN total ELSE 0 END) AS ingresos,
-              SUM(CASE WHEN estado='pagado' THEN comision_tarjeta ELSE 0 END) AS comisiones,
               COUNT(*) AS documentos
        FROM facturas WHERE fecha BETWEEN ? AND ? ${sf.sql}
        GROUP BY fecha ORDER BY fecha ASC`,
@@ -175,10 +173,9 @@ router.get('/financiero', authorize('admin'), async (req, res, next) => {
         `SELECT
            s.nombre AS sede,
            s.id     AS sede_id,
-           COALESCE(SUM(CASE WHEN f.estado='pagado'    THEN f.total             ELSE 0 END),0) AS ingresos,
-           COALESCE(SUM(CASE WHEN f.estado='pagado'    THEN f.comision_tarjeta  ELSE 0 END),0) AS comisiones,
-           COUNT(CASE WHEN f.estado='pagado' THEN 1 END)                                        AS documentos,
-           COALESCE(SUM(CASE WHEN f.estado='pendiente' THEN f.total             ELSE 0 END),0) AS pendiente
+           COALESCE(SUM(CASE WHEN f.estado='pagado' THEN f.total ELSE 0 END),0) AS ingresos,
+           COUNT(CASE WHEN f.estado='pagado' THEN 1 END)                         AS documentos,
+           COALESCE(SUM(CASE WHEN f.estado='pendiente' THEN f.total ELSE 0 END),0) AS pendiente
          FROM sedes s
          LEFT JOIN facturas f ON f.sede_id = s.id AND f.fecha BETWEEN ? AND ?
          WHERE s.activo = 1
@@ -498,6 +495,109 @@ router.get('/atenciones-por-sede', authorize('admin'), async (req, res, next) =>
     );
 
     return res.json({ success: true, data: porSede });
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/v1/reportes/rentabilidad ────────────────────────────
+// Rentabilidad real: ganancia = precio venta - precio compra (snapshot)
+router.get('/rentabilidad', authorize('admin'), async (req, res, next) => {
+  try {
+    const { desde, hasta, sede_id } = req.query;
+    const hoy = new Date().toISOString().split('T')[0];
+    const d   = desde || hoy;
+    const h   = hasta || hoy;
+
+    let sf = 'WHERE f.fecha BETWEEN ? AND ? AND f.estado = \'pagado\'';
+    const p = [d, h];
+    if (sede_id) { sf += ' AND f.sede_id = ?'; p.push(parseInt(sede_id)); }
+
+    // ── KPIs globales ─────────────────────────────────────────
+    const [kpis] = await req.db.query(
+      `SELECT
+         -- Ingresos totales (precio de venta × cantidad)
+         COALESCE(SUM(fi.subtotal), 0) AS ingreso_total,
+         -- Costo total (precio compra snapshot × cantidad) — solo ítems con inventario
+         COALESCE(SUM(
+           CASE WHEN fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0
+                THEN fi.precio_compra_snapshot * fi.cantidad
+                ELSE 0
+           END
+         ), 0) AS costo_total,
+         -- Ganancia neta
+         COALESCE(SUM(fi.subtotal), 0) -
+         COALESCE(SUM(
+           CASE WHEN fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0
+                THEN fi.precio_compra_snapshot * fi.cantidad
+                ELSE 0
+           END
+         ), 0) AS ganancia_neta,
+         -- Ítems vendidos con costo registrado
+         COUNT(CASE WHEN fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0 THEN 1 END) AS items_con_costo,
+         COUNT(fi.id) AS items_total
+       FROM facturas f
+       JOIN factura_items fi ON fi.factura_id = f.id
+       ${sf}`,
+      p
+    );
+
+    // Calcular margen promedio
+    const ingresos = parseFloat(kpis.ingreso_total) || 0;
+    const costos   = parseFloat(kpis.costo_total)   || 0;
+    const ganancia = parseFloat(kpis.ganancia_neta)  || 0;
+    kpis.margen_pct = ingresos > 0 ? parseFloat(((ganancia / ingresos) * 100).toFixed(2)) : 0;
+
+    // ── Por día ───────────────────────────────────────────────
+    const porDia = await req.db.query(
+      `SELECT
+         f.fecha AS dia,
+         COALESCE(SUM(fi.subtotal), 0) AS ingreso,
+         COALESCE(SUM(
+           CASE WHEN fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0
+                THEN fi.precio_compra_snapshot * fi.cantidad ELSE 0
+           END
+         ), 0) AS costo,
+         COALESCE(SUM(fi.subtotal), 0) - COALESCE(SUM(
+           CASE WHEN fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0
+                THEN fi.precio_compra_snapshot * fi.cantidad ELSE 0
+           END
+         ), 0) AS ganancia
+       FROM facturas f
+       JOIN factura_items fi ON fi.factura_id = f.id
+       ${sf}
+       GROUP BY f.fecha
+       ORDER BY f.fecha ASC`,
+      p
+    );
+
+    // ── Top productos más rentables ───────────────────────────
+    const topProductos = await req.db.query(
+      `SELECT
+         fi.descripcion,
+         SUM(fi.cantidad)  AS cantidad_total,
+         SUM(fi.subtotal)  AS ingreso_total,
+         SUM(CASE WHEN fi.precio_compra_snapshot > 0
+                  THEN fi.precio_compra_snapshot * fi.cantidad ELSE 0 END) AS costo_total,
+         SUM(fi.subtotal) - SUM(CASE WHEN fi.precio_compra_snapshot > 0
+                  THEN fi.precio_compra_snapshot * fi.cantidad ELSE 0 END) AS ganancia,
+         CASE WHEN SUM(fi.subtotal) > 0
+              THEN ROUND(
+                (SUM(fi.subtotal) - SUM(CASE WHEN fi.precio_compra_snapshot > 0
+                 THEN fi.precio_compra_snapshot * fi.cantidad ELSE 0 END))
+                / SUM(fi.subtotal) * 100, 2)
+              ELSE 0 END AS margen_pct
+       FROM facturas f
+       JOIN factura_items fi ON fi.factura_id = f.id
+       ${sf} AND fi.inventario_id IS NOT NULL AND fi.precio_compra_snapshot > 0
+       GROUP BY fi.descripcion
+       ORDER BY ganancia DESC
+       LIMIT 10`,
+      p
+    );
+
+    return res.json({
+      success: true,
+      data: { kpis, porDia, topProductos, periodo: { desde: d, hasta: h } },
+    });
   } catch (err) { next(err); }
 });
 

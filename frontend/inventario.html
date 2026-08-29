@@ -52,6 +52,15 @@
         style="accent-color:var(--green-600);width:16px;height:16px"/>
       <label for="f-bajo" style="font-size:.84rem;font-weight:600;cursor:pointer">Solo stock bajo</label>
     </div>
+    <div>
+      <label class="vlabel">Vencimiento</label>
+      <select id="f-vencimiento" class="vinput" style="width:auto" onchange="cargar(true)">
+        <option value="">Todos</option>
+        <option value="vencidos">❌ Vencidos</option>
+        <option value="proximo">⚠️ Vence en 30 días</option>
+        <option value="sin">✅ Sin vencimiento</option>
+      </select>
+    </div>
     <div class="search-wrap" style="flex:1;min-width:200px">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -60,6 +69,9 @@
       <input id="f-search" type="text" class="vinput" placeholder="Buscar producto…" oninput="filtrar()"/>
     </div>
   </div>
+
+  <!-- Alerta de vencimientos -->
+  <div id="alerta-vencimiento" style="display:none;margin-bottom:1rem"></div>
 
   <!-- Tabla -->
   <div class="vcard">
@@ -71,7 +83,9 @@
             <th>Categoría</th>
             <th>Stock actual</th>
             <th>Mínimo</th>
-            <th>Precio unit.</th>
+            <th>P. Compra</th>
+            <th>P. Venta</th>
+            <th>Margen</th>
             <th>Proveedor</th>
             <th class="hidden lg:table-cell">Sede</th>
             <th>Estado</th>
@@ -145,8 +159,25 @@
           <input id="i-min" type="number" min="0" step="0.5" value="5" class="vinput"/>
         </div>
         <div>
-          <label class="vlabel">Precio unitario (S/.)</label>
-          <input id="i-precio" type="number" step="0.01" min="0" class="vinput" placeholder="0.00"/>
+          <label class="vlabel">Precio de compra (S/.)</label>
+          <input id="i-precio-compra" type="number" step="0.01" min="0" class="vinput"
+            placeholder="0.00" oninput="calcularMargenInv()"/>
+        </div>
+        <div>
+          <label class="vlabel">Precio de venta (S/.)</label>
+          <input id="i-precio" type="number" step="0.01" min="0" class="vinput"
+            placeholder="0.00" oninput="calcularMargenInv()"/>
+        </div>
+        <!-- Margen calculado en tiempo real -->
+        <div class="sm:col-span-2" id="margen-preview" style="display:none;
+          background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;
+          padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+          <span style="font-size:.78rem;color:#15803d;font-weight:600">📊 Margen de ganancia:</span>
+          <div style="text-align:right">
+            <span style="font-size:.88rem;font-weight:800;color:#15803d" id="margen-monto">S/. 0.00</span>
+            <span style="font-size:.75rem;font-weight:700;color:#15803d;margin-left:.4rem"
+              id="margen-pct">(0%)</span>
+          </div>
         </div>
         <div>
           <label class="vlabel">Proveedor</label>
@@ -259,6 +290,7 @@ var totalItems     = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'inventario', title:'Inventario', subtitle:'Control de stock' });
+  cargarAlertasVencimiento();
 
   // ── Mostrar sede activa en el banner ──────────────────────────
   var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
@@ -297,14 +329,16 @@ document.addEventListener('DOMContentLoaded', () => {
 async function cargar(resetPage) {
   if (resetPage) paginaActual = 1;
   var cat    = document.getElementById('f-cat').value;
-  var bajo   = document.getElementById('f-bajo').checked;
-  var search = document.getElementById('f-search').value.trim();
+  var bajo       = document.getElementById('f-bajo').checked;
+  var search     = document.getElementById('f-search').value.trim();
+  var vencimiento= document.getElementById('f-vencimiento').value;
   var tbody  = document.getElementById('tbody-inv');
 
   var url = '/inventario?page=' + paginaActual + '&limit=' + limitActual;
   if (cat)    url += '&categoria=' + cat;
-  if (bajo)   url += '&bajo=1';
-  if (search) url += '&search=' + encodeURIComponent(search);
+  if (bajo)       url += '&bajo=1';
+  if (search)     url += '&search=' + encodeURIComponent(search);
+  if (vencimiento)url += '&vencimiento=' + vencimiento;
 
   tbody.innerHTML = '<tr><td colspan="9"><div class="vempty"><div class="vspinner"></div><p>Cargando...</p></div></td></tr>';
 
@@ -429,7 +463,18 @@ function renderTabla(items) {
         </div>
       </td>
       <td style="color:var(--ink-soft);font-size:.85rem">${minimo.toFixed(2)} ${esc(i.unidad||'')}</td>
+      <td style="font-size:.85rem">${i.precio_compra > 0 ? `S/. ${parseFloat(i.precio_compra).toFixed(2)}` : '—'}</td>
       <td style="font-size:.85rem">${i.precio_unitario ? `S/. ${parseFloat(i.precio_unitario).toFixed(2)}` : '—'}</td>
+      <td style="font-size:.82rem">${
+        i.margen_pct !== null && i.margen_pct !== undefined
+          ? `<span style="font-weight:700;color:${parseFloat(i.margen_pct)>=50?'#15803d':parseFloat(i.margen_pct)>=20?'#b45309':'#be123c'}">
+              ${parseFloat(i.margen_pct).toFixed(1)}%
+             </span>
+             <span style="font-size:.68rem;color:var(--ink-faint);display:block">
+               S/. ${parseFloat(i.ganancia_unit||0).toFixed(2)}/u
+             </span>`
+          : '<span style="color:var(--ink-faint)">—</span>'
+      }</td>
       <td style="font-size:.82rem;color:var(--ink-soft)">${esc(i.proveedor||'—')}</td>
       <td class="hidden lg:table-cell" style="font-size:.74rem;color:var(--ink-soft)">${i.sede_nombre ? '🏥 '+esc(i.sede_nombre) : '—'}</td>
       <td>
@@ -477,14 +522,67 @@ async function abrirEditar(id) {
     document.getElementById('i-cat').value       = item.categoria || 'medicamento';
     document.getElementById('i-unidad').value    = item.unidad || '';
     document.getElementById('i-cant').value      = item.cantidad || 0;
-    document.getElementById('i-min').value       = item.stock_minimo || 5;
-    document.getElementById('i-precio').value    = item.precio_unitario || '';
+    document.getElementById('i-min').value         = item.stock_minimo || 5;
+    document.getElementById('i-precio').value       = item.precio_unitario || '';
+    document.getElementById('i-precio-compra').value= item.precio_compra || '';
+    calcularMargenInv();
     document.getElementById('i-proveedor').value = item.proveedor || '';
     document.getElementById('i-venc').value      = item.fecha_vencimiento?.split('T')[0] || '';
   }
 }
 
 // ── Guardar ítem (crear o editar) ─────────────────────────────────
+async function cargarAlertasVencimiento() {
+  try {
+    var res = await api('/inventario/alertas-vencimiento');
+    if (!res||!res.ok) return;
+    var d   = (await res.json()).data;
+    var el  = document.getElementById('alerta-vencimiento');
+    if (!el) return;
+    if (d.vencidos === 0 && d.proximos === 0) { el.style.display='none'; return; }
+    el.style.display = 'block';
+    el.innerHTML =
+      '<div style="display:flex;flex-wrap:wrap;gap:.75rem">' +
+        (d.vencidos > 0
+          ? '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.7rem 1rem;display:flex;align-items:center;gap:.75rem;cursor:pointer" onclick="document.getElementById(\'f-vencimiento\').value=\'vencidos\';cargar(true)">' +
+              '<span style="font-size:1.3rem">❌</span>' +
+              '<div><p style="font-weight:700;font-size:.88rem;color:#be123c">'+d.vencidos+' producto'+(d.vencidos>1?'s':'')+' vencido'+(d.vencidos>1?'s':'')+'</p>' +
+              '<p style="font-size:.72rem;color:#be123c">Retirar del inventario</p></div>' +
+            '</div>'
+          : '') +
+        (d.proximos > 0
+          ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.85rem;padding:.7rem 1rem;display:flex;align-items:center;gap:.75rem;cursor:pointer" onclick="document.getElementById(\'f-vencimiento\').value=\'proximo\';cargar(true)">' +
+              '<span style="font-size:1.3rem">⚠️</span>' +
+              '<div><p style="font-weight:700;font-size:.88rem;color:#b45309">'+d.proximos+' producto'+(d.proximos>1?'s':'')+' vence'+(d.proximos>1?'n':'')+' en 30 días</p>' +
+              (d.urgentes?.length
+                ? '<p style="font-size:.72rem;color:#b45309">Próximo: '+esc(d.urgentes[0].nombre)+' ('+d.urgentes[0].dias_restantes+' días)</p>'
+                : '') +
+              '</div>' +
+            '</div>'
+          : '') +
+      '</div>';
+  } catch {}
+}
+
+function calcularMargenInv() {
+  var compra = parseFloat(document.getElementById('i-precio-compra').value) || 0;
+  var venta  = parseFloat(document.getElementById('i-precio').value) || 0;
+  var prev   = document.getElementById('margen-preview');
+  if (compra > 0 && venta > 0) {
+    var ganancia = venta - compra;
+    var margen   = (ganancia / venta * 100).toFixed(1);
+    prev.style.display = 'flex';
+    document.getElementById('margen-monto').textContent = 'S/. ' + ganancia.toFixed(2);
+    document.getElementById('margen-pct').textContent   = '(' + margen + '%)';
+    prev.style.borderColor = parseFloat(margen)>=50?'#bbf7d0':parseFloat(margen)>=20?'#fde68a':'#fecdd3';
+    prev.style.background  = parseFloat(margen)>=50?'#f0fdf4':parseFloat(margen)>=20?'#fffbeb':'#fff1f2';
+    document.getElementById('margen-monto').style.color = parseFloat(margen)>=50?'#15803d':parseFloat(margen)>=20?'#b45309':'#be123c';
+    document.getElementById('margen-pct').style.color   = parseFloat(margen)>=50?'#15803d':parseFloat(margen)>=20?'#b45309':'#be123c';
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
 async function guardarItem() {
   const id     = document.getElementById('i-id').value;
   const nombre = document.getElementById('i-nombre').value.trim();
@@ -497,6 +595,7 @@ async function guardarItem() {
     unidad          : document.getElementById('i-unidad').value.trim() || 'unidad',
     stock_minimo    : parseFloat(document.getElementById('i-min').value) || 5,
     precio_unitario : parseFloat(document.getElementById('i-precio').value) || null,
+    precio_compra   : parseFloat(document.getElementById('i-precio-compra').value) || 0,
     proveedor       : document.getElementById('i-proveedor').value.trim() || null,
     fecha_vencimiento: document.getElementById('i-venc').value || null,
   };

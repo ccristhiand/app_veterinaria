@@ -304,12 +304,23 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
       // ── INSERT ítems ─────────────────────────────────────────
       for (const it of itemsCalc) {
         const invId = it.inventario_id ? parseInt(it.inventario_id) : null;
+
+        // Snapshot del precio de compra en el momento de la venta
+        let precioCompraSnap = 0;
+        if (invId) {
+          const [[inv]] = await conn.execute(
+            'SELECT precio_compra FROM inventario WHERE id = ?', [invId]
+          );
+          if (inv) precioCompraSnap = parseFloat(inv.precio_compra) || 0;
+        }
+
         await conn.execute(
           `INSERT INTO factura_items
-             (factura_id, descripcion, cantidad, precio_unit, descuento_pct, descuento_monto, subtotal, inventario_id)
-           VALUES (?,?,?,?,?,?,?,?)`,
+             (factura_id, descripcion, cantidad, precio_unit, descuento_pct, descuento_monto,
+              subtotal, inventario_id, precio_compra_snapshot)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
           [facturaId, it.descripcion, it.cantidad, it.precio_unit,
-           it.descuento_pct, it.descuento_monto, it.subtotal, invId]
+           it.descuento_pct, it.descuento_monto, it.subtotal, invId, precioCompraSnap]
         );
 
         // Descontar stock

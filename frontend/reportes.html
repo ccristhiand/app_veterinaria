@@ -87,6 +87,7 @@
     <button class="rep-tab" id="tab-inventario"   onclick="mostrarTab('inventario')">📦 Inventario</button>
     <button class="rep-tab" id="tab-estetica"     onclick="mostrarTab('estetica')">✂️ Estética</button>
     <button class="rep-tab" id="tab-veterinarios" onclick="mostrarTab('veterinarios')">🩺 Veterinarios</button>
+    <button class="rep-tab" id="tab-rentabilidad" onclick="mostrarTab('rentabilidad')">💹 Rentabilidad</button>
   </div>
 
   <!-- Contenidos -->
@@ -100,6 +101,7 @@
   <div id="contenido-inventario"   style="display:none"></div>
   <div id="contenido-estetica"     style="display:none"></div>
   <div id="contenido-veterinarios" style="display:none"></div>
+  <div id="contenido-rentabilidad" style="display:none"></div>
 
   <!-- Comparativa por sede (solo admin, sin filtro de sede específica) -->
   <div id="seccion-por-sede" style="display:none;margin-top:1.5rem">
@@ -217,7 +219,7 @@ function setPeriodo(p) {
 
 function mostrarTab(tab) {
   tabActiva = tab;
-  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios'].forEach(t => {
+  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'].forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.toggle('active', t===tab);
     const el = document.getElementById(`contenido-${t}`);
     if (el) el.style.display = t===tab ? 'block' : 'none';
@@ -229,7 +231,7 @@ function mostrarTab(tab) {
 async function cargarReporte() {
   // Limpiar caché y recargar tab activa
   Object.keys(datosReporte).forEach(k => delete datosReporte[k]);
-  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios'].forEach(t => {
+  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'].forEach(t => {
     const el = document.getElementById(`contenido-${t}`);
     if (el) el.innerHTML = `<div class="vempty"><div class="vspinner"></div><p>Generando…</p></div>`;
   });
@@ -266,6 +268,7 @@ function renderTab(tab, d, cont) {
     case 'inventario':   cont.innerHTML = renderInventario(d);   break;
     case 'estetica':     cont.innerHTML = renderEstetica(d);     break;
     case 'veterinarios': cont.innerHTML = renderVeterinarios(d); break;
+    case 'rentabilidad': cont.innerHTML = renderRentabilidad(d); break;
   }
 }
 
@@ -1134,6 +1137,83 @@ function descargarPDF() {
   ventana.document.close();
   setTimeout(() => ventana.print(), 1000);
   toast('✅ PDF listo para imprimir', 'success');
+}
+
+// ── RENTABILIDAD ──────────────────────────────────────────────────
+function renderRentabilidad(d) {
+  const k        = d.kpis || {};
+  const ingreso  = parseFloat(k.ingreso_total || 0);
+  const costo    = parseFloat(k.costo_total   || 0);
+  const ganancia = parseFloat(k.ganancia_neta || 0);
+  const margen   = parseFloat(k.margen_pct    || 0);
+  const colorM   = margen>=50?'#15803d':margen>=20?'#b45309':'#be123c';
+  const maxGan   = Math.max(...(d.porDia||[]).map(x=>parseFloat(x.ganancia)||0), 1);
+
+  return `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:.85rem;
+      padding:.75rem 1rem;margin-bottom:1.3rem;font-size:.78rem;color:#c2410c">
+      ℹ️ Solo incluye productos de inventario con <strong>precio de compra</strong> registrado.
+      Servicios sin costo registrado no se contabilizan en el costo total.
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi('S/. '+ingreso.toFixed(2),   'Ingreso total',   '#1d4ed8')}
+      ${kpi('S/. '+costo.toFixed(2),     'Costo total',     '#be123c')}
+      ${kpi('S/. '+ganancia.toFixed(2),  'Ganancia neta',   '#15803d')}
+      ${kpi(margen.toFixed(1)+'%',       'Margen promedio', colorM)}
+    </div>
+
+    <div class="vcard vcard-pad" style="margin-bottom:1.3rem">
+      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">📈 Ganancia por día</h3>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        ${(d.porDia||[]).map(dia => {
+          var ing = parseFloat(dia.ingreso||0);
+          var cos = parseFloat(dia.costo||0);
+          var gan = parseFloat(dia.ganancia||0);
+          var pct = maxGan > 0 ? Math.max((gan/maxGan)*100, 2).toFixed(0) : 0;
+          var col = gan >= 0 ? '#15803d' : '#be123c';
+          return `<div style="display:flex;align-items:center;gap:.75rem">
+            <span style="font-size:.72rem;color:var(--ink-faint);font-family:monospace;min-width:70px">${fDate(dia.dia)}</span>
+            <div style="flex:1"><div style="background:#f0f0f0;border-radius:999px;height:8px;overflow:hidden">
+              <div style="height:100%;border-radius:999px;background:${col};width:${pct}%"></div>
+            </div></div>
+            <div style="text-align:right;min-width:130px">
+              <span style="font-size:.78rem;font-weight:700;color:${col}">S/. ${gan.toFixed(2)}</span>
+              <span style="font-size:.65rem;color:var(--ink-faint);display:block">Ing: S/.${ing.toFixed(2)} · Costo: S/.${cos.toFixed(2)}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="vcard vcard-pad">
+      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">🏆 Productos más rentables</h3>
+      ${d.topProductos?.length ? `
+      <table class="rep-table">
+        <thead><tr>
+          <th>Producto</th>
+          <th style="text-align:right">Cantidad</th>
+          <th style="text-align:right">Ingreso</th>
+          <th style="text-align:right">Costo</th>
+          <th style="text-align:right">Ganancia</th>
+          <th style="text-align:right">Margen</th>
+        </tr></thead>
+        <tbody>
+          ${(d.topProductos||[]).map(p => {
+            var mar = parseFloat(p.margen_pct||0);
+            var colM = mar>=50?'#15803d':mar>=20?'#b45309':'#be123c';
+            return `<tr>
+              <td style="font-weight:600">${esc(p.descripcion)}</td>
+              <td style="text-align:right">${parseFloat(p.cantidad_total).toFixed(2)}</td>
+              <td style="text-align:right">S/. ${parseFloat(p.ingreso_total).toFixed(2)}</td>
+              <td style="text-align:right;color:#be123c">S/. ${parseFloat(p.costo_total).toFixed(2)}</td>
+              <td style="text-align:right;font-weight:700;color:#15803d">S/. ${parseFloat(p.ganancia).toFixed(2)}</td>
+              <td style="text-align:right;font-weight:700;color:${colM}">${mar.toFixed(1)}%</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>` : '<div class="vempty" style="padding:2rem">Sin datos de rentabilidad para el período.<br/><small style="color:var(--ink-faint)">Registra precios de compra en el inventario para ver este reporte.</small></div>'}
+    </div>`;
 }
 </script>
 </body>
