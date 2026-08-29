@@ -37,7 +37,8 @@
     .mes-mas  { font-size:.6rem;color:var(--green-600);font-weight:700;cursor:pointer;padding:.1rem .2rem; }
 
     /* SEMANA */
-    .sem-grid { display:grid;grid-template-columns:48px repeat(7,1fr);overflow-y:auto;max-height:calc(100vh - 240px); }
+    .sem-wrap { overflow-x:auto;height:100%; }
+    .sem-grid { display:grid;grid-template-columns:48px repeat(7,1fr); }
     .sem-head { background:#f0fdf4;font-size:.7rem;font-weight:700;text-align:center;padding:.4rem .2rem;
                 border-right:1px solid var(--line);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:10; }
     .sem-head.hoy { background:#15803d;color:#fff; }
@@ -55,7 +56,8 @@
     .sem-evento:hover { opacity:.85;z-index:10; }
 
     /* DÍA */
-    .dia-grid { display:grid;grid-template-columns:52px 1fr;overflow-y:auto;max-height:calc(100vh - 240px); }
+    .dia-wrap { overflow-y:auto;height:100%; }
+    .dia-grid { display:grid;grid-template-columns:52px 1fr; }
     .dia-hora { font-size:.65rem;color:var(--ink-faint);text-align:right;padding:.3rem .5rem 0 0;
                 border-right:2px solid var(--line);border-bottom:1px solid #f0f0f0;height:60px;
                 position:relative;top:-10px; }
@@ -494,46 +496,86 @@ function renderEstructuraSemana(cont) {
     dias.push(d);
   }
 
-  var html = '<div style="overflow-x:auto;height:100%"><div class="sem-grid" style="min-width:500px">';
-  // Row cabecera
-  html += '<div class="sem-head" style="border-bottom:2px solid var(--line)"></div>';
+  // Wrapper con scroll vertical
+  var wrap = document.createElement('div');
+  wrap.className = 'sem-wrap';
+
+  // Sub-wrapper con scroll horizontal
+  var inner = document.createElement('div');
+  inner.style.cssText = 'overflow-y:auto;height:100%;overflow-x:auto';
+
+  var grid = document.createElement('div');
+  grid.className = 'sem-grid';
+  grid.style.minWidth = '500px';
+
+  // Cabecera días
+  var headVacio = document.createElement('div');
+  headVacio.className = 'sem-head';
+  headVacio.style.borderBottom = '2px solid var(--line)';
+  grid.appendChild(headVacio);
+
   dias.forEach(d => {
     var dStr  = fmt(d);
     var esHoy = dStr === hoy;
-    html += '<div class="sem-head'+(esHoy?' hoy':'')+'">'+nomDiaCorto(d.getDay())+'<br/>'+d.getDate()+'</div>';
+    var head  = document.createElement('div');
+    head.className = 'sem-head'+(esHoy?' hoy':'');
+    head.innerHTML = nomDiaCorto(d.getDay())+'<br/>'+d.getDate();
+    grid.appendChild(head);
   });
 
   // Horas 7–21
   for (var h=7; h<=21; h++) {
-    html += '<div class="sem-hora">'+(h<10?'0':'')+h+':00</div>';
+    var hora = document.createElement('div');
+    hora.className   = 'sem-hora';
+    hora.textContent = (h<10?'0':'')+h+':00';
+    grid.appendChild(hora);
+
     dias.forEach(d => {
       var dStr  = fmt(d);
       var esHoy = dStr === hoy;
       var hStr  = String(h).padStart(2,'0');
-      html += '<div class="sem-cell'+(esHoy?' hoy-col':'')+'" '+
-        'onclick="clicCeldaSemana(\''+dStr+'\','+h+')" '+
-        'data-fecha="'+dStr+'" data-hora="'+hStr+'" id="sem-ev-'+dStr+'-'+hStr+'"></div>';
+      var cell  = document.createElement('div');
+      cell.className = 'sem-cell'+(esHoy?' hoy-col':'');
+      cell.id        = 'sem-ev-'+dStr+'-'+hStr;
+      cell.onclick   = ((_d,_h) => () => clicCeldaSemana(_d,_h))(dStr, h);
+      grid.appendChild(cell);
     });
   }
-  html += '</div></div>';
-  cont.innerHTML = html;
+
+  inner.appendChild(grid);
+  wrap.appendChild(inner);
+  cont.innerHTML = '';
+  cont.appendChild(wrap);
 }
 
 // ── Vista DÍA ─────────────────────────────────────────────────────
 function renderEstructuraDia(cont) {
-  var hoy  = hoyStr();
   var dStr = fmt(_fechaBase);
 
-  var html = '<div class="dia-grid" style="min-width:300px">';
+  var wrap = document.createElement('div');
+  wrap.className = 'dia-wrap';
+
+  var grid = document.createElement('div');
+  grid.className = 'dia-grid';
+
   for (var h=7; h<=21; h++) {
     var hStr = String(h).padStart(2,'0');
-    html += '<div class="dia-hora">'+(h<10?'0':'')+h+':00</div>';
-    html += '<div class="dia-cell" '+
-      'onclick="clicCeldaDia(\''+dStr+'\','+h+')" '+
-      'id="dia-ev-'+dStr+'-'+hStr+'"></div>';
+
+    var hora = document.createElement('div');
+    hora.className   = 'dia-hora';
+    hora.textContent = (h<10?'0':'')+h+':00';
+    grid.appendChild(hora);
+
+    var cell = document.createElement('div');
+    cell.className = 'dia-cell';
+    cell.id        = 'dia-ev-'+dStr+'-'+hStr;
+    cell.onclick   = ((_h) => () => clicCeldaDia(dStr, _h))(h);
+    grid.appendChild(cell);
   }
-  html += '</div>';
-  cont.innerHTML = html;
+
+  wrap.appendChild(grid);
+  cont.innerHTML = '';
+  cont.appendChild(wrap);
 }
 
 // ══════════════════════════════════════════════════════════════════
