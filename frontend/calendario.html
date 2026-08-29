@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Calendario</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    /* ── Tipos de cita ── */
+    .ev-medica        { background:#dcfce7;color:#15803d;border-left:3px solid #16a34a; }
+    .ev-vacuna        { background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed; }
+    .ev-desparasitacion{ background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04; }
+    .ev-estetica      { background:#fce7f3;color:#be185d;border-left:3px solid #db2777; }
+    .ev-completada    { background:#f3f4f6;color:#6b7280;border-left:3px solid #9ca3af;opacity:.75; }
+    .ev-cancelada     { background:#fff1f2;color:#be123c;border-left:3px solid #f43f5e;opacity:.6;text-decoration:line-through; }
+
+    /* ── Vistas ── */
+    /* MES */
+    .mes-grid { display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--line);border-top:1px solid var(--line); }
+    .mes-head { background:#f0fdf4;font-size:.68rem;font-weight:700;text-align:center;padding:.4rem;
+                border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:#15803d; }
+    .mes-cell { border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+                min-height:90px;padding:.3rem;cursor:pointer;transition:background .1s;position:relative; }
+    .mes-cell:hover { background:#f8fdf8; }
+    .mes-cell.hoy { background:#f0fdf4; }
+    .mes-cell.otro-mes { background:#fafafa; }
+    .mes-num  { font-size:.72rem;font-weight:700;color:var(--ink-faint);margin-bottom:.25rem;
+                width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%; }
+    .mes-num.hoy-num { background:#15803d;color:#fff; }
+    .mes-evento { font-size:.62rem;border-radius:.3rem;padding:.1rem .35rem;margin-bottom:.15rem;
+                  cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                  transition:opacity .12s;line-height:1.4; }
+    .mes-evento:hover { opacity:.8; }
+    .mes-mas  { font-size:.6rem;color:var(--green-600);font-weight:700;cursor:pointer;padding:.1rem .2rem; }
+
+    /* SEMANA */
+    .sem-grid { display:grid;grid-template-columns:48px repeat(7,1fr);overflow-y:auto;max-height:calc(100vh - 240px); }
+    .sem-head { background:#f0fdf4;font-size:.7rem;font-weight:700;text-align:center;padding:.4rem .2rem;
+                border-right:1px solid var(--line);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:10; }
+    .sem-head.hoy { background:#15803d;color:#fff; }
+    .sem-hora { font-size:.62rem;color:var(--ink-faint);text-align:right;padding:.2rem .4rem 0 0;
+                border-right:1px solid var(--line);border-bottom:1px solid #f0f0f0;height:52px;
+                position:relative;top:-8px;line-height:1; }
+    .sem-cell { border-right:1px solid var(--line);border-bottom:1px solid #f0f0f0;
+                height:52px;position:relative;cursor:pointer;transition:background .1s; }
+    .sem-cell:hover { background:#f0fdf4; }
+    .sem-cell.hoy-col { background:#f8fffe; }
+    .sem-evento { position:absolute;left:2px;right:2px;border-radius:.35rem;padding:.15rem .35rem;
+                  font-size:.62rem;overflow:hidden;cursor:pointer;z-index:5;line-height:1.3;
+                  transition:opacity .12s;border:1px solid rgba(0,0,0,.08); }
+    .sem-evento:hover { opacity:.85;z-index:10; }
+
+    /* DÍA */
+    .dia-grid { display:grid;grid-template-columns:52px 1fr;overflow-y:auto;max-height:calc(100vh - 240px); }
+    .dia-hora { font-size:.65rem;color:var(--ink-faint);text-align:right;padding:.3rem .5rem 0 0;
+                border-right:2px solid var(--line);border-bottom:1px solid #f0f0f0;height:60px;
+                position:relative;top:-10px; }
+    .dia-cell { border-bottom:1px solid #f0f0f0;height:60px;position:relative;cursor:pointer;transition:background .1s; }
+    .dia-cell:hover { background:#f0fdf4; }
+    .dia-evento { position:absolute;left:4px;right:4px;border-radius:.45rem;padding:.25rem .5rem;
+                  font-size:.72rem;cursor:pointer;z-index:5;line-height:1.4;border:1px solid rgba(0,0,0,.08);
+                  transition:all .12s; }
+    .dia-evento:hover { opacity:.85;z-index:10;transform:translateX(2px); }
+
+    /* Botones vista */
+    .vista-btn { padding:.4rem .85rem;border:1.5px solid var(--line);border-radius:.7rem;
+                 font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;
+                 background:#fff;color:var(--ink);transition:all .15s; }
+    .vista-btn.activa { background:#15803d;color:#fff;border-color:#15803d; }
+
+    /* Tipo selector en modal */
+    .tipo-btn-cal { display:flex;flex-direction:column;align-items:center;gap:.3rem;
+                    padding:.6rem .4rem;border:2px solid var(--line);border-radius:.8rem;
+                    cursor:pointer;font-family:inherit;font-size:.7rem;font-weight:600;
+                    background:#fff;color:var(--ink);transition:all .15s;flex:1;min-width:60px; }
+    .tipo-btn-cal.sel-medica        { border-color:#16a34a;background:#f0fdf4;color:#15803d; }
+    .tipo-btn-cal.sel-vacuna        { border-color:#7c3aed;background:#f5f3ff;color:#6d28d9; }
+    .tipo-btn-cal.sel-desparasitacion { border-color:#ca8a04;background:#fefce8;color:#854d0e; }
+    .tipo-btn-cal.sel-estetica      { border-color:#db2777;background:#fdf2f8;color:#be185d; }
+
+    /* Autocomplete */
+    .ac-list { position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
+      background:#fff;border:1.5px solid var(--green-500);border-radius:.85rem;
+      box-shadow:0 8px 24px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;list-style:none;padding:.3rem; }
+    .ac-list li { padding:.45rem .75rem;border-radius:.55rem;cursor:pointer;font-size:.8rem;transition:background .1s; }
+    .ac-list li:hover { background:#f0fdf4; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page" style="overflow:hidden;display:flex;flex-direction:column">
+
+  <!-- ── Cabecera ── -->
+  <div class="page-head" style="flex-wrap:wrap;gap:.75rem;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <!-- Navegación -->
+      <button onclick="navAnterior()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">◀</button>
+      <button onclick="navSiguiente()" class="vbtn vbtn-ghost" style="padding:.4rem .8rem">▶</button>
+      <button onclick="irHoy()" class="vbtn vbtn-ghost" style="font-size:.8rem">Hoy</button>
+      <h3 id="cal-titulo" style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;min-width:220px">—</h3>
+    </div>
+    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-left:auto">
+      <!-- Filtros -->
+      <select id="f-vet" class="vinput" style="width:auto;font-size:.78rem" onchange="cargarCitas()">
+        <option value="">Todos los veterinarios</option>
+      </select>
+      <div id="f-sede-wrap"></div>
+      <!-- Vistas -->
+      <div style="display:flex;gap:.3rem">
+        <button class="vista-btn activa" id="vbtn-mes"    onclick="cambiarVista('mes')">Mes</button>
+        <button class="vista-btn"        id="vbtn-semana" onclick="cambiarVista('semana')">Semana</button>
+        <button class="vista-btn"        id="vbtn-dia"    onclick="cambiarVista('dia')">Día</button>
+      </div>
+      <button onclick="abrirNuevaCita()" class="vbtn vbtn-primary">＋ Nueva Cita</button>
+    </div>
+  </div>
+
+  <!-- ── Leyenda ── -->
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;padding:.4rem 0;flex-shrink:0;font-size:.68rem">
+    <span style="background:#dcfce7;color:#15803d;border-left:3px solid #16a34a;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">🩺 Médica</span>
+    <span style="background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">💉 Vacuna</span>
+    <span style="background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">🪱 Desparasitación</span>
+    <span style="background:#fce7f3;color:#be185d;border-left:3px solid #db2777;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">✂️ Estética</span>
+    <span style="background:#f3f4f6;color:#6b7280;border-left:3px solid #9ca3af;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">✅ Completada</span>
+    <span style="background:#fff1f2;color:#be123c;border-left:3px solid #f43f5e;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">❌ Cancelada</span>
+  </div>
+
+  <!-- ── Área del calendario ── -->
+  <div id="cal-area" class="vcard" style="flex:1;overflow:hidden;position:relative">
+    <div id="cal-loading" class="vempty" style="padding:3rem"><div class="vspinner"></div><p>Cargando…</p></div>
+    <div id="cal-contenido" style="display:none;height:100%"></div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ══ Modal Ver Cita ════════════════════════════════════════════ -->
+<div id="modal-ver-cita" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:460px">
+    <div class="vmodal-head">
+      <h3 id="ver-cita-titulo">📅 Detalle de Cita</h3>
+      <button onclick="closeModal('modal-ver-cita')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="ver-cita-body" style="display:flex;flex-direction:column;gap:.85rem"></div>
+    <div class="vmodal-foot" id="ver-cita-foot">
+      <button onclick="closeModal('modal-ver-cita')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Nueva / Editar Cita ════════════════════════════════ -->
+<div id="modal-ncita" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:620px">
+    <div class="vmodal-head">
+      <h3 id="ncita-titulo">📅 Nueva Cita</h3>
+      <button onclick="cerrarModalNcita()" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+
+      <!-- Buscar propietario -->
+      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1rem">
+        <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">① Propietario</p>
+        <div style="display:flex;gap:.5rem">
+          <div style="flex:1;position:relative">
+            <input id="nc-prop-q" type="text" placeholder="DNI, nombre o teléfono…"
+              class="vinput" style="width:100%" onkeydown="if(event.key==='Enter')buscarPropNC()"/>
+            <ul id="nc-prop-ac" class="ac-list" style="display:none"></ul>
+          </div>
+          <button onclick="buscarPropNC()" class="vbtn vbtn-primary">Buscar</button>
+        </div>
+        <div id="nc-prop-sel" style="display:none;margin-top:.6rem;background:#ecfdf5;border:1px solid #a7f3d0;
+          border-radius:.75rem;padding:.6rem .85rem;align-items:center;gap:.65rem">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
+            color:#fff;font-weight:700;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+            id="nc-prop-avatar">?</div>
+          <div style="flex:1">
+            <p style="font-weight:700;font-size:.83rem" id="nc-prop-nombre">—</p>
+            <p style="font-size:.68rem;color:var(--ink-soft)" id="nc-prop-info">—</p>
+          </div>
+          <button onclick="limpiarPropNC()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+        </div>
+      </div>
+
+      <!-- Mascota -->
+      <div id="nc-paso-mascota" style="display:none;background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1rem">
+        <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">② Mascota</p>
+        <div id="nc-mascotas" style="display:flex;flex-direction:column;gap:.35rem;max-height:150px;overflow-y:auto"></div>
+      </div>
+
+      <!-- Datos cita -->
+      <div id="nc-paso-cita" style="display:none">
+        <!-- Mascota seleccionada -->
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.8rem;padding:.65rem .9rem;
+          margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem">
+          <span style="font-size:1.4rem" id="nc-masc-icon">🐾</span>
+          <div style="flex:1">
+            <p style="font-weight:700;font-size:.85rem" id="nc-masc-nombre">—</p>
+            <p style="font-size:.7rem;color:var(--ink-soft)" id="nc-masc-info">—</p>
+          </div>
+          <button onclick="limpiarMascotaNC()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+        </div>
+
+        <!-- Tipo de cita -->
+        <div style="margin-bottom:.85rem">
+          <label class="vlabel" style="margin-bottom:.45rem">Tipo de atención *</label>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button class="tipo-btn-cal sel-medica" id="nc-tipo-medica"        onclick="selTipoNC('medica')"><span style="font-size:1.2rem">🩺</span><span>Médica</span></button>
+            <button class="tipo-btn-cal"            id="nc-tipo-vacuna"         onclick="selTipoNC('vacuna')"><span style="font-size:1.2rem">💉</span><span>Vacuna</span></button>
+            <button class="tipo-btn-cal"            id="nc-tipo-desparasitacion" onclick="selTipoNC('desparasitacion')"><span style="font-size:1.2rem">🪱</span><span>Desparasi.</span></button>
+            <button class="tipo-btn-cal"            id="nc-tipo-estetica"       onclick="selTipoNC('estetica')"><span style="font-size:1.2rem">✂️</span><span>Estética</span></button>
+          </div>
+          <input type="hidden" id="nc-tipo" value="medica"/>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="vlabel">Veterinario *</label>
+            <select id="nc-vet" class="vinput"></select>
+          </div>
+          <div>
+            <label class="vlabel">Fecha y Hora *</label>
+            <input id="nc-fecha" type="datetime-local" class="vinput"/>
+          </div>
+          <div>
+            <label class="vlabel">Duración (min)</label>
+            <input id="nc-duracion" type="number" value="30" min="15" max="180" class="vinput"/>
+          </div>
+          <div>
+            <label class="vlabel">Motivo *</label>
+            <input id="nc-motivo" type="text" placeholder="Consulta, vacunación…" class="vinput"/>
+          </div>
+        </div>
+        <div style="margin-top:.75rem">
+          <label class="vlabel">Notas</label>
+          <textarea id="nc-notas" rows="2" class="vinput" placeholder="Observaciones opcionales…"></textarea>
+        </div>
+      </div>
+
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="cerrarModalNcita()" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarNcita()" id="nc-btn-guardar" class="vbtn vbtn-primary" style="display:none">💾 Guardar Cita</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Atender ═════════════════════════════════════════════ -->
+<div id="modal-atender-cal" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:440px">
+    <div class="vmodal-head">
+      <h3 id="atender-cal-titulo">🩺 Iniciar Atención</h3>
+      <button onclick="closeModal('modal-atender-cal')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:1rem;margin-bottom:1rem">
+        <p style="font-size:.68rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Cita a atender</p>
+        <p style="font-weight:700;font-size:.92rem" id="atender-cal-paciente">—</p>
+        <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.2rem" id="atender-cal-motivo">—</p>
+        <p style="font-size:.75rem;color:var(--ink-faint);margin-top:.15rem" id="atender-cal-fecha">—</p>
+      </div>
+      <div id="atender-cal-destino"></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-atender-cal')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="irAAtenderCal()" class="vbtn vbtn-primary" id="atender-cal-btn">🩺 Ir a Atender</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════════
+var _vista        = 'mes';       // mes | semana | dia
+var _fechaBase    = new Date();  // fecha de referencia
+var _citas        = [];          // cache de citas cargadas
+var _userRol      = '';
+var _citaAtender  = null;
+var _ncPropSel    = null;
+var _ncMascSel    = null;
+var _vets         = [];
+
+var TIPOS = {
+  medica:          { label:'Atención Médica',   icon:'🩺', cls:'medica',         tab:'consultas' },
+  vacuna:          { label:'Vacunación',         icon:'💉', cls:'vacuna',         tab:'vacunas' },
+  desparasitacion: { label:'Desparasitación',    icon:'🪱', cls:'desparasitacion',tab:'desparasitaciones' },
+  estetica:        { label:'Estética',           icon:'✂️', cls:'estetica',       tab:'estetica' },
+};
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+initPage({ activePage:'calendario', title:'Calendario de Citas', subtitle:'Vista mensual, semanal y diaria' });
+
+(async () => {
+  try { var u = JSON.parse(localStorage.getItem('vet_user')||'{}'); _userRol = u.rol||''; } catch {}
+
+  // Selector de sede solo para admin
+  if (_userRol === 'admin') {
+    initSelectorSede('f-sede-wrap', () => cargarCitas(), { label:'', labelTodas:'Todas las sedes', size:'small' });
+  }
+
+  // Cargar veterinarios para filtro y modal
+  await cargarVets();
+
+  // Socket tiempo real
+  getSocket().on('cita:nueva',       () => cargarCitas());
+  getSocket().on('cita:actualizada', () => cargarCitas());
+
+  renderCalendario();
+  cargarCitas();
+})();
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS DE FECHA
+// ══════════════════════════════════════════════════════════════════
+function fmt(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function hoyStr() { return fmt(new Date()); }
+function lunesDe(d) {
+  var c = new Date(d); var dia = c.getDay();
+  c.setDate(c.getDate() - (dia===0 ? 6 : dia-1)); return c;
+}
+function nomMes(n) {
+  return ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][n];
+}
+function nomDiaCorto(n) { return ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][n]; }
+function nomDiaLargo(n) { return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][n]; }
+
+// ══════════════════════════════════════════════════════════════════
+// NAVEGACIÓN Y VISTAS
+// ══════════════════════════════════════════════════════════════════
+function cambiarVista(v) {
+  _vista = v;
+  ['mes','semana','dia'].forEach(x => {
+    document.getElementById('vbtn-'+x).classList.toggle('activa', x===v);
+  });
+  renderCalendario();
+  cargarCitas();
+}
+
+function irHoy()      { _fechaBase = new Date(); renderCalendario(); cargarCitas(); }
+function navAnterior(){ moverFecha(-1); }
+function navSiguiente(){ moverFecha(1); }
+function moverFecha(dir) {
+  var d = new Date(_fechaBase);
+  if (_vista==='mes')    { d.setMonth(d.getMonth()+dir); }
+  else if (_vista==='semana') { d.setDate(d.getDate()+dir*7); }
+  else                   { d.setDate(d.getDate()+dir); }
+  _fechaBase = d;
+  renderCalendario();
+  cargarCitas();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CARGAR CITAS DEL PERÍODO
+// ══════════════════════════════════════════════════════════════════
+function getRango() {
+  var d = new Date(_fechaBase);
+  if (_vista === 'mes') {
+    var primerDia = new Date(d.getFullYear(), d.getMonth(), 1);
+    var ultimoDia = new Date(d.getFullYear(), d.getMonth()+1, 0);
+    // Extender para incluir días del mes anterior/siguiente visibles
+    var lunes = lunesDe(primerDia);
+    var fin   = new Date(ultimoDia);
+    fin.setDate(ultimoDia.getDate() + (6 - ultimoDia.getDay() + 1) % 7 + (ultimoDia.getDay()===0?0:7-ultimoDia.getDay()));
+    return { desde: fmt(lunes), hasta: fmt(fin) };
+  } else if (_vista === 'semana') {
+    var lunes = lunesDe(d);
+    var dom   = new Date(lunes); dom.setDate(lunes.getDate()+6);
+    return { desde: fmt(lunes), hasta: fmt(dom) };
+  } else {
+    return { desde: fmt(d), hasta: fmt(d) };
+  }
+}
+
+async function cargarCitas() {
+  var rango  = getRango();
+  var vetId  = document.getElementById('f-vet')?.value || '';
+  var sedeId = typeof getSedeActiva === 'function' ? getSedeActiva() : '';
+  var url    = '/citas?desde='+rango.desde+'&hasta='+rango.hasta+'&limit=500';
+  if (vetId)  url += '&veterinario_id='+vetId;
+  if (sedeId) url += '&sede_id='+sedeId;
+
+  try {
+    var res = await api(url);
+    if (!res||!res.ok) return;
+    _citas = (await res.json()).data || [];
+    renderEventos();
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER ESTRUCTURA DEL CALENDARIO
+// ══════════════════════════════════════════════════════════════════
+function renderCalendario() {
+  actualizarTitulo();
+  var cont = document.getElementById('cal-contenido');
+  document.getElementById('cal-loading').style.display = 'none';
+  cont.style.display = 'block';
+
+  if (_vista === 'mes')    renderEstructuraMes(cont);
+  else if (_vista === 'semana') renderEstructuraSemana(cont);
+  else                     renderEstructuraDia(cont);
+}
+
+function actualizarTitulo() {
+  var d  = _fechaBase;
+  var el = document.getElementById('cal-titulo');
+  if (_vista === 'mes') {
+    el.textContent = nomMes(d.getMonth())+' '+d.getFullYear();
+  } else if (_vista === 'semana') {
+    var lunes = lunesDe(d);
+    var dom   = new Date(lunes); dom.setDate(lunes.getDate()+6);
+    el.textContent = lunes.getDate()+' – '+dom.getDate()+' '+nomMes(dom.getMonth())+' '+dom.getFullYear();
+  } else {
+    el.textContent = nomDiaLargo(d.getDay())+', '+d.getDate()+' de '+nomMes(d.getMonth())+' '+d.getFullYear();
+  }
+}
+
+// ── Vista MES ─────────────────────────────────────────────────────
+function renderEstructuraMes(cont) {
+  var d      = _fechaBase;
+  var hoy    = hoyStr();
+  var primer = new Date(d.getFullYear(), d.getMonth(), 1);
+  var ultimo = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  var inicio = lunesDe(primer);
+
+  var html = '<div class="mes-grid" style="height:100%;overflow-y:auto">';
+  // Cabecera días
+  ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].forEach(n =>
+    html += '<div class="mes-head">'+n+'</div>'
+  );
+  // Celdas
+  var cur = new Date(inicio);
+  for (var w=0; w<6; w++) {
+    for (var dd=0; dd<7; dd++) {
+      var dStr    = fmt(cur);
+      var esHoy   = dStr === hoy;
+      var esMes   = cur.getMonth() === d.getMonth();
+      html += '<div class="mes-cell'+(esHoy?' hoy':'')+(esMes?'':' otro-mes')+'" '+
+        'onclick="clicCeldaMes(\''+dStr+'\')" data-fecha="'+dStr+'">' +
+        '<div class="mes-num'+(esHoy?' hoy-num':'')+'">'+cur.getDate()+'</div>' +
+        '<div id="mes-ev-'+dStr+'"></div>' +
+      '</div>';
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+// ── Vista SEMANA ──────────────────────────────────────────────────
+function renderEstructuraSemana(cont) {
+  var hoy   = hoyStr();
+  var lunes = lunesDe(_fechaBase);
+  var dias  = [];
+  for (var i=0; i<7; i++) {
+    var d = new Date(lunes); d.setDate(lunes.getDate()+i);
+    dias.push(d);
+  }
+
+  var html = '<div style="overflow-x:auto;height:100%"><div class="sem-grid" style="min-width:500px">';
+  // Row cabecera
+  html += '<div class="sem-head" style="border-bottom:2px solid var(--line)"></div>';
+  dias.forEach(d => {
+    var dStr  = fmt(d);
+    var esHoy = dStr === hoy;
+    html += '<div class="sem-head'+(esHoy?' hoy':'')+'">'+nomDiaCorto(d.getDay())+'<br/>'+d.getDate()+'</div>';
+  });
+
+  // Horas 7–21
+  for (var h=7; h<=21; h++) {
+    html += '<div class="sem-hora">'+(h<10?'0':'')+h+':00</div>';
+    dias.forEach(d => {
+      var dStr  = fmt(d);
+      var esHoy = dStr === hoy;
+      var hStr  = String(h).padStart(2,'0');
+      html += '<div class="sem-cell'+(esHoy?' hoy-col':'')+'" '+
+        'onclick="clicCeldaSemana(\''+dStr+'\','+h+')" '+
+        'data-fecha="'+dStr+'" data-hora="'+hStr+'" id="sem-ev-'+dStr+'-'+hStr+'"></div>';
+    });
+  }
+  html += '</div></div>';
+  cont.innerHTML = html;
+}
+
+// ── Vista DÍA ─────────────────────────────────────────────────────
+function renderEstructuraDia(cont) {
+  var hoy  = hoyStr();
+  var dStr = fmt(_fechaBase);
+
+  var html = '<div class="dia-grid" style="min-width:300px">';
+  for (var h=7; h<=21; h++) {
+    var hStr = String(h).padStart(2,'0');
+    html += '<div class="dia-hora">'+(h<10?'0':'')+h+':00</div>';
+    html += '<div class="dia-cell" '+
+      'onclick="clicCeldaDia(\''+dStr+'\','+h+')" '+
+      'id="dia-ev-'+dStr+'-'+hStr+'"></div>';
+  }
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER EVENTOS SOBRE LA ESTRUCTURA
+// ══════════════════════════════════════════════════════════════════
+function renderEventos() {
+  if (_vista === 'mes')    renderEventosMes();
+  else if (_vista === 'semana') renderEventosSemana();
+  else                     renderEventosDia();
+}
+
+function clsEvento(c) {
+  if (['completada','cancelada'].includes(c.estado)) return 'ev-'+c.estado;
+  return 'ev-'+(c.tipo_cita||'medica');
+}
+
+// ── Eventos MES ───────────────────────────────────────────────────
+function renderEventosMes() {
+  // Limpiar todos los contenedores de eventos
+  document.querySelectorAll('[id^="mes-ev-"]').forEach(el => el.innerHTML = '');
+
+  // Agrupar por fecha
+  var porFecha = {};
+  _citas.forEach(c => {
+    var d = new Date(c.fecha_hora);
+    var dStr = fmt(d);
+    if (!porFecha[dStr]) porFecha[dStr] = [];
+    porFecha[dStr].push(c);
+  });
+
+  Object.entries(porFecha).forEach(([dStr, citas]) => {
+    var cont = document.getElementById('mes-ev-'+dStr);
+    if (!cont) return;
+    var MAX = 3;
+    citas.slice(0,MAX).forEach(c => {
+      var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
+      var div  = document.createElement('div');
+      div.className = 'mes-evento '+clsEvento(c);
+      div.title     = tipo.icon+' '+esc(c.mascota_nombre)+' · '+fTime(c.fecha_hora);
+      div.textContent = tipo.icon+' '+fTime(c.fecha_hora)+' '+esc(c.mascota_nombre);
+      div.onclick   = e => { e.stopPropagation(); verCita(c); };
+      cont.appendChild(div);
+    });
+    if (citas.length > MAX) {
+      var mas = document.createElement('div');
+      mas.className = 'mes-mas';
+      mas.textContent = '+'+( citas.length-MAX)+' más';
+      mas.onclick = e => { e.stopPropagation(); mostrarTodasDia(dStr, citas); };
+      cont.appendChild(mas);
+    }
+  });
+}
+
+// ── Eventos SEMANA ────────────────────────────────────────────────
+function renderEventosSemana() {
+  document.querySelectorAll('[id^="sem-ev-"]').forEach(el => { el.innerHTML=''; el.style.position='relative'; });
+
+  _citas.forEach(c => {
+    var d    = new Date(c.fecha_hora);
+    var dStr = fmt(d);
+    var h    = d.getHours();
+    if (h < 7 || h > 21) return;
+    var hStr = String(h).padStart(2,'0');
+    var cell = document.getElementById('sem-ev-'+dStr+'-'+hStr);
+    if (!cell) return;
+
+    var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
+    var min  = d.getMinutes();
+    var top  = (min / 60) * 52;
+    var dur  = Math.max((c.duracion_min||30) / 60 * 52, 20);
+
+    var div  = document.createElement('div');
+    div.className = 'sem-evento '+clsEvento(c);
+    div.style.cssText = 'top:'+top+'px;height:'+dur+'px';
+    div.title     = tipo.icon+' '+esc(c.mascota_nombre)+' '+fTime(c.fecha_hora);
+    div.innerHTML = '<strong>'+fTime(c.fecha_hora)+'</strong> '+tipo.icon+' '+esc(c.mascota_nombre);
+    div.onclick   = e => { e.stopPropagation(); verCita(c); };
+    cell.appendChild(div);
+  });
+}
+
+// ── Eventos DÍA ───────────────────────────────────────────────────
+function renderEventosDia() {
+  document.querySelectorAll('[id^="dia-ev-"]').forEach(el => { el.innerHTML=''; el.style.position='relative'; });
+
+  _citas.forEach(c => {
+    var d    = new Date(c.fecha_hora);
+    var dStr = fmt(d);
+    var h    = d.getHours();
+    if (h < 7 || h > 21) return;
+    var hStr = String(h).padStart(2,'0');
+    var cell = document.getElementById('dia-ev-'+dStr+'-'+hStr);
+    if (!cell) return;
+
+    var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
+    var min  = d.getMinutes();
+    var top  = (min / 60) * 60;
+    var dur  = Math.max((c.duracion_min||30) / 60 * 60, 24);
+
+    var div  = document.createElement('div');
+    div.className = 'dia-evento '+clsEvento(c);
+    div.style.cssText = 'top:'+top+'px;height:'+dur+'px';
+    div.innerHTML =
+      '<p style="font-weight:700;font-size:.72rem">'+tipo.icon+' '+fTime(c.fecha_hora)+' · '+esc(c.mascota_nombre)+'</p>'+
+      '<p style="font-size:.65rem;opacity:.85">'+esc(c.propietario_nombre||'')+'</p>'+
+      '<p style="font-size:.65rem;opacity:.75">🩺 '+esc(c.veterinario_nombre||'')+'</p>';
+    div.onclick = e => { e.stopPropagation(); verCita(c); };
+    cell.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CLIC EN CELDA VACÍA → NUEVA CITA
+// ══════════════════════════════════════════════════════════════════
+function clicCeldaMes(fecha) { abrirNuevaCita(fecha, '09:00'); }
+function clicCeldaSemana(fecha, hora) { abrirNuevaCita(fecha, String(hora).padStart(2,'0')+':00'); }
+function clicCeldaDia(fecha, hora)    { abrirNuevaCita(fecha, String(hora).padStart(2,'0')+':00'); }
+
+function mostrarTodasDia(dStr, citas) {
+  // Cambiar a vista día de esa fecha
+  _fechaBase = new Date(dStr+'T12:00:00');
+  cambiarVista('dia');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VER DETALLE DE CITA
+// ══════════════════════════════════════════════════════════════════
+function verCita(c) {
+  var tipo        = TIPOS[c.tipo_cita] || TIPOS.medica;
+  var puedAtender = ['pendiente','confirmada','en_curso'].includes(c.estado);
+
+  document.getElementById('ver-cita-titulo').textContent = tipo.icon+' '+tipo.label;
+
+  document.getElementById('ver-cita-body').innerHTML =
+    '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;align-items:start">' +
+      '<span style="color:var(--ink-faint);font-weight:600">Mascota:</span>' +
+      '<span style="font-weight:700">'+badgeEspecie(c.especie)+' '+esc(c.mascota_nombre)+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Propietario:</span>' +
+      '<span>'+esc(c.propietario_nombre||'—')+(c.telefono?' · 📞 '+esc(c.telefono):'')+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Veterinario:</span>' +
+      '<span>🩺 '+esc(c.veterinario_nombre||'—')+'</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Fecha:</span>' +
+      '<span>'+fDateTime(c.fecha_hora)+' · '+( c.duracion_min||30)+' min</span>' +
+      '<span style="color:var(--ink-faint);font-weight:600">Motivo:</span>' +
+      '<span>'+esc(c.motivo||'—')+'</span>' +
+      (c.sede_nombre?'<span style="color:var(--ink-faint);font-weight:600">Sede:</span><span>🏥 '+esc(c.sede_nombre)+'</span>':'') +
+      (c.notas?'<span style="color:var(--ink-faint);font-weight:600">Notas:</span><span style="font-style:italic">'+esc(c.notas)+'</span>':'') +
+    '</div>' +
+    '<div style="margin-top:.25rem">'+badgeEstado(c.estado)+'</div>';
+
+  // Botones de acción
+  var foot = '<button onclick="closeModal(\'modal-ver-cita\')" class="vbtn vbtn-ghost">Cerrar</button>';
+  if (puedAtender) {
+    foot += '<button onclick="closeModal(\'modal-ver-cita\');abrirAtenderCal('+JSON.stringify(JSON.stringify(c))+')" '+
+      'class="vbtn vbtn-primary">'+tipo.icon+' Atender</button>';
+  }
+  // Cambio de estado rápido
+  foot += '<select onchange="cambiarEstadoCita('+c.id+',this.value)" class="vinput" style="font-size:.75rem;width:auto;padding:.35rem .6rem">'+
+    ['pendiente','confirmada','en_curso','completada','cancelada'].map(s =>
+      '<option value="'+s+'"'+(s===c.estado?' selected':'')+'>'+s+'</option>'
+    ).join('')+'</select>';
+
+  document.getElementById('ver-cita-foot').innerHTML = foot;
+  openModal('modal-ver-cita');
+}
+
+async function cambiarEstadoCita(id, estado) {
+  try {
+    var res = await api('/citas/'+id+'/estado', { method:'PATCH', body:{ estado } });
+    if (res?.ok) {
+      toast('Estado actualizado','success');
+      closeModal('modal-ver-cita');
+      cargarCitas();
+    }
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ATENDER
+// ══════════════════════════════════════════════════════════════════
+function abrirAtenderCal(cStr) {
+  var c    = JSON.parse(cStr);
+  var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
+  _citaAtender = c;
+
+  document.getElementById('atender-cal-titulo').textContent   = tipo.icon+' Iniciar Atención';
+  document.getElementById('atender-cal-paciente').textContent = badgeEspecie(c.especie)+' '+esc(c.mascota_nombre)+' · '+esc(c.propietario_nombre||'');
+  document.getElementById('atender-cal-motivo').textContent   = '📋 '+esc(c.motivo||'');
+  document.getElementById('atender-cal-fecha').textContent    = '🕐 '+fDateTime(c.fecha_hora);
+  document.getElementById('atender-cal-btn').textContent      = tipo.icon+' Ir a Atender';
+
+  var tabLabel = {
+    medica:'Historia Clínica → pestaña <strong>Consultas</strong>',
+    vacuna:'Historia Clínica → pestaña <strong>Vacunas</strong>',
+    desparasitacion:'Historia Clínica → pestaña <strong>Desparasitaciones</strong>',
+    estetica:'Historia Clínica → pestaña <strong>Estética</strong>',
+  };
+  document.getElementById('atender-cal-destino').innerHTML =
+    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;color:#15803d;line-height:1.6">'+
+      tipo.icon+' Serás redirigido a <strong>'+tabLabel[c.tipo_cita||'medica']+'</strong>.<br/>'+
+      'El modal se abrirá automáticamente con los datos precargados.<br/>'+
+      'Al guardar, la cita quedará marcada como <strong>completada</strong>.'+
+    '</div>';
+
+  openModal('modal-atender-cal');
+}
+
+function irAAtenderCal() {
+  if (!_citaAtender) return;
+  var tipo = TIPOS[_citaAtender.tipo_cita] || TIPOS.medica;
+  sessionStorage.setItem('historia_mascota_id', _citaAtender.mascota_id);
+  sessionStorage.setItem('historia_cita_id',    _citaAtender.id);
+  sessionStorage.setItem('historia_motivo',     _citaAtender.motivo||'');
+  sessionStorage.setItem('historia_tab',        tipo.tab);
+  window.location.href = 'historia.html';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// NUEVA CITA DESDE CALENDARIO
+// ══════════════════════════════════════════════════════════════════
+async function cargarVets() {
+  try {
+    var res = await api('/usuarios?rol=veterinario');
+    _vets   = res?.ok ? (await res.json()).data || [] : [];
+    var opts = '<option value="">Todos los veterinarios</option>' +
+      _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+    var fvet = document.getElementById('f-vet');
+    if (fvet) fvet.innerHTML = opts;
+  } catch {}
+}
+
+function abrirNuevaCita(fecha, hora) {
+  _ncPropSel = null; _ncMascSel = null;
+  document.getElementById('nc-prop-q').value = '';
+  document.getElementById('nc-prop-sel').style.display     = 'none';
+  document.getElementById('nc-paso-mascota').style.display = 'none';
+  document.getElementById('nc-paso-cita').style.display    = 'none';
+  document.getElementById('nc-btn-guardar').style.display  = 'none';
+  document.getElementById('nc-prop-ac').style.display      = 'none';
+  document.getElementById('nc-notas').value  = '';
+  document.getElementById('nc-motivo').value = '';
+  document.getElementById('nc-duracion').value = '30';
+  selTipoNC('medica');
+
+  // Precargar fecha/hora si viene de clic en celda
+  var fh = '';
+  if (fecha) {
+    fh = fecha+'T'+(hora||'09:00');
+  } else {
+    var n = new Date();
+    var pad = x => String(x).padStart(2,'0');
+    fh = n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())+'T'+pad(n.getHours())+':00';
+  }
+  document.getElementById('nc-fecha').value = fh;
+
+  // Llenar vets en el select del modal
+  var sel = document.getElementById('nc-vet');
+  sel.innerHTML = '<option value="">Seleccionar veterinario…</option>'+
+    _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+
+  document.getElementById('ncita-titulo').textContent = fecha
+    ? '📅 Nueva Cita — '+new Date(fecha+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',day:'numeric',month:'short'})
+    : '📅 Nueva Cita';
+
+  openModal('modal-ncita');
+}
+
+function cerrarModalNcita() { closeModal('modal-ncita'); _ncPropSel=null; _ncMascSel=null; }
+
+function selTipoNC(tipo) {
+  document.getElementById('nc-tipo').value = tipo;
+  Object.keys(TIPOS).forEach(t => {
+    var btn = document.getElementById('nc-tipo-'+t);
+    if (btn) btn.className = 'tipo-btn-cal'+(t===tipo?' sel-'+t:'');
+  });
+}
+
+// Buscar propietario con autocompletado
+async function buscarPropNC() {
+  var q   = document.getElementById('nc-prop-q').value.trim();
+  var ul  = document.getElementById('nc-prop-ac');
+  if (!q) return;
+  ul.innerHTML = '<li style="color:var(--ink-faint)">Buscando…</li>';
+  ul.style.display = 'block';
+  try {
+    var res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=6');
+    var rows = res?.ok ? (await res.json()).data || [] : [];
+    ul.innerHTML = rows.length
+      ? rows.map(p => '<li onclick="selPropNC('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" >'+
+          '<strong>'+esc(p.nombre+' '+p.apellido)+'</strong> '+
+          '<span style="font-size:.72rem;color:var(--ink-faint)">'+(p.dni?'· DNI '+p.dni:'')+' 📞'+esc(p.telefono||'')+'</span>' +
+        '</li>').join('')
+      : '<li style="color:var(--ink-faint)">Sin resultados</li>';
+  } catch { ul.innerHTML = '<li style="color:#e11d48">Error</li>'; }
+}
+
+document.addEventListener('click', e => {
+  var ul = document.getElementById('nc-prop-ac');
+  if (ul && !ul.contains(e.target) && e.target.id!=='nc-prop-q') ul.style.display='none';
+});
+
+async function selPropNC(id, nombre, apellido, dni, telefono) {
+  _ncPropSel = { id };
+  document.getElementById('nc-prop-ac').style.display      = 'none';
+  document.getElementById('nc-prop-q').value               = '';
+  document.getElementById('nc-prop-sel').style.display     = 'flex';
+  document.getElementById('nc-prop-avatar').textContent    = nombre[0]+apellido[0];
+  document.getElementById('nc-prop-nombre').textContent    = nombre+' '+apellido;
+  document.getElementById('nc-prop-info').textContent      = (dni?'🪪 '+dni+' · ':'')+'📞 '+telefono;
+  document.getElementById('nc-paso-mascota').style.display = 'block';
+  document.getElementById('nc-mascotas').innerHTML         = '<p style="font-size:.78rem;color:var(--ink-faint)">Cargando…</p>';
+  try {
+    var res      = await api('/propietarios/'+id);
+    var mascotas = res?.ok ? (await res.json()).data?.mascotas || [] : [];
+    document.getElementById('nc-mascotas').innerHTML = mascotas.length
+      ? mascotas.map(m =>
+          '<button onclick="selMascotaNC('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
+          'style="display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;background:#fff;border:1px solid var(--line);border-radius:.75rem;cursor:pointer;font-family:inherit;width:100%;text-align:left;transition:all .15s" '+
+          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
+            '<span style="font-size:1.3rem">'+badgeEspecie(m.especie)+'</span>'+
+            '<div><p style="font-weight:700;font-size:.83rem">'+esc(m.nombre)+'</p>'+
+            '<p style="font-size:.68rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'')+'</p></div>' +
+          '</button>'
+        ).join('')
+      : '<p style="font-size:.78rem;color:var(--ink-faint)">No tiene mascotas registradas.</p>';
+  } catch {}
+}
+
+function limpiarPropNC() {
+  _ncPropSel = null; _ncMascSel = null;
+  document.getElementById('nc-prop-sel').style.display     = 'none';
+  document.getElementById('nc-paso-mascota').style.display = 'none';
+  document.getElementById('nc-paso-cita').style.display    = 'none';
+  document.getElementById('nc-btn-guardar').style.display  = 'none';
+}
+
+function selMascotaNC(id, nombre, especie, raza) {
+  _ncMascSel = { id, nombre, especie };
+  document.getElementById('nc-paso-mascota').style.display = 'none';
+  document.getElementById('nc-paso-cita').style.display    = 'block';
+  document.getElementById('nc-btn-guardar').style.display  = 'inline-flex';
+  document.getElementById('nc-masc-icon').textContent      = badgeEspecie(especie);
+  document.getElementById('nc-masc-nombre').textContent    = nombre;
+  document.getElementById('nc-masc-info').textContent      = especie+' · '+raza;
+}
+
+function limpiarMascotaNC() {
+  _ncMascSel = null;
+  document.getElementById('nc-paso-mascota').style.display = 'block';
+  document.getElementById('nc-paso-cita').style.display    = 'none';
+  document.getElementById('nc-btn-guardar').style.display  = 'none';
+}
+
+async function guardarNcita() {
+  if (!_ncPropSel) { toast('Selecciona un propietario','warning'); return; }
+  if (!_ncMascSel) { toast('Selecciona una mascota','warning');    return; }
+  var vetId    = parseInt(document.getElementById('nc-vet').value);
+  var fechaHora= document.getElementById('nc-fecha').value;
+  var motivo   = document.getElementById('nc-motivo').value.trim();
+  var tipo     = document.getElementById('nc-tipo').value || 'medica';
+  if (!vetId)     { toast('Selecciona un veterinario','warning'); return; }
+  if (!fechaHora) { toast('Ingresa la fecha y hora','warning');   return; }
+  if (!motivo)    { toast('Ingresa el motivo','warning');         return; }
+
+  try {
+    var res = await api('/citas', { method:'POST', body:{
+      mascota_id    : _ncMascSel.id,
+      veterinario_id: vetId,
+      fecha_hora    : fechaHora,
+      duracion_min  : parseInt(document.getElementById('nc-duracion').value)||30,
+      motivo, tipo_cita: tipo,
+      notas: document.getElementById('nc-notas').value.trim()||null,
+    }});
+    var data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    var tipoInfo = TIPOS[tipo];
+    toast('✅ Cita agendada · '+tipoInfo.icon+' '+tipoInfo.label,'success');
+    cerrarModalNcita();
+    cargarCitas();
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GOOGLE CALENDAR — PRÓXIMA ETAPA
+// ══════════════════════════════════════════════════════════════════
+/*
+  GC_INTEGRATION_HOOK:
+  Al crear cita  → gcCreateEvent(citaId, mascota, fecha, motivo)
+  Al completar   → gcUpdateEvent(citaId, { status:'confirmed' })
+  Al cancelar    → gcDeleteEvent(citaId)
+
+  Configuración en empresa_config:
+    gc_enabled      TINYINT  (0/1)
+    gc_calendar_id  VARCHAR  (ID del calendario de Google)
+    gc_token        TEXT     (OAuth refresh_token cifrado)
+
+  Endpoint futuro: POST /api/v1/fe/google-calendar/sync
+*/
+</script>
+</body>
+</html>

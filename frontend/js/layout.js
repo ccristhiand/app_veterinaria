@@ -7,15 +7,15 @@
 // ── Módulos por plan ──────────────────────────────────────────────
 const MODULOS_POR_PLAN = {
   basic: [
-    'dashboard','citas','propietarios','mascotas','historia','servicios',
+    'dashboard','citas','calendario','propietarios','mascotas','historia','servicios',
     'asistencia','whatsapp',
   ],
   pro: [
-    'dashboard','citas','propietarios','mascotas','historia',
+    'dashboard','citas','calendario','propietarios','mascotas','historia',
     'inventario','reportes','servicios','asistencia','whatsapp',
   ],
   enterprise: [
-    'dashboard','citas','propietarios','mascotas','historia',
+    'dashboard','citas','calendario','propietarios','mascotas','historia',
     'inventario','facturacion','caja','reportes','servicios',
     'consentimientos','usuarios','configuracion','asistencia','whatsapp',
   ],
@@ -26,6 +26,7 @@ const MODULOS_POR_PLAN = {
 const TODOS_LOS_LINKS = [
   { id:'dashboard',      icon:'📊', label:'Dashboard',        href:'dashboard',      roles:['admin','veterinario','recepcionista'] },
   { id:'citas',          icon:'📅', label:'Citas',            href:'citas',          roles:['admin','veterinario','recepcionista'] },
+  { id:'calendario',     icon:'🗓️', label:'Calendario',       href:'calendario',     roles:['admin','veterinario','recepcionista'] },
   { id:'propietarios',   icon:'👥', label:'Propietarios',     href:'propietarios',   roles:['admin','veterinario','recepcionista'] },
   { id:'mascotas',       icon:'🐾', label:'Mascotas',         href:'mascotas',       roles:['admin','veterinario','recepcionista'] },
   { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia',       roles:['admin','veterinario','recepcionista'] },
