@@ -962,6 +962,7 @@ function addItem(desc, cant, pu) {
         ' style="font-size:.78rem;text-align:center;border-color:#fecdd3;padding:.4rem .3rem" value="0"' +
         ' oninput="calcularTotales()"/>' +
       '<span style="font-size:.72rem;color:#be123c;font-weight:700">%</span>' +
+      '<input type="hidden" data-f="inv-id" value="0"/>' +
     '</div>' +
     '<button onclick="document.getElementById(\'item-'+id+'\').remove();calcularTotales()"' +
       ' style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.2rem">✕</button>';
@@ -987,7 +988,8 @@ async function buscarItemAC(input, id) {
     var precio = item.precio || item.precio_unitario || 0;
     var colores= catColors[cat] || '#f8faf8;color:#4b5f57';
     var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
-    return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+')">' +
+    var invId = item._tipo==='inventario' ? item.id : 0;
+    return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+','+invId+')">' +
       '<span class="ac-cat-pill" style="background:'+colores+'">'+cat+'</span>' +
       '<span style="flex:1;font-weight:600">'+esc(item.nombre)+'</span>' +
       '<span style="font-size:.7rem;color:var(--ink-faint)">S/. '+parseFloat(precio).toFixed(2)+stock+'</span>' +
@@ -996,11 +998,13 @@ async function buscarItemAC(input, id) {
   ul.style.display='block';
 }
 
-function selItemAC(e, id, nombre, precio) {
+function selItemAC(e, id, nombre, precio, invId) {
   e.preventDefault();
   var div = document.getElementById('item-'+id);
-  div.querySelector('[data-f="desc"]').value = nombre;
-  div.querySelector('[data-f="pu"]').value   = precio;
+  div.querySelector('[data-f="desc"]').value  = nombre;
+  div.querySelector('[data-f="pu"]').value    = precio;
+  var hiddenInv = div.querySelector('[data-f="inv-id"]');
+  if (hiddenInv) hiddenInv.value = invId || 0;
   document.getElementById('ac-'+id).style.display='none';
   calcularTotales();
 }
@@ -1180,8 +1184,9 @@ async function emitirFactura() {
     var cant = parseFloat(div.querySelector('[data-f="cant"]')?.value)||1;
     var pu   = parseFloat(div.querySelector('[data-f="pu"]')?.value)||0;
     var dpct = parseFloat(div.querySelector('[data-f="dpct"]')?.value)||0;
+    var invId = parseInt(div.querySelector('[data-f="inv-id"]')?.value) || null;
     if (!desc) { ok=false; return; }
-    items.push({ descripcion:desc, cantidad:cant, precio_unit:pu, descuento_pct:dpct });
+    items.push({ descripcion:desc, cantidad:cant, precio_unit:pu, descuento_pct:dpct, inventario_id: invId || undefined });
   });
   if (!ok)          { toast('Completa la descripción de todos los ítems.','warning'); return; }
   if (!items.length){ toast('Agrega al menos un ítem.','warning'); return; }
