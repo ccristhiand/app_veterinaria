@@ -774,39 +774,21 @@ function aplicarPlantilla() {
 }
 
 function actualizarPreviewMensaje() {
-  const msg          = document.getElementById('wa-mensaje').value;
-  const nombre       = _propWASel?.nombre  || '[nombre]';
-  const mascota      = _propWASel?.mascotas?.map(m => m.nombre).join(', ') || '[mascota]';
-  const clinica      = document.getElementById('sidebar-clinica-nombre')?.textContent || '[clínica]';
-  const telProp      = _propWASel?.telefono || '[teléfono]';
-  const preview = msg
-    .replace(/\[nombre\]/gi,   nombre)
-    .replace(/\[mascota\]/gi,  mascota)
-    .replace(/\[clinica\]/gi,  clinica)
-    .replace(/\[telefono\]/gi, telProp);
+  const msg     = document.getElementById('wa-mensaje').value;
+  const nombre  = _propWASel?.nombre  || '[nombre]';
+  const mascota = _propWASel?.mascotas?.[0]?.nombre || '[mascota]';
+  const preview = msg.replace(/\[nombre\]/gi, nombre).replace(/\[mascota\]/gi, mascota).replace(/\[clinica\]/gi, '[clínica]');
   document.getElementById('wa-preview-msg').textContent = preview || 'El preview aparecerá aquí…';
   document.getElementById('wa-chars').textContent = `${msg.length} caracteres`;
-  document.getElementById('wa-preview-hora').textContent = new Date().toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
-}
   document.getElementById('wa-preview-hora').textContent = new Date().toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
 }
 
 async function enviarMensajeWA() {
   if (!_propWASel) { toast('Selecciona un propietario primero.', 'warning'); return; }
   if (!_propWASel.telefono) { toast('Este propietario no tiene teléfono registrado.', 'warning'); return; }
-  const mensajeRaw = document.getElementById('wa-mensaje').value.trim();
-  if (!mensajeRaw && !_waArchivoB64) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
+  const mensaje = document.getElementById('wa-mensaje').value.trim();
+  if (!mensaje && !_waArchivoB64) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
   if (_waEstado !== 'conectado') { toast('WhatsApp no está conectado.', 'warning'); return; }
-
-  // Reemplazar variables con datos reales del propietario seleccionado
-  const nombreClinica = document.getElementById('sidebar-clinica-nombre')?.textContent || '';
-  const mascotaNombre = _propWASel.mascotas?.map(m => m.nombre).join(', ') || '';
-  const mensaje = (mensajeRaw || '')
-    .replace(/\[nombre\]/gi,   _propWASel.nombre  || '')
-    .replace(/\[mascota\]/gi,  mascotaNombre       || '')
-    .replace(/\[clinica\]/gi,  nombreClinica       || '')
-    .replace(/\[telefono\]/gi, _propWASel.telefono || '');
-
   const btn = document.getElementById('btn-enviar-wa-txt');
   btn.textContent = 'Enviando…';
   document.getElementById('btn-enviar-wa').disabled = true;
