@@ -51,8 +51,9 @@ if (AZURE_CONN) {
 }
 
 /**
- * Subir buffer a Azure Blob Storage y retornar SAS URL (sin necesitar acceso público)
- * @returns {string} SAS URL válida por 1 año
+ * Subir buffer a Azure Blob Storage
+ * El gateway descarga con credenciales SDK — no necesita URL pública ni SAS
+ * @returns {string} URL del blob (requiere credenciales para acceder)
  */
 async function subirBlob(buffer, blobName, contentType = 'image/jpeg') {
   if (!containerClient) throw new Error('Azure Blob no configurado');
@@ -60,24 +61,7 @@ async function subirBlob(buffer, blobName, contentType = 'image/jpeg') {
   await blockBlob.upload(buffer, buffer.length, {
     blobHTTPHeaders: { blobContentType: contentType },
   });
-
-  // Generar SAS URL válida por 1 año (WhatsApp necesita URL accesible)
-  const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
-  const parts   = Object.fromEntries(
-    AZURE_CONN.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; })
-  );
-  const sharedKeyCredential = new StorageSharedKeyCredential(parts.AccountName, parts.AccountKey);
-  const expiresOn = new Date();
-  expiresOn.setFullYear(expiresOn.getFullYear() + 1); // expira en 1 año
-
-  const sasToken = generateBlobSASQueryParameters({
-    containerName: AZURE_CONTAINER,
-    blobName,
-    permissions  : BlobSASPermissions.parse('r'), // solo lectura
-    expiresOn,
-  }, sharedKeyCredential).toString();
-
-  return blockBlob.url + '?' + sasToken;
+  return blockBlob.url; // URL base sin SAS — el gateway usa SDK para descargar
 }
 
 /**
@@ -300,7 +284,34 @@ async function enviarImagen(tenantId, telefono, imagenUrl, caption, codigoPais =
   if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
   const jid = formatTelefono(telefono, codigoPais);
   if (!jid) throw new Error('Teléfono inválido');
-  const { buffer, mimetype } = await descargarImagen(imagenUrl);
+
+  let buffer, mimetype;
+
+  // Si es URL de Azure y tenemos credenciales → descargar con SDK (sin acceso público)
+  if (containerClient && imagenUrl && imagenUrl.includes('.blob.core.windows.net')) {
+    try {
+      // Extraer blobName de la URL
+      const urlObj = new URL(imagenUrl.split('?')[0]); // quitar SAS si tiene
+      const pathParts = urlObj.pathname.split('/');
+      // pathname = /container/blob/name → quitar primer slash y container
+      const blobName = pathParts.slice(2).join('/');
+      const blobClient = containerClient.getBlobClient(blobName);
+      const download = await blobClient.download();
+      const chunks = [];
+      for await (const chunk of download.readableStreamBody) chunks.push(chunk);
+      buffer   = Buffer.concat(chunks);
+      mimetype = download.contentType || 'image/jpeg';
+    } catch (e) {
+      console.error('[WA] Error descargando blob Azure:', e.message);
+      throw new Error('No se pudo descargar la imagen de Azure: ' + e.message);
+    }
+  } else {
+    // URL externa — descarga HTTP normal
+    const dl = await descargarImagen(imagenUrl);
+    buffer   = dl.buffer;
+    mimetype = dl.mimetype;
+  }
+
   await sesion.socket.sendMessage(jid, { image: buffer, mimetype, caption: caption || '' });
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
 }
@@ -322,18 +333,28 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
   if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
 
   if (imagenUrl) {
-    const { buffer, mimetype } = await descargarImagen(imagenUrl);
-    await sesion.socket.sendMessage('status@broadcast', {
-      image  : buffer,
-      mimetype,
-      caption: texto || '',
-    });
+    let buffer, mimetype;
+    // Descargar desde Azure con credenciales si es blob de Azure
+    if (containerClient && imagenUrl.includes('.blob.core.windows.net')) {
+      try {
+        const urlObj   = new URL(imagenUrl.split('?')[0]);
+        const blobName = urlObj.pathname.split('/').slice(2).join('/');
+        const dl       = await containerClient.getBlobClient(blobName).download();
+        const chunks   = [];
+        for await (const chunk of dl.readableStreamBody) chunks.push(chunk);
+        buffer   = Buffer.concat(chunks);
+        mimetype = dl.contentType || 'image/jpeg';
+      } catch (e) {
+        throw new Error('No se pudo descargar imagen de Azure: ' + e.message);
+      }
+    } else {
+      const dl = await descargarImagen(imagenUrl);
+      buffer = dl.buffer; mimetype = dl.mimetype;
+    }
+    await sesion.socket.sendMessage('status@broadcast', { image: buffer, mimetype, caption: texto || '' });
   } else {
-    // Historia de solo texto
     await sesion.socket.sendMessage('status@broadcast', {
-      text          : texto,
-      backgroundArgb: 0xff1f8c3d, // verde VetNetcodip
-      font          : 2,
+      text: texto, backgroundArgb: 0xff1f8c3d, font: 2,
     });
   }
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
