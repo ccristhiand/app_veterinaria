@@ -1062,41 +1062,55 @@ async function cargarCampanas() {
       cont.innerHTML='<div class="vempty"><span style="font-size:2rem">📢</span><p>Sin campañas aún</p><button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Crear primera campaña</button></div>';
       return;
     }
-    cont.innerHTML=rows.map(function(c){return renderCampanaCard(c);}).join('');
+    cont.innerHTML=renderCampanasTabla(rows);
   } catch(e){cont.innerHTML='<div class="vempty">Error al cargar</div>';}
 }
 
-function renderCampanaCard(c) {
-  var pct=c.total>0?Math.round((c.enviados/c.total)*100):0;
+function renderCampanasTabla(rows) {
   var cols={borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
   var emoj={borrador:'📝',programada:'⏰',enviando:'📤',pausada:'⏸️',completada:'✅',cancelada:'❌'};
-  var col=cols[c.estado]||'#6b7280';
-  var cid=c.id;
-  var btnP=c.estado==='enviando'?'<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️ Pausar</button>':'';
-  var btnR=c.estado==='pausada'?'<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶ Reanudar</button>':'';
-  var btnI=c.estado==='borrador'?'<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">🚀 Iniciar</button>':'';
-  var btnE=['borrador','pausada'].includes(c.estado)?'<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button>':'';
-  var btnX=['borrador','pausada','enviando'].includes(c.estado)?'<button class="vbtn" style="font-size:.75rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">❌</button>':'';
-  var html='<div class="vcard vcard-pad" style="margin-bottom:.75rem">';
-  html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">';
-  html+='<div style="flex:1;min-width:0">';
-  html+='<span style="font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">'+emoj[c.estado]+' '+c.estado+'</span> ';
-  if(['enviando','pausada'].includes(c.estado)&&c.total>c.enviados) html+='<span style="font-size:.7rem;color:var(--ink-faint)">~'+Math.ceil((c.total-c.enviados)/_campLimite)+' día(s) restante(s)</span>';
-  html+='<p style="font-weight:700;font-size:.92rem;margin:.3rem 0 .2rem">'+esc(c.nombre)+'</p>';
-  html+='<p style="font-size:.75rem;color:var(--ink-faint)">👥 '+esc(c.segmento)+(c.imagen_url?' · 🖼️ Con imagen':'')+'</p>';
-  html+='</div>';
-  html+='<div style="display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap">'+btnP+btnR+btnI+btnE+btnX+'</div>';
-  html+='</div>';
-  if(c.total>0){
-    html+='<div style="margin-top:.85rem">';
-    html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-faint);margin-bottom:.3rem"><span>✅ '+c.enviados+'/'+c.total+' enviados</span><span>'+pct+'%</span></div>';
-    html+='<div style="height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%;transition:width .4s"></div></div>';
-    if(c.fallidos>0) html+='<p style="font-size:.68rem;color:#be123c;margin-top:.2rem">⚠️ '+c.fallidos+' fallidos</p>';
-    html+='</div>';
-  }
-  html+='</div>';
+  var html='<div class="vcard" style="padding:0;overflow:hidden">';
+  html+='<div style="overflow-x:auto">';
+  html+='<table class="vtable">';
+  html+='<thead><tr>';
+  html+='<th>Campaña</th><th>Segmento</th><th>Estado</th><th>Progreso</th><th>Fecha</th><th style="text-align:center">Acciones</th>';
+  html+='</tr></thead><tbody>';
+  rows.forEach(function(c) {
+    var pct  = c.total>0 ? Math.round((c.enviados/c.total)*100) : 0;
+    var col  = cols[c.estado]||'#6b7280';
+    var cid  = c.id;
+    var prog = c.total>0
+      ? '<div style="display:flex;align-items:center;gap:.5rem"><div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden;min-width:80px"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div><span style="font-size:.72rem;color:var(--ink-faint);white-space:nowrap">'+c.enviados+'/'+c.total+' ('+pct+'%)</span></div>'
+      : '<span style="font-size:.72rem;color:var(--ink-faint)">Sin iniciar</span>';
+    var fecha = c.programada_at
+      ? '⏰ '+new Date(c.programada_at).toLocaleDateString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+      : new Date(c.created_at).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
+    // Botones según estado
+    var acciones = '';
+    if (['borrador','pausada'].includes(c.estado))
+      acciones += '<button title="Editar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button> ';
+    if (c.estado==='borrador')
+      acciones += '<button title="Iniciar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">▶</button> ';
+    if (c.estado==='enviando')
+      acciones += '<button title="Pausar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️</button> ';
+    if (c.estado==='pausada')
+      acciones += '<button title="Reanudar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶</button> ';
+    if (['borrador','pausada','programada'].includes(c.estado))
+      acciones += '<button title="Cancelar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">✕</button>';
+    html+='<tr>';
+    html+='<td><p style="font-weight:700;font-size:.85rem">'+esc(c.nombre)+'</p>'+(c.imagen_url?'<span style="font-size:.68rem;color:#0369a1">🖼️ Con imagen</span>':'')+'</td>';
+    html+='<td style="font-size:.78rem">'+esc(c.segmento)+'</td>';
+    html+='<td><span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40;white-space:nowrap">'+emoj[c.estado]+' '+c.estado+'</span></td>';
+    html+='<td style="min-width:160px">'+prog+'</td>';
+    html+='<td style="font-size:.75rem;white-space:nowrap;color:var(--ink-soft)">'+fecha+'</td>';
+    html+='<td style="text-align:center;white-space:nowrap">'+acciones+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
   return html;
 }
+
+function renderCampanaCard(c) { return ''; } // legacy — no usado
 
 document.addEventListener('click',function(e){
   var btn=e.target.closest('[data-camp-id]'); if(!btn) return;

@@ -198,6 +198,15 @@ async function procesarCampanas() {
 }
 
 async function procesarCampanasTenant(tenant, conn) {
+  // Activar campañas programadas cuya fecha ya llegó
+  await conn.execute(
+    `UPDATE wa_campanas
+     SET estado='enviando', iniciada_at=NOW()
+     WHERE estado='programada'
+       AND programada_at IS NOT NULL
+       AND programada_at <= NOW()`
+  );
+
   const [campanas] = await conn.execute(
     `SELECT id, nombre, mensaje, imagen_url, segmento, segmento_valor,
             estado, total, enviados, fallidos, enviados_hoy,
