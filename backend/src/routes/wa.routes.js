@@ -13,7 +13,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const router = Router();
 router.use(authenticate);
 
-const WA_GATEWAY = process.env.WA_GATEWAY_URL || 'http://localhost:5000';
+const WA_GATEWAY = process.env.WA_GATEWAY_URL || 'http://localhost:5001';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 
 // ── Helper — llamar al gateway ────────────────────────────────
@@ -169,8 +169,8 @@ router.get('/qr', authorize('admin'), async (req, res, next) => {
 // ── POST /api/v1/wa/enviar — admin + recepcionista ────────────
 router.post('/enviar', authorize('admin', 'recepcionista'), async (req, res, next) => {
   try {
-    const { telefono, mensaje, imagen_url, propietario_id } = req.body;
-    if (!telefono || (!mensaje && !imagen_url)) {
+    const { telefono, mensaje, imagen_base64, imagen_mimetype, propietario_id } = req.body;
+    if (!telefono || (!mensaje && !imagen_base64)) {
       return res.status(422).json({ success: false, message: 'telefono y mensaje o imagen son requeridos' });
     }
 
@@ -183,13 +183,14 @@ router.post('/enviar', authorize('admin', 'recepcionista'), async (req, res, nex
     }
 
     const r = await callGateway('POST', '/wa/enviar', {
-      tenantId      : t.id,
+      tenantId       : t.id,
       telefono,
-      mensaje       : mensaje || null,
-      imagen_url    : imagen_url || null,
-      propietarioId : propietario_id || null,
-      tipo          : 'manual',
-      codigoPais    : cfg.codigo_pais || '+51',
+      mensaje        : mensaje || null,
+      imagen_base64  : imagen_base64 || null,
+      imagen_mimetype: imagen_mimetype || null,
+      propietarioId  : propietario_id || null,
+      tipo           : 'manual',
+      codigoPais     : cfg.codigo_pais || '+51',
     });
     return res.status(r.status).json(r.data);
   } catch (err) { next(err); }
