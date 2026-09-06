@@ -1146,6 +1146,10 @@ function renderCampanasGrid(rows) {
     return;
   }
   grid.innerHTML = rows.map(renderCampanaCard).join('');
+  // Cargar imágenes vía proxy (evita 409 de Azure con acceso público bloqueado)
+  grid.querySelectorAll('[data-wa-img]').forEach(function(img) {
+    cargarImagenWA(img, img.getAttribute('data-wa-img'));
+  });
 }
 
 function renderCampanaCard(c) {
@@ -1165,7 +1169,7 @@ function renderCampanaCard(c) {
   acciones.push('<button class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.3rem .7rem" data-camp-id="'+c.id+'" data-camp-ver="1">👁️ Ver</button>');
 
   var imgPreview = c.imagen_url
-    ? '<div style="height:110px;overflow:hidden;background:#1a1a2e;border-radius:.85rem .85rem 0 0;position:relative"><img src="'+esc(c.imagen_url)+'" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display=\'none\'"/><div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.55))"></div></div>'
+    ? '<div style="height:110px;overflow:hidden;background:#1a1a2e;border-radius:.85rem .85rem 0 0;position:relative"><img data-wa-img="'+c.id+'" style="width:100%;height:100%;object-fit:cover"/><div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.55))"></div></div>'
     : '';
 
   var mensajePreview = c.mensaje ? esc(c.mensaje.length > 90 ? c.mensaje.substring(0,90)+'…' : c.mensaje) : '';
@@ -1266,7 +1270,7 @@ async function verDetalleCampana(id) {
 
     // Imagen si existe — hero visual
     if (c.imagen_url) {
-      html += '<div style="border-radius:.85rem;overflow:hidden;margin-bottom:1rem;max-height:200px"><img src="'+esc(c.imagen_url)+'" style="width:100%;object-fit:cover;display:block" onerror="this.parentElement.remove()"/></div>';
+      html += '<div style="border-radius:.85rem;overflow:hidden;margin-bottom:1rem;max-height:200px" id="det-img-wrap-'+c.id+'"><img data-wa-img="'+c.id+'" style="width:100%;object-fit:cover;display:block"/></div>';
     }
 
     // Badge estado + stats grid
@@ -1323,6 +1327,11 @@ async function verDetalleCampana(id) {
     }
 
     document.getElementById('det-camp-body').innerHTML = html;
+
+    // Cargar imagen del modal vía proxy
+    document.getElementById('det-camp-body').querySelectorAll('[data-wa-img]').forEach(function(img) {
+      cargarImagenWA(img, img.getAttribute('data-wa-img'));
+    });
 
     // Guardar contactos para filtrar
     window._detContactos = contactos;
@@ -1401,7 +1410,7 @@ async function editarCampana(id) {
     document.getElementById('det-modal-campana-titulo').textContent = '✏️ Editar campaña';
     if (c.imagen_url) {
       _campImagenUrl = c.imagen_url; _campImagenBlob = c.imagen_blob_name;
-      var pi = document.getElementById('camp-img-prev-img'); if (pi) pi.src = c.imagen_url;
+      var pi = document.getElementById('camp-img-prev-img'); if (pi) cargarImagenWA(pi, c.id);
       var pp = document.getElementById('camp-img-preview');  if (pp) pp.style.display = '';
       var pb = document.getElementById('btn-limpiar-img-camp'); if (pb) pb.style.display = '';
     } else {
@@ -1495,6 +1504,46 @@ async function guardarCampana(iniciar) {
 }
 
 var _campSubiendo = false;
+
+// ══════════════════════════════════════════════════════════════
+// IMÁGENES WA — proxy seguro (igual que estetica/cargarFotoSegura)
+// El backend descarga de Azure con SDK; el frontend nunca llama directo a Azure
+// ══════════════════════════════════════════════════════════════
+var _waBlobCache = {};   // campanaId → objectURL
+
+async function cargarImagenWA(imgEl, campanaId) {
+  if (!campanaId) return;
+  if (_waBlobCache[campanaId]) {
+    imgEl.src = _waBlobCache[campanaId];
+    return;
+  }
+  try {
+    var token = localStorage.getItem('vet_access');
+    var res = await fetch(API_URL + '/api/v1/wa/imagen/' + campanaId, {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'X-Tenant-Host': window.location.hostname,
+      }
+    });
+    if (!res.ok) { imgEl.style.display = 'none'; return; }
+    var blob = await res.blob();
+    var blobUrl = URL.createObjectURL(blob);
+    _waBlobCache[campanaId] = blobUrl;
+    imgEl.src = blobUrl;
+  } catch(e) {
+    imgEl.style.display = 'none';
+  }
+}
+
+// Crea un <img> que carga vía proxy WA
+function crearImgWA(campanaId, style) {
+  var img = document.createElement('img');
+  img.style.cssText = style || 'width:100%;height:100%;object-fit:cover';
+  img.alt = '';
+  if (campanaId) cargarImagenWA(img, campanaId);
+  return img;
+}
+
 
 async function previsualizarImagenCampana(input) {
   var file = input.files[0]; if (!file) return;

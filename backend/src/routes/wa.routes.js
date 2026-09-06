@@ -503,4 +503,45 @@ router.delete('/historias/:id', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/wa/imagen/:campanaId — proxy seguro Azure (igual que estetica/foto) ─
+// El navegador nunca llama directo a Azure. El backend descarga con SDK y hace pipe.
+router.get('/imagen/:campanaId', authenticate, async (req, res, next) => {
+  try {
+    const { BlobServiceClient } = require('@azure/storage-blob');
+
+    const connStr   = process.env.AZURE_WA_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const container = process.env.AZURE_WA_CONTAINER || 'wa-media';
+
+    if (!connStr) return res.status(500).end();
+
+    const [campana] = await req.db.query(
+      'SELECT imagen_url, imagen_blob_name FROM wa_campanas WHERE id = ?', [req.params.campanaId]
+    );
+    if (!campana || !campana.imagen_url) return res.status(404).end();
+
+    // Extraer blobName: puede venir guardado en imagen_blob_name o deducirse de la URL
+    let blobName = campana.imagen_blob_name;
+    if (!blobName) {
+      // Fallback: extraer de la URL (quitando el container y lo previo)
+      const urlParts = campana.imagen_url.split(`/${container}/`);
+      blobName = urlParts[1] ? urlParts[1].split('?')[0] : null;
+    }
+    if (!blobName) return res.status(400).end();
+
+    const client     = BlobServiceClient.fromConnectionString(connStr);
+    const blobClient = client.getContainerClient(container).getBlobClient(blobName);
+
+    const download = await blobClient.download();
+
+    const ext = blobName.split('.').pop().toLowerCase();
+    const mimeMap = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    const contentType = download.contentType || mimeMap[ext] || 'image/jpeg';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    download.readableStreamBody.pipe(res);
+  } catch (err) { next(err); }
+});
+
+
 module.exports = router;
