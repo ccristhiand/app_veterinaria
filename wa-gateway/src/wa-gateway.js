@@ -51,8 +51,8 @@ if (AZURE_CONN) {
 }
 
 /**
- * Subir buffer a Azure Blob Storage
- * @returns {string} URL pública del blob
+ * Subir buffer a Azure Blob Storage y retornar SAS URL (sin necesitar acceso público)
+ * @returns {string} SAS URL válida por 1 año
  */
 async function subirBlob(buffer, blobName, contentType = 'image/jpeg') {
   if (!containerClient) throw new Error('Azure Blob no configurado');
@@ -60,7 +60,24 @@ async function subirBlob(buffer, blobName, contentType = 'image/jpeg') {
   await blockBlob.upload(buffer, buffer.length, {
     blobHTTPHeaders: { blobContentType: contentType },
   });
-  return blockBlob.url;
+
+  // Generar SAS URL válida por 1 año (WhatsApp necesita URL accesible)
+  const { generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } = require('@azure/storage-blob');
+  const parts   = Object.fromEntries(
+    AZURE_CONN.split(';').map(p => { const [k,...v] = p.split('='); return [k, v.join('=')]; })
+  );
+  const sharedKeyCredential = new StorageSharedKeyCredential(parts.AccountName, parts.AccountKey);
+  const expiresOn = new Date();
+  expiresOn.setFullYear(expiresOn.getFullYear() + 1); // expira en 1 año
+
+  const sasToken = generateBlobSASQueryParameters({
+    containerName: AZURE_CONTAINER,
+    blobName,
+    permissions  : BlobSASPermissions.parse('r'), // solo lectura
+    expiresOn,
+  }, sharedKeyCredential).toString();
+
+  return blockBlob.url + '?' + sasToken;
 }
 
 /**
@@ -277,7 +294,7 @@ async function enviarMensaje(tenantId, telefono, mensaje, codigoPais = '+51') {
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
 }
 
-// ── Enviar imagen ─────────────────────────────────────────────
+// ── Enviar imagen desde URL ───────────────────────────────────
 async function enviarImagen(tenantId, telefono, imagenUrl, caption, codigoPais = '+51') {
   const sesion = sesiones.get(tenantId);
   if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
@@ -285,6 +302,17 @@ async function enviarImagen(tenantId, telefono, imagenUrl, caption, codigoPais =
   if (!jid) throw new Error('Teléfono inválido');
   const { buffer, mimetype } = await descargarImagen(imagenUrl);
   await sesion.socket.sendMessage(jid, { image: buffer, mimetype, caption: caption || '' });
+  await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
+}
+
+// ── Enviar imagen desde base64 (sin Azure, directo en memoria) ─
+async function enviarImagenBase64(tenantId, telefono, base64, mimetype, caption, codigoPais = '+51') {
+  const sesion = sesiones.get(tenantId);
+  if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
+  const jid = formatTelefono(telefono, codigoPais);
+  if (!jid) throw new Error('Teléfono inválido');
+  const buffer = Buffer.from(base64, 'base64');
+  await sesion.socket.sendMessage(jid, { image: buffer, mimetype: mimetype || 'image/jpeg', caption: caption || '' });
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
 }
 
@@ -368,16 +396,19 @@ app.get('/wa/sesion/:tenantId/qr', authInternal, async (req, res) => {
 // ── Enviar mensaje / imagen ───────────────────────────────────
 app.post('/wa/enviar', authInternal, async (req, res) => {
   try {
-    const { tenantId, telefono, mensaje, imagen_url, propietarioId, tipo, codigoPais } = req.body;
+    const { tenantId, telefono, mensaje, imagen_url, imagen_base64, imagen_mimetype, propietarioId, tipo, codigoPais } = req.body;
     if (!tenantId || !telefono)
       return res.status(422).json({ success: false, message: 'tenantId y telefono requeridos' });
-    if (!mensaje && !imagen_url)
-      return res.status(422).json({ success: false, message: 'mensaje o imagen_url requerido' });
+    if (!mensaje && !imagen_url && !imagen_base64)
+      return res.status(422).json({ success: false, message: 'mensaje o imagen requerido' });
 
     const cuota = await verificarCuota(parseInt(tenantId));
     if (!cuota.ok) return res.status(422).json({ success: false, message: cuota.razon, code: 'CUOTA_AGOTADA' });
 
-    if (imagen_url) {
+    if (imagen_base64) {
+      // Envío directo en memoria — sin Azure
+      await enviarImagenBase64(parseInt(tenantId), telefono, imagen_base64, imagen_mimetype, mensaje, codigoPais || '+51');
+    } else if (imagen_url) {
       await enviarImagen(parseInt(tenantId), telefono, imagen_url, mensaje, codigoPais || '+51');
     } else {
       await enviarMensaje(parseInt(tenantId), telefono, mensaje, codigoPais || '+51');
