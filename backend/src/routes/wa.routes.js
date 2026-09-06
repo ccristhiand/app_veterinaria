@@ -169,15 +169,14 @@ router.get('/qr', authorize('admin'), async (req, res, next) => {
 // ── POST /api/v1/wa/enviar — admin + recepcionista ────────────
 router.post('/enviar', authorize('admin', 'recepcionista'), async (req, res, next) => {
   try {
-    const { telefono, mensaje, propietario_id } = req.body;
-    if (!telefono || !mensaje) {
-      return res.status(422).json({ success: false, message: 'telefono y mensaje son requeridos' });
+    const { telefono, mensaje, imagen_url, propietario_id } = req.body;
+    if (!telefono || (!mensaje && !imagen_url)) {
+      return res.status(422).json({ success: false, message: 'telefono y mensaje o imagen son requeridos' });
     }
 
     const t = await getTenantInfo(req);
     if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
 
-    // Verificar que WA está activo para este tenant
     const [cfg] = await req.db.query('SELECT activo, codigo_pais FROM wa_config LIMIT 1');
     if (!cfg?.activo) {
       return res.status(422).json({ success: false, message: 'WhatsApp no está activo para esta clínica.' });
@@ -186,7 +185,8 @@ router.post('/enviar', authorize('admin', 'recepcionista'), async (req, res, nex
     const r = await callGateway('POST', '/wa/enviar', {
       tenantId      : t.id,
       telefono,
-      mensaje,
+      mensaje       : mensaje || null,
+      imagen_url    : imagen_url || null,
       propietarioId : propietario_id || null,
       tipo          : 'manual',
       codigoPais    : cfg.codigo_pais || '+51',
