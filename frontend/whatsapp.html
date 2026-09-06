@@ -313,13 +313,26 @@
   <div id="contenido-campanas" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem">
       <p style="font-size:.78rem;color:var(--ink-soft)" id="camp-limite-info">Cargando…</p>
-      <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
+      <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">＋ Nueva campaña</button>
     </div>
-    <div id="campanas-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></div>
+
+    <!-- Filtros de estado -->
+    <div style="display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap">
+      <button onclick="filtrarCampanas('todas')"      id="cf-todas"      class="vbtn vbtn-primary"  style="font-size:.75rem;padding:.3rem .8rem">Todas</button>
+      <button onclick="filtrarCampanas('borrador')"   id="cf-borrador"   class="vbtn vbtn-ghost"    style="font-size:.75rem;padding:.3rem .8rem">📝 Borradores</button>
+      <button onclick="filtrarCampanas('enviando')"   id="cf-enviando"   class="vbtn vbtn-ghost"    style="font-size:.75rem;padding:.3rem .8rem">📤 En curso</button>
+      <button onclick="filtrarCampanas('completada')" id="cf-completada" class="vbtn vbtn-ghost"    style="font-size:.75rem;padding:.3rem .8rem">✅ Completadas</button>
+      <button onclick="filtrarCampanas('pausada')"    id="cf-pausada"    class="vbtn vbtn-ghost"    style="font-size:.75rem;padding:.3rem .8rem">⏸️ Pausadas</button>
+    </div>
+
+    <!-- Cards de campañas -->
+    <div id="campanas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1rem"></div>
+
+    <!-- Panel WS activa (en curso) -->
     <div id="panel-ws-campana" style="display:none;margin-top:1.3rem">
       <div class="vcard" style="border:2px solid #25d366;overflow:hidden">
         <div style="background:#128c7e;color:#fff;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:.6rem"><span class="wa-pulse"></span><span style="font-weight:700;font-size:.88rem">Campaña activa</span></div>
+          <div style="display:flex;align-items:center;gap:.6rem"><span class="wa-pulse"></span><span style="font-weight:700;font-size:.88rem">Campaña activa en tiempo real</span></div>
           <div style="font-size:.8rem;font-weight:700" id="ws-campana-pct">0%</div>
         </div>
         <div style="padding:1rem">
@@ -327,13 +340,13 @@
             <div id="ws-progreso-bar" style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);transition:width .5s;width:0%"></div>
           </div>
           <div class="wa-ws-stats">
-            <div><p style="font-weight:800;font-size:1.1rem;color:#15803d" id="ws-enviados">0</p><p style="color:var(--ink-faint)">Enviados</p></div>
-            <div><p style="font-weight:800;font-size:1.1rem;color:#be123c" id="ws-fallidos">0</p><p style="color:var(--ink-faint)">Fallidos</p></div>
-            <div><p style="font-weight:800;font-size:1.1rem;color:#b45309" id="ws-hoy">0</p><p style="color:var(--ink-faint)">Hoy</p></div>
-            <div><p style="font-weight:800;font-size:1.1rem" id="ws-total">0</p><p style="color:var(--ink-faint)">Total</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:#15803d" id="ws-enviados">0</p><p style="color:var(--ink-faint);font-size:.72rem">Enviados</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:#be123c" id="ws-fallidos">0</p><p style="color:var(--ink-faint);font-size:.72rem">Fallidos</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:#b45309" id="ws-hoy">0</p><p style="color:var(--ink-faint);font-size:.72rem">Hoy</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem" id="ws-total">0</p><p style="color:var(--ink-faint);font-size:.72rem">Total</p></div>
           </div>
-          <div style="background:#f8faf8;border-radius:.75rem;padding:.65rem .85rem;max-height:180px;overflow-y:auto">
-            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.3rem">Log en vivo</p>
+          <div style="background:#f8faf8;border-radius:.75rem;padding:.65rem .85rem;max-height:160px;overflow-y:auto">
+            <p style="font-size:.62rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.3rem">Log en vivo</p>
             <div id="ws-log-lista" style="font-size:.72rem;font-family:monospace"></div>
           </div>
           <div id="ws-limite-alerta" style="display:none;margin-top:.75rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.65rem 1rem;font-size:.78rem;color:#b45309"></div>
@@ -1094,387 +1107,518 @@ guardarConfig = async function() {
 // ══════════════════════════════════════════════════════════════
 // CAMPAÑAS
 // ══════════════════════════════════════════════════════════════
+var _campFiltro = 'todas';
+
 async function cargarCampanas() {
-  var cont = document.getElementById('campanas-lista');
-  if(!cont) return;
-  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
+  var grid = document.getElementById('campanas-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="vempty" style="grid-column:1/-1"><div class="vspinner"></div><p>Cargando…</p></div>';
   await cargarConfigAntispam();
   try {
-    var res=await api('/wa/campanas'); if(!res?.ok) return;
-    var rows=(await res.json()).data||[];
-    if(!rows.length){
-      cont.innerHTML='<div class="vempty"><span style="font-size:2rem">📢</span><p>Sin campañas aún</p><button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Crear primera campaña</button></div>';
-      return;
-    }
-    cont.innerHTML=renderCampanasTabla(rows);
-  } catch(e){cont.innerHTML='<div class="vempty">Error al cargar</div>';}
+    var res = await api('/wa/campanas'); if (!res?.ok) return;
+    var rows = (await res.json()).data || [];
+    _todasCampanas = rows;
+    renderCampanasGrid(rows);
+  } catch(e) {
+    grid.innerHTML = '<div class="vempty" style="grid-column:1/-1"><span>😿</span><p>Error al cargar</p></div>';
+  }
 }
 
-function renderCampanasTabla(rows) {
-  var cols={borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
-  var emoj={borrador:'📝',programada:'⏰',enviando:'📤',pausada:'⏸️',completada:'✅',cancelada:'❌'};
-  var html='<div class="vcard" style="padding:0;overflow:hidden">';
-  html+='<div style="overflow-x:auto">';
-  html+='<table class="vtable">';
-  html+='<thead><tr>';
-  html+='<th>Campaña</th><th class="wa-col-seg">Segmento</th><th>Estado</th><th>Progreso</th><th class="wa-col-fecha">Fecha</th><th style="text-align:center">Acciones</th>';
-  html+='</tr></thead><tbody>';
-  rows.forEach(function(c) {
-    var pct  = c.total>0 ? Math.round((c.enviados/c.total)*100) : 0;
-    var col  = cols[c.estado]||'#6b7280';
-    var cid  = c.id;
-    var prog = c.total>0
-      ? '<div style="display:flex;align-items:center;gap:.5rem"><div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden;min-width:80px"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div><span style="font-size:.72rem;color:var(--ink-faint);white-space:nowrap">'+c.enviados+'/'+c.total+' ('+pct+'%)</span></div>'
-      : '<span style="font-size:.72rem;color:var(--ink-faint)">Sin iniciar</span>';
-    var fecha = c.programada_at
-      ? '⏰ '+new Date(c.programada_at).toLocaleDateString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
-      : new Date(c.created_at).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
-    // Botones según estado
-    var acciones = '';
-    // Ver detalle — siempre disponible
-    acciones += '<button title="Ver detalle" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-ver="1">👁️</button> ';
-    // Editar — solo borradores y pausadas
-    if (['borrador','pausada'].includes(c.estado))
-      acciones += '<button title="Editar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button> ';
-    // Iniciar — solo borradores
-    if (c.estado==='borrador')
-      acciones += '<button title="Iniciar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">▶</button> ';
-    // Pausar — solo enviando
-    if (c.estado==='enviando')
-      acciones += '<button title="Pausar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️</button> ';
-    // Reanudar — solo pausadas
-    if (c.estado==='pausada')
-      acciones += '<button title="Reanudar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶</button> ';
-    // Cancelar — borradores, pausadas, programadas, enviando
-    if (['borrador','pausada','programada','enviando'].includes(c.estado))
-      acciones += '<button title="Cancelar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">✕</button> ';
-    // Eliminar — solo completadas y canceladas
-    if (['completada','cancelada'].includes(c.estado))
-      acciones += '<button title="Eliminar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="eliminar">🗑️</button>';
-    html+='<tr>';
-    html+='<td><p style="font-weight:700;font-size:.85rem">'+esc(c.nombre)+'</p>'+(c.imagen_url?'<span style="font-size:.68rem;color:#0369a1">🖼️ Con imagen</span>':'')+'</td>';
-    html+='<td class="wa-col-seg" style="font-size:.78rem">'+esc(c.segmento)+'</td>';
-    html+='<td><span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40;white-space:nowrap">'+emoj[c.estado]+' '+c.estado+'</span></td>';
-    html+='<td style="min-width:160px">'+prog+'</td>';
-    html+='<td class="wa-col-fecha" style="font-size:.75rem;white-space:nowrap;color:var(--ink-soft)">'+fecha+'</td>';
-    html+='<td style="text-align:center;white-space:nowrap">'+acciones+'</td>';
-    html+='</tr>';
+var _todasCampanas = [];
+
+function filtrarCampanas(f) {
+  _campFiltro = f;
+  ['todas','borrador','enviando','completada','pausada'].forEach(function(x) {
+    var btn = document.getElementById('cf-'+x);
+    if (btn) btn.className = 'vbtn ' + (x === f ? 'vbtn-primary' : 'vbtn-ghost');
+    if (btn) btn.style.fontSize = '.75rem'; if (btn) btn.style.padding = '.3rem .8rem';
   });
-  html+='</tbody></table></div></div>';
-  return html;
+  var filtered = f === 'todas' ? _todasCampanas : _todasCampanas.filter(function(c) { return c.estado === f; });
+  renderCampanasGrid(filtered);
 }
 
-function renderCampanaCard(c) { return ''; } // legacy — no usado
-
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-camp-id]'); if(!btn) return;
-  var id=parseInt(btn.getAttribute('data-camp-id'));
-  var ac=btn.getAttribute('data-camp-accion');
-  var ed=btn.getAttribute('data-camp-edit');
-  var ver=btn.getAttribute('data-camp-ver');
-  if(ac) accionCampana(id,ac);
-  if(ed) editarCampana(id);
-  if(ver) verDetalleCampana(id);
-});
-
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-hist-accion]'); if(!btn) return;
-  var wrap=btn.closest('[data-hist-id]'); if(!wrap) return;
-  var id=parseInt(wrap.getAttribute('data-hist-id'));
-  var ac=btn.getAttribute('data-hist-accion');
-  if(ac==='publicar') publicarHistoriaAhora(id);
-  if(ac==='editar')   editarHistoria(id);
-  if(ac==='eliminar') eliminarHistoria(id);
-});
-
-async function accionCampana(id,accion) {
-  if(accion==='cancelar'){
-    var ok=await vconfirm({titulo:'¿Cancelar campaña?',mensaje:'Esta acción no se puede deshacer.',tipo:'danger',labelOk:'Cancelar campaña'});
-    if(!ok) return;
+function renderCampanasGrid(rows) {
+  var grid = document.getElementById('campanas-grid');
+  if (!grid) return;
+  if (!rows.length) {
+    grid.innerHTML = '<div class="vempty" style="grid-column:1/-1"><span style="font-size:2.5rem">📢</span><p style="margin-top:.5rem">Sin campañas' + (_campFiltro !== 'todas' ? ' con este filtro' : ' — crea la primera') + '</p>' +
+      (_campFiltro === 'todas' ? '<button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Crear primera campaña</button>' : '') + '</div>';
+    return;
   }
-  if(accion==='eliminar'){
-    var ok=await vconfirm({titulo:'¿Eliminar campaña?',mensaje:'Se eliminará permanentemente.',tipo:'danger',labelOk:'Eliminar'});
-    if(!ok) return;
+  grid.innerHTML = rows.map(renderCampanaCard).join('');
+}
+
+function renderCampanaCard(c) {
+  var colMap = { borrador:'#6b7280', programada:'#0369a1', enviando:'#15803d', pausada:'#b45309', completada:'#15803d', cancelada:'#be123c' };
+  var bgMap  = { borrador:'#f8faf8', programada:'#eff6ff', enviando:'#f0fdf4', pausada:'#fffbeb', completada:'#f0fdf4', cancelada:'#fff1f2' };
+  var emojMap= { borrador:'📝', programada:'⏰', enviando:'📤', pausada:'⏸️', completada:'✅', cancelada:'❌' };
+  var col = colMap[c.estado] || '#6b7280';
+  var bg  = bgMap[c.estado]  || '#f8faf8';
+  var pct = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0;
+
+  var acciones = [];
+  if (c.estado === 'borrador')   acciones.push('<button class="vbtn vbtn-primary" style="font-size:.72rem;padding:.3rem .7rem;background:linear-gradient(135deg,#25d366,#128c7e);border:none" data-camp-id="'+c.id+'" data-camp-accion="iniciar">▶ Iniciar</button>');
+  if (c.estado === 'enviando')   acciones.push('<button class="vbtn vbtn-ghost"   style="font-size:.72rem;padding:.3rem .7rem" data-camp-id="'+c.id+'" data-camp-accion="pausar">⏸️ Pausar</button>');
+  if (c.estado === 'pausada')    acciones.push('<button class="vbtn vbtn-primary" style="font-size:.72rem;padding:.3rem .7rem" data-camp-id="'+c.id+'" data-camp-accion="reanudar">▶ Reanudar</button>');
+  if (['borrador','pausada'].includes(c.estado))
+    acciones.push('<button class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.3rem .7rem" data-camp-id="'+c.id+'" data-camp-edit="1">✏️ Editar</button>');
+  acciones.push('<button class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.3rem .7rem" data-camp-id="'+c.id+'" data-camp-ver="1">👁️ Ver</button>');
+
+  var imgPreview = c.imagen_url
+    ? '<div style="height:110px;overflow:hidden;background:#1a1a2e;border-radius:.85rem .85rem 0 0;position:relative"><img src="'+esc(c.imagen_url)+'" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.display=\'none\'"/><div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.55))"></div></div>'
+    : '';
+
+  var mensajePreview = c.mensaje ? esc(c.mensaje.length > 90 ? c.mensaje.substring(0,90)+'…' : c.mensaje) : '';
+
+  return '<div class="vcard" style="padding:0;overflow:hidden;border:1.5px solid '+col+'30;transition:box-shadow .2s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\'" onmouseout="this.style.boxShadow=\'\' " data-camp-id="'+c.id+'">' +
+    imgPreview +
+    '<div style="padding:.9rem 1rem">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem">' +
+        '<p style="font-weight:800;font-size:.9rem;line-height:1.3">'+esc(c.nombre)+'</p>' +
+        '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:'+bg+';color:'+col+';border:1px solid '+col+'40;white-space:nowrap;flex-shrink:0">'+emojMap[c.estado]+' '+c.estado+'</span>' +
+      '</div>' +
+      '<p style="font-size:.72rem;color:var(--ink-soft);line-height:1.4;margin-bottom:.65rem">'+mensajePreview+'</p>' +
+      (c.total > 0
+        ? '<div style="margin-bottom:.5rem"><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--ink-faint);margin-bottom:.2rem"><span>'+c.enviados+'/'+c.total+' enviados</span><span style="font-weight:700">'+pct+'%</span></div><div style="height:5px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div>' +
+          (c.fallidos > 0 ? '<p style="font-size:.65rem;color:#be123c;margin-top:.2rem">'+c.fallidos+' fallidos</p>' : '') +
+          '</div>'
+        : '<p style="font-size:.7rem;color:var(--ink-faint);margin-bottom:.5rem">Sin contactos aún</p>') +
+      '<div style="display:flex;gap:.35rem;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:.65rem;margin-top:.1rem">' +
+        acciones.join('') +
+        ((['borrador','pausada','programada','enviando'].includes(c.estado))
+          ? '<button class="vbtn" style="font-size:.7rem;padding:.3rem .55rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;margin-left:auto" data-camp-id="'+c.id+'" data-camp-accion="cancelar">✕</button>'
+          : ['completada','cancelada'].includes(c.estado)
+            ? '<button class="vbtn" style="font-size:.7rem;padding:.3rem .55rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;margin-left:auto" data-camp-id="'+c.id+'" data-camp-accion="eliminar">🗑️</button>'
+            : '') +
+      '</div>' +
+    '</div></div>';
+}
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-camp-id]'); if (!btn) return;
+  var id  = parseInt(btn.getAttribute('data-camp-id'));
+  var ac  = btn.getAttribute('data-camp-accion');
+  var ed  = btn.getAttribute('data-camp-edit');
+  var ver = btn.getAttribute('data-camp-ver');
+  if (ac)  accionCampana(id, ac);
+  if (ed)  editarCampana(id);
+  if (ver) verDetalleCampana(id);
+});
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-hist-accion]'); if (!btn) return;
+  var wrap = btn.closest('[data-hist-id]'); if (!wrap) return;
+  var id = parseInt(wrap.getAttribute('data-hist-id'));
+  var ac = btn.getAttribute('data-hist-accion');
+  if (ac === 'publicar') publicarHistoriaAhora(id);
+  if (ac === 'editar')   editarHistoria(id);
+  if (ac === 'eliminar') eliminarHistoria(id);
+});
+
+async function accionCampana(id, accion) {
+  if (accion === 'cancelar') {
+    var ok = await vconfirm({ titulo:'¿Cancelar campaña?', mensaje:'Esta acción no se puede deshacer.', tipo:'danger', labelOk:'Cancelar campaña' });
+    if (!ok) return;
+  }
+  if (accion === 'eliminar') {
+    var ok = await vconfirm({ titulo:'¿Eliminar campaña?', mensaje:'Se eliminará permanentemente junto con sus contactos.', tipo:'danger', labelOk:'Eliminar' });
+    if (!ok) return;
   }
   try {
-    var method = accion==='eliminar' ? 'DELETE' : 'POST';
-    var url = accion==='eliminar' ? '/wa/campanas/'+id : '/wa/campanas/'+id+'/'+accion;
-    var res=await api(url,{method}); var d=await res.json();
-    if(!res.ok){toast(d.message||'Error.','danger');return;}
-    toast('✅ '+d.message,'success'); cargarCampanas();
-  } catch(e){toast('Error de conexión.','danger');}
+    var method = accion === 'eliminar' ? 'DELETE' : 'POST';
+    var url    = accion === 'eliminar' ? '/wa/campanas/'+id : '/wa/campanas/'+id+'/'+accion;
+    var res = await api(url, { method }); var d = await res.json();
+    if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
+    toast('✅ ' + d.message, 'success');
+    cargarCampanas();
+    // Si hay modal detalle abierto, cerrarlo
+    closeModal('modal-detalle-campana');
+  } catch(e) { toast('Error de conexión.', 'danger'); }
 }
 
+// ── MODAL DETALLE ─────────────────────────────────────────────
 async function verDetalleCampana(id) {
+  // Abrir modal inmediatamente con spinner
+  document.getElementById('det-camp-titulo').textContent = '📢 Cargando…';
+  document.getElementById('det-camp-body').innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  document.getElementById('det-camp-foot').innerHTML = '<button onclick="closeModal(\'modal-detalle-campana\')" class="vbtn vbtn-ghost">Cerrar</button>';
+  openModal('modal-detalle-campana');
+
   try {
-    var res = await api('/wa/campanas/'+id);
-    if (!res?.ok) { toast('Error al obtener campaña','danger'); return; }
-    var json = await res.json();
-    if (!json.success) { toast(json.message||'Error','danger'); return; }
-    var c = json.data;
-    var cols = {borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
-    var col  = cols[c.estado]||'#6b7280';
-    var pct  = c.total>0 ? Math.round((c.enviados/c.total)*100) : 0;
+    var [resC, resCont] = await Promise.all([
+      api('/wa/campanas/'+id),
+      api('/wa/campanas/'+id+'/contactos?limit=200')
+    ]);
+    if (!resC?.ok) { toast('Error al cargar campaña', 'danger'); return; }
+    var c    = (await resC.json()).data;
+    var contJson = resCont?.ok ? await resCont.json() : { data: [], meta: {} };
+    var contactos = contJson.data || [];
+    var meta      = contJson.meta || {};
 
-    // Construir body con DOM para evitar problemas de comillas
-    var body = document.getElementById('det-camp-body');
-    body.innerHTML = '';
+    var colMap = { borrador:'#6b7280', programada:'#0369a1', enviando:'#15803d', pausada:'#b45309', completada:'#15803d', cancelada:'#be123c' };
+    var col = colMap[c.estado] || '#6b7280';
+    var pct = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0;
 
-    // Grid de stats
-    var grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem';
+    document.getElementById('det-camp-titulo').textContent = '📢 ' + (c.nombre || '');
 
-    function statCell(label, value, color) {
-      var d = document.createElement('div');
-      var lbl = document.createElement('p');
-      lbl.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem';
-      lbl.textContent = label;
-      var val = document.createElement('p');
-      val.style.cssText = 'font-size:.9rem;font-weight:700' + (color?';color:'+color:'');
-      val.textContent = value;
-      d.appendChild(lbl); d.appendChild(val);
-      return d;
+    // ── Construir body ──────────────────────────────────────
+    var html = '';
+
+    // Imagen si existe — hero visual
+    if (c.imagen_url) {
+      html += '<div style="border-radius:.85rem;overflow:hidden;margin-bottom:1rem;max-height:200px"><img src="'+esc(c.imagen_url)+'" style="width:100%;object-fit:cover;display:block" onerror="this.parentElement.remove()"/></div>';
     }
 
-    // Badge estado
-    var dEstado = document.createElement('div');
-    var lEstado = document.createElement('p');
-    lEstado.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem';
-    lEstado.textContent = 'Estado';
-    var bEstado = document.createElement('span');
-    bEstado.style.cssText = 'font-size:.8rem;font-weight:700;padding:.25rem .65rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40';
-    bEstado.textContent = c.estado;
-    dEstado.appendChild(lEstado); dEstado.appendChild(bEstado);
-    grid.appendChild(dEstado);
-    grid.appendChild(statCell('Segmento', c.segmento||'—'));
-    grid.appendChild(statCell('Enviados', c.enviados+' / '+(c.total||0), '#15803d'));
-    grid.appendChild(statCell('Fallidos', c.fallidos||0, c.fallidos>0?'#be123c':null));
-    if (c.programada_at) {
-      var dFecha = statCell('Fecha programada', new Date(c.programada_at.replace('Z','')).toLocaleString('es-PE'));
-      dFecha.style.gridColumn = 'span 2';
-      grid.appendChild(dFecha);
-    }
-    body.appendChild(grid);
+    // Badge estado + stats grid
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;margin-bottom:1rem">';
+    html += '<div style="background:'+col+'12;border:1px solid '+col+'30;border-radius:.85rem;padding:.75rem;text-align:center"><p style="font-size:1.2rem;font-weight:800;color:'+col+'">'+c.enviados+'</p><p style="font-size:.62rem;font-weight:700;color:'+col+';text-transform:uppercase">Enviados</p></div>';
+    html += '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.75rem;text-align:center"><p style="font-size:1.2rem;font-weight:800;color:#be123c">'+(c.fallidos||0)+'</p><p style="font-size:.62rem;font-weight:700;color:#be123c;text-transform:uppercase">Fallidos</p></div>';
+    html += '<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.85rem;padding:.75rem;text-align:center"><p style="font-size:1.2rem;font-weight:800">'+(c.total||0)+'</p><p style="font-size:.62rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase">Total</p></div>';
+    html += '</div>';
 
     // Barra de progreso
     if (c.total > 0) {
-      var dProg = document.createElement('div');
-      dProg.style.marginBottom = '.75rem';
-      var dProgHead = document.createElement('div');
-      dProgHead.style.cssText = 'display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem';
-      dProgHead.innerHTML = '<span>Progreso</span><span>'+pct+'%</span>';
-      var dBar = document.createElement('div');
-      dBar.style.cssText = 'height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden';
-      var dFill = document.createElement('div');
-      dFill.style.cssText = 'height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%';
-      dBar.appendChild(dFill);
-      dProg.appendChild(dProgHead); dProg.appendChild(dBar);
-      body.appendChild(dProg);
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem"><span style="font-weight:600">Progreso</span><span style="font-weight:800;color:'+col+'">'+pct+'%</span></div>';
+      html += '<div style="height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div>';
+      html += '</div>';
     }
+
+    // Metadata chips
+    var segLabels = { todos:'👥 Todos', por_especie:'🐕 Por especie', vacunas_vencidas:'💉 Vacunas', sin_citas_60d:'😴 Sin citas 60d', citas_semana:'📅 Esta semana' };
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem">';
+    html += '<span style="font-size:.7rem;font-weight:700;padding:.25rem .6rem;border-radius:999px;background:'+col+'15;color:'+col+';border:1px solid '+col+'30">'+emojEstado(c.estado)+'</span>';
+    html += '<span style="font-size:.7rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;background:#f8faf8;border:1px solid var(--line)">'+(segLabels[c.segmento]||c.segmento)+'</span>';
+    if (c.programada_at) html += '<span style="font-size:.7rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">⏰ '+new Date(c.programada_at.replace ? c.programada_at.replace('Z','') : c.programada_at).toLocaleString('es-PE')+'</span>';
+    if (c.completada_at) html += '<span style="font-size:.7rem;font-weight:600;padding:.25rem .6rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Completada: '+new Date(c.completada_at.replace ? c.completada_at.replace('Z','') : c.completada_at).toLocaleString('es-PE')+'</span>';
+    html += '</div>';
 
     // Mensaje
-    var dMsg = document.createElement('div');
-    dMsg.style.marginBottom = '.75rem';
-    var lMsg = document.createElement('p');
-    lMsg.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem';
-    lMsg.textContent = 'Mensaje';
-    var boxMsg = document.createElement('div');
-    boxMsg.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;white-space:pre-wrap;max-height:120px;overflow-y:auto';
-    boxMsg.textContent = c.mensaje||'';
-    dMsg.appendChild(lMsg); dMsg.appendChild(boxMsg);
-    body.appendChild(dMsg);
+    html += '<div style="margin-bottom:1rem">';
+    html += '<p style="font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem">💬 Mensaje</p>';
+    html += '<div style="background:#e5ddd5;border-radius:.85rem;padding:.75rem 1rem">';
+    html += '<div style="background:#fff;border-radius:.75rem .75rem .75rem .15rem;padding:.65rem .85rem;font-size:.82rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:140px;overflow-y:auto">'+esc(c.mensaje||'')+'</div>';
+    html += '</div></div>';
 
-    // Imagen si existe
-    if (c.imagen_url) {
-      var dImg = document.createElement('div');
-      var lImg = document.createElement('p');
-      lImg.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem';
-      lImg.textContent = 'Imagen';
-      var img = document.createElement('img');
-      img.src = c.imagen_url;
-      img.style.cssText = 'max-width:100%;max-height:150px;border-radius:.75rem;object-fit:contain;border:1px solid var(--line)';
-      img.onerror = function(){ this.style.display='none'; };
-      dImg.appendChild(lImg); dImg.appendChild(img);
-      body.appendChild(dImg);
+    // Contactos
+    if (contactos.length) {
+      // Tabs de filtro contactos
+      html += '<div style="margin-bottom:.75rem">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">';
+      html += '<p style="font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase">👥 Destinatarios ('+meta.total+')</p>';
+      html += '<div style="display:flex;gap:.3rem">';
+      html += '<button onclick="filtrarContactosDet(\'todos\')"    id="dcf-todos"    class="vbtn vbtn-primary"  style="font-size:.65rem;padding:.2rem .55rem">Todos ('+meta.total+')</button>';
+      html += '<button onclick="filtrarContactosDet(\'enviado\')"  id="dcf-enviado"  class="vbtn vbtn-ghost"    style="font-size:.65rem;padding:.2rem .55rem;color:#15803d">✅ '+(meta.enviados||0)+'</button>';
+      html += '<button onclick="filtrarContactosDet(\'fallido\')"  id="dcf-fallido"  class="vbtn vbtn-ghost"    style="font-size:.65rem;padding:.2rem .55rem;color:#be123c">❌ '+(meta.fallidos||0)+'</button>';
+      html += '</div></div>';
+
+      // Tabla contactos
+      html += '<div style="max-height:240px;overflow-y:auto;border:1px solid var(--line);border-radius:.85rem;overflow:hidden">';
+      html += '<table class="vtable" id="det-contactos-tabla"><thead><tr><th>Nombre</th><th>Teléfono</th><th>Estado</th></tr></thead><tbody id="det-contactos-tbody">';
+      html += renderContactoRows(contactos);
+      html += '</tbody></table></div>';
+      html += '</div>';
+    } else if (c.estado !== 'borrador') {
+      html += '<div style="background:#f8faf8;border-radius:.85rem;padding:.85rem 1rem;text-align:center;color:var(--ink-faint);font-size:.78rem;margin-bottom:.75rem">Sin contactos registrados aún</div>';
     }
 
-    // Título modal
-    document.getElementById('det-camp-titulo').textContent = '📢 ' + (c.nombre||'');
+    document.getElementById('det-camp-body').innerHTML = html;
 
-    // Footer con botones
-    var foot = document.getElementById('det-camp-foot');
-    foot.innerHTML = '';
-    var btnC = document.createElement('button');
-    btnC.className='vbtn vbtn-ghost'; btnC.textContent='Cerrar';
-    btnC.onclick = function(){ closeModal('modal-detalle-campana'); };
-    foot.appendChild(btnC);
-    if (['borrador','pausada'].includes(c.estado)) {
-      var btnE = document.createElement('button');
-      btnE.className='vbtn vbtn-ghost'; btnE.textContent='✏️ Editar';
-      btnE.onclick = function(){ closeModal('modal-detalle-campana'); editarCampana(c.id); };
-      foot.appendChild(btnE);
-    }
-    if (c.estado==='borrador') {
-      var btnI = document.createElement('button');
-      btnI.className='vbtn vbtn-primary'; btnI.textContent='▶ Iniciar';
-      btnI.onclick = function(){ closeModal('modal-detalle-campana'); accionCampana(c.id,'iniciar'); };
-      foot.appendChild(btnI);
-    }
-    openModal('modal-detalle-campana');
+    // Guardar contactos para filtrar
+    window._detContactos = contactos;
+
+    // Footer botones
+    var footHtml = '<button onclick="closeModal(\'modal-detalle-campana\')" class="vbtn vbtn-ghost">Cerrar</button>';
+    if (['borrador','pausada'].includes(c.estado))
+      footHtml += '<button onclick="closeModal(\'modal-detalle-campana\');editarCampana('+c.id+')" class="vbtn vbtn-ghost">✏️ Editar</button>';
+    if (c.estado === 'borrador')
+      footHtml += '<button onclick="closeModal(\'modal-detalle-campana\');accionCampana('+c.id+',\'iniciar\')" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">▶ Iniciar</button>';
+    if (c.estado === 'enviando')
+      footHtml += '<button onclick="closeModal(\'modal-detalle-campana\');accionCampana('+c.id+',\'pausar\')" class="vbtn vbtn-ghost">⏸️ Pausar</button>';
+    if (c.estado === 'pausada')
+      footHtml += '<button onclick="closeModal(\'modal-detalle-campana\');accionCampana('+c.id+',\'reanudar\')" class="vbtn vbtn-primary">▶ Reanudar</button>';
+    document.getElementById('det-camp-foot').innerHTML = footHtml;
+
   } catch(e) {
-    console.error('verDetalleCampana error:', e);
-    toast('Error al cargar detalle: '+e.message, 'danger');
+    console.error('verDetalleCampana', e);
+    document.getElementById('det-camp-body').innerHTML = '<div class="vempty"><span>😿</span><p>Error al cargar detalle</p></div>';
   }
 }
 
+function emojEstado(e) {
+  return { borrador:'📝 Borrador', programada:'⏰ Programada', enviando:'📤 Enviando', pausada:'⏸️ Pausada', completada:'✅ Completada', cancelada:'❌ Cancelada' }[e] || e;
+}
+
+function renderContactoRows(list) {
+  if (!list.length) return '<tr><td colspan="3" style="text-align:center;color:var(--ink-faint);font-size:.78rem;padding:1rem">Sin resultados</td></tr>';
+  return list.map(function(r) {
+    var est = r.estado === 'enviado'
+      ? '<span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Enviado</span>'
+      : r.estado === 'fallido'
+        ? '<span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" title="'+esc(r.error||'')+'">❌ Fallido</span>'
+        : '<span style="font-size:.68rem;color:var(--ink-faint)">⏳ Pendiente</span>';
+    return '<tr><td style="font-size:.78rem;font-weight:600">'+(esc(r.prop_nombre_completo||r.nombre||'—'))+'</td><td style="font-size:.75rem;font-family:monospace">'+esc(r.telefono)+'</td><td>'+est+'</td></tr>';
+  }).join('');
+}
+
+function filtrarContactosDet(filtro) {
+  ['todos','enviado','fallido'].forEach(function(f) {
+    var btn = document.getElementById('dcf-'+f);
+    if (btn) btn.className = 'vbtn ' + (f === filtro ? 'vbtn-primary' : 'vbtn-ghost');
+    if (btn) { btn.style.fontSize = '.65rem'; btn.style.padding = '.2rem .55rem'; }
+    if (f !== 'todos' && btn) btn.style.color = f === 'enviado' ? '#15803d' : '#be123c';
+  });
+  var list = filtro === 'todos' ? window._detContactos : (window._detContactos || []).filter(function(r) { return r.estado === filtro; });
+  var tbody = document.getElementById('det-contactos-tbody');
+  if (tbody) tbody.innerHTML = renderContactoRows(list);
+}
+
+// ── MODAL CREAR / EDITAR ──────────────────────────────────────
 function abrirModalNuevaCampana() {
-  document.getElementById('camp-edit-id').value='';
-  document.getElementById('camp-nombre').value='';
-  document.getElementById('camp-mensaje').value='';
-  document.getElementById('camp-segmento').value='todos';
-  document.getElementById('camp-proyeccion').style.display='none';
+  document.getElementById('camp-edit-id').value = '';
+  document.getElementById('camp-nombre').value  = '';
+  document.getElementById('camp-mensaje').value = '';
+  document.getElementById('camp-segmento').value = 'todos';
+  document.getElementById('camp-proyeccion').style.display = 'none';
+  document.getElementById('det-modal-campana-titulo').textContent = '📢 Nueva campaña';
   limpiarImagenCampana();
-  var chk=document.getElementById('camp-programar'); if(chk){chk.checked=false;toggleFechaCampana(false);}
+  var chk = document.getElementById('camp-programar'); if (chk) { chk.checked = false; toggleFechaCampana(false); }
+  // Limpiar sugerencias IA
+  document.getElementById('camp-ai-resultado').style.display = 'none';
+  document.getElementById('camp-ai-titulo').value = '';
   openModal('modal-campana');
   calcularProyeccion();
 }
 
 async function editarCampana(id) {
   try {
-    var res=await api('/wa/campanas/'+id); if(!res?.ok) return;
-    var c=(await res.json()).data;
-    document.getElementById('camp-edit-id').value=c.id;
-    document.getElementById('camp-nombre').value=c.nombre;
-    document.getElementById('camp-mensaje').value=c.mensaje;
-    document.getElementById('camp-segmento').value=c.segmento;
-    if(c.imagen_url){_campImagenUrl=c.imagen_url;_campImagenBlob=c.imagen_blob_name;var pi=document.getElementById('camp-img-prev-img');if(pi)pi.src=c.imagen_url;var pp=document.getElementById('camp-img-preview');if(pp)pp.style.display='';var pb=document.getElementById('btn-limpiar-img-camp');if(pb)pb.style.display='';}
-    openModal('modal-campana'); calcularProyeccion();
-  } catch(e){}
+    var res = await api('/wa/campanas/'+id); if (!res?.ok) return;
+    var c = (await res.json()).data;
+    document.getElementById('camp-edit-id').value   = c.id;
+    document.getElementById('camp-nombre').value    = c.nombre;
+    document.getElementById('camp-mensaje').value   = c.mensaje;
+    document.getElementById('camp-segmento').value  = c.segmento;
+    document.getElementById('det-modal-campana-titulo').textContent = '✏️ Editar campaña';
+    if (c.imagen_url) {
+      _campImagenUrl = c.imagen_url; _campImagenBlob = c.imagen_blob_name;
+      var pi = document.getElementById('camp-img-prev-img'); if (pi) pi.src = c.imagen_url;
+      var pp = document.getElementById('camp-img-preview');  if (pp) pp.style.display = '';
+      var pb = document.getElementById('btn-limpiar-img-camp'); if (pb) pb.style.display = '';
+    } else {
+      limpiarImagenCampana();
+    }
+    document.getElementById('camp-ai-resultado').style.display = 'none';
+    document.getElementById('camp-ai-titulo').value = '';
+    openModal('modal-campana');
+    calcularProyeccion();
+  } catch(e) { toast('Error al cargar campaña', 'danger'); }
 }
 
 function toggleFechaCampana(checked) {
-  var inp=document.getElementById('camp-fecha-inicio'),hint=document.getElementById('camp-fecha-hint');
-  if(inp) inp.style.display=checked?'':'none';
-  if(checked&&inp){var d=new Date();d.setHours(d.getHours()+1);d.setMinutes(0);var p=function(n){return String(n).padStart(2,'0');};inp.value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';}
-  if(hint) hint.textContent=checked?'La campaña iniciará en la fecha seleccionada':'Sin programar → inicia inmediatamente';
+  var inp  = document.getElementById('camp-fecha-inicio');
+  var hint = document.getElementById('camp-fecha-hint');
+  if (inp) inp.style.display = checked ? '' : 'none';
+  if (checked && inp) {
+    var d = new Date(); d.setHours(d.getHours()+1); d.setMinutes(0);
+    var p = function(n) { return String(n).padStart(2,'0'); };
+    inp.value = d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';
+  }
+  if (hint) hint.textContent = checked ? 'La campaña iniciará en la fecha seleccionada' : 'Sin programar → inicia inmediatamente al guardar';
 }
 
-function insertarVarCampana(v){var ta=document.getElementById('camp-mensaje');var p=ta.selectionStart;ta.value=ta.value.substring(0,p)+v+ta.value.substring(p);ta.focus();}
+function insertarVarCampana(v) {
+  var ta = document.getElementById('camp-mensaje');
+  var p  = ta.selectionStart;
+  ta.value = ta.value.substring(0,p) + v + ta.value.substring(p);
+  ta.focus();
+}
 
-var _campTotal=0, _campImagenUrl=null, _campImagenBlob=null;
+var _campTotal = 0, _campImagenUrl = null, _campImagenBlob = null;
 
 async function calcularProyeccion() {
-  var seg=document.getElementById('camp-segmento')?.value||'todos';
-  var elC=document.getElementById('camp-limite-custom'); if(elC) elC.value=_campLimite;
+  var seg = document.getElementById('camp-segmento')?.value || 'todos';
+  var elC = document.getElementById('camp-limite-custom'); if (elC) elC.value = _campLimite;
   try {
-    var res=await api('/wa/campanas/proyeccion?segmento='+seg); if(!res?.ok) return;
-    _campTotal=(await res.json()).data?.total||0;
-    renderProyeccion(_campTotal,_campLimite);
-  } catch(e){_campTotal=0;}
+    var res = await api('/wa/campanas/proyeccion?segmento='+seg); if (!res?.ok) return;
+    _campTotal = (await res.json()).data?.total || 0;
+    renderProyeccion(_campTotal, _campLimite);
+  } catch(e) { _campTotal = 0; }
 }
 
-function recalcularProyeccion(){renderProyeccion(_campTotal,parseInt(document.getElementById('camp-limite-custom')?.value)||_campLimite);}
-function resetLimiteCustom(){var el=document.getElementById('camp-limite-custom');if(el)el.value=_campLimite;renderProyeccion(_campTotal,_campLimite);}
+function recalcularProyeccion() { renderProyeccion(_campTotal, parseInt(document.getElementById('camp-limite-custom')?.value) || _campLimite); }
+function resetLimiteCustom()    { var el = document.getElementById('camp-limite-custom'); if (el) el.value = _campLimite; renderProyeccion(_campTotal, _campLimite); }
 
-function renderProyeccion(total,limite) {
-  if(!total) return;
-  var box=document.getElementById('camp-proyeccion'),body=document.getElementById('camp-proyeccion-body');
-  if(!box||!body) return;
-  box.style.display='';
-  var dias=Math.ceil(total/limite);
-  var html='<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;margin-bottom:.6rem"><span style="color:var(--ink-faint);font-weight:600">Total contactos:</span><strong>'+total+'</strong><span style="color:var(--ink-faint);font-weight:600">Límite diario:</span><strong>'+limite+' mensajes</strong><span style="color:var(--ink-faint);font-weight:600">Duración estimada:</span><strong>'+dias+' día(s)</strong></div>';
-  html+='<div style="background:#fff;border-radius:.6rem;overflow:hidden;border:1px solid #bae6fd"><div style="background:#0369a1;color:#fff;font-size:.68rem;font-weight:700;padding:.3rem .75rem;text-transform:uppercase">Distribución de envíos</div>';
-  for(var d=1;d<=Math.min(dias,7);d++){
-    var cnt=d<dias?limite:(total-(dias-1)*limite);
-    var pct=Math.round((cnt/limite)*100);
-    var fecha=new Date();fecha.setDate(fecha.getDate()+d-1);
-    html+='<div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;border-bottom:1px solid #f0f0f0"><span style="font-size:.7rem;min-width:70px;color:var(--ink-faint)">'+(d===1?'Hoy':d===2?'Mañana':fecha.toLocaleDateString('es-PE',{weekday:'short',day:'numeric'}))+'</span><div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;background:#0369a1;border-radius:999px;width:'+pct+'%"></div></div><span style="font-size:.72rem;font-weight:700;color:#0369a1;min-width:55px;text-align:right">'+cnt+' msgs</span></div>';
+function renderProyeccion(total, limite) {
+  if (!total) return;
+  var box = document.getElementById('camp-proyeccion'), body = document.getElementById('camp-proyeccion-body');
+  if (!box || !body) return;
+  box.style.display = '';
+  var dias = Math.ceil(total / limite);
+  var html = '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;margin-bottom:.6rem"><span style="color:var(--ink-faint);font-weight:600">Total contactos:</span><strong>'+total+'</strong><span style="color:var(--ink-faint);font-weight:600">Límite diario:</span><strong>'+limite+' mensajes</strong><span style="color:var(--ink-faint);font-weight:600">Duración estimada:</span><strong>'+dias+' día(s)</strong></div>';
+  html += '<div style="background:#fff;border-radius:.6rem;overflow:hidden;border:1px solid #bae6fd"><div style="background:#0369a1;color:#fff;font-size:.68rem;font-weight:700;padding:.3rem .75rem;text-transform:uppercase">Distribución de envíos</div>';
+  for (var d = 1; d <= Math.min(dias, 7); d++) {
+    var cnt = d < dias ? limite : (total - (dias-1)*limite);
+    var pct = Math.round((cnt/limite)*100);
+    var fecha = new Date(); fecha.setDate(fecha.getDate()+d-1);
+    html += '<div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;border-bottom:1px solid #f0f0f0"><span style="font-size:.7rem;min-width:70px;color:var(--ink-faint)">'+(d===1?'Hoy':d===2?'Mañana':fecha.toLocaleDateString('es-PE',{weekday:'short',day:'numeric'}))+'</span><div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;background:#0369a1;border-radius:999px;width:'+pct+'%"></div></div><span style="font-size:.72rem;font-weight:700;color:#0369a1;min-width:55px;text-align:right">'+cnt+' msgs</span></div>';
   }
-  if(dias>7) html+='<div style="padding:.4rem .75rem;font-size:.7rem;color:var(--ink-faint);text-align:center">…y '+(dias-7)+' días más</div>';
-  body.innerHTML=html+'</div>';
+  if (dias > 7) html += '<div style="padding:.4rem .75rem;font-size:.7rem;color:var(--ink-faint);text-align:center">…y '+(dias-7)+' días más</div>';
+  body.innerHTML = html + '</div>';
 }
 
 async function guardarCampana(iniciar) {
-  var nombre=document.getElementById('camp-nombre').value.trim();
-  var mensaje=document.getElementById('camp-mensaje').value.trim();
-  var segmento=document.getElementById('camp-segmento').value;
-  var editId=document.getElementById('camp-edit-id').value;
-  if(!nombre){toast('El nombre es obligatorio.','warning');return;}
-  if(!mensaje){toast('El mensaje es obligatorio.','warning');return;}
-  if(_campSubiendo){toast('Espera a que termine de subir la imagen.','warning');return;}
-  var programar=document.getElementById('camp-programar')?.checked;
-  var fechaInicio=document.getElementById('camp-fecha-inicio')?.value;
-  var body={nombre,mensaje,segmento,imagen_url:_campImagenUrl||null,imagen_blob_name:_campImagenBlob||null,
-    estado:iniciar?(programar&&fechaInicio?'programada':'enviando'):'borrador',
-    programada_at:(programar&&fechaInicio)?fechaInicio:null};
+  var nombre   = document.getElementById('camp-nombre').value.trim();
+  var mensaje  = document.getElementById('camp-mensaje').value.trim();
+  var segmento = document.getElementById('camp-segmento').value;
+  var editId   = document.getElementById('camp-edit-id').value;
+  if (!nombre)  { toast('El nombre es obligatorio.', 'warning'); return; }
+  if (!mensaje) { toast('El mensaje es obligatorio.', 'warning'); return; }
+  if (_campSubiendo) { toast('Espera a que termine de subir la imagen.', 'warning'); return; }
+  var programar   = document.getElementById('camp-programar')?.checked;
+  var fechaInicio = document.getElementById('camp-fecha-inicio')?.value;
+  var body = {
+    nombre, mensaje, segmento,
+    imagen_url: _campImagenUrl || null,
+    imagen_blob_name: _campImagenBlob || null,
+    estado: iniciar ? (programar && fechaInicio ? 'programada' : 'enviando') : 'borrador',
+    programada_at: (programar && fechaInicio) ? fechaInicio : null
+  };
   try {
-    var url=editId?'/wa/campanas/'+editId:'/wa/campanas',method=editId?'PUT':'POST';
-    var res=await api(url,{method,body});var d=await res.json();
-    if(!res.ok){toast(d.message||'Error.','danger');return;}
-    toast('✅ '+(iniciar?'Campaña iniciada':'Borrador guardado'),'success');
-    closeModal('modal-campana');cargarCampanas();
-  } catch(e){toast('Error de conexión.','danger');}
+    var url = editId ? '/wa/campanas/'+editId : '/wa/campanas';
+    var method = editId ? 'PUT' : 'POST';
+    var res = await api(url, { method, body }); var d = await res.json();
+    if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
+    toast('✅ ' + (iniciar ? 'Campaña iniciada' : 'Borrador guardado'), 'success');
+    closeModal('modal-campana');
+    cargarCampanas();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
 }
 
 var _campSubiendo = false;
 
 async function previsualizarImagenCampana(input) {
-  var file=input.files[0];if(!file)return;
-  var reader=new FileReader();
-  reader.onload=async function(e){
-    var pi=document.getElementById('camp-img-prev-img');if(pi)pi.src=e.target.result;
-    var pp=document.getElementById('camp-img-preview');if(pp)pp.style.display='';
-    var pb=document.getElementById('btn-limpiar-img-camp');if(pb)pb.style.display='';
-    // Mostrar estado de subida
-    var pb2=document.getElementById('btn-limpiar-img-camp');
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var pi = document.getElementById('camp-img-prev-img'); if (pi) pi.src = e.target.result;
+    var pp = document.getElementById('camp-img-preview');  if (pp) pp.style.display = '';
+    var pb = document.getElementById('btn-limpiar-img-camp'); if (pb) pb.style.display = '';
     _campSubiendo = true;
-    var nom=document.getElementById('camp-img-prev-nombre');
-    if(nom) nom.textContent='⏳ Subiendo imagen…';
+    var nom = document.getElementById('camp-img-prev-nombre'); if (nom) nom.textContent = '⏳ Subiendo imagen…';
     try {
-      var res=await api('/wa/upload',{method:'POST',body:{base64:e.target.result.split(',')[1],contentType:file.type,filename:file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}});
-      var d=await res.json();if(!res.ok)throw new Error(d.message);
-      _campImagenUrl=d.data.url;_campImagenBlob=d.data.blobName;
-      if(nom) nom.textContent='✅ '+file.name;
-      toast('✅ Imagen subida','success');
-    } catch(err){
-      _campImagenUrl=null;_campImagenBlob=null;
-      if(nom) nom.textContent='❌ Error al subir';
-      toast('Error al subir: '+err.message,'danger');
-    } finally {
-      _campSubiendo = false;
-    }
+      var res = await api('/wa/upload', { method:'POST', body:{ base64: e.target.result.split(',')[1], contentType: file.type, filename: file.name.replace(/[^a-zA-Z0-9._-]/g,'_') } });
+      var d = await res.json(); if (!res.ok) throw new Error(d.message);
+      _campImagenUrl = d.data.url; _campImagenBlob = d.data.blobName;
+      if (nom) nom.textContent = '✅ ' + file.name;
+      toast('✅ Imagen subida', 'success');
+    } catch(err) {
+      _campImagenUrl = null; _campImagenBlob = null;
+      if (nom) nom.textContent = '❌ Error al subir';
+      toast('Error al subir: ' + err.message, 'danger');
+    } finally { _campSubiendo = false; }
   };
   reader.readAsDataURL(file);
 }
 
-function limpiarImagenCampana(){
-  _campImagenUrl=null;_campImagenBlob=null;
-  var f=document.getElementById('camp-imagen-file');if(f)f.value='';
-  var p=document.getElementById('camp-img-preview');if(p)p.style.display='none';
-  var b=document.getElementById('btn-limpiar-img-camp');if(b)b.style.display='none';
+function limpiarImagenCampana() {
+  _campImagenUrl = null; _campImagenBlob = null;
+  var f = document.getElementById('camp-imagen-file'); if (f) f.value = '';
+  var p = document.getElementById('camp-img-preview'); if (p) p.style.display = 'none';
+  var b = document.getElementById('btn-limpiar-img-camp'); if (b) b.style.display = 'none';
+}
+
+// ── GENERADOR DE MENSAJES CON IA ──────────────────────────────
+var _aiGenerando = false;
+
+async function generarMensajeIA() {
+  var titulo = document.getElementById('camp-ai-titulo').value.trim();
+  if (!titulo) { toast('Escribe un título o tema para la campaña.', 'warning'); return; }
+  if (_aiGenerando) return;
+
+  _aiGenerando = true;
+  var btn = document.getElementById('btn-ai-generar');
+  var res_box = document.getElementById('camp-ai-resultado');
+  var list = document.getElementById('camp-ai-lista');
+  btn.disabled = true; btn.textContent = '⏳ Generando…';
+  res_box.style.display = '';
+  list.innerHTML = '<div style="text-align:center;padding:.75rem"><div class="vspinner" style="margin:0 auto .5rem"></div><p style="font-size:.75rem;color:var(--ink-faint)">Creando 3 versiones del mensaje…</p></div>';
+
+  var segmento = document.getElementById('camp-segmento').value;
+  var segDesc = { todos:'todos los propietarios de mascotas', por_especie:'dueños de mascotas de una especie específica', vacunas_vencidas:'dueños cuyas mascotas tienen vacunas vencidas o próximas', sin_citas_60d:'clientes que no han venido en 60+ días', citas_semana:'clientes con cita esta semana' }[segmento] || 'clientes de la clínica veterinaria';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: 'Eres experto en marketing veterinario para Latinoamérica. Genera 3 versiones de mensaje WhatsApp para una campaña llamada "' + titulo + '". El segmento es: ' + segDesc + '. Usa un tono cálido, cercano, con emojis moderados. Incluye las variables disponibles: [nombre], [mascota], [clinica]. Cada mensaje debe ser conciso (máx 250 caracteres), persuasivo y diferente en tono: uno formal, uno casual, uno emotivo. Responde SOLO en JSON sin markdown: {"mensajes":[{"tono":"Formal","texto":"..."},{"tono":"Casual","texto":"..."},{"tono":"Emotivo","texto":"..."}]}'
+        }]
+      })
+    });
+    var data = await response.json();
+    var raw = data.content?.[0]?.text || '';
+    var clean = raw.replace(/```json|```/g,'').trim();
+    var parsed = JSON.parse(clean);
+    var mensajes = parsed.mensajes || [];
+
+    list.innerHTML = mensajes.map(function(m, i) {
+      return '<div style="background:#fff;border:1.5px solid var(--line);border-radius:.85rem;padding:.75rem 1rem;cursor:pointer;transition:all .15s" ' +
+        'onmouseover="this.style.borderColor=\'#25d366\';this.style.background=\'#f0fdf4\'" ' +
+        'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'" ' +
+        'onclick="usarMensajeIA('+i+')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">' +
+          '<span style="font-size:.65rem;font-weight:800;text-transform:uppercase;color:#25d366">'+esc(m.tono)+'</span>' +
+          '<span style="font-size:.65rem;color:var(--ink-faint)">'+(m.texto||'').length+' chars</span>' +
+        '</div>' +
+        '<p style="font-size:.8rem;line-height:1.5;color:var(--ink)">'+esc(m.texto||'')+'</p>' +
+        '<p style="font-size:.65rem;color:#25d366;font-weight:700;margin-top:.35rem">Clic para usar →</p>' +
+      '</div>';
+    }).join('');
+
+    window._aiMensajes = mensajes;
+
+  } catch(err) {
+    list.innerHTML = '<p style="font-size:.78rem;color:#be123c;text-align:center;padding:.5rem">Error al generar. Intenta de nuevo.</p>';
+  } finally {
+    _aiGenerando = false;
+    btn.disabled = false; btn.textContent = '✨ Generar con IA';
+  }
+}
+
+function usarMensajeIA(idx) {
+  var m = (window._aiMensajes || [])[idx];
+  if (!m) return;
+  document.getElementById('camp-mensaje').value = m.texto;
+  toast('✅ Mensaje aplicado', 'success');
+  // Scroll al textarea
+  document.getElementById('camp-mensaje').scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
 function suscribirWSCampanas() {
-  if(!_waSocket) return;
-  _waSocket.on('wa:campana:progreso',function(data){
-    var panel=document.getElementById('panel-ws-campana');if(panel)panel.style.display='';
-    var set=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
-    set('ws-campana-pct',(data.porcentaje||0)+'%');
-    var bar=document.getElementById('ws-progreso-bar');if(bar)bar.style.width=(data.porcentaje||0)+'%';
-    set('ws-enviados',data.enviados||0);set('ws-fallidos',data.fallidos||0);
-    set('ws-hoy',data.enviados_hoy||0);set('ws-total',data.total||0);
-    var al=document.getElementById('ws-limite-alerta');
-    if(al){al.style.display=data.estado==='limite_diario'?'':'none';if(data.estado==='limite_diario')al.textContent='⏸️ '+(data.mensaje||'Límite diario alcanzado.');}
-    if(data.estado==='completada')setTimeout(cargarCampanas,1500);
+  if (!_waSocket) return;
+  _waSocket.on('wa:campana:progreso', function(data) {
+    var panel = document.getElementById('panel-ws-campana'); if (panel) panel.style.display = '';
+    var set = function(id,v) { var el=document.getElementById(id); if(el) el.textContent=v; };
+    set('ws-campana-pct', (data.porcentaje||0)+'%');
+    var bar = document.getElementById('ws-progreso-bar'); if (bar) bar.style.width = (data.porcentaje||0)+'%';
+    set('ws-enviados', data.enviados||0); set('ws-fallidos', data.fallidos||0);
+    set('ws-hoy', data.enviados_hoy||0); set('ws-total', data.total||0);
+    var al = document.getElementById('ws-limite-alerta');
+    if (al) { al.style.display = data.estado==='limite_diario'?'':'none'; if(data.estado==='limite_diario') al.textContent='⏸️ '+(data.mensaje||'Límite diario alcanzado.'); }
+    if (data.estado==='completada') setTimeout(cargarCampanas, 1500);
   });
-  _waSocket.on('wa:campana:log',function(data){
-    var lista=document.getElementById('ws-log-lista');if(!lista)return;
-    var color=data.estado==='enviado'?'#15803d':'#be123c';
-    var linea=document.createElement('div');
-    linea.style.cssText='padding:.15rem 0;color:'+color+';border-bottom:1px solid #f0f0f0';
-    linea.textContent=(data.estado==='enviado'?'✅':'❌')+' '+new Date(data.timestamp).toLocaleTimeString('es-PE')+' → '+data.nombre+' ('+data.telefono+')';
-    lista.insertBefore(linea,lista.firstChild);
-    while(lista.children.length>10)lista.removeChild(lista.lastChild);
+  _waSocket.on('wa:campana:log', function(data) {
+    var lista = document.getElementById('ws-log-lista'); if (!lista) return;
+    var color = data.estado==='enviado'?'#15803d':'#be123c';
+    var linea = document.createElement('div');
+    linea.style.cssText = 'padding:.15rem 0;color:'+color+';border-bottom:1px solid #f0f0f0';
+    linea.textContent = (data.estado==='enviado'?'✅':'❌')+' '+new Date(data.timestamp).toLocaleTimeString('es-PE')+' → '+data.nombre+' ('+data.telefono+')';
+    lista.insertBefore(linea, lista.firstChild);
+    while (lista.children.length > 10) lista.removeChild(lista.lastChild);
   });
 }
 
@@ -1661,39 +1805,57 @@ async function eliminarHistoria(id) {
 
 </script>
 
-<!-- Modal Nueva Campaña -->
+<!-- Modal Crear / Editar Campaña -->
 <div id="modal-campana" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:620px">
-    <div class="vmodal-head"><h3>📢 Nueva Campaña</h3><button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button></div>
+  <div class="vmodal" style="max-width:640px">
+    <div class="vmodal-head">
+      <h3 id="det-modal-campana-titulo">📢 Nueva campaña</h3>
+      <button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button>
+    </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="camp-edit-id"/>
-      <div><label class="vlabel">Nombre *</label><input id="camp-nombre" type="text" class="vinput" placeholder="Ej: Promoción vacunas junio"/></div>
-      <div>
-        <label class="vlabel">Fecha de inicio (opcional)</label>
-        <div style="display:flex;align-items:center;gap:.75rem">
-          <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer"><input type="checkbox" id="camp-programar" style="accent-color:#25d366" onchange="toggleFechaCampana(this.checked)"/> Programar inicio</label>
-          <input type="datetime-local" id="camp-fecha-inicio" class="vinput" style="display:none;max-width:220px"/>
+
+      <!-- IA Generator -->
+      <div style="background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1.5px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1rem">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+          <span style="font-size:1rem">✨</span>
+          <p style="font-weight:800;font-size:.85rem;color:#065f46">Generar mensaje con IA</p>
         </div>
-        <p id="camp-fecha-hint" style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Sin programar → inicia inmediatamente</p>
+        <div style="display:flex;gap:.5rem">
+          <input id="camp-ai-titulo" type="text" class="vinput" placeholder="Ej: Descuento vacunas junio, recordatorio antipulgas…" style="flex:1;font-size:.8rem"/>
+          <button id="btn-ai-generar" onclick="generarMensajeIA()" class="vbtn" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;white-space:nowrap;font-size:.8rem">✨ Generar</button>
+        </div>
+        <div id="camp-ai-resultado" style="display:none;margin-top:.75rem">
+          <p style="font-size:.65rem;font-weight:700;color:#065f46;text-transform:uppercase;margin-bottom:.5rem">3 versiones — haz clic en la que más te guste:</p>
+          <div id="camp-ai-lista" style="display:flex;flex-direction:column;gap:.5rem"></div>
+        </div>
       </div>
-      <div><label class="vlabel">Segmento *</label>
+
+      <div><label class="vlabel">Nombre de la campaña *</label><input id="camp-nombre" type="text" class="vinput" placeholder="Ej: Campaña vacunas julio"/></div>
+
+      <div>
+        <label class="vlabel">Segmento de destinatarios *</label>
         <select id="camp-segmento" class="vinput" onchange="calcularProyeccion()">
           <option value="todos">👥 Todos los propietarios</option>
-          <option value="por_especie">🐕 Por especie</option>
-          <option value="vacunas_vencidas">💉 Vacunas vencidas</option>
-          <option value="sin_citas_60d">📅 Sin citas en 60 días</option>
+          <option value="por_especie">🐕 Por especie de mascota</option>
+          <option value="vacunas_vencidas">💉 Vacunas vencidas o próximas</option>
+          <option value="sin_citas_60d">😴 Sin citas en 60+ días</option>
         </select>
       </div>
+
       <div>
-        <label class="vlabel">Mensaje *</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
+          <label class="vlabel" style="margin:0">Mensaje *</label>
+        </div>
         <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.7rem;padding:.5rem .8rem;margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.3rem">
           <span style="font-size:.63rem;color:var(--ink-faint);width:100%;font-weight:700">Variables:</span>
-          <button onclick="insertarVarCampana('[nombre]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[nombre]</button>
+          <button onclick="insertarVarCampana('[nombre]')"  class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[nombre]</button>
           <button onclick="insertarVarCampana('[mascota]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[mascota]</button>
           <button onclick="insertarVarCampana('[clinica]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[clinica]</button>
         </div>
         <textarea id="camp-mensaje" rows="4" class="vinput" placeholder="Hola [nombre], te contactamos desde [clinica]…"></textarea>
       </div>
+
       <div>
         <label class="vlabel">Imagen (opcional)</label>
         <div style="border:1.5px dashed var(--line);border-radius:.85rem;padding:.85rem 1rem">
@@ -1703,11 +1865,23 @@ async function eliminarHistoria(id) {
             <button onclick="limpiarImagenCampana()" id="btn-limpiar-img-camp" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
           </div>
           <div id="camp-img-preview" style="display:none;margin-top:.6rem">
-            <img id="camp-img-prev-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line)"/>
+            <img id="camp-img-prev-img" style="max-width:100%;max-height:160px;border-radius:.75rem;object-fit:contain;border:1px solid var(--line)"/>
             <p id="camp-img-prev-nombre" style="font-size:.72rem;color:var(--ink-soft);margin-top:.3rem"></p>
           </div>
         </div>
       </div>
+
+      <div>
+        <label class="vlabel">Fecha de inicio (opcional)</label>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer">
+            <input type="checkbox" id="camp-programar" style="accent-color:#25d366" onchange="toggleFechaCampana(this.checked)"/> Programar inicio
+          </label>
+          <input type="datetime-local" id="camp-fecha-inicio" class="vinput" style="display:none;max-width:220px"/>
+        </div>
+        <p id="camp-fecha-hint" style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Sin programar → inicia inmediatamente al guardar</p>
+      </div>
+
       <div id="camp-proyeccion" style="display:none;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:.9rem;padding:1rem">
         <p style="font-size:.72rem;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:.75rem">📊 Proyección de envíos</p>
         <div id="camp-proyeccion-body"></div>
@@ -1724,10 +1898,11 @@ async function eliminarHistoria(id) {
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-campana')" class="vbtn vbtn-ghost">Cancelar</button>
       <button onclick="guardarCampana(false)" class="vbtn vbtn-ghost">💾 Borrador</button>
-      <button onclick="guardarCampana(true)" class="vbtn vbtn-primary">🚀 Iniciar campaña</button>
+      <button onclick="guardarCampana(true)"  class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">🚀 Iniciar campaña</button>
     </div>
   </div>
 </div>
+
 
 <!-- Modal Nueva Historia -->
 <div id="modal-historia" class="hidden vmodal-backdrop">
@@ -1820,7 +1995,7 @@ async function eliminarHistoria(id) {
 
 <!-- Modal Detalle Campaña -->
 <div id="modal-detalle-campana" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:500px">
+  <div class="vmodal" style="max-width:560px">
     <div class="vmodal-head">
       <h3 id="det-camp-titulo">📢 Detalle de campaña</h3>
       <button onclick="closeModal('modal-detalle-campana')" class="vmodal-close">✕</button>
@@ -1833,4 +2008,3 @@ async function eliminarHistoria(id) {
 </div>
 
 </body>
-</html>

@@ -300,6 +300,36 @@ router.get('/campanas/:id', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/v1/wa/campanas/:id/contactos
+router.get('/campanas/:id/contactos', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado, limit = 100, offset = 0 } = req.query;
+    let sql = `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
+                      wcc.estado, wcc.error, wcc.enviado_at,
+                      CONCAT(p.nombre,' ',p.apellido) AS prop_nombre_completo
+               FROM wa_campana_contactos wcc
+               LEFT JOIN propietarios p ON p.id = wcc.propietario_id
+               WHERE wcc.campana_id = ?`;
+    const params = [req.params.id];
+    if (estado) { sql += ' AND wcc.estado = ?'; params.push(estado); }
+    sql += ` ORDER BY wcc.id ASC LIMIT ${parseInt(limit) || 100} OFFSET ${parseInt(offset) || 0}`;
+
+    const [rows] = await req.db.execute(sql, params);
+
+    const [[{ total }]] = await req.db.execute(
+      'SELECT COUNT(*) AS total FROM wa_campana_contactos WHERE campana_id = ?', [req.params.id]
+    );
+    const [[{ enviados }]] = await req.db.execute(
+      "SELECT COUNT(*) AS enviados FROM wa_campana_contactos WHERE campana_id = ? AND estado = 'enviado'", [req.params.id]
+    );
+    const [[{ fallidos }]] = await req.db.execute(
+      "SELECT COUNT(*) AS fallidos FROM wa_campana_contactos WHERE campana_id = ? AND estado = 'fallido'", [req.params.id]
+    );
+
+    return res.json({ success: true, data: rows, meta: { total, enviados, fallidos } });
+  } catch (err) { next(err); }
+});
+
 // POST /api/v1/wa/campanas
 router.post('/campanas', authorize('admin'), async (req, res, next) => {
   try {
