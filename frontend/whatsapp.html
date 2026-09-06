@@ -1163,51 +1163,124 @@ async function accionCampana(id,accion) {
 
 async function verDetalleCampana(id) {
   try {
-    var res=await api('/wa/campanas/'+id); if(!res?.ok) return;
-    var c=(await res.json()).data;
-    var cols={borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
-    var col=cols[c.estado]||'#6b7280';
-    var pct=c.total>0?Math.round((c.enviados/c.total)*100):0;
-    var html='<div style="display:flex;flex-direction:column;gap:.85rem">';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">';
-    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Estado</p>';
-    html+='<span style="font-size:.8rem;font-weight:700;padding:.25rem .65rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">'+c.estado+'</span></div>';
-    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Segmento</p><p style="font-size:.85rem">'+esc(c.segmento)+'</p></div>';
-    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Enviados</p><p style="font-size:.85rem;font-weight:700;color:#15803d">'+c.enviados+' / '+(c.total||'—')+'</p></div>';
-    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Fallidos</p><p style="font-size:.85rem;font-weight:700;color:#be123c">'+c.fallidos+'</p></div>';
-    if(c.programada_at) html+='<div class="col-span-2"><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Fecha programada</p><p style="font-size:.85rem">'+new Date(c.programada_at).toLocaleString("es-PE")+'</p></div>';
-    html+='</div>';
-    if(c.total>0){
-      html+='<div><div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem"><span>Progreso</span><span>'+pct+'%</span></div>';
-      html+='<div style="height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div></div>';
+    var res = await api('/wa/campanas/'+id);
+    if (!res?.ok) { toast('Error al obtener campaña','danger'); return; }
+    var json = await res.json();
+    if (!json.success) { toast(json.message||'Error','danger'); return; }
+    var c = json.data;
+    var cols = {borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
+    var col  = cols[c.estado]||'#6b7280';
+    var pct  = c.total>0 ? Math.round((c.enviados/c.total)*100) : 0;
+
+    // Construir body con DOM para evitar problemas de comillas
+    var body = document.getElementById('det-camp-body');
+    body.innerHTML = '';
+
+    // Grid de stats
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem';
+
+    function statCell(label, value, color) {
+      var d = document.createElement('div');
+      var lbl = document.createElement('p');
+      lbl.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem';
+      lbl.textContent = label;
+      var val = document.createElement('p');
+      val.style.cssText = 'font-size:.9rem;font-weight:700' + (color?';color:'+color:'');
+      val.textContent = value;
+      d.appendChild(lbl); d.appendChild(val);
+      return d;
     }
-    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem">Mensaje</p>';
-    html+='<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;white-space:pre-wrap;max-height:120px;overflow-y:auto">'+esc(c.mensaje||'')+'</div></div>';
-    if(c.imagen_url) html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem">Imagen</p><img src="'+c.imagen_url+'" style="max-width:100%;max-height:150px;border-radius:.75rem;object-fit:contain;border:1px solid var(--line)"/></div>';
-    html+='</div>';
-    document.getElementById('det-camp-body').innerHTML=html;
-    document.getElementById('det-camp-titulo').textContent='📢 '+esc(c.nombre);
-    var foot=document.getElementById('det-camp-foot');
-    foot.innerHTML='';
-    var btnCerrar=document.createElement('button');
-    btnCerrar.className='vbtn vbtn-ghost'; btnCerrar.textContent='Cerrar';
-    btnCerrar.onclick=function(){closeModal('modal-detalle-campana');};
-    foot.appendChild(btnCerrar);
-    if(['borrador','pausada'].includes(c.estado)){
-      var btnEdit=document.createElement('button');
-      btnEdit.className='vbtn vbtn-ghost'; btnEdit.textContent='✏️ Editar';
-      btnEdit.setAttribute('data-camp-id',c.id); btnEdit.setAttribute('data-camp-edit','1');
-      btnEdit.onclick=function(){closeModal('modal-detalle-campana');editarCampana(c.id);};
-      foot.appendChild(btnEdit);
+
+    // Badge estado
+    var dEstado = document.createElement('div');
+    var lEstado = document.createElement('p');
+    lEstado.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem';
+    lEstado.textContent = 'Estado';
+    var bEstado = document.createElement('span');
+    bEstado.style.cssText = 'font-size:.8rem;font-weight:700;padding:.25rem .65rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40';
+    bEstado.textContent = c.estado;
+    dEstado.appendChild(lEstado); dEstado.appendChild(bEstado);
+    grid.appendChild(dEstado);
+    grid.appendChild(statCell('Segmento', c.segmento||'—'));
+    grid.appendChild(statCell('Enviados', c.enviados+' / '+(c.total||0), '#15803d'));
+    grid.appendChild(statCell('Fallidos', c.fallidos||0, c.fallidos>0?'#be123c':null));
+    if (c.programada_at) {
+      var dFecha = statCell('Fecha programada', new Date(c.programada_at.replace('Z','')).toLocaleString('es-PE'));
+      dFecha.style.gridColumn = 'span 2';
+      grid.appendChild(dFecha);
     }
-    if(c.estado==='borrador'){
-      var btnIni=document.createElement('button');
-      btnIni.className='vbtn vbtn-primary'; btnIni.textContent='▶ Iniciar';
-      btnIni.onclick=function(){closeModal('modal-detalle-campana');accionCampana(c.id,'iniciar');};
-      foot.appendChild(btnIni);
+    body.appendChild(grid);
+
+    // Barra de progreso
+    if (c.total > 0) {
+      var dProg = document.createElement('div');
+      dProg.style.marginBottom = '.75rem';
+      var dProgHead = document.createElement('div');
+      dProgHead.style.cssText = 'display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem';
+      dProgHead.innerHTML = '<span>Progreso</span><span>'+pct+'%</span>';
+      var dBar = document.createElement('div');
+      dBar.style.cssText = 'height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden';
+      var dFill = document.createElement('div');
+      dFill.style.cssText = 'height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%';
+      dBar.appendChild(dFill);
+      dProg.appendChild(dProgHead); dProg.appendChild(dBar);
+      body.appendChild(dProg);
+    }
+
+    // Mensaje
+    var dMsg = document.createElement('div');
+    dMsg.style.marginBottom = '.75rem';
+    var lMsg = document.createElement('p');
+    lMsg.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem';
+    lMsg.textContent = 'Mensaje';
+    var boxMsg = document.createElement('div');
+    boxMsg.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;white-space:pre-wrap;max-height:120px;overflow-y:auto';
+    boxMsg.textContent = c.mensaje||'';
+    dMsg.appendChild(lMsg); dMsg.appendChild(boxMsg);
+    body.appendChild(dMsg);
+
+    // Imagen si existe
+    if (c.imagen_url) {
+      var dImg = document.createElement('div');
+      var lImg = document.createElement('p');
+      lImg.style.cssText = 'font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem';
+      lImg.textContent = 'Imagen';
+      var img = document.createElement('img');
+      img.src = c.imagen_url;
+      img.style.cssText = 'max-width:100%;max-height:150px;border-radius:.75rem;object-fit:contain;border:1px solid var(--line)';
+      img.onerror = function(){ this.style.display='none'; };
+      dImg.appendChild(lImg); dImg.appendChild(img);
+      body.appendChild(dImg);
+    }
+
+    // Título modal
+    document.getElementById('det-camp-titulo').textContent = '📢 ' + (c.nombre||'');
+
+    // Footer con botones
+    var foot = document.getElementById('det-camp-foot');
+    foot.innerHTML = '';
+    var btnC = document.createElement('button');
+    btnC.className='vbtn vbtn-ghost'; btnC.textContent='Cerrar';
+    btnC.onclick = function(){ closeModal('modal-detalle-campana'); };
+    foot.appendChild(btnC);
+    if (['borrador','pausada'].includes(c.estado)) {
+      var btnE = document.createElement('button');
+      btnE.className='vbtn vbtn-ghost'; btnE.textContent='✏️ Editar';
+      btnE.onclick = function(){ closeModal('modal-detalle-campana'); editarCampana(c.id); };
+      foot.appendChild(btnE);
+    }
+    if (c.estado==='borrador') {
+      var btnI = document.createElement('button');
+      btnI.className='vbtn vbtn-primary'; btnI.textContent='▶ Iniciar';
+      btnI.onclick = function(){ closeModal('modal-detalle-campana'); accionCampana(c.id,'iniciar'); };
+      foot.appendChild(btnI);
     }
     openModal('modal-detalle-campana');
-  } catch(e){toast('Error al cargar detalle','danger');}
+  } catch(e) {
+    console.error('verDetalleCampana error:', e);
+    toast('Error al cargar detalle: '+e.message, 'danger');
+  }
 }
 
 function abrirModalNuevaCampana() {
