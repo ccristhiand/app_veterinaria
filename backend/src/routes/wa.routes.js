@@ -23,7 +23,7 @@ function callGateway(method, path, body = null) {
     const url     = new URL(WA_GATEWAY + path);
     const options = {
       hostname: url.hostname,
-      port    : url.port || 5000,
+      port    : parseInt(url.port) || 5001,
       path    : url.pathname,
       method,
       headers : {
@@ -41,7 +41,7 @@ function callGateway(method, path, body = null) {
       });
     });
     req.on('error', reject);
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout WA Gateway')); });
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout WA Gateway')); });
     if (bodyStr) req.write(bodyStr);
     req.end();
   });

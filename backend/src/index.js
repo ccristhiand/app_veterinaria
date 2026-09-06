@@ -34,7 +34,6 @@ const brandingRoutes         = require('./routes/branding.routes');
 const { router: permisosAdminRoutes } = require('./routes/permisos.routes');
 const feRoutes               = require('./routes/fe.routes');
 const waRoutes               = require('./routes/wa.routes');
-const waCampanasRoutes       = require('./routes/wa-campanas.routes');
 const desparasitacionesRoutes = require('./routes/desparasitaciones.routes');
 const sedesRoutes             = require('./routes/sedes.routes');   // ← NUEVO
 const asistenciaRoutes        = require('./routes/asistencia.routes'); // ← NUEVO
@@ -174,7 +173,6 @@ app.use(`${API}/consentimientos`,  consentimientosRoutes);
 app.use(`${API}/branding`,         brandingRoutes);
 app.use('/admin/api/permisos',     permisosAdminRoutes);
 app.use(`${API}/fe`,               feRoutes);
-app.use(`${API}/wa/campanas`,      waCampanasRoutes);
 app.use(`${API}/wa`,               waRoutes);
 app.use(`${API}/desparasitaciones`, desparasitacionesRoutes);
 app.use(`${API}/sedes`,            sedesRoutes);             // ← NUEVO
