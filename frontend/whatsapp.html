@@ -1758,5 +1758,19 @@ async function eliminarHistoria(id) {
   </div>
 </template>
 
+<!-- Modal Detalle Campaña -->
+<div id="modal-detalle-campana" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:500px">
+    <div class="vmodal-head">
+      <h3 id="det-camp-titulo">📢 Detalle de campaña</h3>
+      <button onclick="closeModal('modal-detalle-campana')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="det-camp-body"></div>
+    <div class="vmodal-foot" id="det-camp-foot">
+      <button onclick="closeModal('modal-detalle-campana')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
