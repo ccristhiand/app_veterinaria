@@ -302,12 +302,13 @@ router.get('/campanas/:id', authorize('admin'), async (req, res, next) => {
 // POST /api/v1/wa/campanas
 router.post('/campanas', authorize('admin'), async (req, res, next) => {
   try {
-    const { nombre, mensaje, segmento = 'todos', segmento_valor, imagen_url, imagen_blob_name, estado = 'borrador' } = req.body;
+    const { nombre, mensaje, segmento = 'todos', segmento_valor, imagen_url, imagen_blob_name, estado = 'borrador', programada_at } = req.body;
     if (!nombre || !mensaje) return res.status(422).json({ success: false, message: 'Nombre y mensaje requeridos.' });
     const result = await req.db.query(
-      `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado)
-       VALUES (?,?,?,?,?,?,?)`,
-      [nombre, mensaje, segmento, segmento_valor || null, imagen_url || null, imagen_blob_name || null, estado]
+      `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado, programada_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [nombre, mensaje, segmento, segmento_valor || null, imagen_url || null, imagen_blob_name || null,
+       estado, programada_at || null]
     );
     return res.status(201).json({ success: true, data: { id: result.insertId }, message: 'Campaña creada.' });
   } catch (err) { next(err); }
