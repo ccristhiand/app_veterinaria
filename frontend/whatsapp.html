@@ -754,15 +754,22 @@ async function cargarPlantillasSelect() {
     if (!res?.ok) return;
     const rows = (await res.json()).data || [];
     const sel  = document.getElementById('wa-plantilla-sel');
-    sel.innerHTML = '<option value="">Escribir mensaje personalizado…</option>' +
-      rows.map(p => `<option value="${esc(p.contenido)}">${esc(p.nombre)}</option>`).join('');
+    sel.innerHTML = '<option value="">Escribir mensaje personalizado…</option>';
+    rows.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.nombre;
+      opt.dataset.contenido = p.contenido;
+      sel.appendChild(opt);
+    });
   } catch(e) {}
 }
 
 function aplicarPlantilla() {
-  const val = document.getElementById('wa-plantilla-sel').value;
-  if (!val) return;
-  document.getElementById('wa-mensaje').value = val;
+  const sel = document.getElementById('wa-plantilla-sel');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.dataset.contenido) return;
+  document.getElementById('wa-mensaje').value = opt.dataset.contenido;
   actualizarPreviewMensaje();
 }
 
