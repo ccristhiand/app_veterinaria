@@ -1357,6 +1357,7 @@ async function guardarCampana(iniciar) {
   var editId=document.getElementById('camp-edit-id').value;
   if(!nombre){toast('El nombre es obligatorio.','warning');return;}
   if(!mensaje){toast('El mensaje es obligatorio.','warning');return;}
+  if(_campSubiendo){toast('Espera a que termine de subir la imagen.','warning');return;}
   var programar=document.getElementById('camp-programar')?.checked;
   var fechaInicio=document.getElementById('camp-fecha-inicio')?.value;
   var body={nombre,mensaje,segmento,imagen_url:_campImagenUrl||null,imagen_blob_name:_campImagenBlob||null,
@@ -1371,6 +1372,8 @@ async function guardarCampana(iniciar) {
   } catch(e){toast('Error de conexión.','danger');}
 }
 
+var _campSubiendo = false;
+
 async function previsualizarImagenCampana(input) {
   var file=input.files[0];if(!file)return;
   var reader=new FileReader();
@@ -1378,12 +1381,24 @@ async function previsualizarImagenCampana(input) {
     var pi=document.getElementById('camp-img-prev-img');if(pi)pi.src=e.target.result;
     var pp=document.getElementById('camp-img-preview');if(pp)pp.style.display='';
     var pb=document.getElementById('btn-limpiar-img-camp');if(pb)pb.style.display='';
+    // Mostrar estado de subida
+    var pb2=document.getElementById('btn-limpiar-img-camp');
+    _campSubiendo = true;
+    var nom=document.getElementById('camp-img-prev-nombre');
+    if(nom) nom.textContent='⏳ Subiendo imagen…';
     try {
       var res=await api('/wa/upload',{method:'POST',body:{base64:e.target.result.split(',')[1],contentType:file.type,filename:file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}});
       var d=await res.json();if(!res.ok)throw new Error(d.message);
       _campImagenUrl=d.data.url;_campImagenBlob=d.data.blobName;
+      if(nom) nom.textContent='✅ '+file.name;
       toast('✅ Imagen subida','success');
-    } catch(e){toast('Error al subir: '+e.message,'danger');}
+    } catch(err){
+      _campImagenUrl=null;_campImagenBlob=null;
+      if(nom) nom.textContent='❌ Error al subir';
+      toast('Error al subir: '+err.message,'danger');
+    } finally {
+      _campSubiendo = false;
+    }
   };
   reader.readAsDataURL(file);
 }
@@ -1645,6 +1660,7 @@ async function eliminarHistoria(id) {
           </div>
           <div id="camp-img-preview" style="display:none;margin-top:.6rem">
             <img id="camp-img-prev-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line)"/>
+            <p id="camp-img-prev-nombre" style="font-size:.72rem;color:var(--ink-soft);margin-top:.3rem"></p>
           </div>
         </div>
       </div>
