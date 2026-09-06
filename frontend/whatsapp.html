@@ -140,6 +140,25 @@
             <p style="font-size:.65rem;color:var(--ink-faint)" id="wa-chars">0 caracteres</p>
           </div>
         </div>
+        <!-- Adjuntar imagen -->
+        <div style="margin-bottom:1rem;border:1.5px dashed var(--line);border-radius:.85rem;padding:.75rem 1rem">
+          <p style="font-size:.75rem;font-weight:700;margin-bottom:.5rem;color:var(--ink-soft)">📎 Adjuntar imagen (opcional)</p>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <input type="file" id="wa-archivo" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="previsualizarArchivoWA(this)"/>
+            <button onclick="document.getElementById('wa-archivo').click()" class="vbtn vbtn-ghost" style="font-size:.8rem">🖼️ Seleccionar archivo</button>
+            <button onclick="limpiarArchivoWA()" id="btn-limpiar-archivo" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
+          </div>
+          <div id="wa-archivo-preview" style="display:none;margin-top:.6rem">
+            <img id="wa-archivo-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line);display:none"/>
+            <p id="wa-archivo-nombre" style="font-size:.7rem;color:var(--ink-soft);margin-top:.3rem"></p>
+          </div>
+          <div id="wa-upload-progress" style="display:none;margin-top:.5rem">
+            <div style="height:4px;border-radius:999px;background:#f0f0f0;overflow:hidden">
+              <div id="wa-upload-bar" style="height:100%;background:#25d366;width:0%;transition:width .3s;border-radius:999px"></div>
+            </div>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Subiendo a Azure…</p>
+          </div>
+        </div>
         <button onclick="enviarMensajeWA()" id="btn-enviar-wa" class="vbtn" style="width:100%;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.75rem;font-size:.9rem;font-weight:700">
           <span id="btn-enviar-wa-txt">📤 Enviar mensaje</span>
         </button>
@@ -729,6 +748,7 @@ function selPropWA(id, nombre, telefono, mascotas) {
 
 function limpiarPropWA() {
   _propWASel = null;
+  limpiarArchivoWA();
   document.getElementById('wa-prop-sel').style.display = 'none';
   document.getElementById('wa-prop-resultados').innerHTML = '';
 }
@@ -765,18 +785,19 @@ async function enviarMensajeWA() {
   if (!_propWASel) { toast('Selecciona un propietario primero.', 'warning'); return; }
   if (!_propWASel.telefono) { toast('Este propietario no tiene teléfono registrado.', 'warning'); return; }
   const mensaje = document.getElementById('wa-mensaje').value.trim();
-  if (!mensaje) { toast('Escribe un mensaje.', 'warning'); return; }
+  if (!mensaje && !_waArchivoUrl) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
   if (_waEstado !== 'conectado') { toast('WhatsApp no está conectado.', 'warning'); return; }
   const btn = document.getElementById('btn-enviar-wa-txt');
   btn.textContent = 'Enviando…';
   document.getElementById('btn-enviar-wa').disabled = true;
   try {
-    const res  = await api('/wa/enviar', { method:'POST', body:{ telefono:_propWASel.telefono, mensaje, propietario_id:_propWASel.id } });
+    const res  = await api('/wa/enviar', { method:'POST', body:{ telefono:_propWASel.telefono, mensaje:mensaje||null, imagen_url:_waArchivoUrl||null, propietario_id:_propWASel.id } });
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al enviar.', 'danger'); return; }
     toast(`✅ Mensaje enviado a ${_propWASel.nombre}`, 'success');
     document.getElementById('wa-mensaje').value = '';
     document.getElementById('wa-plantilla-sel').value = '';
+    limpiarArchivoWA();
     actualizarPreviewMensaje();
     limpiarPropWA();
     cargarStats();
@@ -942,6 +963,57 @@ async function cargarLog() {
 }
 
 document.getElementById('wa-mensaje').addEventListener('input', actualizarPreviewMensaje);
+
+// ── Upload imagen en enviar mensaje ──────────────────────────
+var _waArchivoUrl  = null;
+var _waArchivoBlog = null;
+
+async function previsualizarArchivoWA(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 10*1024*1024) { toast('El archivo no debe superar 10MB','warning'); return; }
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var b64 = e.target.result;
+    var prev = document.getElementById('wa-archivo-preview');
+    var img  = document.getElementById('wa-archivo-img');
+    var nom  = document.getElementById('wa-archivo-nombre');
+    prev.style.display = '';
+    document.getElementById('btn-limpiar-archivo').style.display = '';
+    if (file.type.startsWith('image/')) { img.src=b64; img.style.display=''; }
+    else { img.style.display='none'; }
+    nom.textContent = '📎 '+file.name+' ('+(file.size/1024).toFixed(0)+' KB)';
+    // Subir a Azure
+    var prog = document.getElementById('wa-upload-progress');
+    var bar  = document.getElementById('wa-upload-bar');
+    prog.style.display=''; bar.style.width='30%';
+    try {
+      var res = await api('/wa/upload',{method:'POST',body:{
+        base64:b64.split(',')[1], contentType:file.type,
+        filename:file.name.replace(/[^a-zA-Z0-9._-]/g,'_')
+      }});
+      bar.style.width='100%';
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.message||'Error al subir');
+      _waArchivoUrl  = d.data.url;
+      _waArchivoBlog = d.data.blobName;
+      setTimeout(function(){ prog.style.display='none'; bar.style.width='0%'; },600);
+      toast('✅ Imagen lista para enviar','success');
+    } catch(err) {
+      prog.style.display='none';
+      toast('Error al subir: '+err.message,'danger');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function limpiarArchivoWA() {
+  _waArchivoUrl=null; _waArchivoBlog=null;
+  document.getElementById('wa-archivo').value='';
+  document.getElementById('wa-archivo-preview').style.display='none';
+  document.getElementById('btn-limpiar-archivo').style.display='none';
+  document.getElementById('wa-archivo-img').style.display='none';
+}
 
 // ══════════════════════════════════════════════════════════════
 // CAMPAÑAS v3
