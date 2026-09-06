@@ -16,7 +16,6 @@ const mysql      = require('mysql2/promise');
 const path       = require('path');
 const fs         = require('fs');
 const https      = require('https');
-const multiparty = require('multiparty');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const {
