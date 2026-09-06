@@ -76,7 +76,7 @@
           <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.85rem">⚡ Acciones rápidas</h3>
           <div style="display:flex;flex-direction:column;gap:.5rem">
             <button onclick="mostrarTab('enviar')" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none;justify-content:flex-start;gap:.6rem">📤 Enviar mensaje manual</button>
-            <button onclick="window.location.href='wa-campanas'" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📢 Nueva campaña masiva</button>
+            <button onclick="mostrarTab('campanas');setTimeout(abrirModalNuevaCampana,100)" class="vbtn vbtn-ghost" style="justify-content:flex-start;gap:.6rem">📢 Nueva campaña masiva</button>
 
       <!-- Panel campañas activas -->
       <div id="panel-campanas-activas" style="display:none;margin-top:.75rem;
@@ -292,7 +292,10 @@
 
   <!-- ── TAB CAMPAÑAS ── -->
   <div id="contenido-campanas" style="display:none">
-    <p style="font-size:.78rem;color:var(--ink-soft);margin-bottom:1rem" id="camp-limite-info">Cargando configuración…</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem">
+      <p style="font-size:.78rem;color:var(--ink-soft)" id="camp-limite-info">Cargando configuración…</p>
+      <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
+    </div>
     <div id="campanas-lista">
       <div class="vempty"><div class="vspinner"></div><p>Cargando campañas…</p></div>
     </div>
@@ -324,7 +327,10 @@
 
   <!-- ── TAB HISTORIAS ── -->
   <div id="contenido-historias" style="display:none">
-    <p style="font-size:.75rem;color:var(--ink-soft);margin-bottom:.75rem">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.75rem">
+      <p style="font-size:.75rem;color:var(--ink-soft)">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
+      <button onclick="abrirModalNuevaHistoria()" class="vbtn vbtn-primary">＋ Nueva historia</button>
+    </div>
     <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
       <button onclick="filtrarHistorias('todas')"      id="hist-f-todas"      class="vbtn vbtn-primary" style="font-size:.78rem;padding:.35rem .85rem">Todas</button>
       <button onclick="filtrarHistorias('programada')" id="hist-f-programada" class="vbtn vbtn-ghost"   style="font-size:.78rem;padding:.35rem .85rem">⏰ Programadas</button>
