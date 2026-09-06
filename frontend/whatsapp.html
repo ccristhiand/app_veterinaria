@@ -1579,72 +1579,54 @@ function limpiarImagenCampana() {
 // ── GENERADOR DE MENSAJES CON IA ──────────────────────────────
 var _aiGenerando = false;
 
-async function generarMensajeIA() {
+function generarMensajeIA() {
   var titulo = document.getElementById('camp-ai-titulo').value.trim();
-  if (!titulo) { toast('Escribe un título o tema para la campaña.', 'warning'); return; }
-  if (_aiGenerando) return;
-
-  _aiGenerando = true;
-  var btn = document.getElementById('btn-ai-generar');
-  var res_box = document.getElementById('camp-ai-resultado');
-  var list = document.getElementById('camp-ai-lista');
-  btn.disabled = true; btn.textContent = '⏳ Generando…';
-  res_box.style.display = '';
-  list.innerHTML = '<div style="text-align:center;padding:.75rem"><div class="vspinner" style="margin:0 auto .5rem"></div><p style="font-size:.75rem;color:var(--ink-faint)">Creando 3 versiones del mensaje…</p></div>';
+  if (!titulo) { toast('Escribe el tema de la campaña primero.', 'warning'); return; }
 
   var segmento = document.getElementById('camp-segmento').value;
-  var segDesc = { todos:'todos los propietarios de mascotas', por_especie:'dueños de mascotas de una especie específica', vacunas_vencidas:'dueños cuyas mascotas tienen vacunas vencidas o próximas', sin_citas_60d:'clientes que no han venido en 60+ días', citas_semana:'clientes con cita esta semana' }[segmento] || 'clientes de la clínica veterinaria';
+  var segDesc = {
+    todos          : 'todos los propietarios de mascotas de la clínica',
+    por_especie    : 'dueños de mascotas de una especie específica',
+    vacunas_vencidas: 'clientes cuyas mascotas tienen vacunas vencidas o próximas a vencer',
+    sin_citas_60d  : 'clientes que no han traído a su mascota en más de 60 días',
+    citas_semana   : 'clientes con cita programada esta semana'
+  }[segmento] || 'clientes de la clínica veterinaria';
 
-  try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: 'Eres experto en marketing veterinario para Latinoamérica. Genera 3 versiones de mensaje WhatsApp para una campaña llamada "' + titulo + '". El segmento es: ' + segDesc + '. Usa un tono cálido, cercano, con emojis moderados. Incluye las variables disponibles: [nombre], [mascota], [clinica]. Cada mensaje debe ser conciso (máx 250 caracteres), persuasivo y diferente en tono: uno formal, uno casual, uno emotivo. Responde SOLO en JSON sin markdown: {"mensajes":[{"tono":"Formal","texto":"..."},{"tono":"Casual","texto":"..."},{"tono":"Emotivo","texto":"..."}]}'
-        }]
-      })
-    });
-    var data = await response.json();
-    var raw = data.content?.[0]?.text || '';
-    var clean = raw.replace(/```json|```/g,'').trim();
-    var parsed = JSON.parse(clean);
-    var mensajes = parsed.mensajes || [];
+  var prompt =
+    'Eres experto en marketing para clínicas veterinarias en Latinoamérica. ' +
+    'Crea 3 versiones de mensaje para WhatsApp sobre el tema: "' + titulo + '". ' +
+    'El mensaje va dirigido a: ' + segDesc + '. ' +
+    'Requisitos:\n' +
+    '- Máximo 250 caracteres por mensaje\n' +
+    '- Tono cálido y cercano, con emojis moderados\n' +
+    '- Incluir estas variables donde corresponda: [nombre] (nombre del cliente), [mascota] (nombre de la mascota), [clinica] (nombre de la clínica)\n' +
+    '- Versión 1: tono formal y profesional\n' +
+    '- Versión 2: tono casual y amigable\n' +
+    '- Versión 3: tono emotivo, apelando al amor por la mascota\n' +
+    'Devuelve solo los 3 mensajes numerados, sin explicaciones adicionales.';
 
-    list.innerHTML = mensajes.map(function(m, i) {
-      return '<div style="background:#fff;border:1.5px solid var(--line);border-radius:.85rem;padding:.75rem 1rem;cursor:pointer;transition:all .15s" ' +
-        'onmouseover="this.style.borderColor=\'#25d366\';this.style.background=\'#f0fdf4\'" ' +
-        'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'" ' +
-        'onclick="usarMensajeIA('+i+')">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">' +
-          '<span style="font-size:.65rem;font-weight:800;text-transform:uppercase;color:#25d366">'+esc(m.tono)+'</span>' +
-          '<span style="font-size:.65rem;color:var(--ink-faint)">'+(m.texto||'').length+' chars</span>' +
-        '</div>' +
-        '<p style="font-size:.8rem;line-height:1.5;color:var(--ink)">'+esc(m.texto||'')+'</p>' +
-        '<p style="font-size:.65rem;color:#25d366;font-weight:700;margin-top:.35rem">Clic para usar →</p>' +
-      '</div>';
-    }).join('');
-
-    window._aiMensajes = mensajes;
-
-  } catch(err) {
-    list.innerHTML = '<p style="font-size:.78rem;color:#be123c;text-align:center;padding:.5rem">Error al generar. Intenta de nuevo.</p>';
-  } finally {
-    _aiGenerando = false;
-    btn.disabled = false; btn.textContent = '✨ Generar con IA';
-  }
+  // Mostrar el prompt para copiar
+  var res_box = document.getElementById('camp-ai-resultado');
+  var list = document.getElementById('camp-ai-lista');
+  res_box.style.display = '';
+  list.innerHTML =
+    '<p style="font-size:.72rem;color:var(--ink-soft);margin-bottom:.5rem">Copia este prompt y pégalo en ChatGPT, Claude.ai o la IA que prefieras:</p>' +
+    '<div style="position:relative">' +
+      '<textarea id="camp-ai-prompt-box" readonly rows="7" style="width:100%;font-size:.75rem;line-height:1.5;background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.65rem .85rem;resize:none;font-family:inherit;color:var(--ink)">' + esc(prompt) + '</textarea>' +
+      '<button onclick="copiarPromptIA()" style="position:absolute;top:.5rem;right:.5rem;background:#128c7e;color:#fff;border:none;border-radius:.5rem;padding:.25rem .6rem;font-size:.68rem;font-weight:700;cursor:pointer" id="btn-copiar-prompt">📋 Copiar</button>' +
+    '</div>' +
+    '<p style="font-size:.68rem;color:var(--ink-faint);margin-top:.4rem">Después pega el mensaje generado en el campo de abajo. ✍️</p>';
 }
 
-function usarMensajeIA(idx) {
-  var m = (window._aiMensajes || [])[idx];
-  if (!m) return;
-  document.getElementById('camp-mensaje').value = m.texto;
-  toast('✅ Mensaje aplicado', 'success');
-  // Scroll al textarea
-  document.getElementById('camp-mensaje').scrollIntoView({ behavior:'smooth', block:'center' });
+function copiarPromptIA() {
+  var box = document.getElementById('camp-ai-prompt-box');
+  if (!box) return;
+  navigator.clipboard.writeText(box.value).then(function() {
+    var btn = document.getElementById('btn-copiar-prompt');
+    if (btn) { btn.textContent = '✅ Copiado'; setTimeout(function(){ btn.textContent = '📋 Copiar'; }, 2000); }
+  }).catch(function() {
+    box.select(); document.execCommand('copy');
+  });
 }
 
 function suscribirWSCampanas() {
@@ -1868,14 +1850,14 @@ async function eliminarHistoria(id) {
       <div style="background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1.5px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1rem">
         <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
           <span style="font-size:1rem">✨</span>
-          <p style="font-weight:800;font-size:.85rem;color:#065f46">Generar mensaje con IA</p>
+          <p style="font-weight:800;font-size:.85rem;color:#065f46">✍️ Generar prompt para IA</p>
         </div>
         <div style="display:flex;gap:.5rem">
           <input id="camp-ai-titulo" type="text" class="vinput" placeholder="Ej: Descuento vacunas junio, recordatorio antipulgas…" style="flex:1;font-size:.8rem"/>
-          <button id="btn-ai-generar" onclick="generarMensajeIA()" class="vbtn" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;white-space:nowrap;font-size:.8rem">✨ Generar</button>
+          <button id="btn-ai-generar" onclick="generarMensajeIA()" class="vbtn" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;white-space:nowrap;font-size:.8rem">📋 Generar prompt</button>
         </div>
         <div id="camp-ai-resultado" style="display:none;margin-top:.75rem">
-          <p style="font-size:.65rem;font-weight:700;color:#065f46;text-transform:uppercase;margin-bottom:.5rem">3 versiones — haz clic en la que más te guste:</p>
+          
           <div id="camp-ai-lista" style="display:flex;flex-direction:column;gap:.5rem"></div>
         </div>
       </div>
