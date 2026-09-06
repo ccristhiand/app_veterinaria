@@ -45,7 +45,6 @@
   <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
     <button class="tab-btn active" id="tab-inicio"     onclick="mostrarTab('inicio')">🏠 Inicio</button>
     <button class="tab-btn"        id="tab-enviar"     onclick="mostrarTab('enviar')">📤 Enviar mensaje</button>
-    <button class="tab-btn"        id="tab-plantillas" onclick="mostrarTab('plantillas')">📝 Plantillas</button>
     <button class="tab-btn"        id="tab-config"     onclick="mostrarTab('config')">⚙️ Configuración</button>
     <button class="tab-btn"        id="tab-log"        onclick="mostrarTab('log')">📋 Historial</button>
     <button class="tab-btn"        id="tab-campanas"   onclick="mostrarTab('campanas')">📢 Campañas</button>
@@ -126,12 +125,7 @@
             <button onclick="limpiarPropWA()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
           </div>
         </div>
-        <div style="margin-bottom:.75rem">
-          <label class="vlabel">Plantilla (opcional)</label>
-          <select id="wa-plantilla-sel" class="vinput" onchange="aplicarPlantilla()">
-            <option value="">Escribir mensaje personalizado…</option>
-          </select>
-        </div>
+
         <div style="margin-bottom:1rem">
           <label class="vlabel">Mensaje *</label>
           <textarea id="wa-mensaje" rows="5" class="vinput" placeholder="Escribe tu mensaje aquí…" oninput="actualizarPreviewMensaje()"></textarea>
@@ -718,8 +712,6 @@ async function cargarPlantillasSelect() {
     const res  = await api('/wa/plantillas');
     if (!res?.ok) return;
     const rows = (await res.json()).data || [];
-    const sel  = document.getElementById('wa-plantilla-sel');
-    sel.innerHTML = '<option value="">Escribir mensaje personalizado…</option>';
     rows.forEach(function(p) {
       var opt = document.createElement('option');
       opt.value = p.id;
@@ -731,8 +723,6 @@ async function cargarPlantillasSelect() {
 }
 
 function aplicarPlantilla() {
-  const sel = document.getElementById('wa-plantilla-sel');
-  const opt = sel.options[sel.selectedIndex];
   if (!opt || !opt.dataset.contenido) return;
   document.getElementById('wa-mensaje').value = opt.dataset.contenido;
   actualizarPreviewMensaje();
@@ -776,8 +766,6 @@ async function enviarMensajeWA() {
     if (!res.ok) { toast(data.message || 'Error al enviar.', 'danger'); return; }
     toast(`✅ Mensaje enviado a ${_propWASel.nombre}`, 'success');
     document.getElementById('wa-mensaje').value = '';
-    document.getElementById('wa-plantilla-sel').value = '';
-    limpiarArchivoWA();
     actualizarPreviewMensaje();
     limpiarPropWA();
     cargarStats();
