@@ -304,6 +304,7 @@ router.get('/campanas/:id', authorize('admin'), async (req, res, next) => {
 router.post('/campanas', authorize('admin'), async (req, res, next) => {
   try {
     const { nombre, mensaje, segmento = 'todos', segmento_valor, imagen_url, imagen_blob_name, estado = 'borrador', programada_at } = req.body;
+    console.log('[CAMPANA POST] imagen_url:', imagen_url, '| imagen_blob_name:', imagen_blob_name);
     if (!nombre || !mensaje) return res.status(422).json({ success: false, message: 'Nombre y mensaje requeridos.' });
     const result = await req.db.query(
       `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado, programada_at)
