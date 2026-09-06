@@ -48,6 +48,8 @@
     <button class="tab-btn"        id="tab-plantillas" onclick="mostrarTab('plantillas')">📝 Plantillas</button>
     <button class="tab-btn"        id="tab-config"     onclick="mostrarTab('config')">⚙️ Configuración</button>
     <button class="tab-btn"        id="tab-log"        onclick="mostrarTab('log')">📋 Historial</button>
+    <button class="tab-btn"        id="tab-campanas"   onclick="mostrarTab('campanas')">📢 Campañas</button>
+    <button class="tab-btn"        id="tab-historias"  onclick="mostrarTab('historias')">📸 Historias</button>
   </div>
 
   <!-- ── TAB INICIO ── -->
@@ -100,54 +102,104 @@
     </div>
   </div>
 
-  <!-- ── TAB ENVIAR ── -->
+  <!-- ── TAB ENVIAR (v3) ── -->
   <div id="contenido-enviar" style="display:none">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;align-items:start">
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:1.3rem;align-items:start">
       <div class="vcard vcard-pad">
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin-bottom:1rem">📤 Nuevo mensaje</h3>
+
+        <!-- Buscar propietario -->
         <div style="margin-bottom:1rem">
-          <label class="vlabel">Destinatario</label>
+          <label class="vlabel">Destinatario *</label>
           <div style="display:flex;gap:.5rem;margin-bottom:.5rem">
             <div class="search-wrap" style="flex:1">
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <input id="wa-prop-q" type="text" class="vinput" placeholder="Buscar propietario…" onkeydown="if(event.key==='Enter')buscarPropWA()"/>
+              <input id="wa-prop-q" type="text" class="vinput" placeholder="Buscar propietario por nombre o DNI…" onkeydown="if(event.key==='Enter')buscarPropWA()"/>
             </div>
             <button onclick="buscarPropWA()" class="vbtn vbtn-primary">Buscar</button>
           </div>
           <div id="wa-prop-resultados" style="display:flex;flex-direction:column;gap:.35rem;max-height:150px;overflow-y:auto"></div>
-          <div id="wa-prop-sel" style="display:none;background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.8rem;padding:.6rem .9rem;align-items:center;gap:.7rem;margin-top:.4rem">
-            <span style="font-size:1.2rem">👤</span>
-            <div style="flex:1">
-              <p style="font-weight:700;font-size:.85rem" id="wa-prop-nombre">—</p>
-              <p style="font-size:.72rem;color:var(--ink-soft)" id="wa-prop-tel">—</p>
+          <div id="wa-prop-sel" style="display:none;background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.8rem;padding:.75rem 1rem;align-items:flex-start;gap:.7rem;margin-top:.4rem;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:.7rem;width:100%">
+              <span style="font-size:1.3rem">👤</span>
+              <div style="flex:1">
+                <p style="font-weight:700;font-size:.88rem" id="wa-prop-nombre">—</p>
+                <p style="font-size:.72rem;color:var(--ink-soft)" id="wa-prop-tel">—</p>
+              </div>
+              <button onclick="limpiarPropWA()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
             </div>
-            <button onclick="limpiarPropWA()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+            <!-- Mascotas múltiples -->
+            <div id="wa-mascotas-wrap" style="display:none;width:100%">
+              <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Seleccionar mascotas (opcional)</p>
+              <div id="wa-mascotas-lista" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
+            </div>
           </div>
         </div>
-        <div style="margin-bottom:.75rem">
-          <label class="vlabel">Plantilla (opcional)</label>
-          <select id="wa-plantilla-sel" class="vinput" onchange="aplicarPlantilla()">
-            <option value="">Escribir mensaje personalizado…</option>
-          </select>
-        </div>
-        <div style="margin-bottom:1rem">
+
+        <!-- Mensaje + variables -->
+        <div style="margin-bottom:.85rem">
           <label class="vlabel">Mensaje *</label>
+          <!-- Panel de ayuda de variables -->
+          <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.6rem .85rem;margin-bottom:.5rem">
+            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">📌 Insertar variable</p>
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+              <button onclick="insertarVarMensaje('[nombre]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[nombre]</button>
+              <button onclick="insertarVarMensaje('[mascota]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[mascota]</button>
+              <button onclick="insertarVarMensaje('[clinica]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[clinica]</button>
+              <button onclick="insertarVarMensaje('[direccion]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[direccion]</button>
+              <button onclick="insertarVarMensaje('[telefono_clinica]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[telefono_clinica]</button>
+              <button onclick="insertarVarMensaje('[foto_mascota]')" class="vbtn vbtn-ghost" style="font-size:.68rem;padding:.2rem .5rem">[foto_mascota]</button>
+            </div>
+          </div>
           <textarea id="wa-mensaje" rows="5" class="vinput" placeholder="Escribe tu mensaje aquí…" oninput="actualizarPreviewMensaje()"></textarea>
           <div style="display:flex;justify-content:space-between;margin-top:.3rem">
-            <p style="font-size:.65rem;color:var(--ink-faint)">Variables: [nombre] [mascota] [clinica]</p>
+            <p style="font-size:.65rem;color:var(--ink-faint)">[nombre] [mascota] [clinica] [direccion] [telefono_clinica] [foto_mascota]</p>
             <p style="font-size:.65rem;color:var(--ink-faint)" id="wa-chars">0 caracteres</p>
           </div>
         </div>
+
+        <!-- Adjuntar imagen o documento -->
+        <div style="margin-bottom:1rem;border:1.5px dashed var(--line);border-radius:.85rem;padding:.85rem 1rem">
+          <p style="font-size:.75rem;font-weight:700;margin-bottom:.6rem">📎 Adjuntar imagen o documento (opcional)</p>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <input type="file" id="wa-archivo" accept="image/*,.pdf,.doc,.docx"
+              onchange="previsualizarArchivoWA(this)" style="display:none"/>
+            <button onclick="document.getElementById('wa-archivo').click()"
+              class="vbtn vbtn-ghost" style="font-size:.8rem">
+              🖼️ Seleccionar archivo
+            </button>
+            <button onclick="limpiarArchivoWA()" id="btn-limpiar-archivo"
+              class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">
+              ✕ Quitar
+            </button>
+          </div>
+          <div id="wa-archivo-preview" style="margin-top:.6rem;display:none">
+            <img id="wa-archivo-img" style="max-width:100%;max-height:160px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line)"/>
+            <p id="wa-archivo-nombre" style="font-size:.7rem;color:var(--ink-soft);margin-top:.3rem"></p>
+          </div>
+          <div id="wa-upload-progress" style="display:none;margin-top:.5rem">
+            <div style="height:4px;border-radius:999px;background:#f0f0f0;overflow:hidden">
+              <div id="wa-upload-bar" style="height:100%;background:#25d366;width:0%;transition:width .3s;border-radius:999px"></div>
+            </div>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Subiendo a Azure…</p>
+          </div>
+        </div>
+
         <button onclick="enviarMensajeWA()" id="btn-enviar-wa" class="vbtn" style="width:100%;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.75rem;font-size:.9rem;font-weight:700">
           <span id="btn-enviar-wa-txt">📤 Enviar mensaje</span>
         </button>
       </div>
-      <div>
+
+      <!-- Preview -->
+      <div style="position:sticky;top:1rem">
         <div class="vcard" style="padding:0;overflow:hidden">
           <div style="padding:.75rem 1rem;background:#128c7e;color:#fff;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:.5rem">
             <span class="wa-pulse"></span> Preview del mensaje
           </div>
-          <div style="background:#e5ddd5;min-height:200px;padding:1rem;display:flex;flex-direction:column;justify-content:flex-end">
+          <div style="background:#e5ddd5;min-height:220px;padding:1rem;display:flex;flex-direction:column;justify-content:flex-end">
+            <div id="wa-preview-img-cont" style="display:none;margin-bottom:.5rem">
+              <img id="wa-preview-img" style="max-width:85%;border-radius:.75rem;max-height:140px;object-fit:cover"/>
+            </div>
             <div id="wa-preview-msg" style="background:#fff;border-radius:.85rem .85rem .85rem .1rem;padding:.75rem 1rem;max-width:85%;box-shadow:0 1px 2px rgba(0,0,0,.15);font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word">El preview aparecerá aquí…</div>
             <p style="font-size:.6rem;color:#667781;text-align:right;margin-top:.25rem" id="wa-preview-hora">—</p>
           </div>
@@ -219,6 +271,65 @@
         </div>
       </div>
     </div>
+    <!-- Sección anti-spam campañas -->
+    <div class="vcard vcard-pad" style="margin-top:1.3rem;border:2px solid #fde68a">
+      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1rem;margin-bottom:.5rem">🛡️ Control anti-spam — Campañas masivas</h3>
+      <p style="font-size:.75rem;color:var(--ink-soft);margin-bottom:1rem">
+        Configura cuántos mensajes de campaña se envían por día. Si una campaña tiene más destinatarios,
+        se repartirá automáticamente en días consecutivos.
+      </p>
+
+      <!-- Recomendaciones visuales -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1.3rem">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;padding:.65rem .8rem;text-align:center">
+          <p style="font-size:.75rem;font-weight:800;color:#15803d">1–30</p>
+          <p style="font-size:.62rem;color:#15803d;font-weight:600">🟢 Riesgo muy bajo</p>
+          <p style="font-size:.6rem;color:var(--ink-faint);margin-top:.2rem">Recomendado para cuentas nuevas</p>
+        </div>
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.75rem;padding:.65rem .8rem;text-align:center">
+          <p style="font-size:.75rem;font-weight:800;color:#0369a1">31–100</p>
+          <p style="font-size:.62rem;color:#0369a1;font-weight:600">🔵 Riesgo bajo</p>
+          <p style="font-size:.6rem;color:var(--ink-faint);margin-top:.2rem">Cuentas con historial &gt; 3 meses</p>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.65rem .8rem;text-align:center">
+          <p style="font-size:.75rem;font-weight:800;color:#b45309">101–200</p>
+          <p style="font-size:.62rem;color:#b45309;font-weight:600">🟡 Riesgo medio</p>
+          <p style="font-size:.6rem;color:var(--ink-faint);margin-top:.2rem">Solo cuentas maduras &gt; 6 meses</p>
+        </div>
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem;padding:.65rem .8rem;text-align:center">
+          <p style="font-size:.75rem;font-weight:800;color:#be123c">200+</p>
+          <p style="font-size:.62rem;color:#be123c;font-weight:600">🔴 Alto riesgo</p>
+          <p style="font-size:.6rem;color:var(--ink-faint);margin-top:.2rem">Riesgo real de bloqueo</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+        <div>
+          <label class="vlabel">
+            Límite diario de mensajes
+            <span id="cfg-limite-badge" style="margin-left:.4rem;font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">30 — 🟢</span>
+          </label>
+          <input id="cfg-limite-dia" type="number" min="5" max="500" value="30" class="vinput"
+            oninput="actualizarBadgeLimite(this.value)" style="max-width:120px"/>
+          <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">Mínimo recomendado: 5 · Máximo seguro: 100</p>
+        </div>
+        <div>
+          <label class="vlabel">Delay entre mensajes (segundos)</label>
+          <input id="cfg-delay-ms" type="number" min="2" max="30" value="4" class="vinput" style="max-width:100px"/>
+          <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">Mínimo: 2s · Recomendado: 4–8s</p>
+        </div>
+        <div>
+          <label class="vlabel">Horario de envío</label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <input id="cfg-hora-inicio" type="time" value="08:00" class="vinput" style="max-width:110px"/>
+            <span style="font-size:.8rem;color:var(--ink-soft)">a</span>
+            <input id="cfg-hora-fin" type="time" value="20:00" class="vinput" style="max-width:110px"/>
+          </div>
+          <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">Fuera de este horario no se procesan campañas</p>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button onclick="guardarConfig()" class="vbtn vbtn-primary">💾 Guardar configuración</button>
     </div>
@@ -254,6 +365,282 @@
           <tbody id="log-tbody"><tr><td colspan="6"><div class="vempty"><div class="vspinner"></div></div></td></tr></tbody>
         </table>
       </div>
+    </div>
+  </div>
+</div>
+
+  <!-- ── TAB CAMPAÑAS ── -->
+  <div id="contenido-campanas" style="display:none;overflow-y:auto;max-height:calc(100vh - 180px)">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:.75rem">
+      <div>
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem">📢 Campañas masivas</h3>
+        <p style="font-size:.75rem;color:var(--ink-soft)" id="camp-limite-info">Límite diario: cargando…</p>
+      </div>
+      <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
+    </div>
+
+    <!-- Lista campañas -->
+    <div id="campanas-lista">
+      <div class="vempty"><div class="vspinner"></div><p>Cargando campañas…</p></div>
+    </div>
+
+    <!-- Panel WebSocket en vivo (oculto hasta que hay campaña activa) -->
+    <div id="panel-ws-campana" style="display:none;margin-top:1.3rem">
+      <div class="vcard" style="border:2px solid #25d366;overflow:hidden">
+        <div style="background:#128c7e;color:#fff;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <span class="wa-pulse"></span>
+            <span style="font-weight:700;font-size:.88rem" id="ws-campana-nombre">Campaña activa</span>
+          </div>
+          <div style="font-size:.8rem;font-weight:700" id="ws-campana-pct">0%</div>
+        </div>
+        <div style="padding:1rem">
+          <!-- Barra de progreso -->
+          <div style="height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin-bottom:.75rem">
+            <div id="ws-progreso-bar" style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);transition:width .5s;width:0%"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:.75rem;font-size:.78rem;text-align:center">
+            <div><p style="font-weight:800;font-size:1.1rem;color:#15803d" id="ws-enviados">0</p><p style="color:var(--ink-faint)">Enviados</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:#be123c" id="ws-fallidos">0</p><p style="color:var(--ink-faint)">Fallidos</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:#b45309" id="ws-hoy">0</p><p style="color:var(--ink-faint)">Hoy</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:var(--ink-soft)" id="ws-total">0</p><p style="color:var(--ink-faint)">Total</p></div>
+          </div>
+          <!-- Log en vivo últimos 10 envíos -->
+          <div style="background:#f8faf8;border-radius:.75rem;padding:.65rem .85rem;max-height:200px;overflow-y:auto">
+            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Log en vivo</p>
+            <div id="ws-log-lista" style="display:flex;flex-direction:column;gap:.2rem;font-size:.72rem;font-family:monospace"></div>
+          </div>
+          <!-- Alerta de límite diario -->
+          <div id="ws-limite-alerta" style="display:none;margin-top:.75rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.65rem 1rem;font-size:.78rem;color:#b45309"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB HISTORIAS ── -->
+  <div id="contenido-historias" style="display:none;overflow-y:auto;max-height:calc(100vh - 180px)">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:.75rem">
+      <div>
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem">📸 Historias de WhatsApp</h3>
+        <p style="font-size:.75rem;color:var(--ink-soft)">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
+      </div>
+      <button onclick="abrirModalNuevaHistoria()" class="vbtn vbtn-primary">＋ Nueva historia</button>
+    </div>
+
+    <!-- Filtros -->
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
+      <button onclick="filtrarHistorias('todas')" id="hist-f-todas" class="vbtn vbtn-primary" style="font-size:.78rem;padding:.35rem .85rem">Todas</button>
+      <button onclick="filtrarHistorias('programada')" id="hist-f-programada" class="vbtn vbtn-ghost" style="font-size:.78rem;padding:.35rem .85rem">⏰ Programadas</button>
+      <button onclick="filtrarHistorias('publicada')" id="hist-f-publicada" class="vbtn vbtn-ghost" style="font-size:.78rem;padding:.35rem .85rem">✅ Publicadas</button>
+      <button onclick="filtrarHistorias('fallida')" id="hist-f-fallida" class="vbtn vbtn-ghost" style="font-size:.78rem;padding:.35rem .85rem">❌ Fallidas</button>
+    </div>
+
+    <!-- Grid de historias -->
+    <div id="historias-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
+      <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
+    </div>
+  </div>
+
+<!-- Modal Nueva Campaña -->
+<div id="modal-campana" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:620px">
+    <div class="vmodal-head">
+      <h3 id="modal-campana-titulo">📢 Nueva Campaña</h3>
+      <button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="camp-edit-id"/>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="vlabel">Nombre de la campaña *</label>
+          <input id="camp-nombre" type="text" class="vinput" placeholder="Ej: Promoción vacunas junio"/>
+        </div>
+        <div class="col-span-2">
+          <label class="vlabel">Segmento de destinatarios *</label>
+          <select id="camp-segmento" class="vinput" onchange="calcularProyeccion()">
+            <option value="todos">👥 Todos los propietarios</option>
+            <option value="por_especie">🐕 Por especie</option>
+            <option value="vacunas_vencidas">💉 Vacunas vencidas</option>
+            <option value="sin_citas_60d">📅 Sin citas en 60 días</option>
+          </select>
+        </div>
+        <div id="camp-especie-wrap" style="display:none;grid-column:span 2">
+          <label class="vlabel">Especie</label>
+          <select id="camp-especie" class="vinput" onchange="calcularProyeccion()">
+            <option value="perro">🐕 Perro</option>
+            <option value="gato">🐈 Gato</option>
+            <option value="otro">🐾 Otro</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="vlabel">Mensaje *</label>
+          <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.7rem;padding:.5rem .8rem;margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.3rem">
+            <span style="font-size:.63rem;color:var(--ink-faint);width:100%;margin-bottom:.2rem;font-weight:700">Variables:</span>
+            <button onclick="insertarVarCampana('[nombre]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[nombre]</button>
+            <button onclick="insertarVarCampana('[mascota]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[mascota]</button>
+            <button onclick="insertarVarCampana('[clinica]')" class="vbtn vbtn-ghost" style="font-size:.65rem;padding:.15rem .4rem">[clinica]</button>
+          </div>
+          <textarea id="camp-mensaje" rows="4" class="vinput" placeholder="Hola [nombre], te contactamos desde [clinica]…"></textarea>
+        </div>
+        <div class="col-span-2">
+          <!-- Imagen campaña -->
+          <label class="vlabel">Imagen de campaña (opcional)</label>
+          <div style="border:1.5px dashed var(--line);border-radius:.85rem;padding:.85rem 1rem">
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+              <input type="file" id="camp-imagen-file" accept="image/*" onchange="previsualizarImagenCampana(this)" style="display:none"/>
+              <button onclick="document.getElementById('camp-imagen-file').click()" class="vbtn vbtn-ghost" style="font-size:.8rem">🖼️ Seleccionar imagen</button>
+              <button onclick="limpiarImagenCampana()" id="btn-limpiar-img-camp" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
+            </div>
+            <div id="camp-img-preview" style="margin-top:.6rem;display:none">
+              <img id="camp-img-prev-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line)"/>
+              <p id="camp-img-prev-nombre" style="font-size:.7rem;color:var(--ink-soft);margin-top:.3rem"></p>
+            </div>
+            <input type="hidden" id="camp-imagen-url"/>
+            <input type="hidden" id="camp-imagen-blob"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel proyección de envíos -->
+      <div id="camp-proyeccion" style="display:none;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:.9rem;padding:1rem">
+        <p style="font-size:.72rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">📊 Proyección de envíos</p>
+        <div id="camp-proyeccion-body"></div>
+        <div style="margin-top:.75rem;border-top:1px solid #bae6fd;padding-top:.75rem">
+          <label class="vlabel" style="font-size:.72rem">Ajustar límite para esta campaña</label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <input type="number" id="camp-limite-custom" min="5" max="500" class="vinput"
+              style="max-width:90px" oninput="recalcularProyeccion()"/>
+            <span style="font-size:.75rem;color:var(--ink-faint)">mensajes/día</span>
+            <button onclick="resetLimiteCustom()" class="vbtn vbtn-ghost" style="font-size:.72rem">Usar configurado</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-campana')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarCampana(false)" class="vbtn vbtn-ghost" id="btn-guardar-borrador">💾 Guardar borrador</button>
+      <button onclick="guardarCampana(true)" class="vbtn vbtn-primary" id="btn-iniciar-campana">🚀 Iniciar campaña</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Historia -->
+<div id="modal-historia" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:560px">
+    <div class="vmodal-head">
+      <h3 id="modal-historia-titulo">📸 Nueva Historia</h3>
+      <button onclick="closeModal('modal-historia')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="historia-edit-id"/>
+
+      <!-- Selector de tipo -->
+      <div>
+        <label class="vlabel" style="margin-bottom:.4rem">Tipo de historia</label>
+        <div style="display:flex;gap:.5rem">
+          <button onclick="selTipoHistoria('imagen')" id="hist-tipo-imagen"
+            style="flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer">
+            🖼️ Imagen
+          </button>
+          <button onclick="selTipoHistoria('texto')" id="hist-tipo-texto"
+            style="flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer">
+            ✏️ Solo texto
+          </button>
+        </div>
+        <input type="hidden" id="historia-tipo" value="imagen"/>
+      </div>
+
+      <!-- Zona de imagen -->
+      <div id="hist-imagen-section">
+        <label class="vlabel">Imagen *</label>
+        <div style="border:2px dashed var(--line);border-radius:.9rem;padding:1.5rem;text-align:center;cursor:pointer;transition:all .15s"
+          id="hist-drop-zone"
+          onclick="document.getElementById('hist-img-file').click()"
+          ondragover="event.preventDefault();this.style.borderColor='#128c7e';this.style.background='#f0fdf4'"
+          ondragleave="this.style.borderColor='';this.style.background=''"
+          ondrop="soltarImagenHistoria(event)">
+          <input type="file" id="hist-img-file" accept="image/*" style="display:none" onchange="cargarImagenHistoria(this)"/>
+          <div id="hist-img-placeholder">
+            <p style="font-size:2.5rem;margin-bottom:.5rem">🖼️</p>
+            <p style="font-size:.82rem;font-weight:600;color:var(--ink-soft)">Arrastra una imagen o haz clic para seleccionar</p>
+            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">JPG, PNG, WEBP · Máx 5MB</p>
+          </div>
+          <div id="hist-img-preview" style="display:none">
+            <img id="hist-img-prev" style="max-width:100%;max-height:200px;border-radius:.75rem;object-fit:contain"/>
+            <button onclick="event.stopPropagation();limpiarImagenHistoria()" style="display:block;margin:.5rem auto 0;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;border-radius:.5rem;padding:.25rem .75rem;font-size:.72rem;cursor:pointer">✕ Quitar imagen</button>
+          </div>
+        </div>
+        <input type="hidden" id="historia-imagen-url"/>
+        <input type="hidden" id="historia-imagen-blob"/>
+      </div>
+
+      <!-- Texto / caption -->
+      <div>
+        <label class="vlabel" id="hist-texto-label">Caption (opcional)</label>
+        <textarea id="historia-texto" rows="3" class="vinput"
+          placeholder="Texto de la historia..." style="resize:vertical"></textarea>
+        <!-- Selector de fondo para historia de texto -->
+        <div id="hist-fondo-section" style="display:none;margin-top:.5rem">
+          <label class="vlabel" style="font-size:.7rem">Color de fondo</label>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <button onclick="selFondoHistoria('#128c7e')" style="width:28px;height:28px;border-radius:50%;background:#128c7e;border:2px solid transparent;cursor:pointer" title="Verde"></button>
+            <button onclick="selFondoHistoria('#1d4ed8')" style="width:28px;height:28px;border-radius:50%;background:#1d4ed8;border:2px solid transparent;cursor:pointer" title="Azul"></button>
+            <button onclick="selFondoHistoria('#7c3aed')" style="width:28px;height:28px;border-radius:50%;background:#7c3aed;border:2px solid transparent;cursor:pointer" title="Violeta"></button>
+            <button onclick="selFondoHistoria('#b45309')" style="width:28px;height:28px;border-radius:50%;background:#b45309;border:2px solid transparent;cursor:pointer" title="Ámbar"></button>
+            <button onclick="selFondoHistoria('#be123c')" style="width:28px;height:28px;border-radius:50%;background:#be123c;border:2px solid transparent;cursor:pointer" title="Rojo"></button>
+            <button onclick="selFondoHistoria('#000000')" style="width:28px;height:28px;border-radius:50%;background:#000;border:2px solid transparent;cursor:pointer" title="Negro"></button>
+          </div>
+          <input type="hidden" id="historia-fondo" value="#128c7e"/>
+        </div>
+      </div>
+
+      <!-- Programar publicación -->
+      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <label class="vlabel" style="margin:0">⏰ Programar publicación</label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem">
+            <input type="checkbox" id="historia-programar" style="accent-color:#128c7e" onchange="toggleProgramarHistoria(this.checked)"/>
+            Programar
+          </label>
+        </div>
+        <div id="historia-fecha-wrap" style="display:none">
+          <input type="datetime-local" id="historia-fecha" class="vinput"/>
+          <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.3rem">
+            Se publicará automáticamente en la fecha y hora seleccionada
+          </p>
+        </div>
+        <p id="historia-inmediata-hint" style="font-size:.72rem;color:var(--ink-soft)">
+          Sin programar → se publica inmediatamente al guardar
+        </p>
+      </div>
+
+      <!-- Preview -->
+      <div id="hist-preview-box" style="display:none;background:#000;border-radius:1rem;overflow:hidden;aspect-ratio:9/16;max-height:300px;position:relative;display:flex;align-items:flex-end">
+        <img id="hist-prev-img" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover"/>
+        <div id="hist-prev-texto" style="position:relative;z-index:2;padding:1rem;color:#fff;font-weight:600;font-size:.85rem;text-shadow:0 1px 4px rgba(0,0,0,.6);width:100%;background:linear-gradient(transparent,rgba(0,0,0,.6))"></div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-historia')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarHistoria()" class="vbtn vbtn-primary" id="btn-guardar-historia">💾 Guardar historia</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalle Campaña -->
+<div id="modal-detalle-campana" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:500px">
+    <div class="vmodal-head">
+      <h3 id="det-camp-titulo">📢 Detalle de campaña</h3>
+      <button onclick="closeModal('modal-detalle-campana')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="det-camp-body"></div>
+    <div class="vmodal-foot" id="det-camp-foot">
+      <button onclick="closeModal('modal-detalle-campana')" class="vbtn vbtn-ghost">Cerrar</button>
     </div>
   </div>
 </div>
@@ -852,6 +1239,901 @@ async function cargarLog() {
 }
 
 document.getElementById('wa-mensaje').addEventListener('input', actualizarPreviewMensaje);
+
+// ══════════════════════════════════════════════════════════════
+// VARIABLES GLOBALES NUEVAS
+// ══════════════════════════════════════════════════════════════
+var _waArchivoUrl   = null;  // URL Azure del archivo adjunto (enviar mensaje)
+var _waArchivoBlog  = null;  // blob name para limpiar
+var _waArchivoB64   = null;  // base64 temporal
+var _waMascotasSel  = [];    // mascotas seleccionadas en enviar
+var _campLimite     = 30;    // límite diario configurado
+var _campImagenUrl  = null;
+var _campImagenBlob = null;
+var _histImagenUrl  = null;
+var _histImagenBlob = null;
+var _histFondo      = '#128c7e';
+var _histFiltro     = 'todas';
+
+// ══════════════════════════════════════════════════════════════
+// ACTUALIZAR mostrarTab PARA INCLUIR CAMPAÑAS E HISTORIAS
+// ══════════════════════════════════════════════════════════════
+var _mostrarTabOriginal = mostrarTab;
+mostrarTab = function(tab) {
+  ['inicio','enviar','plantillas','config','log','campanas','historias'].forEach(function(t) {
+    var btn = document.getElementById('tab-'+t);
+    var cont = document.getElementById('contenido-'+t);
+    if (btn)  btn.classList.toggle('active', t===tab);
+    if (cont) cont.style.display = t===tab ? 'block' : 'none';
+  });
+  if (tab==='plantillas') cargarPlantillas();
+  if (tab==='config')     { cargarConfig(); setTimeout(function(){ cargarConfigAntispam(); }, 100); }
+  if (tab==='log')        cargarLog();
+  if (tab==='campanas')   { cargarCampanas(); suscribirWSCampanas(); }
+  if (tab==='historias')  cargarHistorias();
+};
+
+// ══════════════════════════════════════════════════════════════
+// VARIABLES EN ENVIAR MENSAJE
+// ══════════════════════════════════════════════════════════════
+function insertarVarMensaje(variable) {
+  var ta  = document.getElementById('wa-mensaje');
+  var pos = ta.selectionStart;
+  ta.value = ta.value.substring(0, pos) + variable + ta.value.substring(pos);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = pos + variable.length;
+  actualizarPreviewMensaje();
+}
+
+// ══════════════════════════════════════════════════════════════
+// MASCOTAS MÚLTIPLES EN ENVIAR MENSAJE
+// ══════════════════════════════════════════════════════════════
+var _propWASelOriginal = selPropWA;
+selPropWA = function(id, nombre, telefono, mascotas) {
+  _propWASelOriginal(id, nombre, telefono, mascotas);
+  // Mostrar mascotas si tiene más de una
+  var wrap = document.getElementById('wa-mascotas-wrap');
+  var lista = document.getElementById('wa-mascotas-lista');
+  _waMascotasSel = [];
+  if (mascotas && mascotas.length > 0) {
+    wrap.style.display = 'block';
+        lista.innerHTML = '';
+    mascotas.forEach(function(m) {
+      var lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:.35rem;font-size:.78rem;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:.5rem;padding:.25rem .6rem;transition:all .12s';
+      lbl.addEventListener('mouseover', function(){ this.style.borderColor='#25d366'; });
+      lbl.addEventListener('mouseout',  function(){ this.style.borderColor='var(--line)'; });
+      var chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'masc-check';
+      chk.value = m.id;
+      chk.dataset.nombre = m.nombre;
+      chk.style.accentColor = '#25d366';
+      chk.checked = true;
+      chk.addEventListener('change', actualizarMascotasSel);
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(' ' + m.nombre));
+      lista.appendChild(lbl);
+    });
+    // Seleccionar todas por defecto
+    _waMascotasSel = mascotas.map(function(m){ return m.nombre; });
+    actualizarPreviewMensaje();
+  } else {
+    wrap.style.display = 'none';
+  }
+};
+
+function actualizarMascotasSel() {
+  _waMascotasSel = [];
+  document.querySelectorAll('.masc-check:checked').forEach(function(c){
+    _waMascotasSel.push(c.dataset.nombre);
+  });
+  actualizarPreviewMensaje();
+}
+
+// Override actualizarPreviewMensaje para incluir mascotas múltiples
+var _previewOriginal = actualizarPreviewMensaje;
+actualizarPreviewMensaje = function() {
+  var msg     = document.getElementById('wa-mensaje').value;
+  var nombre  = _propWASel ? _propWASel.nombre : '[nombre]';
+  var mascota = _waMascotasSel.length ? _waMascotasSel.join(', ') : '[mascota]';
+  var preview = msg
+    .replace(/\[nombre\]/gi, nombre)
+    .replace(/\[mascota\]/gi, mascota)
+    .replace(/\[clinica\]/gi, '[clínica]')
+    .replace(/\[direccion\]/gi, '[dirección]')
+    .replace(/\[telefono_clinica\]/gi, '[teléfono]')
+    .replace(/\[foto_mascota\]/gi, '📷');
+  document.getElementById('wa-preview-msg').textContent = preview || 'El preview aparecerá aquí…';
+  document.getElementById('wa-chars').textContent = msg.length + ' caracteres';
+  document.getElementById('wa-preview-hora').textContent = new Date().toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit'});
+  // Preview imagen
+  var imgCont = document.getElementById('wa-preview-img-cont');
+  var imgEl   = document.getElementById('wa-preview-img');
+  if (_waArchivoB64 && imgEl) {
+    imgEl.src = 'data:image/jpeg;base64,' + _waArchivoB64.split(',')[1];
+    imgCont.style.display = 'block';
+  } else if (imgCont) {
+    imgCont.style.display = 'none';
+  }
+};
+
+// ══════════════════════════════════════════════════════════════
+// UPLOAD AZURE — ARCHIVO EN ENVIAR MENSAJE
+// ══════════════════════════════════════════════════════════════
+async function previsualizarArchivoWA(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { toast('El archivo no debe superar 10MB', 'warning'); return; }
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var b64 = e.target.result;
+    _waArchivoB64 = b64;
+
+    // Mostrar preview
+    var prev = document.getElementById('wa-archivo-preview');
+    var img  = document.getElementById('wa-archivo-img');
+    var nom  = document.getElementById('wa-archivo-nombre');
+    prev.style.display = 'block';
+    document.getElementById('btn-limpiar-archivo').style.display = '';
+    if (file.type.startsWith('image/')) {
+      img.src = b64; img.style.display = '';
+    } else {
+      img.style.display = 'none';
+    }
+    nom.textContent = '📎 ' + file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
+    actualizarPreviewMensaje();
+
+    // Subir a Azure
+    var prog = document.getElementById('wa-upload-progress');
+    var bar  = document.getElementById('wa-upload-bar');
+    prog.style.display = '';
+    bar.style.width = '30%';
+    try {
+      var res = await api('/wa/upload', { method:'POST', body:{
+        base64     : b64.split(',')[1],
+        contentType: file.type,
+        filename   : file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),
+      }});
+      bar.style.width = '100%';
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      _waArchivoUrl  = data.data.url;
+      _waArchivoBlog = data.data.blobName;
+      setTimeout(function(){ prog.style.display = 'none'; bar.style.width = '0%'; }, 600);
+      toast('✅ Imagen subida a Azure', 'success');
+    } catch(e) {
+      prog.style.display = 'none';
+      toast('Error al subir imagen: ' + e.message, 'danger');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function limpiarArchivoWA() {
+  _waArchivoUrl = null; _waArchivoBlog = null; _waArchivoB64 = null;
+  document.getElementById('wa-archivo').value = '';
+  document.getElementById('wa-archivo-preview').style.display = 'none';
+  document.getElementById('btn-limpiar-archivo').style.display = 'none';
+  actualizarPreviewMensaje();
+}
+
+// Override enviarMensajeWA para incluir imagen y mascotas
+var _enviarOriginal = enviarMensajeWA;
+enviarMensajeWA = async function() {
+  if (!_propWASel) { toast('Selecciona un propietario primero.', 'warning'); return; }
+  if (!_propWASel.telefono) { toast('Sin teléfono registrado.', 'warning'); return; }
+  var mensaje = document.getElementById('wa-mensaje').value.trim();
+  if (!mensaje && !_waArchivoUrl) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
+  if (_waEstado !== 'conectado') { toast('WhatsApp no está conectado.', 'warning'); return; }
+
+  // Reemplazar variables con valores reales
+  var mascotasStr = _waMascotasSel.length ? _waMascotasSel.join(', ') : '';
+  var mensajeFinal = mensaje
+    .replace(/\[nombre\]/gi, _propWASel.nombre)
+    .replace(/\[mascota\]/gi, mascotasStr);
+
+  var btn = document.getElementById('btn-enviar-wa-txt');
+  btn.textContent = 'Enviando…';
+  document.getElementById('btn-enviar-wa').disabled = true;
+
+  try {
+    var res = await api('/wa/enviar', { method:'POST', body:{
+      telefono      : _propWASel.telefono,
+      mensaje       : mensajeFinal || null,
+      imagen_url    : _waArchivoUrl || null,
+      propietario_id: _propWASel.id,
+    }});
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al enviar.', 'danger'); return; }
+    toast('✅ Mensaje enviado a ' + _propWASel.nombre, 'success');
+    document.getElementById('wa-mensaje').value = '';
+    limpiarArchivoWA();
+    limpiarPropWA();
+    actualizarPreviewMensaje();
+    cargarStats();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+  finally {
+    btn.textContent = '📤 Enviar mensaje';
+    document.getElementById('btn-enviar-wa').disabled = false;
+  }
+};
+
+// ══════════════════════════════════════════════════════════════
+// CONFIG ANTI-SPAM
+// ══════════════════════════════════════════════════════════════
+function actualizarBadgeLimite(val) {
+  val = parseInt(val) || 30;
+  var badge = document.getElementById('cfg-limite-badge');
+  var txt, color, bg, border;
+  if (val <= 30)       { txt='🟢 Muy bajo'; color='#15803d'; bg='#f0fdf4'; border='#bbf7d0'; }
+  else if (val <= 100) { txt='🔵 Bajo'; color='#0369a1'; bg='#f0f9ff'; border='#bae6fd'; }
+  else if (val <= 200) { txt='🟡 Medio'; color='#b45309'; bg='#fffbeb'; border='#fde68a'; }
+  else                  { txt='🔴 Alto'; color='#be123c'; bg='#fff1f2'; border='#fecdd3'; }
+  if (badge) {
+    badge.textContent = val + ' — ' + txt;
+    badge.style.cssText = 'margin-left:.4rem;font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;'+
+      'background:'+bg+';color:'+color+';border:1px solid '+border;
+  }
+}
+
+async function cargarConfigAntispam() {
+  try {
+    var res = await api('/wa/config');
+    if (!res?.ok) return;
+    var cfg = (await res.json()).data.config;
+    var limiteDia = cfg.campana_limite_dia || 30;
+    var delayMs   = cfg.campana_delay_ms   || 4000;
+    var horaIni   = cfg.campana_hora_inicio || '08:00';
+    var horaFin   = cfg.campana_hora_fin    || '20:00';
+    _campLimite = limiteDia;
+    var elLim = document.getElementById('cfg-limite-dia');
+    var elDel = document.getElementById('cfg-delay-ms');
+    var elHI  = document.getElementById('cfg-hora-inicio');
+    var elHF  = document.getElementById('cfg-hora-fin');
+    if (elLim) { elLim.value = limiteDia; actualizarBadgeLimite(limiteDia); }
+    if (elDel) elDel.value = Math.round(delayMs/1000);
+    if (elHI)  elHI.value = horaIni.substring(0,5);
+    if (elHF)  elHF.value = horaFin.substring(0,5);
+  } catch(e) {}
+}
+
+// Override guardarConfig para incluir anti-spam
+var _guardarCfgOriginal = guardarConfig;
+guardarConfig = async function() {
+  var elLim = document.getElementById('cfg-limite-dia');
+  var elDel = document.getElementById('cfg-delay-ms');
+  var elHI  = document.getElementById('cfg-hora-inicio');
+  var elHF  = document.getElementById('cfg-hora-fin');
+  var body = {
+    activo                               : document.getElementById('cfg-activo').checked,
+    codigo_pais                          : document.getElementById('cfg-codigo-pais').value.trim() || '+51',
+    recordatorio_citas_activo            : document.getElementById('cfg-citas-activo').checked,
+    recordatorio_citas_horas             : parseInt(document.getElementById('cfg-citas-h1').value)||24,
+    recordatorio_citas_horas2            : parseInt(document.getElementById('cfg-citas-h2').value)||null,
+    recordatorio_vacunas_activo          : document.getElementById('cfg-vacunas-activo').checked,
+    recordatorio_vacunas_dias            : parseInt(document.getElementById('cfg-vacunas-d1').value)||7,
+    recordatorio_vacunas_dias2           : parseInt(document.getElementById('cfg-vacunas-d2').value)||null,
+    recordatorio_desparasitaciones_activo: document.getElementById('cfg-desparasitaciones-activo').checked,
+    campana_limite_dia : elLim ? parseInt(elLim.value)||30 : 30,
+    campana_delay_ms   : elDel ? (parseInt(elDel.value)||4)*1000 : 4000,
+    campana_hora_inicio: elHI ? elHI.value+':00' : '08:00:00',
+    campana_hora_fin   : elHF ? elHF.value+':00' : '20:00:00',
+  };
+  _campLimite = body.campana_limite_dia;
+  try {
+    var res = await api('/wa/config', { method:'PUT', body });
+    var d   = await res.json();
+    if (!res.ok) { toast(d.message || 'Error.', 'danger'); return; }
+    toast('✅ Configuración guardada', 'success');
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+};
+
+// ══════════════════════════════════════════════════════════════
+// CAMPAÑAS
+// ══════════════════════════════════════════════════════════════
+async function cargarCampanas() {
+  var cont = document.getElementById('campanas-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
+  try {
+    var [resCamp, resCfg] = await Promise.all([api('/wa/campanas'), api('/wa/config')]);
+    if (resCfg?.ok) {
+      var cfg = (await resCfg.json()).data.config;
+      _campLimite = cfg.campana_limite_dia || 30;
+      var infoEl = document.getElementById('camp-limite-info');
+      if (infoEl) infoEl.textContent = 'Límite diario: '+_campLimite+' mensajes · Horario: '+(cfg.campana_hora_inicio||'08:00').substring(0,5)+' – '+(cfg.campana_hora_fin||'20:00').substring(0,5);
+    }
+    if (!resCamp?.ok) return;
+    var rows = (await resCamp.json()).data || [];
+    if (!rows.length) {
+      cont.innerHTML = '<div class="vempty"><span style="font-size:2rem">📢</span><p>Sin campañas aún</p><p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem">Crea tu primera campaña masiva</p></div>';
+      return;
+    }
+    cont.innerHTML = rows.map(function(c) { return renderCampanaCard(c); }).join('');
+  } catch(e) { cont.innerHTML = '<div class="vempty">Error al cargar</div>'; }
+}
+
+function renderCampanaCard(c) {
+  var pct = c.total > 0 ? Math.round((c.enviados/c.total)*100) : 0;
+  var estadoColors = {
+    borrador:'#6b7280', programada:'#0369a1', enviando:'#15803d',
+    pausada:'#b45309', completada:'#15803d', cancelada:'#be123c'
+  };
+  var estadoEmojis = {
+    borrador:'📝', programada:'⏰', enviando:'📤', pausada:'⏸️', completada:'✅', cancelada:'❌'
+  };
+  var col = estadoColors[c.estado] || '#6b7280';
+
+  var diasRestantes = '';
+  if (['enviando','pausada','programada'].includes(c.estado) && c.total > c.enviados) {
+    var pendientes = c.total - c.enviados;
+    var diasNec    = Math.ceil(pendientes / _campLimite);
+    diasRestantes  = '<span style="font-size:.7rem;color:var(--ink-faint)">~' + diasNec + ' día(s) restante(s)</span>';
+  }
+
+  var cid = c.id;
+  var btnPausar   = c.estado==='enviando' ? '<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️ Pausar</button>' : '';
+  var btnReanudar = c.estado==='pausada'  ? '<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶ Reanudar</button>' : '';
+  var btnIniciar  = c.estado==='borrador' ? '<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">🚀 Iniciar</button>' : '';
+  var btnEditar   = ['borrador','pausada'].includes(c.estado) ? '<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button>' : '';
+  var btnCancelar = ['borrador','pausada','enviando'].includes(c.estado) ? '<button class="vbtn" style="font-size:.75rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">❌</button>' : '';
+
+  var conImagen   = c.imagen_url ? '🖼️ Con imagen · ' : '';
+
+  var html = '<div class="vcard vcard-pad" style="margin-bottom:.75rem">';
+  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="flex:1;min-width:0">';
+  html += '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">';
+  html += '<span style="font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">';
+  html += estadoEmojis[c.estado]+' '+c.estado+'</span>';
+  html += diasRestantes;
+  html += '</div>';
+  html += '<p style="font-weight:700;font-size:.92rem;margin-bottom:.2rem">'+esc(c.nombre)+'</p>';
+  html += '<p style="font-size:.75rem;color:var(--ink-faint)">👥 '+esc(c.segmento)+' · '+conImagen+'📅 '+new Date(c.created_at).toLocaleDateString('es-PE')+'</p>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap">';
+  html += btnPausar + btnReanudar + btnIniciar + btnEditar + btnCancelar;
+  html += '</div></div>';
+
+  if (c.total > 0) {
+    html += '<div style="margin-top:.85rem">';
+    html += '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-faint);margin-bottom:.3rem">';
+    html += '<span>✅ '+c.enviados+'/'+c.total+' enviados</span><span>'+pct+'%</span></div>';
+    html += '<div style="height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden">';
+    html += '<div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%;transition:width .4s"></div></div>';
+    if (c.fallidos > 0) html += '<p style="font-size:.68rem;color:#be123c;margin-top:.2rem">⚠️ '+c.fallidos+' fallidos</p>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+
+async function accionCampana(id, accion) {
+  var confirmaciones = {
+    cancelar : { titulo:'¿Cancelar campaña?', mensaje:'Esta acción no se puede deshacer.', tipo:'danger', labelOk:'Cancelar campaña' },
+  };
+  if (confirmaciones[accion]) {
+    var ok = await vconfirm(confirmaciones[accion]);
+    if (!ok) return;
+  }
+  try {
+    var res = await api('/wa/campanas/'+id+'/'+accion, { method:'POST' });
+    var d   = await res.json();
+    if (!res.ok) { toast(d.message||'Error.', 'danger'); return; }
+    toast('✅ '+d.message, 'success');
+    cargarCampanas();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+// ── Nueva campaña ─────────────────────────────────────────────
+function abrirModalNuevaCampana() {
+  document.getElementById('modal-campana-titulo').textContent = '📢 Nueva Campaña';
+  document.getElementById('camp-edit-id').value = '';
+  document.getElementById('camp-nombre').value  = '';
+  document.getElementById('camp-mensaje').value = '';
+  document.getElementById('camp-segmento').value = 'todos';
+  limpiarImagenCampana();
+  document.getElementById('camp-proyeccion').style.display = 'none';
+  openModal('modal-campana');
+  calcularProyeccion();
+}
+
+async function editarCampana(id) {
+  try {
+    var res = await api('/wa/campanas/'+id);
+    if (!res?.ok) return;
+    var c = (await res.json()).data;
+    document.getElementById('modal-campana-titulo').textContent = '✏️ Editar Campaña';
+    document.getElementById('camp-edit-id').value   = c.id;
+    document.getElementById('camp-nombre').value    = c.nombre;
+    document.getElementById('camp-mensaje').value   = c.mensaje;
+    document.getElementById('camp-segmento').value  = c.segmento;
+    if (c.imagen_url) {
+      _campImagenUrl  = c.imagen_url;
+      _campImagenBlob = c.imagen_blob_name;
+      document.getElementById('camp-img-prev-img').src = c.imagen_url;
+      document.getElementById('camp-img-preview').style.display = '';
+      document.getElementById('btn-limpiar-img-camp').style.display = '';
+    }
+    openModal('modal-campana');
+    calcularProyeccion();
+  } catch(e) {}
+}
+
+function insertarVarCampana(variable) {
+  var ta  = document.getElementById('camp-mensaje');
+  var pos = ta.selectionStart;
+  ta.value = ta.value.substring(0, pos) + variable + ta.value.substring(pos);
+  ta.focus();
+}
+
+document.getElementById('camp-segmento') && document.getElementById('camp-segmento').addEventListener('change', function() {
+  var wrap = document.getElementById('camp-especie-wrap');
+  if (wrap) wrap.style.display = this.value==='por_especie' ? '' : 'none';
+});
+
+var _campTotal = 0;
+async function calcularProyeccion() {
+  var segmento = document.getElementById('camp-segmento')?.value || 'todos';
+  document.getElementById('camp-limite-custom').value = _campLimite;
+  try {
+    var res = await api('/wa/campanas/proyeccion?segmento='+segmento);
+    if (!res?.ok) return;
+    var d = await res.json();
+    _campTotal = d.data.total || 0;
+    renderProyeccion(_campTotal, _campLimite);
+  } catch(e) { _campTotal = 0; }
+}
+
+function recalcularProyeccion() {
+  var lim = parseInt(document.getElementById('camp-limite-custom').value) || _campLimite;
+  renderProyeccion(_campTotal, lim);
+}
+
+function resetLimiteCustom() {
+  document.getElementById('camp-limite-custom').value = _campLimite;
+  renderProyeccion(_campTotal, _campLimite);
+}
+
+function renderProyeccion(total, limite) {
+  if (!total) return;
+  var box  = document.getElementById('camp-proyeccion');
+  var body = document.getElementById('camp-proyeccion-body');
+  box.style.display = '';
+  var dias = Math.ceil(total / limite);
+  var html = '<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;margin-bottom:.6rem">'+
+    '<span style="color:var(--ink-faint);font-weight:600">Total contactos:</span><strong>'+total+'</strong>'+
+    '<span style="color:var(--ink-faint);font-weight:600">Límite diario:</span><strong>'+limite+' mensajes</strong>'+
+    '<span style="color:var(--ink-faint);font-weight:600">Duración estimada:</span><strong>'+dias+' día(s)</strong>'+
+  '</div>'+
+  '<div style="background:#fff;border-radius:.6rem;overflow:hidden;border:1px solid #bae6fd">'+
+  '<div style="background:#0369a1;color:#fff;font-size:.68rem;font-weight:700;padding:.3rem .75rem;text-transform:uppercase;letter-spacing:.08em">Distribución de envíos</div>';
+  for (var d=1; d<=Math.min(dias, 7); d++) {
+    var cnt  = d < dias ? limite : (total - (dias-1)*limite);
+    var pct  = Math.round((cnt/limite)*100);
+    var fecha = new Date(); fecha.setDate(fecha.getDate() + d - 1);
+    html += '<div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;border-bottom:1px solid #f0f0f0">'+
+      '<span style="font-size:.7rem;min-width:70px;color:var(--ink-faint)">'+
+        (d===1?'Hoy':d===2?'Mañana':fecha.toLocaleDateString('es-PE',{weekday:'short',day:'numeric'}))+
+      '</span>'+
+      '<div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden">'+
+        '<div style="height:100%;background:#0369a1;border-radius:999px;width:'+pct+'%"></div>'+
+      '</div>'+
+      '<span style="font-size:.72rem;font-weight:700;color:#0369a1;min-width:55px;text-align:right">'+cnt+' msgs</span>'+
+    '</div>';
+  }
+  if (dias > 7) html += '<div style="padding:.4rem .75rem;font-size:.7rem;color:var(--ink-faint);text-align:center">…y ' + (dias-7) + ' días más</div>';
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+async function guardarCampana(iniciar) {
+  var nombre   = document.getElementById('camp-nombre').value.trim();
+  var mensaje  = document.getElementById('camp-mensaje').value.trim();
+  var segmento = document.getElementById('camp-segmento').value;
+  var editId   = document.getElementById('camp-edit-id').value;
+  if (!nombre)  { toast('El nombre es obligatorio.', 'warning'); return; }
+  if (!mensaje) { toast('El mensaje es obligatorio.', 'warning'); return; }
+
+  // Si tiene imagen pendiente de subir
+  if (document.getElementById('camp-imagen-file').files[0] && !_campImagenUrl) {
+    toast('Espera a que termine de subir la imagen.', 'warning'); return;
+  }
+
+  var body = {
+    nombre, mensaje, segmento,
+    imagen_url      : _campImagenUrl  || null,
+    imagen_blob_name: _campImagenBlob || null,
+    estado          : iniciar ? 'enviando' : 'borrador',
+  };
+
+  try {
+    var url    = editId ? '/wa/campanas/'+editId : '/wa/campanas';
+    var method = editId ? 'PUT' : 'POST';
+    var res    = await api(url, { method, body });
+    var d      = await res.json();
+    if (!res.ok) { toast(d.message||'Error.', 'danger'); return; }
+    toast('✅ ' + (iniciar ? 'Campaña iniciada' : 'Borrador guardado'), 'success');
+    closeModal('modal-campana');
+    cargarCampanas();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+// ── Imagen campaña ────────────────────────────────────────────
+async function previsualizarImagenCampana(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    document.getElementById('camp-img-prev-img').src = e.target.result;
+    document.getElementById('camp-img-preview').style.display = '';
+    document.getElementById('btn-limpiar-img-camp').style.display = '';
+    try {
+      var res = await api('/wa/upload', { method:'POST', body:{
+        base64: e.target.result.split(',')[1], contentType: file.type,
+        filename: file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),
+      }});
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.message);
+      _campImagenUrl  = d.data.url;
+      _campImagenBlob = d.data.blobName;
+      document.getElementById('camp-imagen-url').value  = _campImagenUrl;
+      document.getElementById('camp-imagen-blob').value = _campImagenBlob;
+      toast('✅ Imagen subida', 'success');
+    } catch(e) { toast('Error al subir imagen: '+e.message, 'danger'); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function limpiarImagenCampana() {
+  _campImagenUrl = null; _campImagenBlob = null;
+  document.getElementById('camp-imagen-file').value = '';
+  document.getElementById('camp-img-preview').style.display = 'none';
+  document.getElementById('btn-limpiar-img-camp').style.display = 'none';
+}
+
+// ── WebSocket campañas ─────────────────────────────────────────
+function suscribirWSCampanas() {
+  if (!_waSocket) return;
+  _waSocket.on('wa:campana:progreso', function(data) {
+    var panel = document.getElementById('panel-ws-campana');
+    panel.style.display = '';
+    document.getElementById('ws-campana-pct').textContent   = (data.porcentaje||0)+'%';
+    document.getElementById('ws-progreso-bar').style.width  = (data.porcentaje||0)+'%';
+    document.getElementById('ws-enviados').textContent      = data.enviados||0;
+    document.getElementById('ws-fallidos').textContent      = data.fallidos||0;
+    document.getElementById('ws-hoy').textContent           = data.enviados_hoy||0;
+    document.getElementById('ws-total').textContent         = data.total||0;
+    // Alerta límite diario
+    var alertaEl = document.getElementById('ws-limite-alerta');
+    if (data.estado==='limite_diario') {
+      alertaEl.style.display = '';
+      alertaEl.textContent   = '⏸️ ' + (data.mensaje||'Límite diario alcanzado. Continuará mañana.');
+    } else { alertaEl.style.display = 'none'; }
+    if (data.estado==='completada') {
+      setTimeout(function(){ cargarCampanas(); }, 1500);
+    }
+  });
+  _waSocket.on('wa:campana:log', function(data) {
+    var lista = document.getElementById('ws-log-lista');
+    if (!lista) return;
+    var color = data.estado==='enviado' ? '#15803d' : '#be123c';
+    var emoji = data.estado==='enviado' ? '✅' : '❌';
+    var linea = document.createElement('div');
+    linea.style.cssText = 'padding:.15rem 0;color:'+color+';border-bottom:1px solid #f0f0f0';
+    linea.textContent   = emoji+' '+new Date(data.timestamp).toLocaleTimeString('es-PE')+' → '+data.nombre+' ('+data.telefono+')';
+    lista.insertBefore(linea, lista.firstChild);
+    // Máx 10 líneas
+    while (lista.children.length > 10) lista.removeChild(lista.lastChild);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// HISTORIAS
+// ══════════════════════════════════════════════════════════════
+async function cargarHistorias() {
+  var grid = document.getElementById('historias-grid');
+  grid.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
+  try {
+    var url = '/wa/historias' + (_histFiltro !== 'todas' ? '?estado='+_histFiltro : '');
+    var res = await api(url);
+    if (!res?.ok) return;
+    var rows = (await res.json()).data || [];
+    if (!rows.length) {
+      grid.innerHTML = '<div class="vempty" style="grid-column:1/-1"><span style="font-size:2rem">📸</span><p>Sin historias aún</p><p style="font-size:.78rem;color:var(--ink-faint);margin-top:.3rem">Crea tu primera historia de WhatsApp</p></div>';
+      return;
+    }
+    grid.innerHTML = rows.map(function(h) { return renderHistoriaCard(h); }).join('');
+  } catch(e) { grid.innerHTML = '<div class="vempty">Error al cargar</div>'; }
+}
+
+function filtrarHistorias(estado) {
+  _histFiltro = estado;
+  ['todas','programada','publicada','fallida'].forEach(function(f) {
+    var btn = document.getElementById('hist-f-'+f);
+    if (btn) btn.className = 'vbtn ' + (f===estado ? 'vbtn-primary' : 'vbtn-ghost') + ' font-size:.78rem;padding:.35rem .85rem';
+  });
+  cargarHistorias();
+}
+
+function renderHistoriaCard(h) {
+  var estadoColors = { borrador:'#6b7280', programada:'#0369a1', publicada:'#15803d', fallida:'#be123c', cancelada:'#9ca3af' };
+  var estadoEmojis = { borrador:'📝', programada:'⏰', publicada:'✅', fallida:'❌', cancelada:'🚫' };
+  var col = estadoColors[h.estado] || '#6b7280';
+
+  return '<div class="vcard" style="overflow:hidden;border:1.5px solid '+col+'40">'+
+    // Imagen o fondo de color
+    (h.imagen_url
+      ? '<div style="position:relative;aspect-ratio:9/16;max-height:280px;overflow:hidden;background:#000">'+
+          '<img src="'+h.imagen_url+'" style="width:100%;height:100%;object-fit:cover"/>'+
+          (h.texto ? '<div style="position:absolute;bottom:0;left:0;right:0;padding:.75rem;color:#fff;font-weight:600;font-size:.8rem;'+
+            'text-shadow:0 1px 4px rgba(0,0,0,.7);background:linear-gradient(transparent,rgba(0,0,0,.6))">'+esc(h.texto)+'</div>' : '')+
+          '<div style="position:absolute;top:.5rem;right:.5rem;background:rgba(0,0,0,.5);color:#fff;font-size:.6rem;'+
+            'font-weight:700;padding:.2rem .5rem;border-radius:999px">'+estadoEmojis[h.estado]+' '+h.estado+'</div>'+
+        '</div>'
+      : '<div style="aspect-ratio:9/16;max-height:280px;background:#128c7e;display:flex;align-items:center;'+
+          'justify-content:center;padding:1rem;text-align:center;color:#fff">'+
+          '<p style="font-size:.88rem;font-weight:600;line-height:1.5">'+esc(h.texto||'')+'</p>'+
+        '</div>'
+    )+
+    '<div style="padding:.75rem">'+
+      '<p style="font-weight:700;font-size:.85rem;margin-bottom:.25rem">'+esc(h.titulo)+'</p>'+
+      (h.programada_at ? '<p style="font-size:.7rem;color:var(--ink-faint)">⏰ '+new Date(h.programada_at).toLocaleString('es-PE')+'</p>' : '')+
+      (h.publicada_at  ? '<p style="font-size:.7rem;color:#15803d">✅ Publicada: '+new Date(h.publicada_at).toLocaleString('es-PE')+'</p>' : '')+
+      (h.error_msg     ? '<p style="font-size:.7rem;color:#be123c" title="'+esc(h.error_msg)+'">❌ '+esc(h.error_msg.substring(0,60))+'</p>' : '')+
+      '<div style="display:flex;gap:.35rem;margin-top:.6rem;flex-wrap:wrap" data-hist-id="'+h.id+'" data-hist-estado="'+h.estado+'">'+
+        (h.estado==='borrador'||h.estado==='programada' ? '<button class="vbtn vbtn-primary" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">📤 Publicar ahora</button>' : '')+
+        (h.estado==='fallida' ? '<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">🔄 Reintentar</button>' : '')+
+        (['borrador','programada'].includes(h.estado) ? '<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="editar">✏️</button>' : '')+
+        '<button class="vbtn" style="font-size:.7rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-hist-accion="eliminar">🗑️</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function abrirModalNuevaHistoria() {
+  document.getElementById('modal-historia-titulo').textContent = '📸 Nueva Historia';
+  document.getElementById('historia-edit-id').value   = '';
+  document.getElementById('historia-texto').value     = '';
+  document.getElementById('historia-programar').checked = false;
+  document.getElementById('historia-fecha-wrap').style.display = 'none';
+  document.getElementById('historia-inmediata-hint').style.display = '';
+  document.getElementById('hist-preview-box').style.display = 'none';
+  limpiarImagenHistoria();
+  selTipoHistoria('imagen');
+  openModal('modal-historia');
+}
+
+function selTipoHistoria(tipo) {
+  document.getElementById('historia-tipo').value = tipo;
+  var btnImg = document.getElementById('hist-tipo-imagen');
+  var btnTxt = document.getElementById('hist-tipo-texto');
+  var imgSec = document.getElementById('hist-imagen-section');
+  var fondoSec = document.getElementById('hist-fondo-section');
+  var textoLabel = document.getElementById('hist-texto-label');
+
+  if (tipo==='imagen') {
+    btnImg.style.cssText = 'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer';
+    btnTxt.style.cssText = 'flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer';
+    imgSec.style.display = '';
+    fondoSec.style.display = 'none';
+    textoLabel.textContent = 'Caption (opcional)';
+  } else {
+    btnImg.style.cssText = 'flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer';
+    btnTxt.style.cssText = 'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer';
+    imgSec.style.display = 'none';
+    fondoSec.style.display = '';
+    textoLabel.textContent = 'Texto de la historia *';
+  }
+}
+
+function selFondoHistoria(color) {
+  _histFondo = color;
+  document.getElementById('historia-fondo').value = color;
+  document.querySelectorAll('#hist-fondo-section button').forEach(function(btn) {
+    btn.style.border = btn.style.background===color ? '2px solid #fff' : '2px solid transparent';
+  });
+}
+
+function toggleProgramarHistoria(checked) {
+  document.getElementById('historia-fecha-wrap').style.display     = checked ? '' : 'none';
+  document.getElementById('historia-inmediata-hint').style.display = checked ? 'none' : '';
+  if (checked) {
+    var d = new Date(); d.setHours(d.getHours()+1); d.setMinutes(0);
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    document.getElementById('historia-fecha').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':00';
+  }
+}
+
+function cargarImagenHistoria(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 5*1024*1024) { toast('Máximo 5MB', 'warning'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('hist-img-prev').src = e.target.result;
+    document.getElementById('hist-img-preview').style.display = '';
+    document.getElementById('hist-img-placeholder').style.display = 'none';
+    // Preview
+    var prevBox = document.getElementById('hist-preview-box');
+    prevBox.style.display = 'flex';
+    document.getElementById('hist-prev-img').src = e.target.result;
+    actualizarPreviewHistoria();
+    // Subir Azure
+    subirImagenHistoria(e.target.result.split(',')[1], file.type, file.name);
+  };
+  reader.readAsDataURL(file);
+}
+
+function soltarImagenHistoria(e) {
+  e.preventDefault();
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    var input = document.getElementById('hist-img-file');
+    var dt = new DataTransfer(); dt.items.add(file);
+    input.files = dt.files;
+    cargarImagenHistoria(input);
+  }
+  e.currentTarget.style.borderColor = '';
+  e.currentTarget.style.background  = '';
+}
+
+async function subirImagenHistoria(b64, contentType, filename) {
+  try {
+    var res = await api('/wa/upload', { method:'POST', body:{
+      base64: b64, contentType, filename: filename.replace(/[^a-zA-Z0-9._-]/g,'_')
+    }});
+    var d = await res.json();
+    if (!res.ok) throw new Error(d.message);
+    _histImagenUrl  = d.data.url;
+    _histImagenBlob = d.data.blobName;
+    document.getElementById('historia-imagen-url').value  = _histImagenUrl;
+    document.getElementById('historia-imagen-blob').value = _histImagenBlob;
+    toast('✅ Imagen subida', 'success');
+  } catch(e) { toast('Error al subir: '+e.message, 'danger'); }
+}
+
+function limpiarImagenHistoria() {
+  _histImagenUrl = null; _histImagenBlob = null;
+  document.getElementById('hist-img-file').value = '';
+  document.getElementById('hist-img-preview').style.display = 'none';
+  document.getElementById('hist-img-placeholder').style.display = '';
+  document.getElementById('hist-preview-box').style.display = 'none';
+  document.getElementById('historia-imagen-url').value = '';
+  document.getElementById('historia-imagen-blob').value = '';
+}
+
+function actualizarPreviewHistoria() {
+  var texto = document.getElementById('historia-texto').value;
+  document.getElementById('hist-prev-texto').textContent = texto;
+}
+
+document.getElementById('historia-texto') && document.getElementById('historia-texto').addEventListener('input', actualizarPreviewHistoria);
+
+async function guardarHistoria() {
+  var tipo      = document.getElementById('historia-tipo').value;
+  var titulo    = document.getElementById('historia-texto').value.trim().substring(0,60) || 'Historia '+new Date().toLocaleDateString('es-PE');
+  var texto     = document.getElementById('historia-texto').value.trim();
+  var programar = document.getElementById('historia-programar').checked;
+  var fecha     = document.getElementById('historia-fecha').value;
+  var editId    = document.getElementById('historia-edit-id').value;
+
+  if (tipo==='imagen' && !_histImagenUrl) { toast('Selecciona y sube una imagen primero.', 'warning'); return; }
+  if (tipo==='texto'  && !texto)           { toast('El texto es obligatorio.', 'warning'); return; }
+  if (programar && !fecha)                  { toast('Selecciona la fecha de publicación.', 'warning'); return; }
+
+  var body = {
+    titulo,
+    tipo,
+    texto        : texto || null,
+    imagen_url   : _histImagenUrl  || null,
+    imagen_blob  : _histImagenBlob || null,
+    estado       : programar ? 'programada' : 'borrador',
+    programada_at: programar ? fecha : null,
+    publicar_ahora: !programar,
+  };
+
+  var btn = document.getElementById('btn-guardar-historia');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  try {
+    var url    = editId ? '/wa/historias/'+editId : '/wa/historias';
+    var method = editId ? 'PUT' : 'POST';
+    var res    = await api(url, { method, body });
+    var d      = await res.json();
+    if (!res.ok) { toast(d.message||'Error.', 'danger'); return; }
+    toast(programar ? '⏰ Historia programada para '+new Date(fecha).toLocaleString('es-PE') : '📤 Historia publicada', 'success', 5000);
+    closeModal('modal-historia');
+    cargarHistorias();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+  finally { btn.disabled=false; btn.textContent='💾 Guardar historia'; }
+}
+
+async function publicarHistoriaAhora(id) {
+  var ok = await vconfirm({ titulo:'¿Publicar historia ahora?', mensaje:'Se publicará inmediatamente en tu estado de WhatsApp.', labelOk:'📤 Publicar', tipo:'info' });
+  if (!ok) return;
+  try {
+    var res = await api('/wa/historias/'+id+'/publicar', { method:'POST' });
+    var d   = await res.json();
+    if (!res.ok) { toast(d.message||'Error.', 'danger'); return; }
+    toast('✅ Historia publicada en WhatsApp', 'success', 5000);
+    cargarHistorias();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+async function editarHistoria(id) {
+  try {
+    var res = await api('/wa/historias/'+id);
+    if (!res?.ok) return;
+    var h = (await res.json()).data;
+    document.getElementById('modal-historia-titulo').textContent = '✏️ Editar Historia';
+    document.getElementById('historia-edit-id').value  = h.id;
+    document.getElementById('historia-texto').value    = h.texto || '';
+    selTipoHistoria(h.tipo || 'imagen');
+    if (h.imagen_url) {
+      _histImagenUrl  = h.imagen_url;
+      _histImagenBlob = h.imagen_blob;
+      document.getElementById('hist-img-prev').src = h.imagen_url;
+      document.getElementById('hist-img-preview').style.display = '';
+      document.getElementById('hist-img-placeholder').style.display = 'none';
+      var prevBox = document.getElementById('hist-preview-box');
+      prevBox.style.display = 'flex';
+      document.getElementById('hist-prev-img').src = h.imagen_url;
+    }
+    if (h.programada_at) {
+      document.getElementById('historia-programar').checked = true;
+      toggleProgramarHistoria(true);
+      document.getElementById('historia-fecha').value = h.programada_at.replace('Z','').substring(0,16);
+    }
+    openModal('modal-historia');
+  } catch(e) {}
+}
+
+async function eliminarHistoria(id) {
+  var ok = await vconfirm({ titulo:'¿Eliminar historia?', mensaje:'Se eliminará la imagen de Azure también.', tipo:'danger', labelOk:'Eliminar' });
+  if (!ok) return;
+  try {
+    var res = await api('/wa/historias/'+id, { method:'DELETE' });
+    var d   = await res.json();
+    if (!res.ok) { toast(d.message||'Error.', 'danger'); return; }
+    toast('Historia eliminada', 'success');
+    cargarHistorias();
+  } catch(e) { toast('Error de conexión.', 'danger'); }
+}
+
+// WebSocket historias
+if (_waSocket) {
+  _waSocket.on('wa:historia:publicada', function(data) {
+    toast('📸 Historia publicada en WhatsApp', 'success', 4000);
+    if (document.getElementById('contenido-historias').style.display !== 'none') cargarHistorias();
+  });
+}
+
+// ── Event delegation campañas ──
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-camp-id]');
+  if (!btn) return;
+  var id     = parseInt(btn.getAttribute('data-camp-id'));
+  var accion = btn.getAttribute('data-camp-accion');
+  var edit   = btn.getAttribute('data-camp-edit');
+  if (accion) accionCampana(id, accion);
+  if (edit)   editarCampana(id);
+});
+
+// ── Event delegation historias ──
+document.addEventListener('click', function(e) {
+  var wrap = e.target.closest('[data-hist-id]');
+  if (!wrap) return;
+  var btn = e.target.closest('button[data-hist-accion]');
+  if (!btn) return;
+  var id     = parseInt(wrap.getAttribute('data-hist-id'));
+  var accion = btn.getAttribute('data-hist-accion');
+  if (accion === 'publicar')  publicarHistoriaAhora(id);
+  if (accion === 'editar')    editarHistoria(id);
+  if (accion === 'eliminar')  eliminarHistoria(id);
+});
 </script>
 </body>
 </html>

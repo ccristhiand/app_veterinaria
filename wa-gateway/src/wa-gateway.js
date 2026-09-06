@@ -1,9 +1,12 @@
 'use strict';
 
 /**
- * VetNetcodip SaaS — WhatsApp Gateway v2
- * Puerto: 5000
- * Mejoras: soporte imágenes/media, WebSocket progreso campañas, control cuota
+ * VetNetcodip SaaS — WhatsApp Gateway v3
+ * Nuevas funciones:
+ * - Upload de imágenes/documentos a Azure Blob Storage
+ * - Publicación de historias (WhatsApp Status)
+ * - Programador de historias (cada 60s revisa pendientes)
+ * - WebSocket mejorado con log en vivo de campañas
  */
 
 const express    = require('express');
@@ -13,6 +16,7 @@ const mysql      = require('mysql2/promise');
 const path       = require('path');
 const fs         = require('fs');
 const https      = require('https');
+const multiparty = require('multiparty');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const {
@@ -20,33 +24,78 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  jidDecode,
-  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino      = require('pino');
 
+// ── Azure Blob Storage ────────────────────────────────────────
+const { BlobServiceClient } = require('@azure/storage-blob');
+
+const AZURE_CONN      = process.env.AZURE_WA_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION;
+const AZURE_CONTAINER = process.env.AZURE_WA_CONTAINER          || 'wa-media';
+
+let blobServiceClient = null;
+let containerClient   = null;
+
+if (AZURE_CONN) {
+  try {
+    blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_CONN);
+    containerClient   = blobServiceClient.getContainerClient(AZURE_CONTAINER);
+    containerClient.createIfNotExists({ access: 'blob' })
+      .then(() => console.log(`[WA] Azure Blob OK — container: ${AZURE_CONTAINER}`))
+      .catch(e  => console.error('[WA] Azure Blob error:', e.message));
+  } catch (e) {
+    console.error('[WA] Azure config inválida:', e.message);
+  }
+} else {
+  console.warn('[WA] AZURE_WA_STORAGE_CONNECTION no configurado — upload deshabilitado');
+}
+
+/**
+ * Subir buffer a Azure Blob Storage
+ * @returns {string} URL pública del blob
+ */
+async function subirBlob(buffer, blobName, contentType = 'image/jpeg') {
+  if (!containerClient) throw new Error('Azure Blob no configurado');
+  const blockBlob = containerClient.getBlockBlobClient(blobName);
+  await blockBlob.upload(buffer, buffer.length, {
+    blobHTTPHeaders: { blobContentType: contentType },
+  });
+  return blockBlob.url;
+}
+
+/**
+ * Eliminar blob de Azure
+ */
+async function eliminarBlob(blobName) {
+  if (!containerClient || !blobName) return;
+  try {
+    await containerClient.deleteBlob(blobName);
+  } catch {}
+}
+
+// ── Express + Socket.io ───────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: '*' } });
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '25mb' }));
 
-const PORT         = process.env.WA_PORT        || 5000;
+const PORT         = process.env.WA_PORT         || 5000;
 const SESSIONS_DIR = process.env.WA_SESSIONS_DIR || '/var/www/app_veterinaria/wa-sessions';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 
 if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 
-// ── Pool DB ───────────────────────────────────────────────────
+// ── Pool DB master ────────────────────────────────────────────
 const masterPool = mysql.createPool({
-  host    : process.env.MASTER_DB_HOST,
-  port    : process.env.MASTER_DB_PORT || 3306,
-  user    : process.env.MASTER_DB_USER,
-  password: process.env.MASTER_DB_PASS,
-  database: process.env.MASTER_DB_NAME,
+  host              : process.env.MASTER_DB_HOST,
+  port              : process.env.MASTER_DB_PORT || 3306,
+  user              : process.env.MASTER_DB_USER,
+  password          : process.env.MASTER_DB_PASS,
+  database          : process.env.MASTER_DB_NAME,
   waitForConnections: true,
-  connectionLimit: 5,
+  connectionLimit   : 5,
 });
 
 async function masterQuery(sql, params = []) {
@@ -66,7 +115,7 @@ async function getTenantConn(tenantId) {
   });
 }
 
-// ── Estado de sesiones en memoria ─────────────────────────────
+// ── Estado de sesiones en memoria ────────────────────────────
 const sesiones = new Map();
 
 // ── Auth interna ──────────────────────────────────────────────
@@ -93,7 +142,7 @@ async function logMensaje(tenantId, tipo, propietarioId, telefono, mensaje, esta
     await conn.execute(
       `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at)
        VALUES (?,?,?,?,?,?,?)`,
-      [tipo, propietarioId || null, telefono, mensaje || '[imagen]', estado, error,
+      [tipo, propietarioId || null, telefono, mensaje || '[media]', estado, error,
        estado === 'enviado' ? new Date() : null]
     );
     await conn.end();
@@ -109,10 +158,7 @@ async function verificarCuota(tenantId) {
   if (cfg.ilimitado) return { ok: true };
   const mesActual = new Date().toISOString().slice(0, 7);
   if (cfg.mes_actual !== mesActual) {
-    await masterQuery(
-      'UPDATE wa_config_global SET msgs_usados=0, mes_actual=? WHERE tenant_id=?',
-      [mesActual, tenantId]
-    );
+    await masterQuery('UPDATE wa_config_global SET msgs_usados=0, mes_actual=? WHERE tenant_id=?', [mesActual, tenantId]);
     return { ok: true };
   }
   if (cfg.msgs_usados >= cfg.msgs_incluidos)
@@ -121,10 +167,7 @@ async function verificarCuota(tenantId) {
 }
 
 async function incrementarCuota(tenantId) {
-  await masterQuery(
-    'UPDATE wa_config_global SET msgs_usados = msgs_usados + 1 WHERE tenant_id=?',
-    [tenantId]
-  );
+  await masterQuery('UPDATE wa_config_global SET msgs_usados=msgs_usados+1 WHERE tenant_id=?', [tenantId]);
 }
 
 // ── Descargar imagen desde URL ────────────────────────────────
@@ -179,35 +222,25 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
-
     if (qr) {
-      sesion.qr     = qr;
-      sesion.estado = 'conectando';
-      console.log(`[WA] QR generado: ${tenantSlug}`);
+      sesion.qr = qr; sesion.estado = 'conectando';
       io.to(`tenant:${tenantId}`).emit('wa:qr', { tenantId, qr });
       await masterQuery('UPDATE wa_sesiones SET estado=? WHERE tenant_id=?', ['conectando', tenantId]);
     }
-
     if (connection === 'open') {
       const numero = sock.user?.id?.split(':')[0] || null;
-      sesion.estado = 'conectado';
-      sesion.numero = numero;
-      sesion.qr     = null;
-      console.log(`[WA] ✅ Conectado: ${tenantSlug} → ${numero}`);
+      sesion.estado = 'conectado'; sesion.numero = numero; sesion.qr = null;
       await masterQuery(
         'UPDATE wa_sesiones SET estado=?, numero_wa=?, ultima_conexion=NOW(), error_msg=NULL WHERE tenant_id=?',
         ['conectado', numero, tenantId]
       );
       io.to(`tenant:${tenantId}`).emit('wa:conectado', { tenantId, numero });
     }
-
     if (connection === 'close') {
       const codigo = (lastDisconnect?.error instanceof Boom)
         ? lastDisconnect.error.output?.statusCode : null;
       const debeReconectar = codigo !== DisconnectReason.loggedOut;
-      console.log(`[WA] ❌ Desconectado: ${tenantSlug} — código: ${codigo}`);
       if (debeReconectar) {
-        console.log(`[WA] 🔄 Reconectando: ${tenantSlug}`);
         sesiones.delete(tenantId);
         setTimeout(() => crearSesion(tenantId, tenantSlug, tenantNombre), 5000);
       } else {
@@ -221,7 +254,6 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
 }
 
 async function limpiarSesion(tenantId, tenantSlug, estadoFinal = 'desconectado') {
-  console.log(`[WA] 🧹 Limpiando sesión: ${tenantSlug}`);
   const sesion = sesiones.get(tenantId);
   if (sesion?.socket) {
     try { await sesion.socket.logout(); } catch {}
@@ -239,8 +271,7 @@ async function limpiarSesion(tenantId, tenantSlug, estadoFinal = 'desconectado')
 // ── Enviar mensaje texto ──────────────────────────────────────
 async function enviarMensaje(tenantId, telefono, mensaje, codigoPais = '+51') {
   const sesion = sesiones.get(tenantId);
-  if (!sesion || sesion.estado !== 'conectado')
-    throw new Error('WhatsApp no conectado para este tenant');
+  if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
   const jid = formatTelefono(telefono, codigoPais);
   if (!jid) throw new Error('Teléfono inválido');
   await sesion.socket.sendMessage(jid, { text: mensaje });
@@ -250,32 +281,50 @@ async function enviarMensaje(tenantId, telefono, mensaje, codigoPais = '+51') {
 // ── Enviar imagen ─────────────────────────────────────────────
 async function enviarImagen(tenantId, telefono, imagenUrl, caption, codigoPais = '+51') {
   const sesion = sesiones.get(tenantId);
-  if (!sesion || sesion.estado !== 'conectado')
-    throw new Error('WhatsApp no conectado para este tenant');
+  if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
   const jid = formatTelefono(telefono, codigoPais);
   if (!jid) throw new Error('Teléfono inválido');
-
   const { buffer, mimetype } = await descargarImagen(imagenUrl);
-
-  await sesion.socket.sendMessage(jid, {
-    image  : buffer,
-    mimetype,
-    caption: caption || '',
-  });
+  await sesion.socket.sendMessage(jid, { image: buffer, mimetype, caption: caption || '' });
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
 }
 
-// ── RUTAS HTTP ────────────────────────────────────────────────
+// ── Publicar historia (WhatsApp Status) ───────────────────────
+async function publicarHistoria(tenantId, imagenUrl, texto) {
+  const sesion = sesiones.get(tenantId);
+  if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
 
+  if (imagenUrl) {
+    const { buffer, mimetype } = await descargarImagen(imagenUrl);
+    await sesion.socket.sendMessage('status@broadcast', {
+      image  : buffer,
+      mimetype,
+      caption: texto || '',
+    });
+  } else {
+    // Historia de solo texto
+    await sesion.socket.sendMessage('status@broadcast', {
+      text          : texto,
+      backgroundArgb: 0xff1f8c3d, // verde VetNetcodip
+      font          : 2,
+    });
+  }
+  await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RUTAS HTTP
+// ══════════════════════════════════════════════════════════════
+
+// ── Sesión ────────────────────────────────────────────────────
 app.post('/wa/sesion/iniciar', authInternal, async (req, res) => {
   try {
     const { tenantId, tenantSlug, tenantNombre } = req.body;
     if (!tenantId || !tenantSlug)
       return res.status(422).json({ success: false, message: 'tenantId y tenantSlug requeridos' });
     const result = await crearSesion(parseInt(tenantId), tenantSlug, tenantNombre);
-    return res.json({ success: true, ...result });
+    res.json({ success: true, ...result });
   } catch (err) {
-    console.error('[WA iniciar]', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -284,7 +333,7 @@ app.post('/wa/sesion/desconectar', authInternal, async (req, res) => {
   try {
     const { tenantId, tenantSlug } = req.body;
     await limpiarSesion(parseInt(tenantId), tenantSlug, 'desconectado');
-    return res.json({ success: true, message: 'Sesión cerrada y limpiada.' });
+    res.json({ success: true, message: 'Sesión cerrada.' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -298,31 +347,26 @@ app.get('/wa/sesion/:tenantId/estado', authInternal, async (req, res) => {
       'SELECT estado, numero_wa, ultima_conexion, ultima_actividad FROM wa_sesiones WHERE tenant_id=?',
       [tenantId]
     );
-    return res.json({
-      success: true,
-      data: {
-        en_memoria      : !!sesion,
-        estado          : sesion?.estado || dbSesion?.estado || 'desconectado',
-        numero          : sesion?.numero || dbSesion?.numero_wa || null,
-        tiene_qr        : !!sesion?.qr,
-        ultima_conexion : dbSesion?.ultima_conexion || null,
-        ultima_actividad: dbSesion?.ultima_actividad || null,
-      },
-    });
+    res.json({ success: true, data: {
+      en_memoria      : !!sesion,
+      estado          : sesion?.estado || dbSesion?.estado || 'desconectado',
+      numero          : sesion?.numero || dbSesion?.numero_wa || null,
+      tiene_qr        : !!sesion?.qr,
+      ultima_conexion : dbSesion?.ultima_conexion || null,
+      ultima_actividad: dbSesion?.ultima_actividad || null,
+    }});
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 app.get('/wa/sesion/:tenantId/qr', authInternal, async (req, res) => {
-  const tenantId = parseInt(req.params.tenantId);
-  const sesion   = sesiones.get(tenantId);
-  if (!sesion?.qr)
-    return res.status(404).json({ success: false, message: 'QR no disponible aún.' });
-  return res.json({ success: true, data: { qr: sesion.qr } });
+  const sesion = sesiones.get(parseInt(req.params.tenantId));
+  if (!sesion?.qr) return res.status(404).json({ success: false, message: 'QR no disponible.' });
+  res.json({ success: true, data: { qr: sesion.qr } });
 });
 
-// POST /wa/enviar — texto o imagen
+// ── Enviar mensaje / imagen ───────────────────────────────────
 app.post('/wa/enviar', authInternal, async (req, res) => {
   try {
     const { tenantId, telefono, mensaje, imagen_url, propietarioId, tipo, codigoPais } = req.body;
@@ -332,8 +376,7 @@ app.post('/wa/enviar', authInternal, async (req, res) => {
       return res.status(422).json({ success: false, message: 'mensaje o imagen_url requerido' });
 
     const cuota = await verificarCuota(parseInt(tenantId));
-    if (!cuota.ok)
-      return res.status(422).json({ success: false, message: cuota.razon, code: 'CUOTA_AGOTADA' });
+    if (!cuota.ok) return res.status(422).json({ success: false, message: cuota.razon, code: 'CUOTA_AGOTADA' });
 
     if (imagen_url) {
       await enviarImagen(parseInt(tenantId), telefono, imagen_url, mensaje, codigoPais || '+51');
@@ -343,18 +386,51 @@ app.post('/wa/enviar', authInternal, async (req, res) => {
 
     await incrementarCuota(parseInt(tenantId));
     await logMensaje(parseInt(tenantId), tipo || 'manual', propietarioId, telefono, mensaje || '[imagen]', 'enviado');
-
-    return res.json({ success: true, message: 'Mensaje enviado.' });
+    res.json({ success: true, message: 'Mensaje enviado.' });
   } catch (err) {
     await logMensaje(
       parseInt(req.body.tenantId), req.body.tipo || 'manual',
-      req.body.propietarioId, req.body.telefono, req.body.mensaje || '[imagen]', 'fallido', err.message
+      req.body.propietarioId, req.body.telefono, req.body.mensaje || '[media]', 'fallido', err.message
     );
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET /wa/estado
+// ── Upload de media a Azure Blob ──────────────────────────────
+// Acepta base64 en JSON { tenantId, base64, contentType, filename }
+app.post('/wa/upload', authInternal, async (req, res) => {
+  try {
+    if (!containerClient)
+      return res.status(503).json({ success: false, message: 'Azure Blob no configurado. Revisa AZURE_WA_STORAGE_CONNECTION en .env' });
+
+    const { tenantId, base64, contentType = 'image/jpeg', filename } = req.body;
+    if (!tenantId || !base64)
+      return res.status(422).json({ success: false, message: 'tenantId y base64 requeridos' });
+
+    const buffer   = Buffer.from(base64, 'base64');
+    const ext      = contentType.split('/')[1] || 'jpg';
+    const blobName = `tenant-${tenantId}/${Date.now()}-${filename || 'media'}.${ext}`;
+
+    const url = await subirBlob(buffer, blobName, contentType);
+    res.json({ success: true, data: { url, blobName } });
+  } catch (err) {
+    console.error('[WA upload]', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Eliminar blob de Azure ────────────────────────────────────
+app.delete('/wa/upload/:blobName', authInternal, async (req, res) => {
+  try {
+    const blobName = decodeURIComponent(req.params.blobName);
+    await eliminarBlob(blobName);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Estado general ────────────────────────────────────────────
 app.get('/wa/estado', authInternal, async (req, res) => {
   try {
     const sesionesDB = await masterQuery(
@@ -365,32 +441,80 @@ app.get('/wa/estado', authInternal, async (req, res) => {
        LEFT JOIN wa_config_global wcg ON wcg.tenant_id = ws.tenant_id
        ORDER BY tc.nombre_clinica`
     );
-    const data = sesionesDB.map(s => ({
+    res.json({ success: true, data: sesionesDB.map(s => ({
       ...s,
       en_memoria    : sesiones.has(s.tenant_id),
       estado_memoria: sesiones.get(s.tenant_id)?.estado || null,
-    }));
-    return res.json({ success: true, data });
+    }))});
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-
-// POST /wa/campana/progreso — recibe progreso de wa-campanas.js y lo emite via WS
+// ── Progreso campaña (de wa-campanas.js → WebSocket clientes) ─
 app.post('/wa/campana/progreso', authInternal, (req, res) => {
   const { tenantId, campanaId, ...datos } = req.body;
-  if (tenantId && campanaId) {
+  if (tenantId && campanaId)
     io.to(`tenant:${tenantId}`).emit('wa:campana:progreso', { campanaId, ...datos });
-  }
   res.json({ success: true });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', sesiones: sesiones.size, uptime: process.uptime() });
+// ── Log en vivo de envío ──────────────────────────────────────
+app.post('/wa/campana/log', authInternal, (req, res) => {
+  const { tenantId, campanaId, ...entrada } = req.body;
+  if (tenantId && campanaId)
+    io.to(`tenant:${tenantId}`).emit('wa:campana:log', { campanaId, ...entrada });
+  res.json({ success: true });
 });
 
-// ── WebSocket ─────────────────────────────────────────────────
+// ── Historias — publicar ahora ────────────────────────────────
+app.post('/wa/historia/publicar', authInternal, async (req, res) => {
+  try {
+    const { tenantId, historiaId, imagenUrl, texto } = req.body;
+    if (!tenantId) return res.status(422).json({ success: false, message: 'tenantId requerido' });
+
+    await publicarHistoria(parseInt(tenantId), imagenUrl, texto);
+
+    // Actualizar estado en BD si viene con historiaId
+    if (historiaId) {
+      const conn = await getTenantConn(parseInt(tenantId));
+      await conn.execute(
+        "UPDATE wa_historias SET estado='publicada', publicada_at=NOW() WHERE id=?",
+        [historiaId]
+      );
+      await conn.end();
+    }
+
+    io.to(`tenant:${tenantId}`).emit('wa:historia:publicada', { historiaId });
+    res.json({ success: true, message: 'Historia publicada.' });
+  } catch (err) {
+    // Marcar como fallida
+    if (req.body.historiaId) {
+      try {
+        const conn = await getTenantConn(parseInt(req.body.tenantId));
+        await conn.execute(
+          "UPDATE wa_historias SET estado='fallida', error_msg=? WHERE id=?",
+          [err.message.substring(0, 500), req.body.historiaId]
+        );
+        await conn.end();
+      } catch {}
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/health', (req, res) => {
+  res.json({
+    status   : 'ok',
+    sesiones : sesiones.size,
+    uptime   : process.uptime(),
+    azure    : !!containerClient,
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// WEBSOKET
+// ══════════════════════════════════════════════════════════════
 io.on('connection', (socket) => {
   socket.on('wa:suscribir', (tenantId) => {
     socket.join(`tenant:${tenantId}`);
@@ -401,16 +525,78 @@ io.on('connection', (socket) => {
       numero: sesion?.numero || null,
     });
   });
+
+  socket.on('wa:suscribir:campana', ({ tenantId, campanaId }) => {
+    socket.join(`campana:${campanaId}`);
+  });
 });
 
-// Función pública para emitir progreso de campaña desde wa-campanas.js
 function emitirProgresoCampana(tenantId, campanaId, datos) {
   io.to(`tenant:${tenantId}`).emit('wa:campana:progreso', { campanaId, ...datos });
 }
 
-module.exports = { io, emitirProgresoCampana };
+function emitirLogCampana(tenantId, campanaId, entrada) {
+  io.to(`tenant:${tenantId}`).emit('wa:campana:log', { campanaId, ...entrada });
+}
 
-// ── Restaurar sesiones ────────────────────────────────────────
+module.exports = { io, emitirProgresoCampana, emitirLogCampana };
+
+// ══════════════════════════════════════════════════════════════
+// PROGRAMADOR DE HISTORIAS (cada 60s)
+// ══════════════════════════════════════════════════════════════
+async function procesarHistoriasProgramadas() {
+  try {
+    // Buscar todos los tenants con sesión activa
+    const tenants = await masterQuery(
+      "SELECT tenant_id FROM wa_sesiones WHERE estado='conectado'"
+    );
+
+    for (const { tenant_id } of tenants) {
+      const sesion = sesiones.get(tenant_id);
+      if (!sesion || sesion.estado !== 'conectado') continue;
+
+      const conn = await getTenantConn(tenant_id);
+      try {
+        const [historias] = await conn.execute(
+          `SELECT id, imagen_url, texto
+           FROM wa_historias
+           WHERE estado = 'programada'
+             AND programada_at <= NOW()
+           LIMIT 3`
+        );
+
+        for (const h of historias) {
+          try {
+            await publicarHistoria(tenant_id, h.imagen_url, h.texto);
+            await conn.execute(
+              "UPDATE wa_historias SET estado='publicada', publicada_at=NOW() WHERE id=?",
+              [h.id]
+            );
+            io.to(`tenant:${tenant_id}`).emit('wa:historia:publicada', { historiaId: h.id });
+            console.log(`[WA Historias] ✅ tenant:${tenant_id} historia:${h.id}`);
+          } catch (e) {
+            await conn.execute(
+              "UPDATE wa_historias SET estado='fallida', error_msg=? WHERE id=?",
+              [e.message.substring(0, 500), h.id]
+            );
+            console.error(`[WA Historias] ❌ historia:${h.id}:`, e.message);
+          }
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } finally {
+        await conn.end();
+      }
+    }
+  } catch (e) {
+    console.error('[WA Historias scheduler]', e.message);
+  }
+}
+
+setInterval(procesarHistoriasProgramadas, 60 * 1000);
+
+// ══════════════════════════════════════════════════════════════
+// RESTAURAR SESIONES AL INICIAR
+// ══════════════════════════════════════════════════════════════
 async function restaurarSesiones() {
   try {
     const activas = await masterQuery(
@@ -421,7 +607,7 @@ async function restaurarSesiones() {
        JOIN wa_config_global wcg ON wcg.tenant_id = ws.tenant_id
        WHERE ws.estado = 'conectado' AND wcg.activo = 1`
     );
-    console.log(`[WA] Restaurando ${activas.length} sesiones activas...`);
+    console.log(`[WA] Restaurando ${activas.length} sesiones...`);
     for (const s of activas) {
       const dir = sessionDir(s.slug);
       if (fs.existsSync(dir)) {
@@ -434,6 +620,7 @@ async function restaurarSesiones() {
   } catch (e) { console.error('[WA restore]', e.message); }
 }
 
+// Health check de sesiones cada 5 min
 setInterval(async () => {
   for (const [tenantId, sesion] of sesiones.entries()) {
     if (sesion.estado === 'error') {
@@ -444,10 +631,11 @@ setInterval(async () => {
 }, 5 * 60 * 1000);
 
 server.listen(PORT, async () => {
-  console.log(`[WA Gateway] ✅ Puerto ${PORT}`);
-  console.log(`[WA Gateway] Sesiones en: ${SESSIONS_DIR}`);
+  console.log(`[WA Gateway v3] ✅ Puerto ${PORT}`);
+  console.log(`[WA Gateway v3] Sessions: ${SESSIONS_DIR}`);
+  console.log(`[WA Gateway v3] Azure: ${containerClient ? '✅ ' + AZURE_CONTAINER : '❌ No configurado'}`);
   await restaurarSesiones();
 });
 
-process.on('uncaughtException',  (err) => console.error('[WA uncaught]',    err.message));
-process.on('unhandledRejection', (err) => console.error('[WA unhandled]',   err?.message));
+process.on('uncaughtException',  (err) => console.error('[WA uncaught]',  err.message));
+process.on('unhandledRejection', (err) => console.error('[WA unhandled]', err?.message));

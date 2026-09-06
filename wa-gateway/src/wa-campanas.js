@@ -1,12 +1,13 @@
 'use strict';
 
 /**
- * VetNetcodip SaaS — Procesador de Campañas WA v2
+ * VetNetcodip SaaS — Procesador de Campañas WA v3
  * Mejoras:
- * - WebSocket progreso en tiempo real
- * - Soporte de imagen en campaña
- * - Control por lotes con límite configurable
- * - No re-envía campañas completadas
+ * - Límite diario anti-spam configurable por tenant
+ * - Respeto de horario de envío (hora_inicio / hora_fin)
+ * - Log en vivo por WebSocket de cada envío
+ * - Reset automático del contador diario
+ * - Soporte imagen Azure Blob
  */
 
 const mysql = require('mysql2/promise');
@@ -14,18 +15,16 @@ const http  = require('http');
 const path  = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const WA_GATEWAY    = process.env.WA_GATEWAY_URL  || 'http://localhost:5000';
-const INTERNAL_KEY  = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
-const DELAY_MS      = parseInt(process.env.WA_CAMPANA_DELAY_MS || '4000');
-const LOTE_MAX      = parseInt(process.env.WA_CAMPANA_LOTE     || '50');  // máx mensajes por ciclo
+const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5001';
+const INTERNAL_KEY = process.env.WA_INTERNAL_KEY  || 'wa-internal-secret-2026';
 
 const masterPool = mysql.createPool({
-  host    : process.env.MASTER_DB_HOST,
-  port    : process.env.MASTER_DB_PORT || 3306,
-  user    : process.env.MASTER_DB_USER,
-  password: process.env.MASTER_DB_PASS,
-  database: process.env.MASTER_DB_NAME,
-  connectionLimit: 3,
+  host              : process.env.MASTER_DB_HOST,
+  port              : process.env.MASTER_DB_PORT || 3306,
+  user              : process.env.MASTER_DB_USER,
+  password          : process.env.MASTER_DB_PASS,
+  database          : process.env.MASTER_DB_NAME,
+  connectionLimit   : 3,
 });
 
 async function masterQuery(sql, params = []) {
@@ -46,11 +45,11 @@ function callGateway(method, path, body = null) {
     const url     = new URL(WA_GATEWAY + path);
     const options = {
       hostname: url.hostname,
-      port    : url.port || 5000,
+      port    : parseInt(url.port) || 5001,
       path    : url.pathname,
       method,
       headers : {
-        'Content-Type': 'application/json',
+        'Content-Type'  : 'application/json',
         'x-internal-key': INTERNAL_KEY,
         ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
       },
@@ -67,125 +66,130 @@ function callGateway(method, path, body = null) {
   });
 }
 
-// Emitir progreso via gateway WebSocket
 async function emitirProgreso(tenantId, campanaId, datos) {
-  try {
-    await callGateway('POST', '/wa/campana/progreso', { tenantId, campanaId, ...datos });
-  } catch {}
+  try { await callGateway('POST', '/wa/campana/progreso', { tenantId, campanaId, ...datos }); } catch {}
+}
+
+async function emitirLog(tenantId, campanaId, entrada) {
+  try { await callGateway('POST', '/wa/campana/log', { tenantId, campanaId, ...entrada }); } catch {}
 }
 
 function rellenarPlantilla(msg, vars) {
-  return msg
+  return (msg || '')
     .replace(/\[nombre\]/gi,   vars.nombre   || '')
     .replace(/\[mascota\]/gi,  vars.mascota  || '')
     .replace(/\[clinica\]/gi,  vars.clinica  || '')
     .replace(/\[telefono\]/gi, vars.telefono || '');
 }
 
-async function obtenerContactosCampana(conn, campana) {
-  let sql = '';
-  const params = [];
-
-  switch (campana.segmento) {
-    case 'todos':
-      sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
-               p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-             FROM propietarios p LEFT JOIN mascotas m ON m.propietario_id = p.id
-             WHERE p.telefono IS NOT NULL AND p.telefono != ''
-             GROUP BY p.id`;
-      break;
-    case 'por_especie':
-      sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
-               p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-             FROM propietarios p JOIN mascotas m ON m.propietario_id = p.id
-             WHERE p.telefono IS NOT NULL AND m.especie = ?
-             GROUP BY p.id`;
-      params.push(campana.segmento_valor || 'perro');
-      break;
-    case 'vacunas_vencidas':
-      sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
-               p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-             FROM propietarios p JOIN mascotas m ON m.propietario_id = p.id
-             JOIN vacunas v ON v.mascota_id = m.id
-             WHERE p.telefono IS NOT NULL AND v.proxima_dosis <= CURDATE() AND v.notificado = 0
-             GROUP BY p.id`;
-      break;
-    case 'citas_semana':
-      sql = `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
-               p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-             FROM propietarios p JOIN mascotas m ON m.propietario_id = p.id
-             JOIN citas c ON c.mascota_id = m.id
-             WHERE p.telefono IS NOT NULL
-               AND c.fecha_hora BETWEEN NOW() AND NOW() + INTERVAL 7 DAY
-               AND c.estado IN ('pendiente','confirmada')
-             GROUP BY p.id`;
-      break;
-    case 'sin_citas_60d':
-      sql = `SELECT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
-               p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-             FROM propietarios p LEFT JOIN mascotas m ON m.propietario_id = p.id
-             WHERE p.telefono IS NOT NULL
-               AND p.id NOT IN (
-                 SELECT DISTINCT m2.propietario_id FROM citas c2
-                 JOIN mascotas m2 ON m2.id = c2.mascota_id
-                 WHERE c2.fecha_hora >= NOW() - INTERVAL 60 DAY
-               )
-             GROUP BY p.id`;
-      break;
-    default:
-      sql = `SELECT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre, p.telefono, '' AS mascotas
-             FROM propietarios p WHERE p.telefono IS NOT NULL`;
-  }
-
-  const [rows] = await conn.execute(sql, params);
-  return rows;
+// ── Obtener config anti-spam del tenant ───────────────────────
+async function getConfigCampana(conn) {
+  const [cfg] = await conn.execute(
+    `SELECT campana_limite_dia, campana_delay_ms, campana_hora_inicio, campana_hora_fin
+     FROM wa_config LIMIT 1`
+  );
+  return {
+    limite_dia  : cfg?.campana_limite_dia  || 30,
+    delay_ms    : cfg?.campana_delay_ms    || 4000,
+    hora_inicio : cfg?.campana_hora_inicio || '08:00:00',
+    hora_fin    : cfg?.campana_hora_fin    || '20:00:00',
+  };
 }
 
-// ── Procesar campañas ─────────────────────────────────────────
+// ── Verificar si estamos en horario permitido ─────────────────
+function dentroDeHorario(horaInicio, horaFin) {
+  const ahora = new Date();
+  const hh    = ahora.getHours().toString().padStart(2, '0');
+  const mm    = ahora.getMinutes().toString().padStart(2, '0');
+  const horaActual = `${hh}:${mm}:00`;
+  return horaActual >= horaInicio && horaActual <= horaFin;
+}
+
+// ── Verificar y resetear contador diario ─────────────────────
+async function verificarLimiteDiario(conn, campana, limiteDia) {
+  const hoy = new Date().toISOString().split('T')[0];
+
+  // Si el último envío fue otro día → resetear enviados_hoy
+  if (!campana.fecha_ultimo_envio ||
+      campana.fecha_ultimo_envio.toString().substring(0, 10) !== hoy) {
+    await conn.execute(
+      'UPDATE wa_campanas SET enviados_hoy=0, fecha_ultimo_envio=? WHERE id=?',
+      [hoy, campana.id]
+    );
+    campana.enviados_hoy = 0;
+  }
+
+  const disponibleHoy = limiteDia - (campana.enviados_hoy || 0);
+  return { disponible: Math.max(disponibleHoy, 0), agotado: disponibleHoy <= 0 };
+}
+
+// ── Obtener contactos de la campaña ──────────────────────────
+async function obtenerContactosCampana(conn, campana) {
+  switch (campana.segmento) {
+    case 'todos':
+      return conn.execute(
+        `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
+                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+         FROM propietarios p LEFT JOIN mascotas m ON m.propietario_id = p.id
+         WHERE p.telefono IS NOT NULL AND p.telefono != ''
+         GROUP BY p.id`
+      ).then(([r]) => r);
+    case 'por_especie':
+      return conn.execute(
+        `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
+                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+         FROM propietarios p JOIN mascotas m ON m.propietario_id = p.id
+         WHERE m.especie = ? AND p.telefono IS NOT NULL AND p.telefono != ''
+         GROUP BY p.id`,
+        [campana.segmento_valor || '']
+      ).then(([r]) => r);
+    case 'vacunas_vencidas':
+      return conn.execute(
+        `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
+                p.telefono, m.nombre AS mascotas
+         FROM propietarios p
+         JOIN mascotas m ON m.propietario_id = p.id
+         JOIN vacunas v ON v.mascota_id = m.id
+         WHERE v.proxima_dosis < CURDATE() AND v.notificado = 0
+           AND p.telefono IS NOT NULL AND p.telefono != ''
+         GROUP BY p.id`
+      ).then(([r]) => r);
+    case 'sin_citas_60d':
+      return conn.execute(
+        `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
+                p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+         FROM propietarios p LEFT JOIN mascotas m ON m.propietario_id = p.id
+         WHERE p.id NOT IN (
+           SELECT DISTINCT mascota_id FROM citas
+           WHERE fecha_hora >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+         ) AND p.telefono IS NOT NULL AND p.telefono != ''
+         GROUP BY p.id`
+      ).then(([r]) => r);
+    default:
+      return [];
+  }
+}
+
+// ── Procesar todas las campañas de todos los tenants ──────────
 async function procesarCampanas() {
   try {
     const tenants = await masterQuery(
-      `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
-              tc.nombre_clinica
+      `SELECT t.id AS tenant_id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
+              tc.nombre_clinica, tc.telefono AS tel_clinica
        FROM tenants t
-       JOIN tenant_config tc ON tc.tenant_id = t.id
-       JOIN wa_sesiones ws ON ws.tenant_id = t.id
-       JOIN wa_config_global wcg ON wcg.tenant_id = t.id
-       WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
+       LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
+       JOIN wa_config_global wcg ON wcg.tenant_id = t.id AND wcg.activo = 1`
     );
 
     for (const tenant of tenants) {
       let conn;
       try {
         conn = await getTenantConn(tenant);
-
-        // Activar campañas programadas
-        await conn.execute(
-          `UPDATE wa_campanas SET estado='enviando', iniciada_at=NOW()
-           WHERE estado='programada' AND programada_at <= NOW()`
-        );
-
-        // Obtener campañas activas
-        const [campanas] = await conn.execute(
-          `SELECT * FROM wa_campanas WHERE estado='enviando' LIMIT 3`
-        );
-
-        for (const campana of campanas) {
-          // Inyectar datos del tenant manualmente (evita bug de mysql2 con strings en execute)
-          campana.tenant_id    = tenant.id;
-          campana.slug         = tenant.slug;
-          campana.nombre_clinica = tenant.nombre_clinica;
-          campana.db_host      = tenant.db_host;
-          campana.db_port      = tenant.db_port;
-          campana.db_user      = tenant.db_user;
-          campana.db_pass      = tenant.db_pass;
-          campana.db_name      = tenant.db_name;
-          await procesarCampana(campana, conn);
-        }
+        await procesarCampanasTenant(tenant, conn);
       } catch (e) {
-        console.error(`[WA Campanas] Error tenant ${tenant.slug}: ${e.message}`);
+        console.error(`[WA Campanas] Error tenant ${tenant.slug}:`, e.message);
       } finally {
-        await conn?.end();
+        if (conn) await conn.end().catch(() => {});
       }
     }
   } catch (e) {
@@ -193,29 +197,70 @@ async function procesarCampanas() {
   }
 }
 
-async function procesarCampana(campana, conn) {
-  console.log(`[WA Campanas] Procesando: "${campana.nombre}" (${campana.slug})`);
+async function procesarCampanasTenant(tenant, conn) {
+  const [campanas] = await conn.execute(
+    `SELECT id, nombre, mensaje, imagen_url, segmento, segmento_valor,
+            estado, total, enviados, fallidos, enviados_hoy,
+            fecha_ultimo_envio
+     FROM wa_campanas
+     WHERE estado = 'enviando'
+     ORDER BY id ASC`
+  );
 
+  if (!campanas.length) return;
+
+  const cfg = await getConfigCampana(conn);
+
+  // Verificar horario
+  if (!dentroDeHorario(cfg.hora_inicio, cfg.hora_fin)) {
+    // Fuera de horario — no procesar
+    return;
+  }
+
+  for (const campana of campanas) {
+    campana.tenant_id      = tenant.tenant_id;
+    campana.nombre_clinica = tenant.nombre_clinica;
+    await procesarCampana(campana, conn, cfg, tenant);
+  }
+}
+
+async function procesarCampana(campana, conn, cfg, tenant) {
   try {
-    // Obtener lote de contactos pendientes (respetar LOTE_MAX)
-    // Nota: LIMIT no acepta prepared statement param en mysql2 — se interpola directo (valor numérico seguro)
-    const [contactosPendientes] = await conn.execute(
-      `SELECT id, propietario_id, telefono, nombre FROM wa_campana_contactos
-       WHERE campana_id=? AND estado='pendiente' ORDER BY id ASC LIMIT ${parseInt(LOTE_MAX)}`,
+    // Verificar límite diario
+    const limite = await verificarLimiteDiario(conn, campana, cfg.limite_dia);
+
+    if (limite.agotado) {
+      console.log(`[WA Campanas] ⏳ Campaña #${campana.id} — límite diario alcanzado (${cfg.limite_dia}/día). Retomará mañana.`);
+      await emitirProgreso(tenant.tenant_id, campana.id, {
+        estado    : 'limite_diario',
+        enviados  : campana.enviados,
+        fallidos  : campana.fallidos,
+        total     : campana.total,
+        enviados_hoy: campana.enviados_hoy,
+        limite_dia: cfg.limite_dia,
+        mensaje   : `Límite diario alcanzado. Los ${campana.total - campana.enviados} mensajes restantes se enviarán mañana.`,
+      });
+      return;
+    }
+
+    // Obtener lote de contactos pendientes respetando el disponible de hoy
+    const [contactos] = await conn.execute(
+      `SELECT id, propietario_id, telefono, nombre
+       FROM wa_campana_contactos
+       WHERE campana_id=? AND estado='pendiente'
+       ORDER BY id ASC
+       LIMIT ${parseInt(limite.disponible)}`,
       [campana.id]
     );
 
-    if (!contactosPendientes.length) {
-      // Ver si hay contactos en total
+    if (!contactos.length) {
+      // ¿Ya cargamos contactos?
       const [[{ n }]] = await conn.execute(
         'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?', [campana.id]
       );
-
       if (!n) {
-        // Sin contactos cargados aún
         await cargarContactosCampana(campana, conn);
       } else {
-        // Todos enviados — verificar que no haya pendientes reales
         const [[{ pendientes }]] = await conn.execute(
           "SELECT COUNT(*) AS pendientes FROM wa_campana_contactos WHERE campana_id=? AND estado='pendiente'",
           [campana.id]
@@ -225,36 +270,37 @@ async function procesarCampana(campana, conn) {
             "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
             [campana.id]
           );
-          console.log(`[WA Campanas] ✅ Completada: "${campana.nombre}"`);
-          await emitirProgreso(campana.tenant_id, campana.id, {
-            estado: 'completada',
-            enviados: campana.enviados,
-            fallidos: campana.fallidos,
-            total   : campana.total,
-            porcentaje: 100,
+          await emitirProgreso(tenant.tenant_id, campana.id, {
+            estado: 'completada', enviados: campana.enviados, fallidos: campana.fallidos,
+            total: campana.total, porcentaje: 100,
           });
+          console.log(`[WA Campanas] ✅ Completada: "${campana.nombre}" (tenant: ${tenant.slug})`);
         }
       }
       return;
     }
 
-    for (const contacto of contactosPendientes) {
-      // Verificar si fue pausada/cancelada
+    // Enviar lote
+    for (const contacto of contactos) {
+      // Verificar que sigue en estado enviando
       const [[estadoActual]] = await conn.execute(
-        'SELECT estado, enviados, fallidos, total FROM wa_campanas WHERE id=?', [campana.id]
+        'SELECT estado, enviados_hoy FROM wa_campanas WHERE id=?', [campana.id]
       );
       if (!estadoActual || estadoActual.estado !== 'enviando') {
         console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada — deteniendo`);
         break;
       }
 
-      const msg = rellenarPlantilla(campana.mensaje || '', {
+      const msg = rellenarPlantilla(campana.mensaje, {
         nombre : contacto.nombre,
         clinica: campana.nombre_clinica || 'VetNetcodip',
+        telefono: tenant.tel_clinica || '',
       });
 
+      const inicio = Date.now();
+      let ok = false;
+
       try {
-        // Enviar texto y/o imagen
         await callGateway('POST', '/wa/enviar', {
           tenantId  : campana.tenant_id,
           telefono  : contacto.telefono,
@@ -269,12 +315,14 @@ async function procesarCampana(campana, conn) {
           [contacto.id]
         );
         await conn.execute(
-          'UPDATE wa_campanas SET enviados=enviados+1 WHERE id=?', [campana.id]
+          'UPDATE wa_campanas SET enviados=enviados+1, enviados_hoy=enviados_hoy+1, fecha_ultimo_envio=CURDATE() WHERE id=?',
+          [campana.id]
         );
-        console.log(`[WA Campanas] ✅ → ${contacto.telefono}`);
+        ok = true;
+        console.log(`[WA Campanas] ✅ → ${contacto.telefono} (${contacto.nombre})`);
       } catch (e) {
         await conn.execute(
-          `UPDATE wa_campana_contactos SET estado='fallido', error=? WHERE id=?`,
+          "UPDATE wa_campana_contactos SET estado='fallido', error=? WHERE id=?",
           [e.message.substring(0, 255), contacto.id]
         );
         await conn.execute(
@@ -283,40 +331,47 @@ async function procesarCampana(campana, conn) {
         console.error(`[WA Campanas] ❌ → ${contacto.telefono}: ${e.message}`);
       }
 
-      // Emitir progreso via WebSocket
-      const [[progreso]] = await conn.execute(
-        'SELECT enviados, fallidos, total FROM wa_campanas WHERE id=?', [campana.id]
+      // Emitir progreso + log en vivo
+      const [[prog]] = await conn.execute(
+        'SELECT enviados, fallidos, total, enviados_hoy FROM wa_campanas WHERE id=?', [campana.id]
       );
-      if (progreso) {
-        const pct = progreso.total > 0 ? Math.round((progreso.enviados / progreso.total) * 100) : 0;
+      if (prog) {
+        const pct = prog.total > 0 ? Math.round((prog.enviados / prog.total) * 100) : 0;
         await emitirProgreso(campana.tenant_id, campana.id, {
           estado    : 'enviando',
-          enviados  : progreso.enviados,
-          fallidos  : progreso.fallidos,
-          total     : progreso.total,
+          enviados  : prog.enviados,
+          fallidos  : prog.fallidos,
+          total     : prog.total,
+          enviados_hoy: prog.enviados_hoy,
+          limite_dia: cfg.limite_dia,
           porcentaje: pct,
+        });
+        await emitirLog(campana.tenant_id, campana.id, {
+          telefono   : contacto.telefono,
+          nombre     : contacto.nombre,
+          estado     : ok ? 'enviado' : 'fallido',
+          timestamp  : new Date().toISOString(),
+          duracion_ms: Date.now() - inicio,
         });
       }
 
-      await new Promise(r => setTimeout(r, DELAY_MS));
+      // Delay anti-spam
+      await new Promise(r => setTimeout(r, cfg.delay_ms));
     }
   } catch (e) {
-    console.error(`[WA Campanas] Error campaña ${campana.id}: ${e.message}`);
-    console.error(`[WA Campanas] STACK: ${e.stack}`);
-    console.error(`[WA Campanas] SQL: ${e.sql || "(no sql)"}`);
-    console.error(`[WA Campanas] campana.id=${campana.id} tipo_id=${typeof campana.id} LOTE_MAX=${LOTE_MAX} tipo_lote=${typeof LOTE_MAX}`);
+    console.error(`[WA Campanas] Error campaña ${campana.id}:`, e.message);
   }
 }
 
 async function cargarContactosCampana(campana, conn) {
-  console.log(`[WA Campanas] Cargando contactos: "${campana.nombre}"`);
+  console.log(`[WA Campanas] Cargando contactos para campaña #${campana.id}`);
   const contactos = await obtenerContactosCampana(conn, campana);
 
   if (!contactos.length) {
     await conn.execute(
-      "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?", [campana.id]
+      "UPDATE wa_campanas SET estado='completada', completada_at=NOW() WHERE id=?",
+      [campana.id]
     );
-    console.log(`[WA Campanas] ⚠️  Sin contactos para campaña ${campana.id}`);
     return;
   }
 
@@ -326,17 +381,14 @@ async function cargarContactosCampana(campana, conn) {
       [campana.id, c.id, c.telefono, c.nombre]
     );
   }
-
   await conn.execute(
     'UPDATE wa_campanas SET total=? WHERE id=?', [contactos.length, campana.id]
   );
-
-  console.log(`[WA Campanas] ${contactos.length} contactos cargados`);
+  console.log(`[WA Campanas] ${contactos.length} contactos cargados para campaña #${campana.id}`);
 }
 
 setInterval(procesarCampanas, 10000);
 procesarCampanas();
 
-console.log(`[WA Campanas] ✅ Procesador activo (lote: ${LOTE_MAX}, delay: ${DELAY_MS}ms)`);
-
+console.log(`[WA Campanas v3] ✅ Procesador activo`);
 module.exports = { procesarCampanas };

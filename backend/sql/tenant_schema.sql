@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v11
+-- VETNETCODIP SaaS — TENANT SCHEMA v12
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -7,7 +7,9 @@
 -- v9:  + descuento_pct / descuento_monto en factura_items
 --       + subtotal_bruto / descuento_items / descuento_global /
 --         descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
--- v10: + turnos y asistencias (módulo de asistencia del personal)
+-- v12: + campana_limite_dia / campana_delay_ms / campana_hora_inicio / campana_hora_fin en wa_config
+--       + imagen_url / imagen_blob_name / enviados_hoy / fecha_ultimo_envio en wa_campanas
+--       + tabla wa_historias
 -- v11: + tipo_cita en citas (redirección automática)
 --       + precio_compra en inventario (rentabilidad)
 --       + precio_compra_snapshot en factura_items (historial rentabilidad)
@@ -487,6 +489,10 @@ CREATE TABLE IF NOT EXISTS wa_config (
   recordatorio_vacunas_dias             INT UNSIGNED NOT NULL DEFAULT 7,
   recordatorio_vacunas_dias2            INT UNSIGNED NULL DEFAULT 1,
   recordatorio_desparasitaciones_activo TINYINT(1)   NOT NULL DEFAULT 1,
+  campana_limite_dia                    INT UNSIGNED NOT NULL DEFAULT 30,
+  campana_delay_ms                      INT UNSIGNED NOT NULL DEFAULT 4000,
+  campana_hora_inicio                   TIME         NOT NULL DEFAULT '08:00:00',
+  campana_hora_fin                      TIME         NOT NULL DEFAULT '20:00:00',
   updated_at                            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -518,23 +524,27 @@ CREATE TABLE IF NOT EXISTS wa_mensajes_log (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS wa_campanas (
-  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  nombre         VARCHAR(150)   NOT NULL,
-  mensaje        TEXT           NOT NULL,
-  segmento       ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
-                 NOT NULL DEFAULT 'todos',
-  segmento_valor VARCHAR(50)    NULL,
-  estado         ENUM('borrador','programada','enviando','pausada','completada','cancelada')
-                 NOT NULL DEFAULT 'borrador',
-  total          INT UNSIGNED   NOT NULL DEFAULT 0,
-  enviados       INT UNSIGNED   NOT NULL DEFAULT 0,
-  fallidos       INT UNSIGNED   NOT NULL DEFAULT 0,
-  ultimo_id      INT UNSIGNED   NOT NULL DEFAULT 0,
-  programada_at  TIMESTAMP      NULL,
-  iniciada_at    TIMESTAMP      NULL,
-  pausada_at     TIMESTAMP      NULL,
-  completada_at  TIMESTAMP      NULL,
-  created_at     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre           VARCHAR(150)   NOT NULL,
+  mensaje          TEXT           NOT NULL,
+  imagen_url       VARCHAR(500)   NULL,
+  imagen_blob_name VARCHAR(200)   NULL,
+  segmento         ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
+                   NOT NULL DEFAULT 'todos',
+  segmento_valor   VARCHAR(50)    NULL,
+  estado           ENUM('borrador','programada','enviando','pausada','completada','cancelada')
+                   NOT NULL DEFAULT 'borrador',
+  total            INT UNSIGNED   NOT NULL DEFAULT 0,
+  enviados         INT UNSIGNED   NOT NULL DEFAULT 0,
+  fallidos         INT UNSIGNED   NOT NULL DEFAULT 0,
+  enviados_hoy     INT UNSIGNED   NOT NULL DEFAULT 0,
+  fecha_ultimo_envio DATE         NULL,
+  ultimo_id        INT UNSIGNED   NOT NULL DEFAULT 0,
+  programada_at    TIMESTAMP      NULL,
+  iniciada_at      TIMESTAMP      NULL,
+  pausada_at       TIMESTAMP      NULL,
+  completada_at    TIMESTAMP      NULL,
+  created_at       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_estado (estado),
   INDEX idx_fecha  (created_at)
 ) ENGINE=InnoDB;
@@ -615,4 +625,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
   ('Campaña general', 'campana',
    '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v11 ✅' AS resultado;
+SELECT 'tenant_schema v12 ✅' AS resultado;

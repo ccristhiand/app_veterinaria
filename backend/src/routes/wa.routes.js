@@ -248,3 +248,217 @@ router.get('/log', authorize('admin'), async (req, res, next) => {
 });
 
 module.exports = router;
+
+// ══════════════════════════════════════════════════════════════
+// CAMPAÑAS v3
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/v1/wa/campanas
+router.get('/campanas', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado } = req.query;
+    let sql = 'SELECT * FROM wa_campanas WHERE 1=1';
+    const params = [];
+    if (estado) { sql += ' AND estado=?'; params.push(estado); }
+    sql += ' ORDER BY created_at DESC';
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/campanas/proyeccion
+router.get('/campanas/proyeccion', authorize('admin'), async (req, res, next) => {
+  try {
+    const { segmento = 'todos', segmento_valor } = req.query;
+    let sql = '';
+    switch (segmento) {
+      case 'todos':
+        sql = "SELECT COUNT(DISTINCT id) AS total FROM propietarios WHERE telefono IS NOT NULL AND telefono != ''";
+        break;
+      case 'por_especie':
+        sql = `SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p JOIN mascotas m ON m.propietario_id=p.id WHERE m.especie='${req.db.escape(segmento_valor||'perro').replace(/'/g,"'")}' AND p.telefono IS NOT NULL`;
+        break;
+      case 'vacunas_vencidas':
+        sql = "SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p JOIN mascotas m ON m.propietario_id=p.id JOIN vacunas v ON v.mascota_id=m.id WHERE v.proxima_dosis < CURDATE() AND p.telefono IS NOT NULL";
+        break;
+      case 'sin_citas_60d':
+        sql = "SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p WHERE p.id NOT IN (SELECT DISTINCT mascota_id FROM citas WHERE fecha_hora >= DATE_SUB(NOW(),INTERVAL 60 DAY)) AND p.telefono IS NOT NULL";
+        break;
+      default:
+        sql = "SELECT COUNT(DISTINCT id) AS total FROM propietarios WHERE telefono IS NOT NULL AND telefono != ''";
+    }
+    const [row] = await req.db.query(sql);
+    return res.json({ success: true, data: { total: parseInt(row.total) || 0 } });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/campanas/:id
+router.get('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [c] = await req.db.query('SELECT * FROM wa_campanas WHERE id=?', [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
+    return res.json({ success: true, data: c });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/campanas
+router.post('/campanas', authorize('admin'), async (req, res, next) => {
+  try {
+    const { nombre, mensaje, segmento = 'todos', segmento_valor, imagen_url, imagen_blob_name, estado = 'borrador' } = req.body;
+    if (!nombre || !mensaje) return res.status(422).json({ success: false, message: 'Nombre y mensaje requeridos.' });
+    const result = await req.db.query(
+      `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado)
+       VALUES (?,?,?,?,?,?,?)`,
+      [nombre, mensaje, segmento, segmento_valor || null, imagen_url || null, imagen_blob_name || null, estado]
+    );
+    return res.status(201).json({ success: true, data: { id: result.insertId }, message: 'Campaña creada.' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/v1/wa/campanas/:id
+router.put('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado } = req.body;
+    await req.db.query(
+      `UPDATE wa_campanas SET nombre=?, mensaje=?, segmento=?, segmento_valor=?,
+        imagen_url=?, imagen_blob_name=?, estado=? WHERE id=?`,
+      [nombre, mensaje, segmento || 'todos', segmento_valor || null,
+       imagen_url || null, imagen_blob_name || null, estado || 'borrador', req.params.id]
+    );
+    return res.json({ success: true, message: 'Campaña actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/campanas/:id/:accion
+router.post('/campanas/:id/:accion', authorize('admin'), async (req, res, next) => {
+  try {
+    const { id, accion } = req.params;
+    const acciones = {
+      pausar   : "UPDATE wa_campanas SET estado='pausada', pausada_at=NOW() WHERE id=?",
+      reanudar : "UPDATE wa_campanas SET estado='enviando' WHERE id=?",
+      iniciar  : "UPDATE wa_campanas SET estado='enviando', iniciada_at=NOW() WHERE id=?",
+      cancelar : "UPDATE wa_campanas SET estado='cancelada' WHERE id=?",
+    };
+    if (!acciones[accion]) return res.status(422).json({ success: false, message: 'Acción inválida.' });
+    await req.db.query(acciones[accion], [id]);
+    const msgs = { pausar:'Campaña pausada.', reanudar:'Campaña reanudada.', iniciar:'Campaña iniciada.', cancelar:'Campaña cancelada.' };
+    return res.json({ success: true, message: msgs[accion] });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/upload — proxy al gateway
+router.post('/upload', authorize('admin'), async (req, res, next) => {
+  try {
+    const tenant = await getTenantInfo(req);
+    const result = await callGateway('POST', '/wa/upload', {
+      tenantId   : tenant?.id,
+      base64     : req.body.base64,
+      contentType: req.body.contentType,
+      filename   : req.body.filename,
+    });
+    if (!result.data?.success) return res.status(500).json(result.data || { success: false });
+    return res.json(result.data);
+  } catch (err) { next(err); }
+});
+
+// ══════════════════════════════════════════════════════════════
+// HISTORIAS v3
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/v1/wa/historias
+router.get('/historias', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado } = req.query;
+    let sql = 'SELECT h.*, u.nombre AS creada_por_nombre FROM wa_historias h JOIN usuarios u ON u.id=h.creada_por_id WHERE 1=1';
+    const params = [];
+    if (estado) { sql += ' AND h.estado=?'; params.push(estado); }
+    sql += ' ORDER BY h.created_at DESC';
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/historias/:id
+router.get('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT * FROM wa_historias WHERE id=?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, message: 'Historia no encontrada.' });
+    return res.json({ success: true, data: h });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/historias
+router.post('/historias', authorize('admin'), async (req, res, next) => {
+  try {
+    const { titulo, tipo = 'imagen', texto, imagen_url, imagen_blob, estado = 'borrador', programada_at, publicar_ahora } = req.body;
+
+    const result = await req.db.query(
+      `INSERT INTO wa_historias (titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at, creada_por_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [titulo, tipo, texto || null, imagen_url || null, imagen_blob || null,
+       publicar_ahora ? 'borrador' : (estado || 'borrador'),
+       programada_at || null, req.user.id]
+    );
+
+    const historiaId = result.insertId;
+
+    // Publicar inmediatamente si se solicitó
+    if (publicar_ahora) {
+      const tenant = await getTenantInfo(req);
+      if (tenant) {
+        callGateway('POST', '/wa/historia/publicar', {
+          tenantId : tenant.id,
+          historiaId,
+          imagenUrl: imagen_url || null,
+          texto    : texto || null,
+        }).catch(e => console.error('[WA Historia publicar]', e.message));
+      }
+    }
+
+    return res.status(201).json({ success: true, data: { id: historiaId }, message: publicar_ahora ? 'Historia publicando…' : 'Historia guardada.' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/v1/wa/historias/:id
+router.put('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at } = req.body;
+    await req.db.query(
+      `UPDATE wa_historias SET titulo=?, tipo=?, texto=?, imagen_url=?, imagen_blob=?, estado=?, programada_at=? WHERE id=?`,
+      [titulo, tipo || 'imagen', texto || null, imagen_url || null, imagen_blob || null,
+       estado || 'borrador', programada_at || null, req.params.id]
+    );
+    return res.json({ success: true, message: 'Historia actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/historias/:id/publicar
+router.post('/historias/:id/publicar', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT * FROM wa_historias WHERE id=?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, message: 'Historia no encontrada.' });
+    const tenant = await getTenantInfo(req);
+    const result = await callGateway('POST', '/wa/historia/publicar', {
+      tenantId  : tenant?.id,
+      historiaId: h.id,
+      imagenUrl : h.imagen_url || null,
+      texto     : h.texto || null,
+    });
+    if (!result.data?.success) return res.status(500).json(result.data || { success: false });
+    return res.json({ success: true, message: 'Historia publicada.' });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/wa/historias/:id
+router.delete('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT imagen_blob FROM wa_historias WHERE id=?', [req.params.id]);
+    if (h?.imagen_blob) {
+      callGateway('DELETE', '/wa/upload/'+encodeURIComponent(h.imagen_blob)).catch(() => {});
+    }
+    await req.db.query('DELETE FROM wa_historias WHERE id=?', [req.params.id]);
+    return res.json({ success: true, message: 'Historia eliminada.' });
+  } catch (err) { next(err); }
+});
+
+module.exports = router;

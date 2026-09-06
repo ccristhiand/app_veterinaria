@@ -1,16 +1,18 @@
 {
   "name": "wa-gateway",
-  "version": "1.0.0",
-  "description": "",
+  "version": "3.0.0",
+  "description": "VetNetcodip WhatsApp Gateway v3 — Azure Blob, historias, límite diario",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/wa-gateway.js",
+    "campanas": "node src/wa-campanas.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/storage-blob": "^12.26.0",
     "@hapi/boom": "^10.0.1",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "dotenv": "^17.4.2",
