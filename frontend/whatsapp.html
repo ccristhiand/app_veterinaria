@@ -27,22 +27,18 @@
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
-<div id="main-content" class="page">
-  <div class="page-head">
-    <div>
-      <h2>💬 WhatsApp</h2>
-      <p>Recordatorios automáticos, mensajes manuales y campañas</p>
-    </div>
-    <div style="display:flex;gap:.6rem;align-items:center">
-      <div id="wa-badge-header" class="badge-wa badge-desconectado">⚪ Desconectado</div>
-      <button id="btn-conectar" onclick="conectarWA()" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">
-        📱 Conectar WhatsApp
-      </button>
-    </div>
+<div id="main-content" class="page" style="overflow-y:auto">
+
+  <!-- Badge y botón conectar — se moverán al topbar via JS -->
+  <div id="wa-connect-wrap" style="display:none">
+    <div id="wa-badge-header" class="badge-wa badge-desconectado">⚪ Desconectado</div>
+    <button id="btn-conectar" onclick="conectarWA()" class="vbtn vbtn-primary" style="background:linear-gradient(135deg,#25d366,#128c7e);border:none">
+      📱 Conectar WhatsApp
+    </button>
   </div>
 
   <!-- Tabs -->
-  <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
+  <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem;flex-wrap:wrap">
     <button class="tab-btn active" id="tab-inicio"     onclick="mostrarTab('inicio')">🏠 Inicio</button>
     <button class="tab-btn"        id="tab-enviar"     onclick="mostrarTab('enviar')">📤 Enviar mensaje</button>
     <button class="tab-btn"        id="tab-plantillas" onclick="mostrarTab('plantillas')">📝 Plantillas</button>
@@ -726,22 +722,32 @@ let _waSocket      = null;  // ← _waSocket (no _socket) para no chocar con lay
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'WhatsApp', subtitle:'Mensajería y recordatorios' });
-  // Insertar div de acciones en el topbar para botones de campañas/historias
+  // Mover badge WA y botón conectar al topbar
   setTimeout(function() {
     var topbar = document.querySelector('.topbar');
-    if (topbar && !document.getElementById('wa-topbar-actions')) {
-      var div = document.createElement('div');
-      div.id = 'wa-topbar-actions';
-      div.style.cssText = 'display:flex;align-items:center;gap:.5rem';
-      // Insertar antes del último elemento del topbar (notificaciones)
+    if (!topbar) return;
+
+    // Contenedor de acciones WA en el topbar
+    if (!document.getElementById('wa-topbar-actions')) {
+      var actDiv = document.createElement('div');
+      actDiv.id = 'wa-topbar-actions';
+      actDiv.style.cssText = 'display:flex;align-items:center;gap:.5rem';
       var notifBtn = topbar.querySelector('.notif-btn');
-      if (notifBtn) {
-        topbar.insertBefore(div, notifBtn.parentNode);
-      } else {
-        topbar.appendChild(div);
-      }
+      if (notifBtn) topbar.insertBefore(actDiv, notifBtn.parentNode);
+      else topbar.appendChild(actDiv);
     }
-  }, 300);
+
+    // Mover badge de estado y botón conectar
+    var badge  = document.getElementById('wa-badge-header');
+    var btnCon = document.getElementById('btn-conectar');
+    var actions = document.getElementById('wa-topbar-actions');
+    if (badge && btnCon && actions) {
+      actions.appendChild(badge);
+      actions.appendChild(btnCon);
+      badge.style.display = '';
+      btnCon.style.display = '';
+    }
+  }, 200);
   iniciarSocket();
   cargarEstado();
   cargarStats();
