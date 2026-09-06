@@ -372,13 +372,9 @@
   <!-- ── TAB CAMPAÑAS ── -->
   <div id="contenido-campanas" style="display:none;overflow-y:auto;max-height:calc(100vh - 180px);width:100%">
 
-    <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:.75rem">
-      <div>
-        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem">📢 Campañas masivas</h3>
-        <p style="font-size:.75rem;color:var(--ink-soft)" id="camp-limite-info">Límite diario: cargando…</p>
-      </div>
-      <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
+    <!-- Info límite -->
+    <div style="margin-bottom:1rem">
+      <p style="font-size:.78rem;color:var(--ink-soft)" id="camp-limite-info">Límite diario: cargando…</p>
     </div>
 
     <!-- Lista campañas -->
@@ -422,13 +418,9 @@
   <!-- ── TAB HISTORIAS ── -->
   <div id="contenido-historias" style="display:none;overflow-y:auto;max-height:calc(100vh - 180px);width:100%">
 
-    <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;flex-wrap:wrap;gap:.75rem">
-      <div>
-        <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem">📸 Historias de WhatsApp</h3>
-        <p style="font-size:.75rem;color:var(--ink-soft)">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
-      </div>
-      <button onclick="abrirModalNuevaHistoria()" class="vbtn vbtn-primary">＋ Nueva historia</button>
+    <!-- Info historias -->
+    <div style="margin-bottom:1rem">
+      <p style="font-size:.75rem;color:var(--ink-soft)">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
     </div>
 
     <!-- Filtros -->
@@ -734,6 +726,22 @@ let _waSocket      = null;  // ← _waSocket (no _socket) para no chocar con lay
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'whatsapp', title:'WhatsApp', subtitle:'Mensajería y recordatorios' });
+  // Insertar div de acciones en el topbar para botones de campañas/historias
+  setTimeout(function() {
+    var topbar = document.querySelector('.topbar');
+    if (topbar && !document.getElementById('wa-topbar-actions')) {
+      var div = document.createElement('div');
+      div.id = 'wa-topbar-actions';
+      div.style.cssText = 'display:flex;align-items:center;gap:.5rem';
+      // Insertar antes del último elemento del topbar (notificaciones)
+      var notifBtn = topbar.querySelector('.notif-btn');
+      if (notifBtn) {
+        topbar.insertBefore(div, notifBtn.parentNode);
+      } else {
+        topbar.appendChild(div);
+      }
+    }
+  }, 300);
   iniciarSocket();
   cargarEstado();
   cargarStats();
@@ -1271,12 +1279,43 @@ var _histFiltro     = 'todas';
 // ══════════════════════════════════════════════════════════════
 var _mostrarTabOriginal = mostrarTab;
 mostrarTab = function(tab) {
-  ['inicio','enviar','plantillas','config','log','campanas','historias'].forEach(function(t) {
-    var btn = document.getElementById('tab-'+t);
+  var todos = ['inicio','enviar','plantillas','config','log','campanas','historias'];
+  todos.forEach(function(t) {
+    var btn  = document.getElementById('tab-'+t);
     var cont = document.getElementById('contenido-'+t);
     if (btn)  btn.classList.toggle('active', t===tab);
     if (cont) cont.style.display = t===tab ? 'block' : 'none';
   });
+
+  // Actualizar título del topbar según el tab activo
+  var titulos = {
+    inicio:'WhatsApp', enviar:'Enviar mensaje', plantillas:'Plantillas',
+    config:'Configuración', log:'Historial', campanas:'Campañas masivas', historias:'Historias de WhatsApp'
+  };
+  var subtitulos = {
+    inicio:'Mensajería y recordatorios', enviar:'Mensajes individuales',
+    plantillas:'Gestión de plantillas', config:'Ajustes de WhatsApp',
+    log:'Registro de mensajes enviados',
+    campanas:'Envíos masivos con límite anti-spam',
+    historias:'Estados automáticos de WhatsApp'
+  };
+  var titleEl = document.getElementById('page-title');
+  var subEl   = document.querySelector('.topbar-sub');
+  if (titleEl) titleEl.textContent = titulos[tab] || 'WhatsApp';
+  if (subEl)   subEl.textContent   = subtitulos[tab] || '';
+
+  // Acciones en topbar (botón Nueva campaña / Nueva historia)
+  var topbarRight = document.getElementById('wa-topbar-actions');
+  if (topbarRight) {
+    if (tab === 'campanas') {
+      topbarRight.innerHTML = '<button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="font-size:.85rem">＋ Nueva campaña</button>';
+    } else if (tab === 'historias') {
+      topbarRight.innerHTML = '<button onclick="abrirModalNuevaHistoria()" class="vbtn vbtn-primary" style="font-size:.85rem">＋ Nueva historia</button>';
+    } else {
+      topbarRight.innerHTML = '';
+    }
+  }
+
   if (tab==='plantillas') cargarPlantillas();
   if (tab==='config')     { cargarConfig(); setTimeout(function(){ cargarConfigAntispam(); }, 100); }
   if (tab==='log')        cargarLog();
