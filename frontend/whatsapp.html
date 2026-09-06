@@ -140,6 +140,18 @@
             <p style="font-size:.65rem;color:var(--ink-faint)" id="wa-chars">0 caracteres</p>
           </div>
         </div>
+        <div style="margin-bottom:1rem;border:1.5px dashed var(--line);border-radius:.85rem;padding:.75rem 1rem">
+          <p style="font-size:.75rem;font-weight:700;margin-bottom:.5rem;color:var(--ink-soft)">📎 Adjuntar imagen (opcional)</p>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input type="file" id="wa-archivo" accept="image/*" style="display:none" onchange="previsualizarArchivoWA(this)"/>
+            <button onclick="document.getElementById('wa-archivo').click()" class="vbtn vbtn-ghost" style="font-size:.8rem">🖼️ Seleccionar archivo</button>
+            <button onclick="limpiarArchivoWA()" id="btn-limpiar-archivo" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
+          </div>
+          <div id="wa-archivo-preview" style="display:none;margin-top:.6rem">
+            <img id="wa-archivo-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line);display:none"/>
+            <p id="wa-archivo-nombre" style="font-size:.7rem;color:var(--ink-soft);margin-top:.3rem"></p>
+          </div>
+        </div>
         <button onclick="enviarMensajeWA()" id="btn-enviar-wa" class="vbtn" style="width:100%;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.75rem;font-size:.9rem;font-weight:700">
           <span id="btn-enviar-wa-txt">📤 Enviar mensaje</span>
         </button>
