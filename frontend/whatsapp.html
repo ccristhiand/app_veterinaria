@@ -140,20 +140,6 @@
             <p style="font-size:.65rem;color:var(--ink-faint)" id="wa-chars">0 caracteres</p>
           </div>
         </div>
-        <!-- Adjuntar imagen -->
-        <div style="margin-bottom:1rem;border:1.5px dashed var(--line);border-radius:.85rem;padding:.75rem 1rem">
-          <p style="font-size:.75rem;font-weight:700;margin-bottom:.5rem;color:var(--ink-soft)">📎 Adjuntar imagen (opcional)</p>
-          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-            <input type="file" id="wa-archivo" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="previsualizarArchivoWA(this)"/>
-            <button onclick="document.getElementById('wa-archivo').click()" class="vbtn vbtn-ghost" style="font-size:.8rem">🖼️ Seleccionar archivo</button>
-            <button onclick="limpiarArchivoWA()" id="btn-limpiar-archivo" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
-          </div>
-          <div id="wa-archivo-preview" style="display:none;margin-top:.6rem">
-            <img id="wa-archivo-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line);display:none"/>
-            <p id="wa-archivo-nombre" style="font-size:.7rem;color:var(--ink-soft);margin-top:.3rem"></p>
-          </div>
-
-        </div>
         <button onclick="enviarMensajeWA()" id="btn-enviar-wa" class="vbtn" style="width:100%;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.75rem;font-size:.9rem;font-weight:700">
           <span id="btn-enviar-wa-txt">📤 Enviar mensaje</span>
         </button>
@@ -235,34 +221,6 @@
         </div>
       </div>
     </div>
-    <!-- Anti-spam campañas -->
-    <div class="vcard vcard-pad" style="margin-top:1.3rem;border:2px solid #fde68a">
-      <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.5rem">🛡️ Control anti-spam — Campañas</h3>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem;font-size:.7rem">
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#15803d">1–30</p><p style="color:#15803d;font-weight:600">🟢 Muy bajo</p></div>
-        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#0369a1">31–100</p><p style="color:#0369a1;font-weight:600">🔵 Bajo</p></div>
-        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#b45309">101–200</p><p style="color:#b45309;font-weight:600">🟡 Medio</p></div>
-        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#be123c">200+</p><p style="color:#be123c;font-weight:600">🔴 Alto</p></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
-        <div>
-          <label class="vlabel">Límite diario <span id="cfg-limite-badge" style="font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">30 — 🟢</span></label>
-          <input id="cfg-limite-dia" type="number" min="5" max="500" value="30" class="vinput" style="max-width:100px" oninput="actualizarBadgeLimite(this.value)"/>
-        </div>
-        <div>
-          <label class="vlabel">Delay entre mensajes (seg)</label>
-          <input id="cfg-delay-ms" type="number" min="2" max="30" value="4" class="vinput" style="max-width:90px"/>
-        </div>
-        <div>
-          <label class="vlabel">Horario de envío</label>
-          <div style="display:flex;align-items:center;gap:.4rem">
-            <input id="cfg-hora-inicio" type="time" value="08:00" class="vinput" style="max-width:100px"/>
-            <span style="font-size:.75rem">a</span>
-            <input id="cfg-hora-fin" type="time" value="20:00" class="vinput" style="max-width:100px"/>
-          </div>
-        </div>
-      </div>
-    </div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button onclick="guardarConfig()" class="vbtn vbtn-primary">💾 Guardar configuración</button>
     </div>
@@ -301,22 +259,17 @@
     </div>
   </div>
 
-
-
-
-  <!-- ── TAB CAMPAÑAS ── -->
+  <!-- TAB CAMPANAS -->
   <div id="contenido-campanas" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem">
-      <p style="font-size:.78rem;color:var(--ink-soft)" id="camp-limite-info">Cargando configuración…</p>
+      <p style="font-size:.78rem;color:var(--ink-soft)" id="camp-limite-info">Cargando…</p>
       <button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary">＋ Nueva campaña</button>
     </div>
-    <div id="campanas-lista">
-      <div class="vempty"><div class="vspinner"></div><p>Cargando campañas…</p></div>
-    </div>
+    <div id="campanas-lista"><div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div></div>
     <div id="panel-ws-campana" style="display:none;margin-top:1.3rem">
       <div class="vcard" style="border:2px solid #25d366;overflow:hidden">
         <div style="background:#128c7e;color:#fff;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:.6rem"><span class="wa-pulse"></span><span style="font-weight:700;font-size:.88rem" id="ws-campana-nombre">Campaña activa</span></div>
+          <div style="display:flex;align-items:center;gap:.6rem"><span class="wa-pulse"></span><span style="font-weight:700;font-size:.88rem">Campaña activa</span></div>
           <div style="font-size:.8rem;font-weight:700" id="ws-campana-pct">0%</div>
         </div>
         <div style="padding:1rem">
@@ -327,11 +280,11 @@
             <div><p style="font-weight:800;font-size:1.1rem;color:#15803d" id="ws-enviados">0</p><p style="color:var(--ink-faint)">Enviados</p></div>
             <div><p style="font-weight:800;font-size:1.1rem;color:#be123c" id="ws-fallidos">0</p><p style="color:var(--ink-faint)">Fallidos</p></div>
             <div><p style="font-weight:800;font-size:1.1rem;color:#b45309" id="ws-hoy">0</p><p style="color:var(--ink-faint)">Hoy</p></div>
-            <div><p style="font-weight:800;font-size:1.1rem;color:var(--ink-soft)" id="ws-total">0</p><p style="color:var(--ink-faint)">Total</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem" id="ws-total">0</p><p style="color:var(--ink-faint)">Total</p></div>
           </div>
           <div style="background:#f8faf8;border-radius:.75rem;padding:.65rem .85rem;max-height:180px;overflow-y:auto">
-            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Log en vivo</p>
-            <div id="ws-log-lista" style="display:flex;flex-direction:column;gap:.2rem;font-size:.72rem;font-family:monospace"></div>
+            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.3rem">Log en vivo</p>
+            <div id="ws-log-lista" style="font-size:.72rem;font-family:monospace"></div>
           </div>
           <div id="ws-limite-alerta" style="display:none;margin-top:.75rem;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.65rem 1rem;font-size:.78rem;color:#b45309"></div>
         </div>
@@ -339,7 +292,7 @@
     </div>
   </div>
 
-  <!-- ── TAB HISTORIAS ── -->
+  <!-- TAB HISTORIAS -->
   <div id="contenido-historias" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.75rem">
       <p style="font-size:.75rem;color:var(--ink-soft)">Publica estados automáticamente. Solo la ven contactos que tengan tu número guardado.</p>
@@ -358,8 +311,8 @@
 
 </div>
 
-
-<!-- Modal QR --><div id="modal-qr" class="hidden vmodal-backdrop">
+<!-- Modal QR -->
+<div id="modal-qr" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:420px">
     <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="closeModal('modal-qr')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="text-align:center;padding:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem">
@@ -776,8 +729,13 @@ function aplicarPlantilla() {
 function actualizarPreviewMensaje() {
   const msg     = document.getElementById('wa-mensaje').value;
   const nombre  = _propWASel?.nombre  || '[nombre]';
-  const mascota = _propWASel?.mascotas?.[0]?.nombre || '[mascota]';
-  const preview = msg.replace(/\[nombre\]/gi, nombre).replace(/\[mascota\]/gi, mascota).replace(/\[clinica\]/gi, '[clínica]');
+  const mascota = (_propWASel?.mascotas||[]).map(m=>m.nombre).join(', ') || '[mascota]';
+  const clinica = document.getElementById('sidebar-clinica-nombre')?.textContent || '[clínica]';
+  const preview = msg
+    .replace(/\[nombre\]/gi,   nombre)
+    .replace(/\[mascota\]/gi,  mascota)
+    .replace(/\[clinica\]/gi,  clinica)
+    .replace(/\[telefono\]/gi, _propWASel?.telefono || '[teléfono]');
   document.getElementById('wa-preview-msg').textContent = preview || 'El preview aparecerá aquí…';
   document.getElementById('wa-chars').textContent = `${msg.length} caracteres`;
   document.getElementById('wa-preview-hora').textContent = new Date().toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
@@ -786,9 +744,17 @@ function actualizarPreviewMensaje() {
 async function enviarMensajeWA() {
   if (!_propWASel) { toast('Selecciona un propietario primero.', 'warning'); return; }
   if (!_propWASel.telefono) { toast('Este propietario no tiene teléfono registrado.', 'warning'); return; }
-  const mensaje = document.getElementById('wa-mensaje').value.trim();
-  if (!mensaje && !_waArchivoB64) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
+  const mensajeRaw = document.getElementById('wa-mensaje').value.trim();
+  if (!mensajeRaw && !_waArchivoB64) { toast('Escribe un mensaje o adjunta una imagen.', 'warning'); return; }
   if (_waEstado !== 'conectado') { toast('WhatsApp no está conectado.', 'warning'); return; }
+  // Reemplazar variables
+  const clinica = document.getElementById('sidebar-clinica-nombre')?.textContent || '';
+  const mascota = (_propWASel.mascotas||[]).map(m=>m.nombre).join(', ') || '';
+  const mensaje = (mensajeRaw||'')
+    .replace(/\[nombre\]/gi,   _propWASel.nombre  || '')
+    .replace(/\[mascota\]/gi,  mascota)
+    .replace(/\[clinica\]/gi,  clinica)
+    .replace(/\[telefono\]/gi, _propWASel.telefono || '');
   const btn = document.getElementById('btn-enviar-wa-txt');
   btn.textContent = 'Enviando…';
   document.getElementById('btn-enviar-wa').disabled = true;
@@ -812,13 +778,13 @@ async function enviarMensajeWA() {
 
 function mostrarTab(tab) {
   ['inicio','enviar','plantillas','config','log','campanas','historias'].forEach(function(t) {
-    var btn  = document.getElementById('tab-'+t);
+    var btn = document.getElementById('tab-'+t);
     var cont = document.getElementById('contenido-'+t);
     if (btn)  btn.classList.toggle('active', t===tab);
     if (cont) cont.style.display = t===tab ? 'block' : 'none';
   });
   if (tab === 'plantillas') cargarPlantillas();
-  if (tab === 'config')     { cargarConfig(); setTimeout(function(){ cargarConfigAntispam(); }, 100); }
+  if (tab === 'config')     { cargarConfig(); setTimeout(cargarConfigAntispam, 200); }
   if (tab === 'log')        cargarLog();
   if (tab === 'campanas')   { cargarCampanas(); suscribirWSCampanas(); }
   if (tab === 'historias')  cargarHistorias();
@@ -901,6 +867,24 @@ async function guardarPlantilla() {
 }
 
 async function cargarConfig() {
+  // Inyectar panel anti-spam en config si no existe aún
+  setTimeout(function() {
+    var cont = document.getElementById('contenido-config');
+    if (cont && !document.getElementById('cfg-limite-dia')) {
+      var tpl = document.getElementById('tpl-antispam');
+      if (tpl) {
+        var clone = tpl.content.cloneNode(true);
+        // Insertar antes del botón guardar
+        var btn = cont.querySelector('button[onclick*="guardarConfig"]');
+        if (btn) {
+          var wrap = btn.parentNode;
+          cont.insertBefore(clone, wrap);
+        } else {
+          cont.appendChild(clone);
+        }
+      }
+    }
+  }, 100);
   try {
     const res = await api('/wa/config');
     if (!res?.ok) return;
@@ -966,82 +950,80 @@ async function cargarLog() {
 
 document.getElementById('wa-mensaje').addEventListener('input', actualizarPreviewMensaje);
 
-// ── Imagen en enviar mensaje (base64 directo, sin Azure) ──────
+// ══════════════════════════════════════════════════════════════
+// IMAGEN EN ENVIAR MENSAJE (base64 directo, sin Azure)
+// ══════════════════════════════════════════════════════════════
 var _waArchivoB64      = null;
 var _waArchivoMimetype = null;
 
 function previsualizarArchivoWA(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 10*1024*1024) { toast('El archivo no debe superar 10MB','warning'); return; }
+  if (file.size > 10*1024*1024) { toast('Máximo 10MB','warning'); return; }
   var reader = new FileReader();
   reader.onload = function(e) {
-    var b64full = e.target.result; // data:image/jpeg;base64,....
-    _waArchivoB64      = b64full.split(',')[1]; // solo el base64
+    var b64full = e.target.result;
+    _waArchivoB64      = b64full.split(',')[1];
     _waArchivoMimetype = file.type;
     var prev = document.getElementById('wa-archivo-preview');
     var img  = document.getElementById('wa-archivo-img');
     var nom  = document.getElementById('wa-archivo-nombre');
-    prev.style.display = '';
-    document.getElementById('btn-limpiar-archivo').style.display = '';
-    if (file.type.startsWith('image/')) { img.src=b64full; img.style.display=''; }
-    else { img.style.display='none'; }
-    nom.textContent = '📎 '+file.name+' ('+(file.size/1024).toFixed(0)+' KB) — lista para enviar';
+    if (prev) prev.style.display = '';
+    var btnL = document.getElementById('btn-limpiar-archivo');
+    if (btnL) btnL.style.display = '';
+    if (img && file.type.startsWith('image/')) { img.src=b64full; img.style.display=''; }
+    if (nom) nom.textContent = '📎 '+file.name+' ('+(file.size/1024).toFixed(0)+' KB)';
   };
   reader.readAsDataURL(file);
 }
 
 function limpiarArchivoWA() {
   _waArchivoB64=null; _waArchivoMimetype=null;
-  document.getElementById('wa-archivo').value='';
-  document.getElementById('wa-archivo-preview').style.display='none';
-  document.getElementById('btn-limpiar-archivo').style.display='none';
-  document.getElementById('wa-archivo-img').style.display='none';
+  var el;
+  el=document.getElementById('wa-archivo');         if(el) el.value='';
+  el=document.getElementById('wa-archivo-preview'); if(el) el.style.display='none';
+  el=document.getElementById('btn-limpiar-archivo');if(el) el.style.display='none';
+  el=document.getElementById('wa-archivo-img');     if(el) el.style.display='none';
 }
 
 // ══════════════════════════════════════════════════════════════
-// CAMPAÑAS v3
+// ANTI-SPAM CONFIG
 // ══════════════════════════════════════════════════════════════
-var _campLimite    = 30;
-var _campImagenUrl = null;
-var _campImagenBlob= null;
-var _histFiltro    = 'todas';
-var _histImagenUrl = null;
-var _histImagenBlob= null;
+var _campLimite = 30;
 
 function actualizarBadgeLimite(val) {
   val = parseInt(val)||30;
   var badge = document.getElementById('cfg-limite-badge');
   var txt, color, bg, border;
-  if (val<=30)      { txt='🟢 Muy bajo'; color='#15803d'; bg='#f0fdf4'; border='#bbf7d0'; }
-  else if (val<=100){ txt='🔵 Bajo';     color='#0369a1'; bg='#f0f9ff'; border='#bae6fd'; }
-  else if (val<=200){ txt='🟡 Medio';    color='#b45309'; bg='#fffbeb'; border='#fde68a'; }
-  else               { txt='🔴 Alto';    color='#be123c'; bg='#fff1f2'; border='#fecdd3'; }
+  if (val<=30)       { txt='🟢 Muy bajo'; color='#15803d'; bg='#f0fdf4'; border='#bbf7d0'; }
+  else if (val<=100) { txt='🔵 Bajo';     color='#0369a1'; bg='#f0f9ff'; border='#bae6fd'; }
+  else if (val<=200) { txt='🟡 Medio';    color='#b45309'; bg='#fffbeb'; border='#fde68a'; }
+  else               { txt='🔴 Alto';     color='#be123c'; bg='#fff1f2'; border='#fecdd3'; }
   if (badge) { badge.textContent=val+' — '+txt; badge.style.cssText='font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:'+bg+';color:'+color+';border:1px solid '+border; }
 }
 
 async function cargarConfigAntispam() {
   try {
-    var res = await api('/wa/config');
-    if (!res?.ok) return;
+    var res = await api('/wa/config'); if(!res?.ok) return;
     var cfg = (await res.json()).data?.config || {};
     _campLimite = cfg.campana_limite_dia || 30;
-    var el = document.getElementById('cfg-limite-dia');   if (el) { el.value=_campLimite; actualizarBadgeLimite(_campLimite); }
-    var ed = document.getElementById('cfg-delay-ms');     if (ed) ed.value = Math.round((cfg.campana_delay_ms||4000)/1000);
-    var hi = document.getElementById('cfg-hora-inicio');  if (hi) hi.value = (cfg.campana_hora_inicio||'08:00').substring(0,5);
-    var hf = document.getElementById('cfg-hora-fin');     if (hf) hf.value = (cfg.campana_hora_fin||'20:00').substring(0,5);
-    var inf= document.getElementById('camp-limite-info');
-    if (inf) inf.textContent = 'Límite diario: '+_campLimite+' mensajes · Horario: '+(cfg.campana_hora_inicio||'08:00').substring(0,5)+' – '+(cfg.campana_hora_fin||'20:00').substring(0,5);
+    var el;
+    el=document.getElementById('cfg-limite-dia');  if(el){el.value=_campLimite;actualizarBadgeLimite(_campLimite);}
+    el=document.getElementById('cfg-delay-ms');    if(el) el.value=Math.round((cfg.campana_delay_ms||4000)/1000);
+    el=document.getElementById('cfg-hora-inicio'); if(el) el.value=(cfg.campana_hora_inicio||'08:00').substring(0,5);
+    el=document.getElementById('cfg-hora-fin');    if(el) el.value=(cfg.campana_hora_fin||'20:00').substring(0,5);
+    el=document.getElementById('camp-limite-info');
+    if(el) el.textContent='Límite diario: '+_campLimite+' mensajes · Horario: '+(cfg.campana_hora_inicio||'08:00:00').substring(0,5)+' – '+(cfg.campana_hora_fin||'20:00:00').substring(0,5);
   } catch(e){}
 }
 
 // Override guardarConfig para incluir anti-spam
-var _guardarCfgOrig = guardarConfig;
+var _guardarCfgOrig = typeof guardarConfig !== 'undefined' ? guardarConfig : null;
 guardarConfig = async function() {
-  var elLim = document.getElementById('cfg-limite-dia');
-  var elDel = document.getElementById('cfg-delay-ms');
-  var elHI  = document.getElementById('cfg-hora-inicio');
-  var elHF  = document.getElementById('cfg-hora-fin');
+  var elLim=document.getElementById('cfg-limite-dia');
+  var elDel=document.getElementById('cfg-delay-ms');
+  var elHI =document.getElementById('cfg-hora-inicio');
+  var elHF =document.getElementById('cfg-hora-fin');
   var body = {
     activo                               : document.getElementById('cfg-activo').checked,
     codigo_pais                          : document.getElementById('cfg-codigo-pais').value.trim()||'+51',
@@ -1054,316 +1036,285 @@ guardarConfig = async function() {
     recordatorio_desparasitaciones_activo: document.getElementById('cfg-desparasitaciones-activo').checked,
     campana_limite_dia : elLim ? parseInt(elLim.value)||30 : 30,
     campana_delay_ms   : elDel ? (parseInt(elDel.value)||4)*1000 : 4000,
-    campana_hora_inicio: elHI ? elHI.value+':00' : '08:00:00',
-    campana_hora_fin   : elHF ? elHF.value+':00' : '20:00:00',
+    campana_hora_inicio: elHI  ? elHI.value+':00' : '08:00:00',
+    campana_hora_fin   : elHF  ? elHF.value+':00' : '20:00:00',
   };
   _campLimite = body.campana_limite_dia;
   try {
-    var res = await api('/wa/config', { method:'PUT', body });
-    var d   = await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
+    var res=await api('/wa/config',{method:'PUT',body}); var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
     toast('✅ Configuración guardada','success');
-  } catch(e) { toast('Error de conexión.','danger'); }
+  } catch(e){toast('Error de conexión.','danger');}
 };
 
-// Cargar anti-spam cuando se abre config
-var _cargarCfgOrig = cargarConfig;
-cargarConfig = async function() {
-  await _cargarCfgOrig();
-  await cargarConfigAntispam();
-};
-
+// ══════════════════════════════════════════════════════════════
+// CAMPAÑAS
+// ══════════════════════════════════════════════════════════════
 async function cargarCampanas() {
   var cont = document.getElementById('campanas-lista');
+  if(!cont) return;
   cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
   await cargarConfigAntispam();
   try {
-    var res  = await api('/wa/campanas');
-    if (!res?.ok) return;
-    var rows = (await res.json()).data || [];
-    if (!rows.length) {
-      cont.innerHTML = '<div class="vempty"><span style="font-size:2rem">📢</span><p>Sin campañas aún</p><button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Crear primera campaña</button></div>';
+    var res=await api('/wa/campanas'); if(!res?.ok) return;
+    var rows=(await res.json()).data||[];
+    if(!rows.length){
+      cont.innerHTML='<div class="vempty"><span style="font-size:2rem">📢</span><p>Sin campañas aún</p><button onclick="abrirModalNuevaCampana()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Crear primera campaña</button></div>';
       return;
     }
-    cont.innerHTML = rows.map(function(c) { return renderCampanaCard(c); }).join('');
-  } catch(e) { cont.innerHTML = '<div class="vempty">Error al cargar</div>'; }
+    cont.innerHTML=rows.map(function(c){return renderCampanaCard(c);}).join('');
+  } catch(e){cont.innerHTML='<div class="vempty">Error al cargar</div>';}
 }
 
 function renderCampanaCard(c) {
-  var pct = c.total > 0 ? Math.round((c.enviados/c.total)*100) : 0;
-  var estadoColors = { borrador:'#6b7280', programada:'#0369a1', enviando:'#15803d', pausada:'#b45309', completada:'#15803d', cancelada:'#be123c' };
-  var estadoEmojis = { borrador:'📝', programada:'⏰', enviando:'📤', pausada:'⏸️', completada:'✅', cancelada:'❌' };
-  var col = estadoColors[c.estado] || '#6b7280';
-  var cid = c.id;
-  var diasRestantes = '';
-  if (['enviando','pausada','programada'].includes(c.estado) && c.total > c.enviados) {
-    var diasNec = Math.ceil((c.total-c.enviados) / _campLimite);
-    diasRestantes = '<span style="font-size:.7rem;color:var(--ink-faint)">~'+diasNec+' día(s) restante(s)</span>';
+  var pct=c.total>0?Math.round((c.enviados/c.total)*100):0;
+  var cols={borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
+  var emoj={borrador:'📝',programada:'⏰',enviando:'📤',pausada:'⏸️',completada:'✅',cancelada:'❌'};
+  var col=cols[c.estado]||'#6b7280';
+  var cid=c.id;
+  var btnP=c.estado==='enviando'?'<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️ Pausar</button>':'';
+  var btnR=c.estado==='pausada'?'<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶ Reanudar</button>':'';
+  var btnI=c.estado==='borrador'?'<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">🚀 Iniciar</button>':'';
+  var btnE=['borrador','pausada'].includes(c.estado)?'<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button>':'';
+  var btnX=['borrador','pausada','enviando'].includes(c.estado)?'<button class="vbtn" style="font-size:.75rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">❌</button>':'';
+  var html='<div class="vcard vcard-pad" style="margin-bottom:.75rem">';
+  html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">';
+  html+='<div style="flex:1;min-width:0">';
+  html+='<span style="font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">'+emoj[c.estado]+' '+c.estado+'</span> ';
+  if(['enviando','pausada'].includes(c.estado)&&c.total>c.enviados) html+='<span style="font-size:.7rem;color:var(--ink-faint)">~'+Math.ceil((c.total-c.enviados)/_campLimite)+' día(s) restante(s)</span>';
+  html+='<p style="font-weight:700;font-size:.92rem;margin:.3rem 0 .2rem">'+esc(c.nombre)+'</p>';
+  html+='<p style="font-size:.75rem;color:var(--ink-faint)">👥 '+esc(c.segmento)+(c.imagen_url?' · 🖼️ Con imagen':'')+'</p>';
+  html+='</div>';
+  html+='<div style="display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap">'+btnP+btnR+btnI+btnE+btnX+'</div>';
+  html+='</div>';
+  if(c.total>0){
+    html+='<div style="margin-top:.85rem">';
+    html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-faint);margin-bottom:.3rem"><span>✅ '+c.enviados+'/'+c.total+' enviados</span><span>'+pct+'%</span></div>';
+    html+='<div style="height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%;transition:width .4s"></div></div>';
+    if(c.fallidos>0) html+='<p style="font-size:.68rem;color:#be123c;margin-top:.2rem">⚠️ '+c.fallidos+' fallidos</p>';
+    html+='</div>';
   }
-  var btnPausar   = c.estado==='enviando' ? '<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️ Pausar</button>' : '';
-  var btnReanudar = c.estado==='pausada'  ? '<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶ Reanudar</button>' : '';
-  var btnIniciar  = c.estado==='borrador' ? '<button class="vbtn vbtn-primary" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">🚀 Iniciar</button>' : '';
-  var btnEditar   = ['borrador','pausada'].includes(c.estado) ? '<button class="vbtn vbtn-ghost" style="font-size:.75rem;padding:.3rem .7rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button>' : '';
-  var btnCancelar = ['borrador','pausada','enviando'].includes(c.estado) ? '<button class="vbtn" style="font-size:.75rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">❌</button>' : '';
-  var html = '<div class="vcard vcard-pad" style="margin-bottom:.75rem">';
-  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">';
-  html += '<div style="flex:1;min-width:0">';
-  html += '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">';
-  html += '<span style="font-size:.72rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">'+estadoEmojis[c.estado]+' '+c.estado+'</span>';
-  html += diasRestantes + '</div>';
-  html += '<p style="font-weight:700;font-size:.92rem;margin-bottom:.2rem">'+esc(c.nombre)+'</p>';
-  html += '<p style="font-size:.75rem;color:var(--ink-faint)">👥 '+esc(c.segmento)+(c.imagen_url?' · 🖼️ Con imagen':'')+'</p>';
-  html += '</div>';
-  html += '<div style="display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap">'+btnPausar+btnReanudar+btnIniciar+btnEditar+btnCancelar+'</div>';
-  html += '</div>';
-  if (c.total > 0) {
-    html += '<div style="margin-top:.85rem">';
-    html += '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-faint);margin-bottom:.3rem"><span>✅ '+c.enviados+'/'+c.total+' enviados</span><span>'+pct+'%</span></div>';
-    html += '<div style="height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%;transition:width .4s"></div></div>';
-    if (c.fallidos>0) html += '<p style="font-size:.68rem;color:#be123c;margin-top:.2rem">⚠️ '+c.fallidos+' fallidos</p>';
-    html += '</div>';
-  }
-  html += '</div>';
+  html+='</div>';
   return html;
 }
 
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-camp-id]');
-  if (!btn) return;
-  var id = parseInt(btn.getAttribute('data-camp-id'));
-  var accion = btn.getAttribute('data-camp-accion');
-  var edit   = btn.getAttribute('data-camp-edit');
-  if (accion) accionCampana(id, accion);
-  if (edit)   editarCampana(id);
+document.addEventListener('click',function(e){
+  var btn=e.target.closest('[data-camp-id]'); if(!btn) return;
+  var id=parseInt(btn.getAttribute('data-camp-id'));
+  var ac=btn.getAttribute('data-camp-accion');
+  var ed=btn.getAttribute('data-camp-edit');
+  if(ac) accionCampana(id,ac);
+  if(ed) editarCampana(id);
 });
 
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-hist-accion]');
-  if (!btn) return;
-  var wrap = btn.closest('[data-hist-id]');
-  if (!wrap) return;
-  var id = parseInt(wrap.getAttribute('data-hist-id'));
-  var accion = btn.getAttribute('data-hist-accion');
-  if (accion==='publicar')  publicarHistoriaAhora(id);
-  if (accion==='editar')    editarHistoria(id);
-  if (accion==='eliminar')  eliminarHistoria(id);
+document.addEventListener('click',function(e){
+  var btn=e.target.closest('[data-hist-accion]'); if(!btn) return;
+  var wrap=btn.closest('[data-hist-id]'); if(!wrap) return;
+  var id=parseInt(wrap.getAttribute('data-hist-id'));
+  var ac=btn.getAttribute('data-hist-accion');
+  if(ac==='publicar') publicarHistoriaAhora(id);
+  if(ac==='editar')   editarHistoria(id);
+  if(ac==='eliminar') eliminarHistoria(id);
 });
 
-async function accionCampana(id, accion) {
-  if (accion==='cancelar') {
-    var ok = await vconfirm({ titulo:'¿Cancelar campaña?', mensaje:'Esta acción no se puede deshacer.', tipo:'danger', labelOk:'Cancelar campaña' });
-    if (!ok) return;
+async function accionCampana(id,accion) {
+  if(accion==='cancelar'){
+    var ok=await vconfirm({titulo:'¿Cancelar campaña?',mensaje:'Esta acción no se puede deshacer.',tipo:'danger',labelOk:'Cancelar campaña'});
+    if(!ok) return;
   }
   try {
-    var res = await api('/wa/campanas/'+id+'/'+accion, { method:'POST' });
-    var d   = await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
-    toast('✅ '+d.message,'success');
-    cargarCampanas();
-  } catch(e) { toast('Error de conexión.','danger'); }
+    var res=await api('/wa/campanas/'+id+'/'+accion,{method:'POST'}); var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
+    toast('✅ '+d.message,'success'); cargarCampanas();
+  } catch(e){toast('Error de conexión.','danger');}
 }
 
 function abrirModalNuevaCampana() {
-  document.getElementById('camp-edit-id').value  = '';
-  document.getElementById('camp-nombre').value   = '';
-  document.getElementById('camp-mensaje').value  = '';
-  document.getElementById('camp-segmento').value = 'todos';
-  document.getElementById('camp-proyeccion').style.display = 'none';
+  document.getElementById('camp-edit-id').value='';
+  document.getElementById('camp-nombre').value='';
+  document.getElementById('camp-mensaje').value='';
+  document.getElementById('camp-segmento').value='todos';
+  document.getElementById('camp-proyeccion').style.display='none';
   limpiarImagenCampana();
-  var chk = document.getElementById('camp-programar');
-  if (chk) { chk.checked=false; toggleFechaCampana(false); }
+  var chk=document.getElementById('camp-programar'); if(chk){chk.checked=false;toggleFechaCampana(false);}
   openModal('modal-campana');
   calcularProyeccion();
 }
 
 async function editarCampana(id) {
   try {
-    var res = await api('/wa/campanas/'+id);
-    if (!res?.ok) return;
-    var c = (await res.json()).data;
-    document.getElementById('camp-edit-id').value   = c.id;
-    document.getElementById('camp-nombre').value    = c.nombre;
-    document.getElementById('camp-mensaje').value   = c.mensaje;
-    document.getElementById('camp-segmento').value  = c.segmento;
-    if (c.imagen_url) { _campImagenUrl=c.imagen_url; _campImagenBlob=c.imagen_blob_name; document.getElementById('camp-img-prev-img').src=c.imagen_url; document.getElementById('camp-img-preview').style.display=''; document.getElementById('btn-limpiar-img-camp').style.display=''; }
-    openModal('modal-campana');
-    calcularProyeccion();
-  } catch(e) {}
+    var res=await api('/wa/campanas/'+id); if(!res?.ok) return;
+    var c=(await res.json()).data;
+    document.getElementById('camp-edit-id').value=c.id;
+    document.getElementById('camp-nombre').value=c.nombre;
+    document.getElementById('camp-mensaje').value=c.mensaje;
+    document.getElementById('camp-segmento').value=c.segmento;
+    if(c.imagen_url){_campImagenUrl=c.imagen_url;_campImagenBlob=c.imagen_blob_name;var pi=document.getElementById('camp-img-prev-img');if(pi)pi.src=c.imagen_url;var pp=document.getElementById('camp-img-preview');if(pp)pp.style.display='';var pb=document.getElementById('btn-limpiar-img-camp');if(pb)pb.style.display='';}
+    openModal('modal-campana'); calcularProyeccion();
+  } catch(e){}
 }
 
 function toggleFechaCampana(checked) {
-  var inp=document.getElementById('camp-fecha-inicio'), hint=document.getElementById('camp-fecha-hint');
-  if (inp) inp.style.display = checked ? '' : 'none';
-  if (checked && inp) {
-    var d=new Date(); d.setHours(d.getHours()+1); d.setMinutes(0);
-    var p=function(n){return String(n).padStart(2,'0');};
-    inp.value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';
-  }
-  if (hint) hint.textContent = checked ? 'La campaña iniciará en la fecha seleccionada' : 'Sin programar → inicia inmediatamente';
+  var inp=document.getElementById('camp-fecha-inicio'),hint=document.getElementById('camp-fecha-hint');
+  if(inp) inp.style.display=checked?'':'none';
+  if(checked&&inp){var d=new Date();d.setHours(d.getHours()+1);d.setMinutes(0);var p=function(n){return String(n).padStart(2,'0');};inp.value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';}
+  if(hint) hint.textContent=checked?'La campaña iniciará en la fecha seleccionada':'Sin programar → inicia inmediatamente';
 }
 
-function insertarVarCampana(v) { var ta=document.getElementById('camp-mensaje'); var p=ta.selectionStart; ta.value=ta.value.substring(0,p)+v+ta.value.substring(p); ta.focus(); }
+function insertarVarCampana(v){var ta=document.getElementById('camp-mensaje');var p=ta.selectionStart;ta.value=ta.value.substring(0,p)+v+ta.value.substring(p);ta.focus();}
 
-var _campTotal = 0;
+var _campTotal=0, _campImagenUrl=null, _campImagenBlob=null;
+
 async function calcularProyeccion() {
-  var seg = document.getElementById('camp-segmento')?.value||'todos';
-  if (!document.getElementById('camp-limite-custom')) return;
-  document.getElementById('camp-limite-custom').value = _campLimite;
+  var seg=document.getElementById('camp-segmento')?.value||'todos';
+  var elC=document.getElementById('camp-limite-custom'); if(elC) elC.value=_campLimite;
   try {
-    var res = await api('/wa/campanas/proyeccion?segmento='+seg);
-    if (!res?.ok) return;
-    _campTotal = (await res.json()).data?.total || 0;
-    renderProyeccion(_campTotal, _campLimite);
-  } catch(e) { _campTotal=0; }
+    var res=await api('/wa/campanas/proyeccion?segmento='+seg); if(!res?.ok) return;
+    _campTotal=(await res.json()).data?.total||0;
+    renderProyeccion(_campTotal,_campLimite);
+  } catch(e){_campTotal=0;}
 }
 
-function recalcularProyeccion() { renderProyeccion(_campTotal, parseInt(document.getElementById('camp-limite-custom').value)||_campLimite); }
-function resetLimiteCustom()    { document.getElementById('camp-limite-custom').value=_campLimite; renderProyeccion(_campTotal,_campLimite); }
+function recalcularProyeccion(){renderProyeccion(_campTotal,parseInt(document.getElementById('camp-limite-custom')?.value)||_campLimite);}
+function resetLimiteCustom(){var el=document.getElementById('camp-limite-custom');if(el)el.value=_campLimite;renderProyeccion(_campTotal,_campLimite);}
 
-function renderProyeccion(total, limite) {
-  if (!total) return;
-  var box=document.getElementById('camp-proyeccion'), body=document.getElementById('camp-proyeccion-body');
-  if (!box||!body) return;
+function renderProyeccion(total,limite) {
+  if(!total) return;
+  var box=document.getElementById('camp-proyeccion'),body=document.getElementById('camp-proyeccion-body');
+  if(!box||!body) return;
   box.style.display='';
   var dias=Math.ceil(total/limite);
-  var html='<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;margin-bottom:.6rem">'+
-    '<span style="color:var(--ink-faint);font-weight:600">Total contactos:</span><strong>'+total+'</strong>'+
-    '<span style="color:var(--ink-faint);font-weight:600">Límite diario:</span><strong>'+limite+' mensajes</strong>'+
-    '<span style="color:var(--ink-faint);font-weight:600">Duración estimada:</span><strong>'+dias+' día(s)</strong>'+
-  '</div><div style="background:#fff;border-radius:.6rem;overflow:hidden;border:1px solid #bae6fd">'+
-  '<div style="background:#0369a1;color:#fff;font-size:.68rem;font-weight:700;padding:.3rem .75rem;text-transform:uppercase">Distribución de envíos</div>';
-  for (var d=1;d<=Math.min(dias,7);d++) {
+  var html='<div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.82rem;margin-bottom:.6rem"><span style="color:var(--ink-faint);font-weight:600">Total contactos:</span><strong>'+total+'</strong><span style="color:var(--ink-faint);font-weight:600">Límite diario:</span><strong>'+limite+' mensajes</strong><span style="color:var(--ink-faint);font-weight:600">Duración estimada:</span><strong>'+dias+' día(s)</strong></div>';
+  html+='<div style="background:#fff;border-radius:.6rem;overflow:hidden;border:1px solid #bae6fd"><div style="background:#0369a1;color:#fff;font-size:.68rem;font-weight:700;padding:.3rem .75rem;text-transform:uppercase">Distribución de envíos</div>';
+  for(var d=1;d<=Math.min(dias,7);d++){
     var cnt=d<dias?limite:(total-(dias-1)*limite);
     var pct=Math.round((cnt/limite)*100);
-    var fecha=new Date(); fecha.setDate(fecha.getDate()+d-1);
-    html+='<div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;border-bottom:1px solid #f0f0f0">'+
-      '<span style="font-size:.7rem;min-width:70px;color:var(--ink-faint)">'+(d===1?'Hoy':d===2?'Mañana':fecha.toLocaleDateString('es-PE',{weekday:'short',day:'numeric'}))+'</span>'+
-      '<div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;background:#0369a1;border-radius:999px;width:'+pct+'%"></div></div>'+
-      '<span style="font-size:.72rem;font-weight:700;color:#0369a1;min-width:55px;text-align:right">'+cnt+' msgs</span>'+
-    '</div>';
+    var fecha=new Date();fecha.setDate(fecha.getDate()+d-1);
+    html+='<div style="display:flex;align-items:center;gap:.75rem;padding:.4rem .75rem;border-bottom:1px solid #f0f0f0"><span style="font-size:.7rem;min-width:70px;color:var(--ink-faint)">'+(d===1?'Hoy':d===2?'Mañana':fecha.toLocaleDateString('es-PE',{weekday:'short',day:'numeric'}))+'</span><div style="flex:1;height:6px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;background:#0369a1;border-radius:999px;width:'+pct+'%"></div></div><span style="font-size:.72rem;font-weight:700;color:#0369a1;min-width:55px;text-align:right">'+cnt+' msgs</span></div>';
   }
-  if (dias>7) html+='<div style="padding:.4rem .75rem;font-size:.7rem;color:var(--ink-faint);text-align:center">…y '+(dias-7)+' días más</div>';
+  if(dias>7) html+='<div style="padding:.4rem .75rem;font-size:.7rem;color:var(--ink-faint);text-align:center">…y '+(dias-7)+' días más</div>';
   body.innerHTML=html+'</div>';
 }
 
 async function guardarCampana(iniciar) {
-  var nombre  =document.getElementById('camp-nombre').value.trim();
-  var mensaje =document.getElementById('camp-mensaje').value.trim();
+  var nombre=document.getElementById('camp-nombre').value.trim();
+  var mensaje=document.getElementById('camp-mensaje').value.trim();
   var segmento=document.getElementById('camp-segmento').value;
-  var editId  =document.getElementById('camp-edit-id').value;
-  if (!nombre)  { toast('El nombre es obligatorio.','warning'); return; }
-  if (!mensaje) { toast('El mensaje es obligatorio.','warning'); return; }
-  var programar   = document.getElementById('camp-programar')?.checked;
-  var fechaInicio = document.getElementById('camp-fecha-inicio')?.value;
-  var body = { nombre, mensaje, segmento, imagen_url:_campImagenUrl||null, imagen_blob_name:_campImagenBlob||null,
-    estado: iniciar?(programar&&fechaInicio?'programada':'enviando'):'borrador',
-    programada_at: (programar&&fechaInicio)?fechaInicio:null };
+  var editId=document.getElementById('camp-edit-id').value;
+  if(!nombre){toast('El nombre es obligatorio.','warning');return;}
+  if(!mensaje){toast('El mensaje es obligatorio.','warning');return;}
+  var programar=document.getElementById('camp-programar')?.checked;
+  var fechaInicio=document.getElementById('camp-fecha-inicio')?.value;
+  var body={nombre,mensaje,segmento,imagen_url:_campImagenUrl||null,imagen_blob_name:_campImagenBlob||null,
+    estado:iniciar?(programar&&fechaInicio?'programada':'enviando'):'borrador',
+    programada_at:(programar&&fechaInicio)?fechaInicio:null};
   try {
-    var url=editId?'/wa/campanas/'+editId:'/wa/campanas', method=editId?'PUT':'POST';
-    var res=await api(url,{method,body}); var d=await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
+    var url=editId?'/wa/campanas/'+editId:'/wa/campanas',method=editId?'PUT':'POST';
+    var res=await api(url,{method,body});var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
     toast('✅ '+(iniciar?'Campaña iniciada':'Borrador guardado'),'success');
-    closeModal('modal-campana'); cargarCampanas();
-  } catch(e) { toast('Error de conexión.','danger'); }
+    closeModal('modal-campana');cargarCampanas();
+  } catch(e){toast('Error de conexión.','danger');}
 }
 
 async function previsualizarImagenCampana(input) {
-  var file=input.files[0]; if (!file) return;
+  var file=input.files[0];if(!file)return;
   var reader=new FileReader();
-  reader.onload=async function(e) {
-    document.getElementById('camp-img-prev-img').src=e.target.result;
-    document.getElementById('camp-img-preview').style.display='';
-    document.getElementById('btn-limpiar-img-camp').style.display='';
+  reader.onload=async function(e){
+    var pi=document.getElementById('camp-img-prev-img');if(pi)pi.src=e.target.result;
+    var pp=document.getElementById('camp-img-preview');if(pp)pp.style.display='';
+    var pb=document.getElementById('btn-limpiar-img-camp');if(pb)pb.style.display='';
     try {
       var res=await api('/wa/upload',{method:'POST',body:{base64:e.target.result.split(',')[1],contentType:file.type,filename:file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}});
-      var d=await res.json(); if (!res.ok) throw new Error(d.message);
-      _campImagenUrl=d.data.url; _campImagenBlob=d.data.blobName;
+      var d=await res.json();if(!res.ok)throw new Error(d.message);
+      _campImagenUrl=d.data.url;_campImagenBlob=d.data.blobName;
       toast('✅ Imagen subida','success');
-    } catch(e) { toast('Error al subir: '+e.message,'danger'); }
+    } catch(e){toast('Error al subir: '+e.message,'danger');}
   };
   reader.readAsDataURL(file);
 }
 
-function limpiarImagenCampana() {
-  _campImagenUrl=null; _campImagenBlob=null;
-  var f=document.getElementById('camp-imagen-file'); if(f) f.value='';
-  var p=document.getElementById('camp-img-preview'); if(p) p.style.display='none';
-  var b=document.getElementById('btn-limpiar-img-camp'); if(b) b.style.display='none';
+function limpiarImagenCampana(){
+  _campImagenUrl=null;_campImagenBlob=null;
+  var f=document.getElementById('camp-imagen-file');if(f)f.value='';
+  var p=document.getElementById('camp-img-preview');if(p)p.style.display='none';
+  var b=document.getElementById('btn-limpiar-img-camp');if(b)b.style.display='none';
 }
 
 function suscribirWSCampanas() {
-  if (!_waSocket) return;
-  _waSocket.on('wa:campana:progreso', function(data) {
-    var panel=document.getElementById('panel-ws-campana'); if(panel) panel.style.display='';
-    var setPct=function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
-    setPct('ws-campana-pct',(data.porcentaje||0)+'%');
-    var bar=document.getElementById('ws-progreso-bar'); if(bar) bar.style.width=(data.porcentaje||0)+'%';
-    setPct('ws-enviados',data.enviados||0); setPct('ws-fallidos',data.fallidos||0);
-    setPct('ws-hoy',data.enviados_hoy||0); setPct('ws-total',data.total||0);
+  if(!_waSocket) return;
+  _waSocket.on('wa:campana:progreso',function(data){
+    var panel=document.getElementById('panel-ws-campana');if(panel)panel.style.display='';
+    var set=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
+    set('ws-campana-pct',(data.porcentaje||0)+'%');
+    var bar=document.getElementById('ws-progreso-bar');if(bar)bar.style.width=(data.porcentaje||0)+'%';
+    set('ws-enviados',data.enviados||0);set('ws-fallidos',data.fallidos||0);
+    set('ws-hoy',data.enviados_hoy||0);set('ws-total',data.total||0);
     var al=document.getElementById('ws-limite-alerta');
-    if (al) { al.style.display=data.estado==='limite_diario'?'':'none'; if(data.estado==='limite_diario') al.textContent='⏸️ '+(data.mensaje||'Límite diario alcanzado. Continuará mañana.'); }
-    if (data.estado==='completada') setTimeout(function(){ cargarCampanas(); },1500);
+    if(al){al.style.display=data.estado==='limite_diario'?'':'none';if(data.estado==='limite_diario')al.textContent='⏸️ '+(data.mensaje||'Límite diario alcanzado.');}
+    if(data.estado==='completada')setTimeout(cargarCampanas,1500);
   });
-  _waSocket.on('wa:campana:log', function(data) {
-    var lista=document.getElementById('ws-log-lista'); if(!lista) return;
+  _waSocket.on('wa:campana:log',function(data){
+    var lista=document.getElementById('ws-log-lista');if(!lista)return;
     var color=data.estado==='enviado'?'#15803d':'#be123c';
     var linea=document.createElement('div');
     linea.style.cssText='padding:.15rem 0;color:'+color+';border-bottom:1px solid #f0f0f0';
     linea.textContent=(data.estado==='enviado'?'✅':'❌')+' '+new Date(data.timestamp).toLocaleTimeString('es-PE')+' → '+data.nombre+' ('+data.telefono+')';
     lista.insertBefore(linea,lista.firstChild);
-    while(lista.children.length>10) lista.removeChild(lista.lastChild);
+    while(lista.children.length>10)lista.removeChild(lista.lastChild);
   });
 }
 
 // ══════════════════════════════════════════════════════════════
-// HISTORIAS v3
+// HISTORIAS
 // ══════════════════════════════════════════════════════════════
+var _histFiltro='todas', _histImagenUrl=null, _histImagenBlob=null;
+
 async function cargarHistorias() {
-  var grid=document.getElementById('historias-grid');
+  var grid=document.getElementById('historias-grid');if(!grid)return;
   grid.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>';
   try {
     var url='/wa/historias'+(_histFiltro!=='todas'?'?estado='+_histFiltro:'');
-    var res=await api(url); if(!res?.ok) return;
+    var res=await api(url);if(!res?.ok)return;
     var rows=(await res.json()).data||[];
-    if (!rows.length) {
+    if(!rows.length){
       grid.innerHTML='<div class="vempty" style="grid-column:1/-1"><span style="font-size:2rem">📸</span><p>Sin historias aún</p><button onclick="abrirModalNuevaHistoria()" class="vbtn vbtn-primary" style="margin-top:.75rem">＋ Nueva historia</button></div>';
       return;
     }
-    grid.innerHTML=rows.map(function(h){ return renderHistoriaCard(h); }).join('');
-  } catch(e) { grid.innerHTML='<div class="vempty">Error al cargar</div>'; }
+    grid.innerHTML=rows.map(function(h){return renderHistoriaCard(h);}).join('');
+  } catch(e){grid.innerHTML='<div class="vempty">Error al cargar</div>';}
 }
 
 function filtrarHistorias(estado) {
   _histFiltro=estado;
   ['todas','programada','publicada','fallida'].forEach(function(f){
     var btn=document.getElementById('hist-f-'+f);
-    if (btn) btn.className='vbtn '+(f===estado?'vbtn-primary':'vbtn-ghost')+' font-size:.78rem';
+    if(btn) btn.className='vbtn '+(f===estado?'vbtn-primary':'vbtn-ghost');
   });
   cargarHistorias();
 }
 
 function renderHistoriaCard(h) {
-  var estadoColors={ borrador:'#6b7280',programada:'#0369a1',publicada:'#15803d',fallida:'#be123c',cancelada:'#9ca3af' };
-  var col=estadoColors[h.estado]||'#6b7280';
+  var cols={borrador:'#6b7280',programada:'#0369a1',publicada:'#15803d',fallida:'#be123c',cancelada:'#9ca3af'};
+  var col=cols[h.estado]||'#6b7280';
   var html='<div class="vcard" style="overflow:hidden;border:1.5px solid '+col+'40" data-hist-id="'+h.id+'">';
-  if (h.imagen_url) {
+  if(h.imagen_url){
     html+='<div style="height:200px;overflow:hidden;background:#1a1a2e;display:flex;align-items:center;justify-content:center;position:relative">';
     html+='<img src="'+h.imagen_url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.opacity=0"/>';
     html+='<span style="position:absolute;top:.5rem;right:.5rem;background:rgba(0,0,0,.5);color:#fff;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px">'+h.estado+'</span>';
     html+='</div>';
   } else {
-    html+='<div style="height:160px;background:#128c7e;display:flex;align-items:center;justify-content:center;padding:1rem">';
-    html+='<p style="color:#fff;font-size:.88rem;font-weight:600;text-align:center;line-height:1.5">'+esc(h.texto||'')+'</p></div>';
+    html+='<div style="height:160px;background:#128c7e;display:flex;align-items:center;justify-content:center;padding:1rem"><p style="color:#fff;font-size:.88rem;font-weight:600;text-align:center;line-height:1.5">'+esc(h.texto||'')+'</p></div>';
   }
   html+='<div style="padding:.75rem">';
   html+='<p style="font-weight:700;font-size:.85rem;margin-bottom:.25rem">'+esc(h.titulo)+'</p>';
-  if (h.programada_at) html+='<p style="font-size:.7rem;color:var(--ink-faint)">⏰ '+new Date(h.programada_at).toLocaleString('es-PE')+'</p>';
-  if (h.publicada_at)  html+='<p style="font-size:.7rem;color:#15803d">✅ Publicada: '+new Date(h.publicada_at).toLocaleString('es-PE')+'</p>';
-  if (h.error_msg)     html+='<p style="font-size:.7rem;color:#be123c" title="'+esc(h.error_msg)+'">❌ '+esc(h.error_msg.substring(0,60))+'</p>';
+  if(h.programada_at) html+='<p style="font-size:.7rem;color:var(--ink-faint)">⏰ '+new Date(h.programada_at).toLocaleString('es-PE')+'</p>';
+  if(h.publicada_at)  html+='<p style="font-size:.7rem;color:#15803d">✅ Publicada: '+new Date(h.publicada_at).toLocaleString('es-PE')+'</p>';
+  if(h.error_msg)     html+='<p style="font-size:.7rem;color:#be123c">❌ '+esc(h.error_msg.substring(0,60))+'</p>';
   html+='<div style="display:flex;gap:.35rem;margin-top:.6rem;flex-wrap:wrap">';
-  if (['borrador','programada'].includes(h.estado)) html+='<button class="vbtn vbtn-primary" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">📤 Publicar ahora</button>';
-  if (h.estado==='fallida')                         html+='<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">🔄 Reintentar</button>';
-  if (['borrador','programada'].includes(h.estado)) html+='<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="editar">✏️</button>';
+  if(['borrador','programada'].includes(h.estado)) html+='<button class="vbtn vbtn-primary" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">📤 Publicar ahora</button>';
+  if(h.estado==='fallida') html+='<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="publicar">🔄 Reintentar</button>';
+  if(['borrador','programada'].includes(h.estado)) html+='<button class="vbtn vbtn-ghost" style="font-size:.7rem;padding:.3rem .7rem" data-hist-accion="editar">✏️</button>';
   html+='<button class="vbtn" style="font-size:.7rem;padding:.3rem .7rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-hist-accion="eliminar">🗑️</button>';
   html+='</div></div></div>';
   return html;
@@ -1375,8 +1326,7 @@ function abrirModalNuevaHistoria() {
   document.getElementById('historia-programar').checked=false;
   document.getElementById('historia-fecha-wrap').style.display='none';
   document.getElementById('historia-inmediata-hint').style.display='';
-  limpiarImagenHistoria();
-  selTipoHistoria('imagen');
+  limpiarImagenHistoria(); selTipoHistoria('imagen');
   openModal('modal-historia');
 }
 
@@ -1384,38 +1334,30 @@ function selTipoHistoria(tipo) {
   document.getElementById('historia-tipo').value=tipo;
   ['imagen','texto'].forEach(function(t){
     var btn=document.getElementById('hist-tipo-'+t);
-    if (btn) btn.style.cssText=t===tipo?'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer':'flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer';
+    if(btn) btn.style.cssText=t===tipo?'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer':'flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer';
   });
-  var imgSec=document.getElementById('hist-imagen-section');
-  var fondoSec=document.getElementById('hist-fondo-section');
-  var lbl=document.getElementById('hist-texto-label');
-  if (imgSec)   imgSec.style.display  = tipo==='imagen'?'':'none';
-  if (fondoSec) fondoSec.style.display= tipo==='texto'?'':'none';
-  if (lbl)      lbl.textContent       = tipo==='imagen'?'Caption (opcional)':'Texto de la historia *';
+  var imgSec=document.getElementById('hist-imagen-section');var fondoSec=document.getElementById('hist-fondo-section');var lbl=document.getElementById('hist-texto-label');
+  if(imgSec)   imgSec.style.display  =tipo==='imagen'?'':'none';
+  if(fondoSec) fondoSec.style.display=tipo==='texto'?'':'none';
+  if(lbl)      lbl.textContent       =tipo==='imagen'?'Caption (opcional)':'Texto de la historia *';
 }
 
 function toggleProgramarHistoria(checked) {
-  var fw=document.getElementById('historia-fecha-wrap'), hint=document.getElementById('historia-inmediata-hint');
-  if (fw) fw.style.display=checked?'':'none';
-  if (hint) hint.style.display=checked?'none':'';
-  if (checked) {
-    var d=new Date(); d.setHours(d.getHours()+1); d.setMinutes(0);
-    var p=function(n){return String(n).padStart(2,'0');};
-    var el=document.getElementById('historia-fecha');
-    if (el) el.value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';
-  }
+  var fw=document.getElementById('historia-fecha-wrap'),hint=document.getElementById('historia-inmediata-hint');
+  if(fw) fw.style.display=checked?'':'none';
+  if(hint) hint.style.display=checked?'none':'';
+  if(checked){var d=new Date();d.setHours(d.getHours()+1);d.setMinutes(0);var p=function(n){return String(n).padStart(2,'0');};var el=document.getElementById('historia-fecha');if(el)el.value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':00';}
 }
 
 function cargarImagenHistoria(input) {
-  var file=input.files[0]; if (!file) return;
-  if (file.size>5*1024*1024) { toast('Máximo 5MB','warning'); return; }
+  var file=input.files[0];if(!file)return;
+  if(file.size>5*1024*1024){toast('Máximo 5MB','warning');return;}
   var reader=new FileReader();
-  reader.onload=function(e) {
-    var prev=document.getElementById('hist-img-prev'); if(prev){ prev.src=e.target.result; prev.style.display=''; }
-    var ph=document.getElementById('hist-img-placeholder'); if(ph) ph.style.display='none';
-    var prevBox=document.getElementById('hist-preview-box');
-    if (prevBox) { prevBox.style.display='flex'; var pi=document.getElementById('hist-prev-img'); if(pi) pi.src=e.target.result; }
-    subirImagenHistoria(e.target.result.split(',')[1], file.type, file.name);
+  reader.onload=function(e){
+    var prev=document.getElementById('hist-img-prev');if(prev){prev.src=e.target.result;prev.style.display='';}
+    var ph=document.getElementById('hist-img-placeholder');if(ph)ph.style.display='none';
+    var pb=document.getElementById('hist-preview-box');if(pb){pb.style.display='flex';var pi=document.getElementById('hist-prev-img');if(pi)pi.src=e.target.result;}
+    subirImagenHistoria(e.target.result.split(',')[1],file.type,file.name);
   };
   reader.readAsDataURL(file);
 }
@@ -1423,33 +1365,29 @@ function cargarImagenHistoria(input) {
 function soltarImagenHistoria(e) {
   e.preventDefault();
   var file=e.dataTransfer.files[0];
-  if (file&&file.type.startsWith('image/')) {
-    var input=document.getElementById('hist-img-file');
-    var dt=new DataTransfer(); dt.items.add(file); input.files=dt.files;
-    cargarImagenHistoria(input);
-  }
-  e.currentTarget.style.borderColor=''; e.currentTarget.style.background='';
+  if(file&&file.type.startsWith('image/')){var input=document.getElementById('hist-img-file');var dt=new DataTransfer();dt.items.add(file);input.files=dt.files;cargarImagenHistoria(input);}
+  e.currentTarget.style.borderColor='';e.currentTarget.style.background='';
 }
 
-async function subirImagenHistoria(b64, contentType, filename) {
+async function subirImagenHistoria(b64,contentType,filename) {
   try {
     var res=await api('/wa/upload',{method:'POST',body:{base64:b64,contentType,filename:filename.replace(/[^a-zA-Z0-9._-]/g,'_')}});
-    var d=await res.json(); if (!res.ok) throw new Error(d.message);
-    _histImagenUrl=d.data.url; _histImagenBlob=d.data.blobName;
+    var d=await res.json();if(!res.ok)throw new Error(d.message);
+    _histImagenUrl=d.data.url;_histImagenBlob=d.data.blobName;
     document.getElementById('historia-imagen-url').value=_histImagenUrl;
     document.getElementById('historia-imagen-blob').value=_histImagenBlob;
     toast('✅ Imagen subida','success');
-  } catch(e) { toast('Error al subir: '+e.message,'danger'); }
+  } catch(e){toast('Error al subir: '+e.message,'danger');}
 }
 
 function limpiarImagenHistoria() {
-  _histImagenUrl=null; _histImagenBlob=null;
-  var f=document.getElementById('hist-img-file'); if(f) f.value='';
-  var p=document.getElementById('hist-img-prev'); if(p) { p.style.display='none'; }
-  var ph=document.getElementById('hist-img-placeholder'); if(ph) ph.style.display='';
-  var pb=document.getElementById('hist-preview-box'); if(pb) pb.style.display='none';
-  var u=document.getElementById('historia-imagen-url'); if(u) u.value='';
-  var b=document.getElementById('historia-imagen-blob'); if(b) b.value='';
+  _histImagenUrl=null;_histImagenBlob=null;
+  var f=document.getElementById('hist-img-file');if(f)f.value='';
+  var p=document.getElementById('hist-img-prev');if(p){p.src='';p.style.display='none';}
+  var ph=document.getElementById('hist-img-placeholder');if(ph)ph.style.display='';
+  var pb=document.getElementById('hist-preview-box');if(pb)pb.style.display='none';
+  var u=document.getElementById('historia-imagen-url');if(u)u.value='';
+  var b=document.getElementById('historia-imagen-blob');if(b)b.value='';
 }
 
 async function guardarHistoria() {
@@ -1459,54 +1397,53 @@ async function guardarHistoria() {
   var fecha=document.getElementById('historia-fecha')?.value;
   var editId=document.getElementById('historia-edit-id').value;
   var titulo=texto.substring(0,60)||('Historia '+new Date().toLocaleDateString('es-PE'));
-  if (tipo==='imagen'&&!_histImagenUrl) { toast('Selecciona y sube una imagen primero.','warning'); return; }
-  if (tipo==='texto'&&!texto)           { toast('El texto es obligatorio.','warning'); return; }
-  if (programar&&!fecha)                { toast('Selecciona la fecha de publicación.','warning'); return; }
-  var body={ titulo, tipo, texto:texto||null, imagen_url:_histImagenUrl||null, imagen_blob:_histImagenBlob||null,
-    estado:programar?'programada':'borrador', programada_at:programar?fecha:null, publicar_ahora:!programar };
-  var btn=document.getElementById('btn-guardar-historia');
-  btn.disabled=true; btn.textContent='Guardando…';
+  if(tipo==='imagen'&&!_histImagenUrl){toast('Selecciona y sube una imagen primero.','warning');return;}
+  if(tipo==='texto'&&!texto){toast('El texto es obligatorio.','warning');return;}
+  if(programar&&!fecha){toast('Selecciona la fecha de publicación.','warning');return;}
+  var body={titulo,tipo,texto:texto||null,imagen_url:_histImagenUrl||null,imagen_blob:_histImagenBlob||null,
+    estado:programar?'programada':'borrador',programada_at:programar?fecha:null,publicar_ahora:!programar};
+  var btn=document.getElementById('btn-guardar-historia');btn.disabled=true;btn.textContent='Guardando…';
   try {
-    var url=editId?'/wa/historias/'+editId:'/wa/historias', method=editId?'PUT':'POST';
-    var res=await api(url,{method,body}); var d=await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
+    var url=editId?'/wa/historias/'+editId:'/wa/historias',method=editId?'PUT':'POST';
+    var res=await api(url,{method,body});var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
     toast(programar?'⏰ Historia programada':'📤 Historia publicando…','success',5000);
-    closeModal('modal-historia'); cargarHistorias();
-  } catch(e) { toast('Error de conexión.','danger'); }
-  finally { btn.disabled=false; btn.textContent='💾 Guardar historia'; }
+    closeModal('modal-historia');cargarHistorias();
+  } catch(e){toast('Error de conexión.','danger');}
+  finally{btn.disabled=false;btn.textContent='💾 Guardar historia';}
 }
 
 async function publicarHistoriaAhora(id) {
   var ok=await vconfirm({titulo:'¿Publicar historia ahora?',mensaje:'Se publicará inmediatamente en tu estado de WhatsApp.',labelOk:'📤 Publicar',tipo:'info'});
-  if (!ok) return;
+  if(!ok) return;
   try {
-    var res=await api('/wa/historias/'+id+'/publicar',{method:'POST'}); var d=await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
-    toast('✅ Historia publicada en WhatsApp','success',5000); cargarHistorias();
-  } catch(e) { toast('Error de conexión.','danger'); }
+    var res=await api('/wa/historias/'+id+'/publicar',{method:'POST'});var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
+    toast('✅ Historia publicada en WhatsApp','success',5000);cargarHistorias();
+  } catch(e){toast('Error de conexión.','danger');}
 }
 
 async function editarHistoria(id) {
   try {
-    var res=await api('/wa/historias/'+id); if (!res?.ok) return;
+    var res=await api('/wa/historias/'+id);if(!res?.ok)return;
     var h=(await res.json()).data;
     document.getElementById('historia-edit-id').value=h.id;
     document.getElementById('historia-texto').value=h.texto||'';
     selTipoHistoria(h.tipo||'imagen');
-    if (h.imagen_url) { _histImagenUrl=h.imagen_url; _histImagenBlob=h.imagen_blob; var prev=document.getElementById('hist-img-prev'); if(prev){ prev.src=h.imagen_url; prev.style.display=''; } var ph=document.getElementById('hist-img-placeholder'); if(ph) ph.style.display='none'; }
-    if (h.programada_at) { document.getElementById('historia-programar').checked=true; toggleProgramarHistoria(true); document.getElementById('historia-fecha').value=h.programada_at.replace('Z','').substring(0,16); }
+    if(h.imagen_url){_histImagenUrl=h.imagen_url;_histImagenBlob=h.imagen_blob;var prev=document.getElementById('hist-img-prev');if(prev){prev.src=h.imagen_url;prev.style.display='';}}
+    if(h.programada_at){document.getElementById('historia-programar').checked=true;toggleProgramarHistoria(true);document.getElementById('historia-fecha').value=h.programada_at.replace('Z','').substring(0,16);}
     openModal('modal-historia');
-  } catch(e) {}
+  } catch(e){}
 }
 
 async function eliminarHistoria(id) {
-  var ok=await vconfirm({titulo:'¿Eliminar historia?',mensaje:'Se eliminará la imagen de Azure también.',tipo:'danger',labelOk:'Eliminar'});
-  if (!ok) return;
+  var ok=await vconfirm({titulo:'¿Eliminar historia?',mensaje:'Se eliminará también de Azure.',tipo:'danger',labelOk:'Eliminar'});
+  if(!ok) return;
   try {
-    var res=await api('/wa/historias/'+id,{method:'DELETE'}); var d=await res.json();
-    if (!res.ok) { toast(d.message||'Error.','danger'); return; }
-    toast('Historia eliminada','success'); cargarHistorias();
-  } catch(e) { toast('Error de conexión.','danger'); }
+    var res=await api('/wa/historias/'+id,{method:'DELETE'});var d=await res.json();
+    if(!res.ok){toast(d.message||'Error.','danger');return;}
+    toast('Historia eliminada','success');cargarHistorias();
+  } catch(e){toast('Error de conexión.','danger');}
 }
 
 </script>
@@ -1514,42 +1451,24 @@ async function eliminarHistoria(id) {
 <!-- Modal Nueva Campaña -->
 <div id="modal-campana" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:620px">
-    <div class="vmodal-head">
-      <h3>📢 <span id="modal-campana-titulo">Nueva Campaña</span></h3>
-      <button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button>
-    </div>
+    <div class="vmodal-head"><h3>📢 Nueva Campaña</h3><button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="camp-edit-id"/>
-      <div>
-        <label class="vlabel">Nombre *</label>
-        <input id="camp-nombre" type="text" class="vinput" placeholder="Ej: Promoción vacunas junio"/>
-      </div>
+      <div><label class="vlabel">Nombre *</label><input id="camp-nombre" type="text" class="vinput" placeholder="Ej: Promoción vacunas junio"/></div>
       <div>
         <label class="vlabel">Fecha de inicio (opcional)</label>
         <div style="display:flex;align-items:center;gap:.75rem">
-          <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer">
-            <input type="checkbox" id="camp-programar" style="accent-color:#25d366" onchange="toggleFechaCampana(this.checked)"/>
-            Programar inicio
-          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer"><input type="checkbox" id="camp-programar" style="accent-color:#25d366" onchange="toggleFechaCampana(this.checked)"/> Programar inicio</label>
           <input type="datetime-local" id="camp-fecha-inicio" class="vinput" style="display:none;max-width:220px"/>
         </div>
         <p id="camp-fecha-hint" style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Sin programar → inicia inmediatamente</p>
       </div>
-      <div>
-        <label class="vlabel">Segmento *</label>
+      <div><label class="vlabel">Segmento *</label>
         <select id="camp-segmento" class="vinput" onchange="calcularProyeccion()">
           <option value="todos">👥 Todos los propietarios</option>
           <option value="por_especie">🐕 Por especie</option>
           <option value="vacunas_vencidas">💉 Vacunas vencidas</option>
           <option value="sin_citas_60d">📅 Sin citas en 60 días</option>
-        </select>
-      </div>
-      <div id="camp-especie-wrap" style="display:none">
-        <label class="vlabel">Especie</label>
-        <select id="camp-especie" class="vinput" onchange="calcularProyeccion()">
-          <option value="perro">🐕 Perro</option>
-          <option value="gato">🐈 Gato</option>
-          <option value="otro">🐾 Otro</option>
         </select>
       </div>
       <div>
@@ -1570,13 +1489,13 @@ async function eliminarHistoria(id) {
             <button onclick="document.getElementById('camp-imagen-file').click()" class="vbtn vbtn-ghost" style="font-size:.8rem">🖼️ Seleccionar imagen</button>
             <button onclick="limpiarImagenCampana()" id="btn-limpiar-img-camp" class="vbtn vbtn-ghost" style="font-size:.78rem;display:none;color:#be123c">✕ Quitar</button>
           </div>
-          <div id="camp-img-preview" style="margin-top:.6rem;display:none">
+          <div id="camp-img-preview" style="display:none;margin-top:.6rem">
             <img id="camp-img-prev-img" style="max-width:100%;max-height:140px;border-radius:.6rem;object-fit:contain;border:1px solid var(--line)"/>
           </div>
         </div>
       </div>
       <div id="camp-proyeccion" style="display:none;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:.9rem;padding:1rem">
-        <p style="font-size:.72rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">📊 Proyección de envíos</p>
+        <p style="font-size:.72rem;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:.75rem">📊 Proyección de envíos</p>
         <div id="camp-proyeccion-body"></div>
         <div style="margin-top:.75rem;border-top:1px solid #bae6fd;padding-top:.75rem">
           <label class="vlabel" style="font-size:.72rem">Ajustar límite para esta campaña</label>
@@ -1590,7 +1509,7 @@ async function eliminarHistoria(id) {
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-campana')" class="vbtn vbtn-ghost">Cancelar</button>
-      <button onclick="guardarCampana(false)" class="vbtn vbtn-ghost">💾 Guardar borrador</button>
+      <button onclick="guardarCampana(false)" class="vbtn vbtn-ghost">💾 Borrador</button>
       <button onclick="guardarCampana(true)" class="vbtn vbtn-primary">🚀 Iniciar campaña</button>
     </div>
   </div>
@@ -1599,10 +1518,7 @@ async function eliminarHistoria(id) {
 <!-- Modal Nueva Historia -->
 <div id="modal-historia" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:520px">
-    <div class="vmodal-head">
-      <h3 id="modal-historia-titulo">📸 Nueva Historia</h3>
-      <button onclick="closeModal('modal-historia')" class="vmodal-close">✕</button>
-    </div>
+    <div class="vmodal-head"><h3 id="modal-historia-titulo">📸 Nueva Historia</h3><button onclick="closeModal('modal-historia')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="historia-edit-id"/>
       <input type="hidden" id="historia-tipo" value="imagen"/>
@@ -1623,11 +1539,7 @@ async function eliminarHistoria(id) {
           ondragleave="this.style.borderColor=''"
           ondrop="soltarImagenHistoria(event)">
           <input type="file" id="hist-img-file" accept="image/*" style="display:none" onchange="cargarImagenHistoria(this)"/>
-          <div id="hist-img-placeholder">
-            <p style="font-size:2rem;margin-bottom:.5rem">🖼️</p>
-            <p style="font-size:.82rem;font-weight:600;color:var(--ink-soft)">Arrastra o haz clic para seleccionar</p>
-            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">JPG, PNG · Máx 5MB</p>
-          </div>
+          <div id="hist-img-placeholder"><p style="font-size:2rem;margin-bottom:.5rem">🖼️</p><p style="font-size:.82rem;font-weight:600;color:var(--ink-soft)">Arrastra o haz clic para seleccionar</p><p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">JPG, PNG · Máx 5MB</p></div>
           <img id="hist-img-prev" style="display:none;max-width:100%;max-height:200px;border-radius:.75rem;object-fit:contain"/>
         </div>
       </div>
@@ -1641,22 +1553,13 @@ async function eliminarHistoria(id) {
         </div>
         <input type="hidden" id="historia-fondo" value="#128c7e"/>
       </div>
-      <div>
-        <label class="vlabel" id="hist-texto-label">Caption (opcional)</label>
-        <textarea id="historia-texto" rows="3" class="vinput" placeholder="Texto de la historia…"></textarea>
-      </div>
+      <div><label class="vlabel" id="hist-texto-label">Caption (opcional)</label><textarea id="historia-texto" rows="3" class="vinput" placeholder="Texto de la historia…"></textarea></div>
       <div style="background:#f8faf8;border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
           <label class="vlabel" style="margin:0">⏰ Programar publicación</label>
-          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem">
-            <input type="checkbox" id="historia-programar" style="accent-color:#128c7e" onchange="toggleProgramarHistoria(this.checked)"/>
-            Programar
-          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem"><input type="checkbox" id="historia-programar" style="accent-color:#128c7e" onchange="toggleProgramarHistoria(this.checked)"/> Programar</label>
         </div>
-        <div id="historia-fecha-wrap" style="display:none">
-          <input type="datetime-local" id="historia-fecha" class="vinput"/>
-          <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.3rem">Se publicará automáticamente en la fecha y hora seleccionada</p>
-        </div>
+        <div id="historia-fecha-wrap" style="display:none"><input type="datetime-local" id="historia-fecha" class="vinput"/><p style="font-size:.65rem;color:var(--ink-faint);margin-top:.3rem">Se publicará automáticamente en la fecha y hora seleccionada</p></div>
         <p id="historia-inmediata-hint" style="font-size:.72rem;color:var(--ink-soft)">Sin programar → se publica inmediatamente al guardar</p>
       </div>
       <div id="hist-preview-box" style="display:none;background:#000;border-radius:1rem;overflow:hidden;height:200px;position:relative">
@@ -1669,6 +1572,37 @@ async function eliminarHistoria(id) {
     </div>
   </div>
 </div>
+
+<!-- Anti-spam config (se inyecta en tab config via JS) -->
+<template id="tpl-antispam">
+  <div class="vcard vcard-pad" style="margin-top:1.3rem;border:2px solid #fde68a">
+    <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.5rem">🛡️ Control anti-spam — Campañas</h3>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem;font-size:.7rem">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#15803d">1–30</p><p style="color:#15803d;font-weight:600">🟢 Muy bajo</p></div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#0369a1">31–100</p><p style="color:#0369a1;font-weight:600">🔵 Bajo</p></div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#b45309">101–200</p><p style="color:#b45309;font-weight:600">🟡 Medio</p></div>
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#be123c">200+</p><p style="color:#be123c;font-weight:600">🔴 Alto</p></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+      <div>
+        <label class="vlabel">Límite diario <span id="cfg-limite-badge" style="font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">30 — 🟢</span></label>
+        <input id="cfg-limite-dia" type="number" min="5" max="500" value="30" class="vinput" style="max-width:100px" oninput="actualizarBadgeLimite(this.value)"/>
+      </div>
+      <div>
+        <label class="vlabel">Delay (seg)</label>
+        <input id="cfg-delay-ms" type="number" min="2" max="30" value="4" class="vinput" style="max-width:90px"/>
+      </div>
+      <div>
+        <label class="vlabel">Horario de envío</label>
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <input id="cfg-hora-inicio" type="time" value="08:00" class="vinput" style="max-width:100px"/>
+          <span style="font-size:.75rem">a</span>
+          <input id="cfg-hora-fin" type="time" value="20:00" class="vinput" style="max-width:100px"/>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 </body>
 </html>
