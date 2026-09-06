@@ -449,6 +449,17 @@ router.post('/historias/:id/publicar', authorize('admin'), async (req, res, next
   } catch (err) { next(err); }
 });
 
+// DELETE /api/v1/wa/campanas/:id
+router.delete('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [c] = await req.db.query('SELECT imagen_blob_name FROM wa_campanas WHERE id=?', [req.params.id]);
+    if (c?.imagen_blob_name) callGateway('DELETE', '/wa/upload/'+encodeURIComponent(c.imagen_blob_name)).catch(() => {});
+    await req.db.query('DELETE FROM wa_campana_contactos WHERE campana_id=?', [req.params.id]);
+    await req.db.query('DELETE FROM wa_campanas WHERE id=?', [req.params.id]);
+    return res.json({ success: true, message: 'Campaña eliminada.' });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/v1/wa/historias/:id
 router.delete('/historias/:id', authorize('admin'), async (req, res, next) => {
   try {

@@ -1087,16 +1087,26 @@ function renderCampanasTabla(rows) {
       : new Date(c.created_at).toLocaleDateString('es-PE',{day:'2-digit',month:'short'});
     // Botones según estado
     var acciones = '';
+    // Ver detalle — siempre disponible
+    acciones += '<button title="Ver detalle" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-ver="1">👁️</button> ';
+    // Editar — solo borradores y pausadas
     if (['borrador','pausada'].includes(c.estado))
       acciones += '<button title="Editar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-edit="1">✏️</button> ';
+    // Iniciar — solo borradores
     if (c.estado==='borrador')
       acciones += '<button title="Iniciar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="iniciar">▶</button> ';
+    // Pausar — solo enviando
     if (c.estado==='enviando')
       acciones += '<button title="Pausar" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="pausar">⏸️</button> ';
+    // Reanudar — solo pausadas
     if (c.estado==='pausada')
       acciones += '<button title="Reanudar" class="vbtn vbtn-primary" style="font-size:.72rem;padding:.25rem .5rem" data-camp-id="'+cid+'" data-camp-accion="reanudar">▶</button> ';
-    if (['borrador','pausada','programada'].includes(c.estado))
-      acciones += '<button title="Cancelar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">✕</button>';
+    // Cancelar — borradores, pausadas, programadas, enviando
+    if (['borrador','pausada','programada','enviando'].includes(c.estado))
+      acciones += '<button title="Cancelar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="cancelar">✕</button> ';
+    // Eliminar — solo completadas y canceladas
+    if (['completada','cancelada'].includes(c.estado))
+      acciones += '<button title="Eliminar" class="vbtn" style="font-size:.72rem;padding:.25rem .5rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" data-camp-id="'+cid+'" data-camp-accion="eliminar">🗑️</button>';
     html+='<tr>';
     html+='<td><p style="font-weight:700;font-size:.85rem">'+esc(c.nombre)+'</p>'+(c.imagen_url?'<span style="font-size:.68rem;color:#0369a1">🖼️ Con imagen</span>':'')+'</td>';
     html+='<td style="font-size:.78rem">'+esc(c.segmento)+'</td>';
@@ -1117,8 +1127,10 @@ document.addEventListener('click',function(e){
   var id=parseInt(btn.getAttribute('data-camp-id'));
   var ac=btn.getAttribute('data-camp-accion');
   var ed=btn.getAttribute('data-camp-edit');
+  var ver=btn.getAttribute('data-camp-ver');
   if(ac) accionCampana(id,ac);
   if(ed) editarCampana(id);
+  if(ver) verDetalleCampana(id);
 });
 
 document.addEventListener('click',function(e){
@@ -1136,11 +1148,66 @@ async function accionCampana(id,accion) {
     var ok=await vconfirm({titulo:'¿Cancelar campaña?',mensaje:'Esta acción no se puede deshacer.',tipo:'danger',labelOk:'Cancelar campaña'});
     if(!ok) return;
   }
+  if(accion==='eliminar'){
+    var ok=await vconfirm({titulo:'¿Eliminar campaña?',mensaje:'Se eliminará permanentemente.',tipo:'danger',labelOk:'Eliminar'});
+    if(!ok) return;
+  }
   try {
-    var res=await api('/wa/campanas/'+id+'/'+accion,{method:'POST'}); var d=await res.json();
+    var method = accion==='eliminar' ? 'DELETE' : 'POST';
+    var url = accion==='eliminar' ? '/wa/campanas/'+id : '/wa/campanas/'+id+'/'+accion;
+    var res=await api(url,{method}); var d=await res.json();
     if(!res.ok){toast(d.message||'Error.','danger');return;}
     toast('✅ '+d.message,'success'); cargarCampanas();
   } catch(e){toast('Error de conexión.','danger');}
+}
+
+async function verDetalleCampana(id) {
+  try {
+    var res=await api('/wa/campanas/'+id); if(!res?.ok) return;
+    var c=(await res.json()).data;
+    var cols={borrador:'#6b7280',programada:'#0369a1',enviando:'#15803d',pausada:'#b45309',completada:'#15803d',cancelada:'#be123c'};
+    var col=cols[c.estado]||'#6b7280';
+    var pct=c.total>0?Math.round((c.enviados/c.total)*100):0;
+    var html='<div style="display:flex;flex-direction:column;gap:.85rem">';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">';
+    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Estado</p>';
+    html+='<span style="font-size:.8rem;font-weight:700;padding:.25rem .65rem;border-radius:999px;background:'+col+'20;color:'+col+';border:1px solid '+col+'40">'+c.estado+'</span></div>';
+    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Segmento</p><p style="font-size:.85rem">'+esc(c.segmento)+'</p></div>';
+    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Enviados</p><p style="font-size:.85rem;font-weight:700;color:#15803d">'+c.enviados+' / '+(c.total||'—')+'</p></div>';
+    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Fallidos</p><p style="font-size:.85rem;font-weight:700;color:#be123c">'+c.fallidos+'</p></div>';
+    if(c.programada_at) html+='<div class="col-span-2"><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.2rem">Fecha programada</p><p style="font-size:.85rem">'+new Date(c.programada_at).toLocaleString("es-PE")+'</p></div>';
+    html+='</div>';
+    if(c.total>0){
+      html+='<div><div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.3rem"><span>Progreso</span><span>'+pct+'%</span></div>';
+      html+='<div style="height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden"><div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);width:'+pct+'%"></div></div></div>';
+    }
+    html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem">Mensaje</p>';
+    html+='<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;white-space:pre-wrap;max-height:120px;overflow-y:auto">'+esc(c.mensaje||'')+'</div></div>';
+    if(c.imagen_url) html+='<div><p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;margin-bottom:.4rem">Imagen</p><img src="'+c.imagen_url+'" style="max-width:100%;max-height:150px;border-radius:.75rem;object-fit:contain;border:1px solid var(--line)"/></div>';
+    html+='</div>';
+    document.getElementById('det-camp-body').innerHTML=html;
+    document.getElementById('det-camp-titulo').textContent='📢 '+esc(c.nombre);
+    var foot=document.getElementById('det-camp-foot');
+    foot.innerHTML='';
+    var btnCerrar=document.createElement('button');
+    btnCerrar.className='vbtn vbtn-ghost'; btnCerrar.textContent='Cerrar';
+    btnCerrar.onclick=function(){closeModal('modal-detalle-campana');};
+    foot.appendChild(btnCerrar);
+    if(['borrador','pausada'].includes(c.estado)){
+      var btnEdit=document.createElement('button');
+      btnEdit.className='vbtn vbtn-ghost'; btnEdit.textContent='✏️ Editar';
+      btnEdit.setAttribute('data-camp-id',c.id); btnEdit.setAttribute('data-camp-edit','1');
+      btnEdit.onclick=function(){closeModal('modal-detalle-campana');editarCampana(c.id);};
+      foot.appendChild(btnEdit);
+    }
+    if(c.estado==='borrador'){
+      var btnIni=document.createElement('button');
+      btnIni.className='vbtn vbtn-primary'; btnIni.textContent='▶ Iniciar';
+      btnIni.onclick=function(){closeModal('modal-detalle-campana');accionCampana(c.id,'iniciar');};
+      foot.appendChild(btnIni);
+    }
+    openModal('modal-detalle-campana');
+  } catch(e){toast('Error al cargar detalle','danger');}
 }
 
 function abrirModalNuevaCampana() {
