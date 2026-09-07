@@ -332,9 +332,19 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
   const sesion = sesiones.get(tenantId);
   if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
 
+  // En Baileys v6+ hay que pasar statusJidList para que el estado sea visible.
+  // Obtenemos todos los contactos del store o usamos lista vacía (WA igual lo publica).
+  // Con lista vacía el estado se publica pero solo lo ven quienes ya tienen el número.
+  let statusJidList = [];
+  try {
+    // Intentar obtener contactos del socket para que sea visible a todos
+    const contacts = await sesion.socket.store?.contacts || {};
+    statusJidList = Object.keys(contacts).filter(j => j.endsWith('@s.whatsapp.net'));
+  } catch { /* si falla, publica igual sin lista explícita */ }
+
   if (imagenUrl) {
     let buffer, mimetype;
-    // Descargar desde Azure con credenciales si es blob de Azure
+    // Descargar desde Azure con SDK (credenciales servidor, no URL pública)
     if (containerClient && imagenUrl.includes('.blob.core.windows.net')) {
       try {
         const urlObj   = new URL(imagenUrl.split('?')[0]);
@@ -351,13 +361,30 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
       const dl = await descargarImagen(imagenUrl);
       buffer = dl.buffer; mimetype = dl.mimetype;
     }
-    await sesion.socket.sendMessage('status@broadcast', { image: buffer, mimetype, caption: texto || '' });
+
+    await sesion.socket.sendMessage(
+      'status@broadcast',
+      {
+        image  : buffer,
+        mimetype,
+        caption: texto || '',
+      },
+      statusJidList.length ? { statusJidList } : {}
+    );
   } else {
-    await sesion.socket.sendMessage('status@broadcast', {
-      text: texto, backgroundArgb: 0xff1f8c3d, font: 2,
-    });
+    await sesion.socket.sendMessage(
+      'status@broadcast',
+      {
+        text           : texto || '',
+        backgroundArgb : 0xff1f8c3d,
+        font           : 2,
+      },
+      statusJidList.length ? { statusJidList } : {}
+    );
   }
+
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
+  console.log('[WA Historia] ✅ Estado publicado — tenant:' + tenantId + ' — contactos notificados:' + statusJidList.length);
 }
 
 // ══════════════════════════════════════════════════════════════
