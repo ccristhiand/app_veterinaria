@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v12
+-- VETNETCODIP SaaS — TENANT SCHEMA v13
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -7,12 +7,12 @@
 -- v9:  + descuento_pct / descuento_monto en factura_items
 --       + subtotal_bruto / descuento_items / descuento_global /
 --         descuento_global_pct / comision_tarjeta / comision_tarjeta_pct en facturas
--- v12: + campana_limite_dia / campana_delay_ms / campana_hora_inicio / campana_hora_fin en wa_config
---       + imagen_url / imagen_blob_name / enviados_hoy / fecha_ultimo_envio en wa_campanas
---       + tabla wa_historias
 -- v11: + tipo_cita en citas (redirección automática)
 --       + precio_compra en inventario (rentabilidad)
 --       + precio_compra_snapshot en factura_items (historial rentabilidad)
+-- v12: + campana_limite_dia / campana_delay_ms / campana_hora_inicio / campana_hora_fin en wa_config
+--       + imagen_url / imagen_blob_name / enviados_hoy / fecha_ultimo_envio en wa_campanas
+-- v13: + tabla wa_historias (WhatsApp Stories — imagen/texto, programable)
 -- Ejecutar al crear nueva clínica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
@@ -489,10 +489,14 @@ CREATE TABLE IF NOT EXISTS wa_config (
   recordatorio_vacunas_dias             INT UNSIGNED NOT NULL DEFAULT 7,
   recordatorio_vacunas_dias2            INT UNSIGNED NULL DEFAULT 1,
   recordatorio_desparasitaciones_activo TINYINT(1)   NOT NULL DEFAULT 1,
-  campana_limite_dia                    INT UNSIGNED NOT NULL DEFAULT 30,
-  campana_delay_ms                      INT UNSIGNED NOT NULL DEFAULT 4000,
-  campana_hora_inicio                   TIME         NOT NULL DEFAULT '08:00:00',
-  campana_hora_fin                      TIME         NOT NULL DEFAULT '20:00:00',
+  campana_limite_dia                    INT UNSIGNED NOT NULL DEFAULT 30
+                                        COMMENT 'Mensajes máximos por día para campañas',
+  campana_delay_ms                      INT UNSIGNED NOT NULL DEFAULT 4000
+                                        COMMENT 'Delay en ms entre mensajes de campaña',
+  campana_hora_inicio                   TIME         NOT NULL DEFAULT '08:00:00'
+                                        COMMENT 'Hora de inicio de envío de campañas',
+  campana_hora_fin                      TIME         NOT NULL DEFAULT '20:00:00'
+                                        COMMENT 'Hora de fin de envío de campañas',
   updated_at                            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -524,27 +528,31 @@ CREATE TABLE IF NOT EXISTS wa_mensajes_log (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS wa_campanas (
-  id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  nombre           VARCHAR(150)   NOT NULL,
-  mensaje          TEXT           NOT NULL,
-  imagen_url       VARCHAR(500)   NULL,
-  imagen_blob_name VARCHAR(200)   NULL,
-  segmento         ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
-                   NOT NULL DEFAULT 'todos',
-  segmento_valor   VARCHAR(50)    NULL,
-  estado           ENUM('borrador','programada','enviando','pausada','completada','cancelada')
-                   NOT NULL DEFAULT 'borrador',
-  total            INT UNSIGNED   NOT NULL DEFAULT 0,
-  enviados         INT UNSIGNED   NOT NULL DEFAULT 0,
-  fallidos         INT UNSIGNED   NOT NULL DEFAULT 0,
-  enviados_hoy     INT UNSIGNED   NOT NULL DEFAULT 0,
-  fecha_ultimo_envio DATE         NULL,
-  ultimo_id        INT UNSIGNED   NOT NULL DEFAULT 0,
-  programada_at    TIMESTAMP      NULL,
-  iniciada_at      TIMESTAMP      NULL,
-  pausada_at       TIMESTAMP      NULL,
-  completada_at    TIMESTAMP      NULL,
-  created_at       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre            VARCHAR(150)   NOT NULL,
+  mensaje           TEXT           NOT NULL,
+  imagen_url        VARCHAR(500)   NULL
+                    COMMENT 'URL de imagen en Azure Blob Storage',
+  imagen_blob_name  VARCHAR(200)   NULL
+                    COMMENT 'Nombre del blob en Azure para gestión',
+  segmento          ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
+                    NOT NULL DEFAULT 'todos',
+  segmento_valor    VARCHAR(50)    NULL,
+  estado            ENUM('borrador','programada','enviando','pausada','completada','cancelada')
+                    NOT NULL DEFAULT 'borrador',
+  total             INT UNSIGNED   NOT NULL DEFAULT 0,
+  enviados          INT UNSIGNED   NOT NULL DEFAULT 0,
+  fallidos          INT UNSIGNED   NOT NULL DEFAULT 0,
+  enviados_hoy      INT UNSIGNED   NOT NULL DEFAULT 0
+                    COMMENT 'Enviados en el día actual (se resetea cada día)',
+  fecha_ultimo_envio DATE          NULL
+                    COMMENT 'Fecha del último envío — para control diario',
+  ultimo_id         INT UNSIGNED   NOT NULL DEFAULT 0,
+  programada_at     TIMESTAMP      NULL,
+  iniciada_at       TIMESTAMP      NULL,
+  pausada_at        TIMESTAMP      NULL,
+  completada_at     TIMESTAMP      NULL,
+  created_at        TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_estado (estado),
   INDEX idx_fecha  (created_at)
 ) ENGINE=InnoDB;
@@ -561,6 +569,37 @@ CREATE TABLE IF NOT EXISTS wa_campana_contactos (
   INDEX idx_campana (campana_id),
   INDEX idx_estado  (estado),
   FOREIGN KEY (campana_id) REFERENCES wa_campanas(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── WhatsApp Historias (Stories) ─────────────────────────────
+-- v13: permite publicar y programar estados de WhatsApp con imagen o texto
+CREATE TABLE IF NOT EXISTS wa_historias (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  titulo        VARCHAR(150)   NOT NULL
+                COMMENT 'Título interno para identificar la historia',
+  texto         TEXT           NULL
+                COMMENT 'Texto / caption de la historia',
+  imagen_url    VARCHAR(500)   NULL
+                COMMENT 'URL de la imagen en Azure Blob Storage',
+  imagen_blob   VARCHAR(200)   NULL
+                COMMENT 'Nombre del blob en Azure para gestión y eliminación',
+  tipo          ENUM('imagen','texto') NOT NULL DEFAULT 'imagen'
+                COMMENT 'Tipo de historia: con imagen o solo texto con fondo',
+  estado        ENUM('borrador','programada','publicada','fallida','cancelada')
+                NOT NULL DEFAULT 'borrador',
+  programada_at TIMESTAMP      NULL
+                COMMENT 'Fecha/hora programada de publicación (NULL = publicar ahora)',
+  publicada_at  TIMESTAMP      NULL
+                COMMENT 'Fecha/hora real en que se publicó en WhatsApp',
+  error_msg     TEXT           NULL
+                COMMENT 'Mensaje de error si la publicación falló',
+  creada_por_id INT UNSIGNED   NOT NULL,
+  created_at    TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (creada_por_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+  INDEX idx_estado     (estado),
+  INDEX idx_programada (programada_at),
+  INDEX idx_creada_por (creada_por_id)
 ) ENGINE=InnoDB;
 
 -- ── Turnos del personal ──────────────────────────────────────
@@ -625,4 +664,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
   ('Campaña general', 'campana',
    '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
 
-SELECT 'tenant_schema v12 ✅' AS resultado;
+SELECT 'tenant_schema v13 ✅' AS resultado;

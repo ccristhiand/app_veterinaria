@@ -434,12 +434,22 @@ router.post('/historias', authorize('admin'), async (req, res, next) => {
   try {
     const { titulo, tipo = 'imagen', texto, imagen_url, imagen_blob, estado = 'borrador', programada_at, publicar_ahora } = req.body;
 
+    // titulo fallback si viene vacío
+    const tituloFinal = titulo?.trim() ||
+      (texto ? texto.substring(0, 60) : null) ||
+      ('Historia ' + new Date().toLocaleDateString('es-PE'));
+
+    // Estado: si publicar_ahora → borrador (el gateway lo pone en publicada al terminar)
+    //         si programada_at → programada
+    //         si no → borrador
+    const estadoFinal = publicar_ahora ? 'borrador'
+      : (programada_at ? 'programada' : (estado || 'borrador'));
+
     const result = await req.db.query(
       `INSERT INTO wa_historias (titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at, creada_por_id)
        VALUES (?,?,?,?,?,?,?,?)`,
-      [titulo, tipo, texto || null, imagen_url || null, imagen_blob || null,
-       publicar_ahora ? 'borrador' : (estado || 'borrador'),
-       programada_at || null, req.user.id]
+      [tituloFinal, tipo, texto || null, imagen_url || null, imagen_blob || null,
+       estadoFinal, programada_at || null, req.user.id]
     );
 
     const historiaId = result.insertId;
@@ -465,10 +475,15 @@ router.post('/historias', authorize('admin'), async (req, res, next) => {
 router.put('/historias/:id', authorize('admin'), async (req, res, next) => {
   try {
     const { titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at } = req.body;
+    const tituloFinal = titulo?.trim() ||
+      (texto ? texto.substring(0, 60) : null) ||
+      ('Historia ' + new Date().toLocaleDateString('es-PE'));
+    const estadoFinal = programada_at ? 'programada' : (estado || 'borrador');
+
     await req.db.query(
       `UPDATE wa_historias SET titulo=?, tipo=?, texto=?, imagen_url=?, imagen_blob=?, estado=?, programada_at=? WHERE id=?`,
-      [titulo, tipo || 'imagen', texto || null, imagen_url || null, imagen_blob || null,
-       estado || 'borrador', programada_at || null, req.params.id]
+      [tituloFinal, tipo || 'imagen', texto || null, imagen_url || null, imagen_blob || null,
+       estadoFinal, programada_at || null, req.params.id]
     );
     return res.json({ success: true, message: 'Historia actualizada.' });
   } catch (err) { next(err); }
@@ -547,5 +562,35 @@ router.get('/imagen/:campanaId', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// ── GET /api/v1/wa/imagen-historia/:historiaId — proxy Azure para historias ─────
+router.get('/imagen-historia/:historiaId', authenticate, async (req, res, next) => {
+  try {
+    const container   = process.env.AZURE_WA_CONTAINER || 'wa-media';
+    const azureClient = getWABlobClient();
+    if (!azureClient) return res.status(503).json({ success: false, message: 'Azure no configurado' });
+
+    const [h] = await req.db.query(
+      'SELECT imagen_url, imagen_blob FROM wa_historias WHERE id = ?', [req.params.historiaId]
+    );
+    if (!h || !h.imagen_url) return res.status(404).end();
+
+    let blobName = h.imagen_blob;
+    if (!blobName) {
+      const parts = h.imagen_url.split(`/${container}/`);
+      blobName = parts[1] ? parts[1].split('?')[0] : null;
+    }
+    if (!blobName) return res.status(400).end();
+
+    const blobClient = azureClient.getContainerClient(container).getBlobClient(blobName);
+    const download   = await blobClient.download();
+
+    const ext  = blobName.split('.').pop().toLowerCase();
+    const mime = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    res.setHeader('Content-Type', download.contentType || mime[ext] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    download.readableStreamBody.pipe(res);
+  } catch (err) { next(err); }
+});
 
 module.exports = router;
