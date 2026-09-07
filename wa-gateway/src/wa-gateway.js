@@ -23,6 +23,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  Browsers,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino      = require('pino');
@@ -211,7 +212,7 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
     auth            : state,
     logger          : pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser         : ['VetNetcodip', 'Chrome', '1.0'],
+    browser         : Browsers.baileys('Desktop'),
     syncFullHistory : false,
   });
 
