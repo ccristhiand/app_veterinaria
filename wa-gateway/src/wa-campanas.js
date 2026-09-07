@@ -253,11 +253,15 @@ async function procesarCampana(campana, conn, cfg, tenant) {
     }
 
     // Obtener lote de contactos pendientes respetando el disponible de hoy
+    // JOIN mascotas a demanda — sin columna extra en la tabla
     const [contactos] = await conn.execute(
-      `SELECT id, propietario_id, telefono, nombre
-       FROM wa_campana_contactos
-       WHERE campana_id=? AND estado='pendiente'
-       ORDER BY id ASC
+      `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
+              GROUP_CONCAT(m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+       FROM wa_campana_contactos wcc
+       LEFT JOIN mascotas m ON m.propietario_id = wcc.propietario_id
+       WHERE wcc.campana_id=? AND wcc.estado='pendiente'
+       GROUP BY wcc.id
+       ORDER BY wcc.id ASC
        LIMIT ${parseInt(limite.disponible)}`,
       [campana.id]
     );
@@ -301,8 +305,9 @@ async function procesarCampana(campana, conn, cfg, tenant) {
       }
 
       const msg = rellenarPlantilla(campana.mensaje, {
-        nombre : contacto.nombre,
-        clinica: campana.nombre_clinica || 'VetNetcodip',
+        nombre  : contacto.nombre,
+        mascota : contacto.mascotas || '',
+        clinica : campana.nombre_clinica || 'VetNetcodip',
         telefono: tenant.tel_clinica || '',
       });
 
