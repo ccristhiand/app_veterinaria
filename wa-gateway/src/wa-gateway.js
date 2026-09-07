@@ -383,7 +383,7 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
     await sesion.socket.sendMessage(
       'status@broadcast',
       { image: buffer, mimetype, caption: texto || '' },
-      opts
+      { ...opts, broadcast: true }
     );
 
   } else {
@@ -392,7 +392,7 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
     await sesion.socket.sendMessage(
       'status@broadcast',
       { text: texto || '' },
-      { ...opts, backgroundColor: '#1f8c3d', font: 2 }
+      { ...opts, backgroundColor: '#1f8c3d', font: 2, broadcast: true }
     );
   }
 
