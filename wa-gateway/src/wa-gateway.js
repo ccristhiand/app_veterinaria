@@ -332,19 +332,35 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
   const sesion = sesiones.get(tenantId);
   if (!sesion || sesion.estado !== 'conectado') throw new Error('WhatsApp no conectado');
 
-  // En Baileys v6+ hay que pasar statusJidList para que el estado sea visible.
-  // Obtenemos todos los contactos del store o usamos lista vacía (WA igual lo publica).
-  // Con lista vacía el estado se publica pero solo lo ven quienes ya tienen el número.
+  // Baileys v7: statusJidList en las OPTIONS (3er param de sendMessage)
+  // Sin store, obtenemos los contactos directo de la BD del tenant
   let statusJidList = [];
   try {
-    // Intentar obtener contactos del socket para que sea visible a todos
-    const contacts = await sesion.socket.store?.contacts || {};
-    statusJidList = Object.keys(contacts).filter(j => j.endsWith('@s.whatsapp.net'));
-  } catch { /* si falla, publica igual sin lista explícita */ }
+    const conn = await getTenantConn(tenantId);
+    const [props] = await conn.execute(
+      "SELECT telefono FROM propietarios WHERE telefono IS NOT NULL AND telefono != '' LIMIT 500"
+    );
+    await conn.end();
+    // Formatear teléfonos como JIDs de WA (+51 -> 51XXXXXXXXX@s.whatsapp.net)
+    statusJidList = props
+      .map(p => {
+        let t = (p.telefono || '').replace(/[^\d]/g, '');
+        if (t.length === 9) t = '51' + t;      // número peruano sin código
+        return t ? t + '@s.whatsapp.net' : null;
+      })
+      .filter(Boolean);
+    console.log('[WA Historia] Contactos para statusJidList: ' + statusJidList.length);
+  } catch (e) {
+    console.warn('[WA Historia] No se pudo obtener contactos, publicando sin lista:', e.message);
+  }
+
+  // Opciones comunes para el status
+  const opts = statusJidList.length ? { statusJidList } : {};
 
   if (imagenUrl) {
     let buffer, mimetype;
-    // Descargar desde Azure con SDK (credenciales servidor, no URL pública)
+
+    // Descargar imagen desde Azure con SDK (credenciales servidor)
     if (containerClient && imagenUrl.includes('.blob.core.windows.net')) {
       try {
         const urlObj   = new URL(imagenUrl.split('?')[0]);
@@ -362,29 +378,25 @@ async function publicarHistoria(tenantId, imagenUrl, texto) {
       buffer = dl.buffer; mimetype = dl.mimetype;
     }
 
+    // Baileys v7: imagen como status
     await sesion.socket.sendMessage(
       'status@broadcast',
-      {
-        image  : buffer,
-        mimetype,
-        caption: texto || '',
-      },
-      statusJidList.length ? { statusJidList } : {}
+      { image: buffer, mimetype, caption: texto || '' },
+      opts
     );
+
   } else {
+    // Baileys v7: texto como status
+    // backgroundColor va en OPTIONS, no en el mensaje
     await sesion.socket.sendMessage(
       'status@broadcast',
-      {
-        text           : texto || '',
-        backgroundArgb : 0xff1f8c3d,
-        font           : 2,
-      },
-      statusJidList.length ? { statusJidList } : {}
+      { text: texto || '' },
+      { ...opts, backgroundColor: '#1f8c3d', font: 2 }
     );
   }
 
   await masterQuery('UPDATE wa_sesiones SET ultima_actividad=NOW() WHERE tenant_id=?', [tenantId]);
-  console.log('[WA Historia] ✅ Estado publicado — tenant:' + tenantId + ' — contactos notificados:' + statusJidList.length);
+  console.log('[WA Historia] ✅ Estado publicado para tenant:' + tenantId);
 }
 
 // ══════════════════════════════════════════════════════════════
