@@ -45,7 +45,10 @@ app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, '../../public/admin/index.html'));
 });
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../public/index.html'));
+  const indexPath = path.join(__dirname, '../../public/index.html');
+  res.sendFile(indexPath, err => {
+    if (err) res.status(404).json({ success: false, message: 'Portal no disponible' });
+  });
 });
 
 // ── Error handler ─────────────────────────────────────────────
