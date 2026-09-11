@@ -1642,16 +1642,8 @@ function catIcon(cat) {
 async function imprimirReceta() {
   const c = window._consultaActual;
   if (!c || !c.recetas?.length) { toast('Sin recetas para imprimir.','warning'); return; }
-  const btn = document.getElementById('ver-btn-imprimir');
-  btn.textContent = '⏳ Generando…'; btn.disabled = true;
-  try {
-    const res = await api(`/historia/${c.id}/receta-pdf`, { method:'POST' });
-    if (!res.ok) { toast('Error al generar receta.','danger'); return; }
-    const html = await res.text();
-    // Abrir HTML en nueva pestaña — el HTML tiene window.print() automático
-    const ventana = window.open('', '_blank');
-    ventana.document.write(html);
-    ventana.document.close();
-  } catch(e) { toast('Error: '+e.message,'danger'); }
-  finally { btn.textContent = '🖨️ Imprimir receta'; btn.disabled = false; }
+  const token = localStorage.getItem('vet_access') || '';
+  // Abrir GET directo en nueva pestaña — URL real, sin about:blank
+  const url = `${API_URL}/api/v1/historia/${c.id}/receta-pdf?token=${encodeURIComponent(token)}`;
+  window.open(url, '_blank');
 }

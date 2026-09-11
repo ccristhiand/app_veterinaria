@@ -215,9 +215,17 @@ router.delete('/:id', authorize('admin', 'veterinario'), auditMiddleware('histor
   } catch (err) { next(err); }
 });
 
-// ── POST /api/v1/historia/:id/receta-pdf ─────────────────────
-router.post('/:id/receta-pdf', authorize('admin','veterinario','recepcionista'), async (req, res, next) => {
+// ── GET /api/v1/historia/:id/receta-pdf ──────────────────────
+router.get('/:id/receta-pdf', async (req, res, next) => {
   try {
+    // Auth: acepta token por query param o por header Authorization
+    const token = req.query.token || req.headers.authorization?.replace('Bearer ','');
+    if (!token) return res.status(401).send('<h1>No autorizado</h1>');
+    const jwt = require('jsonwebtoken');
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET);
+    } catch { return res.status(401).send('<h1>Token inválido o expirado</h1>'); }
+
     // 1. Obtener historia con recetas
     const [historia] = await req.db.query(
       `SELECT h.*, u.nombre AS vet_nombre, u.email AS vet_email,
