@@ -1646,14 +1646,12 @@ async function imprimirReceta() {
   btn.textContent = '⏳ Generando…'; btn.disabled = true;
   try {
     const res = await api(`/historia/${c.id}/receta-pdf`, { method:'POST' });
-    if (!res.ok) { toast('Error al generar PDF.','danger'); return; }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.target = '_blank';
-    a.download = `receta_${c.id}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!res.ok) { toast('Error al generar receta.','danger'); return; }
+    const html = await res.text();
+    // Abrir HTML en nueva pestaña — el HTML tiene window.print() automático
+    const ventana = window.open('', '_blank');
+    ventana.document.write(html);
+    ventana.document.close();
   } catch(e) { toast('Error: '+e.message,'danger'); }
   finally { btn.textContent = '🖨️ Imprimir receta'; btn.disabled = false; }
 }
