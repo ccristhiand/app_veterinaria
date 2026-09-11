@@ -1,0 +1,35 @@
+/* VetNetcodip — Historia Clínica styles */
+
+/* ── Autocompletado inventario ──────────────────────────────── */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: #fff; border: 1.5px solid var(--green-500);
+      border-radius: .85rem; box-shadow: 0 8px 24px rgba(13,59,46,.12);
+      max-height: 220px; overflow-y: auto; list-style: none; padding: .35rem;
+      animation: fadeIn .15s ease;
+    }
+    .autocomplete-list li {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .55rem .75rem; border-radius: .6rem;
+      cursor: pointer; transition: background .12s; font-size: .8rem;
+    }
+    .autocomplete-list li:hover { background: var(--green-50); }
+    .autocomplete-list li .ac-nombre { font-weight: 600; color: var(--ink); flex: 1; }
+    .autocomplete-list li .ac-stock  { font-size: .68rem; color: var(--ink-faint); white-space: nowrap; }
+    .autocomplete-list li .ac-cat    {
+      font-size: .62rem; font-weight: 700; padding: .15rem .45rem;
+      border-radius: 999px; white-space: nowrap;
+    }
+    .ac-cat-medicamento { background:#f0f9ff; color:#0369a1; }
+    .ac-cat-vacuna      { background:#f5f3ff; color:#6d28d9; }
+    .ac-cat-insumo      { background:#f8faf8; color:#4b5f57; }
+    .ac-cat-otro        { background:#faf9f6; color:#78716c; }
+    .autocomplete-list .ac-empty {
+      padding: .6rem .75rem; color: var(--ink-faint);
+      font-size: .78rem; text-align: center; cursor: default;
+    }
+    .autocomplete-list li .ac-hint {
+      font-size: .62rem; color: var(--green-600);
+      font-style: italic; white-space: nowrap;
+    }

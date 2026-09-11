@@ -1,0 +1,1659 @@
+/* VetNetcodip — Historia Clínica JS */
+
+let mascotaId  = null;
+let citaId     = null;
+let motivoCita = null;
+let recetaN    = 0;
+
+const ssMascotaId = sessionStorage.getItem('historia_mascota_id');
+const ssCitaId    = sessionStorage.getItem('historia_cita_id');
+const ssMotivo    = sessionStorage.getItem('historia_motivo');
+sessionStorage.removeItem('historia_mascota_id');
+sessionStorage.removeItem('historia_cita_id');
+sessionStorage.removeItem('historia_motivo');
+
+initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
+
+if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
+if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
+
+function mostrarTab(tab) {
+  const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('tab-'+t);
+    if (!btn) return;
+    const isActive = t === tab;
+    const activeColor  = { consultas:'#059669', vacunas:'#6d28d9', desparasitaciones:'#047857', estetica:'#db2777' };
+    const activeBorder = { consultas:'#10b981', vacunas:'#8b5cf6', desparasitaciones:'#10b981',  estetica:'#ec4899' };
+    btn.style.color             = isActive ? activeColor[t]  : 'var(--ink-faint)';
+    btn.style.borderBottomColor = isActive ? activeBorder[t] : 'transparent';
+    btn.style.fontWeight        = isActive ? '700' : '600';
+  });
+  document.getElementById('contenido-consultas').style.display         = tab==='consultas'         ? 'block' : 'none';
+  document.getElementById('contenido-vacunas').style.display           = tab==='vacunas'           ? 'block' : 'none';
+  document.getElementById('contenido-desparasitaciones').style.display = tab==='desparasitaciones' ? 'block' : 'none';
+  document.getElementById('contenido-estetica').style.display          = tab==='estetica'          ? 'block' : 'none';
+  if (tab==='vacunas'           && mascotaId) cargarVacunas(mascotaId);
+  if (tab==='desparasitaciones' && mascotaId) cargarDesparasitaciones(mascotaId);
+  if (tab==='estetica'          && mascotaId) cargarEstetica(mascotaId);
+}
+
+function mostrarBannerCita() {
+  document.getElementById('banner-cita').style.display         = 'flex';
+  document.getElementById('banner-motivo').textContent         = '📋 '+motivoCita;
+  document.getElementById('page-head-sub').textContent         = 'Atendiendo cita #'+citaId;
+  document.getElementById('modal-consulta-titulo').textContent = '🩺 Registrar Atención — Cita #'+citaId;
+  document.getElementById('modal-cita-banner').style.display   = 'flex';
+  document.getElementById('modal-cita-id-label').textContent   = citaId;
+  document.getElementById('btn-guardar-consulta').textContent  = '✅ Guardar y Completar Cita';
+}
+
+function toggleVacunaRapida() {
+  const checked = document.getElementById('toggle-vacuna-rapida').checked;
+  document.getElementById('vacuna-rapida-form').style.display = checked ? 'flex' : 'none';
+
+  if (checked) {
+    document.getElementById('vr-fecha').value = fechaHoyInput();
+
+    // Adjuntar autocompletado solo la primera vez
+    if (!_acVacunaRapidaInit) {
+      _acVacunaRapidaInit = true;
+      const inputVR = document.getElementById('vr-nombre');
+      attachAutocomplete(inputVR, ['vacuna'], (item) => {
+        const fabInput = document.getElementById('vr-fabricante');
+        if (fabInput && !fabInput.value && item.proveedor) {
+          fabInput.value = item.proveedor;
+        }
+      });
+    }
+  }
+}
+
+// Flag para evitar adjuntar el autocomplete más de una vez
+let _acVacunaModalInit    = false;
+let _acVacunaRapidaInit   = false;
+
+function abrirModalVacuna() {
+  document.getElementById('v-fecha').value = fechaHoyInput();
+  openModal('modal-vacuna');
+
+  // Adjuntar autocompletado solo la primera vez que se abre el modal
+  if (!_acVacunaModalInit) {
+    _acVacunaModalInit = true;
+    const inputNombre = document.getElementById('v-nombre');
+    attachAutocomplete(inputNombre, ['vacuna'], (item) => {
+      // Al seleccionar vacuna, rellenar fabricante si existe en inventario y está vacío
+      const fabInput = document.getElementById('v-fabricante');
+      if (fabInput && !fabInput.value && item.proveedor) {
+        fabInput.value = item.proveedor;
+      }
+    });
+  }
+}
+
+function switchBuscarTab(tab) {
+  var isProp = tab === 'prop';
+  document.getElementById('panel-buscar-prop').style.display = isProp ? 'block' : 'none';
+  document.getElementById('panel-buscar-masc').style.display = isProp ? 'none' : 'block';
+  var bp = document.getElementById('tab-buscar-prop');
+  var bm = document.getElementById('tab-buscar-masc');
+  bp.style.background  = isProp ? '#fff' : 'none';
+  bp.style.color       = isProp ? '#15803d' : 'var(--ink-soft)';
+  bp.style.fontWeight  = isProp ? '700' : '600';
+  bp.style.boxShadow   = isProp ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
+  bm.style.background  = isProp ? 'none' : '#fff';
+  bm.style.color       = isProp ? 'var(--ink-soft)' : '#15803d';
+  bm.style.fontWeight  = isProp ? '600' : '700';
+  bm.style.boxShadow   = isProp ? 'none' : '0 1px 3px rgba(0,0,0,.1)';
+  document.getElementById('b-prop-resultados').innerHTML = '';
+  if (document.getElementById('b-masc-resultados'))
+    document.getElementById('b-masc-resultados').innerHTML = '';
+  document.getElementById('b-mascotas-section').style.display = 'none';
+  setTimeout(function() {
+    var inp = document.getElementById(isProp ? 'b-prop' : 'b-masc');
+    if (inp) inp.focus();
+  }, 100);
+}
+
+async function buscarMascotaH() {
+  var q = document.getElementById('b-masc').value.trim();
+  if (!q) { toast('Ingresa el nombre de la mascota', 'warning'); return; }
+  var cont = document.getElementById('b-masc-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando...</div>';
+  try {
+    var res = await api('/mascotas?search=' + encodeURIComponent(q) + '&limit=10');
+    if (!res) return;
+    var rows = (await res.json()).data || [];
+    if (!rows.length) {
+      cont.innerHTML = '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:.75rem">No se encontraron mascotas</div>';
+      return;
+    }
+    cont.innerHTML = '';
+    rows.forEach(function(m) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s;margin-bottom:.4rem';
+      btn.onmouseover = function() { this.style.borderColor = '#10b981'; this.style.background = '#f0fdf4'; };
+      btn.onmouseout  = function() { this.style.borderColor = 'var(--line)'; this.style.background = '#fff'; };
+      btn.onclick     = function() { selMascotaH(m.id); };
+      btn.innerHTML =
+        '<span style="font-size:1.6rem">' + badgeEspecie(m.especie) + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<p style="font-weight:700;font-size:.88rem">' + esc(m.nombre) + '</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-faint)">' + esc(m.especie) + ' - ' + esc(m.raza || 'Sin raza') + '</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-soft);margin-top:.1rem">Prop: ' + esc(m.propietario_nombre || '') + '</p>' +
+        '</div>' +
+        (m.alertas_medicas ? '<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3">Alerta</span>' : '');
+      cont.appendChild(btn);
+    });
+  } catch {
+    cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>';
+  }
+}
+
+async function buscarPropH() {
+  const q = document.getElementById('b-prop').value.trim();
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  const cont = document.getElementById('b-prop-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
+  document.getElementById('b-mascotas-section').style.display = 'none';
+  try {
+    const res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=8');
+    if (!res) return;
+    const rows = (await res.json()).data||[];
+    cont.innerHTML = rows.length ? rows.map(p=>`
+      <button onclick="selPropH(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
+        style="display:flex;align-items:center;gap:.75rem;padding:.75rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
+        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.8rem;flex-shrink:0;display:flex;align-items:center;justify-content:center">${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-weight:700;font-size:.87rem">${esc(p.nombre)} ${esc(p.apellido)}</p>
+          <p style="font-size:.7rem;color:var(--ink-faint)">${p.dni?'🪪 '+esc(p.dni)+' · ':''}📞 ${esc(p.telefono)}</p>
+        </div>
+        <span style="background:#ecfdf5;color:#047857;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;flex-shrink:0">🐾 ${p.total_mascotas}</span>
+      </button>`).join('')
+    : '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:.75rem">No se encontraron propietarios</div>';
+  } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>'; }
+}
+
+async function selPropH(propId, propNombre) {
+  document.getElementById('b-prop-resultados').innerHTML = '';
+  document.getElementById('b-prop').value = '';
+  document.getElementById('b-mascotas-section').style.display = 'block';
+  document.getElementById('b-prop-nombre-sel').textContent    = propNombre;
+  document.getElementById('b-mascotas-lista').innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Cargando mascotas…</div>';
+  try {
+    const res      = await api('/propietarios/'+propId);
+    if (!res) return;
+    const mascotas = (await res.json()).data?.mascotas||[];
+    document.getElementById('b-mascotas-lista').innerHTML = mascotas.length
+      ? mascotas.map(m=>`
+          <button onclick="selMascotaH(${m.id})"
+            style="display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
+            onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+            onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
+            <span style="font-size:1.6rem">${badgeEspecie(m.especie)}</span>
+            <div style="flex:1"><p style="font-weight:700;font-size:.88rem">${esc(m.nombre)}</p><p style="font-size:.7rem;color:var(--ink-faint)">${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}</p></div>
+            ${m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3;white-space:nowrap">⚠️ Alerta</span>':''}
+          </button>`).join('')
+      : '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:1rem">Sin mascotas. <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar</a></div>';
+  } catch { document.getElementById('b-mascotas-lista').innerHTML='<div style="font-size:.78rem;color:#e11d48">Error</div>'; }
+}
+
+function selMascotaH(id) { closeModal('modal-buscar'); resetBusqueda(); cargarHistoria(id); }
+function resetBusqueda() {
+  document.getElementById('b-mascotas-section').style.display='none';
+  document.getElementById('b-prop-resultados').innerHTML='';
+  document.getElementById('b-prop').value='';
+}
+
+async function cargarHistoria(id) {
+  mascotaId = id;
+  document.getElementById('vacio').style.display              = 'none';
+  document.getElementById('panel').style.display              = 'flex';
+  document.getElementById('panel').style.flexDirection        = 'column';
+  document.getElementById('panel').style.gap                  = '1.3rem';
+  document.getElementById('btn-nueva-consulta').style.display  = 'inline-flex';
+  document.getElementById('btn-nueva-vacuna').style.display    = 'inline-flex';
+  document.getElementById('btn-nueva-estetica').style.display  = 'inline-flex';
+  document.getElementById('consultas').innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div>';
+  try {
+    const rm = await api('/mascotas/'+id);
+    if (!rm||!rm.ok) { toast('Mascota no encontrada.','danger'); return; }
+    const m = (await rm.json()).data;
+    document.getElementById('h-icon').textContent    = badgeEspecie(m.especie);
+    document.getElementById('h-nombre').textContent  = m.nombre;
+    document.getElementById('h-info').textContent    = m.especie+' · '+(m.raza||'Sin raza')+' · '+m.sexo+(m.peso_kg?' · '+m.peso_kg+' kg':'');
+    const propEl = document.getElementById('h-propietario');
+    if (propEl&&m.propietario_nombre) propEl.textContent='👤 '+m.propietario_nombre;
+    if (m.alertas_medicas) { const al=document.getElementById('h-alerta'); al.style.display='block'; al.innerHTML='⚠️ '+esc(m.alertas_medicas); }
+    // Precargar info en modal de vacuna
+    document.getElementById('vac-mascota-icon').textContent   = badgeEspecie(m.especie);
+    document.getElementById('vac-mascota-nombre').textContent = m.nombre;
+    document.getElementById('vac-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
+    document.getElementById('v-fecha').value = fechaHoyInput();
+
+    // Precargar info en modal de estética
+    document.getElementById('est-mascota-icon').textContent   = badgeEspecie(m.especie);
+    document.getElementById('est-mascota-nombre').textContent = m.nombre;
+    document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
+    document.getElementById('est-fecha').value = fechaHoyInput();
+    if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
+    const rh = await api('/historia?mascota_id='+id);
+    if (!rh) return;
+    const consultas = (await rh.json()).data||[];
+    document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
+    renderTimeline(consultas);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('consultas').innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar el historial.</p></div>';
+  }
+}
+
+async function cargarVacunas(id) {
+  const cont = document.getElementById('vacunas-lista');
+  cont.innerHTML='<div class="vempty"><div class="vspinner"></div><p>Cargando vacunas…</p></div>';
+  try {
+    const res  = await api('/vacunas?mascota_id='+id);
+    if (!res) return;
+    const rows = (await res.json()).data||[];
+    if (!rows.length) {
+      cont.innerHTML=`<div class="vcard" style="padding:2.5rem;text-align:center"><span style="font-size:2.5rem;display:block;margin-bottom:.8rem">💉</span><p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin vacunas registradas para esta mascota.</p><button onclick="abrirModalVacuna()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">💉 Registrar Primera Vacuna</button></div>`;
+      return;
+    }
+    cont.innerHTML='<div style="display:flex;flex-direction:column;gap:.7rem">'+rows.map(v=>{
+      const hoy=new Date();
+      const proxima=v.proxima_dosis?new Date(v.proxima_dosis):null;
+      const dias=proxima?Math.ceil((proxima-hoy)/(1000*60*60*24)):null;
+      const vencida=dias!==null&&dias<0;
+      const proxima30=dias!==null&&dias<=30&&dias>=0;
+      return `<div class="vcard vcard-pad" style="${vencida?'border-color:#fecdd3;background:#fff1f2':proxima30?'border-color:#fde68a;background:#fffbeb':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+              <span style="font-size:1.2rem">💉</span>
+              <h4 style="font-weight:700;font-size:.95rem">${esc(v.nombre)}</h4>
+              ${vencida?'<span style="background:#fff1f2;color:#be123c;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fecdd3">🔴 VENCIDA</span>':''}
+              ${proxima30&&!vencida?'<span style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fde68a">⚠️ Próxima</span>':''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+              <span>📅 Aplicada: <strong>${fDate(v.fecha_aplicacion)}</strong></span>
+              ${v.fabricante?'<span>🏭 '+esc(v.fabricante)+'</span>':''}
+              ${v.lote?'<span>🔖 Lote: '+esc(v.lote)+'</span>':''}
+              <span>🩺 Dr(a). ${esc(v.veterinario_nombre||'—')}</span>
+            </div>
+            ${v.notas?'<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.35rem">📝 '+esc(v.notas)+'</p>':''}
+          </div>
+          ${v.proxima_dosis?`<div style="text-align:right;flex-shrink:0">
+            <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Próxima dosis</p>
+            <p style="font-weight:700;font-size:.88rem;margin-top:.2rem;color:${vencida?'#be123c':proxima30?'#b45309':'var(--ink)'}">${fDate(v.proxima_dosis)}</p>
+            ${dias!==null?'<p style="font-size:.7rem;color:'+(vencida?'#be123c':proxima30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>':''}
+          </div>`:''}
+        </div>
+        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+          <button onclick="abrirEditarVacuna(${v.id})"
+            style="font-size:.72rem;color:var(--sky);background:none;border:none;
+            cursor:pointer;font-family:inherit;font-weight:600">
+            ✏️ Editar vacuna
+          </button>
+        </div>
+      </div>`;
+    }).join('')+'</div>';
+  } catch { cont.innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar vacunas.</p></div>'; }
+}
+
+async function guardarVacuna() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+  const nombre=document.getElementById('v-nombre').value.trim();
+  const fecha=document.getElementById('v-fecha').value;
+  if (!nombre) { toast('El nombre de la vacuna es obligatorio.','warning'); return; }
+  if (!fecha)  { toast('La fecha de aplicación es obligatoria.','warning'); return; }
+  const body = { mascota_id:mascotaId, nombre, fabricante:document.getElementById('v-fabricante').value.trim()||null, lote:document.getElementById('v-lote').value.trim()||null, fecha_aplicacion:fecha, proxima_dosis:document.getElementById('v-proxima').value||null, notas:document.getElementById('v-notas').value.trim()||null };
+  try {
+    const res=await api('/vacunas',{method:'POST',body});
+    if (!res) return;
+    const data=await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+    toast('💉 Vacuna registrada correctamente','success');
+    closeModal('modal-vacuna');
+    ['v-nombre','v-fabricante','v-lote','v-proxima','v-notas'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('v-fecha').value=fechaHoyInput();
+    mostrarTab('vacunas');
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ── DESPARASITACIONES ─────────────────────────────────────────
+async function cargarDesparasitaciones(id) {
+  const cont = document.getElementById('desparasitaciones-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando desparasitaciones…</p></div>';
+  try {
+    const res  = await api('/desparasitaciones?mascota_id='+id);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    if (!rows.length) {
+      cont.innerHTML = `<div class="vcard" style="padding:2.5rem;text-align:center">
+        <span style="font-size:2.5rem;display:block;margin-bottom:.8rem">🐛</span>
+        <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin desparasitaciones registradas para esta mascota.</p>
+        <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Registrar Desparasitación</button>
+      </div>`;
+      return;
+    }
+    const tipoLabel = { interna:'🔵 Interna', externa:'🟢 Externa', interna_externa:'🔷 Int+Ext' };
+    const tipoColor = { interna:'#eff6ff', externa:'#f0fdf4', interna_externa:'#f0fdf4' };
+    cont.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+      <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.55rem 1.1rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Nueva desparasitación</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.7rem">` +
+    rows.map(d => {
+      const hoy     = new Date();
+      const proxima = d.proxima_dosis ? new Date(String(d.proxima_dosis).split('T')[0]+'T12:00:00') : null;
+      const dias    = proxima ? Math.ceil((proxima-hoy)/(1000*60*60*24)) : null;
+      const vencida = dias !== null && dias < 0;
+      const prox30  = dias !== null && dias >= 0 && dias <= 30;
+      return `<div class="vcard vcard-pad" style="${vencida?'border-color:#fecdd3;background:#fff1f2':prox30?'border-color:#fde68a;background:#fffbeb':''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+              <span style="font-size:1.2rem">🐛</span>
+              <h4 style="font-weight:700;font-size:.95rem">${esc(d.producto)}</h4>
+              <span style="background:${tipoColor[d.tipo]||'#f0fdf4'};color:#047857;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #a7f3d0">${tipoLabel[d.tipo]||d.tipo}</span>
+              ${vencida ? '<span style="background:#fff1f2;color:#be123c;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fecdd3">🔴 VENCIDA</span>' : ''}
+              ${prox30 && !vencida ? '<span style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fde68a">⚠️ Próxima</span>' : ''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+              <span>📅 Aplicada: <strong>${fDate(d.fecha_aplicacion)}</strong></span>
+              ${d.dosis ? '<span>💊 '+esc(d.dosis)+'</span>' : ''}
+              <span>🩺 Dr(a). ${esc(d.veterinario_nombre||'—')}</span>
+            </div>
+            ${d.notas ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.35rem">📝 '+esc(d.notas)+'</p>' : ''}
+          </div>
+          ${d.proxima_dosis ? `<div style="text-align:right;flex-shrink:0">
+            <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Próxima</p>
+            <p style="font-weight:700;font-size:.88rem;margin-top:.2rem;color:${vencida?'#be123c':prox30?'#b45309':'var(--ink)'}">${fDate(d.proxima_dosis)}</p>
+            ${dias !== null ? '<p style="font-size:.7rem;color:'+(vencida?'#be123c':prox30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>' : ''}
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+  } catch(e) {
+    cont.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error al cargar desparasitaciones.</p></div>';
+  }
+}
+
+function abrirModalDesparasitacion() {
+  document.getElementById('d-tipo').value    = 'interna';
+  document.getElementById('d-producto').value= '';
+  document.getElementById('d-dosis').value   = '';
+  document.getElementById('d-fecha').value   = fechaHoyInput();
+  document.getElementById('d-proxima').value = '';
+  document.getElementById('d-notas').value   = '';
+  openModal('modal-desparasitacion');
+}
+
+async function guardarDesparasitacion() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+  const producto = document.getElementById('d-producto').value.trim();
+  const fecha    = document.getElementById('d-fecha').value;
+  if (!producto) { toast('El nombre del producto es obligatorio.','warning'); return; }
+  if (!fecha)    { toast('La fecha de aplicación es obligatoria.','warning'); return; }
+  const body = {
+    mascota_id      : mascotaId,
+    tipo            : document.getElementById('d-tipo').value,
+    producto,
+    dosis           : document.getElementById('d-dosis').value.trim() || null,
+    fecha_aplicacion: fecha,
+    proxima_dosis   : document.getElementById('d-proxima').value || null,
+    notas           : document.getElementById('d-notas').value.trim() || null,
+  };
+  try {
+    const res  = await api('/desparasitaciones', { method:'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
+    toast('🐛 Desparasitación registrada correctamente', 'success');
+    closeModal('modal-desparasitacion');
+    mostrarTab('desparasitaciones');
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+function renderTimeline(consultas) {
+  const cont=document.getElementById('consultas');
+  if (!consultas.length) {
+    cont.className='';
+    cont.innerHTML='<div class="vcard" style="padding:3rem 2rem;text-align:center"><span style="font-size:2.5rem;display:block;margin-bottom:.8rem">🌱</span><p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin consultas registradas.</p><button onclick="openModal(\'modal-consulta\')" class="vbtn vbtn-primary" style="margin:0 auto">➕ Primera Consulta</button></div>';
+    return;
+  }
+  cont.className='timeline';
+  cont.innerHTML=consultas.map(c=>`
+    <div class="timeline-item">
+      <div class="vcard vcard-pad" style="cursor:pointer;transition:all .22s" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow=''" onclick="verConsultaConId(${c.id})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;gap:.6rem;align-items:center;font-size:.7rem;color:var(--ink-faint);margin-bottom:.4rem;flex-wrap:wrap">
+              <span>${fDateTime(c.fecha)}</span><span>·</span>
+              <span style="color:var(--green-600);font-weight:700">Dr(a). ${esc(c.veterinario_nombre||'')}</span>
+              ${c.cita_id?'<span style="background:#ecfdf5;color:#047857;font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;border:1px solid #a7f3d0">Cita #'+c.cita_id+'</span>':''}
+            </div>
+            <h4 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700">${esc(c.motivo)}</h4>
+            ${c.diagnostico?'<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.4rem;line-height:1.5"><strong>Dx:</strong> '+esc(c.diagnostico.substring(0,140))+(c.diagnostico.length>140?'…':'')+'</p>':''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.35rem;align-items:flex-end;flex-shrink:0">
+            ${c.peso_kg?'<span style="font-size:.68rem;background:#f0f9ff;color:#0369a1;padding:.25rem .6rem;border-radius:999px;font-weight:700">⚖️ '+c.peso_kg+' kg</span>':''}
+            ${c.temperatura_c?'<span style="font-size:.68rem;background:#fffbeb;color:#b45309;padding:.25rem .6rem;border-radius:999px;font-weight:700">🌡️ '+c.temperatura_c+'°C</span>':''}
+          </div>
+        </div>
+        <div style="margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <p style="font-size:.68rem;color:var(--ink-faint)">👆 Click para ver detalle</p>
+            <button onclick="event.stopPropagation();abrirEditarConsulta(${c.id})"
+              style="font-size:.68rem;color:var(--sky);background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Editar consulta">✏️ Editar</button>
+            <button onclick="event.stopPropagation();abrirModalSeguimiento(${c.id})"
+              style="font-size:.68rem;color:#8b5cf6;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Agregar seguimiento">➕ Seguimiento</button>
+            <button onclick="event.stopPropagation();eliminarConsultaDirecto(${c.id})"
+              style="font-size:.68rem;color:#e11d48;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Eliminar consulta">🗑️ Eliminar</button>
+          </div>
+          ${c.tratamiento?'<span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;font-weight:600">💊 Con tratamiento</span>':''}
+        </div>
+        <!-- Seguimientos -->
+        ${c.seguimientos?.length ? renderSeguimientos(c.seguimientos) : ''}
+      </div>
+    </div>`).join('');
+}
+
+
+var _verConsultaId = null;
+
+async function verConsultaConId(id) {
+  _verConsultaId = id;
+  return verConsulta(id);
+}
+
+function verAEditar() {
+  if (!_verConsultaId) return;
+  closeModal('modal-ver');
+  abrirEditarConsulta(_verConsultaId);
+}
+
+async function eliminarConsultaDirecto(id) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta consulta?',
+    mensaje : 'Se eliminarán la consulta, recetas y seguimientos. No se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + id, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Consulta eliminada.', 'success');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+async function eliminarConsulta() {
+  if (!_verConsultaId) return;
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta consulta?',
+    mensaje : 'Se eliminará la consulta y todas sus recetas y seguimientos. Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + _verConsultaId, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Consulta eliminada.', 'success');
+    closeModal('modal-ver');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+async function verConsulta(id) {
+  document.getElementById('ver-titulo').textContent='📋 Cargando…';
+  document.getElementById('ver-body').innerHTML='<div class="vempty"><div class="vspinner"></div></div>';
+  openModal('modal-ver');
+  try {
+    const res=await api('/historia/'+id); if (!res) return;
+    const c=(await res.json()).data;
+    document.getElementById('ver-titulo').textContent='📋 '+c.motivo;
+    document.getElementById('ver-body').innerHTML=`
+      <div class="grid grid-cols-2 gap-3" style="margin-bottom:1.2rem">
+        ${ib('📆 Fecha',fDateTime(c.fecha))}${ib('🩺 Veterinario',c.veterinario_nombre)}
+        ${c.peso_kg?ib('⚖️ Peso',c.peso_kg+' kg'):''}
+        ${c.temperatura_c?ib('🌡️ Temperatura',c.temperatura_c+' °C'):''}
+        ${c.cita_id?'<div style="background:#ecfdf5;border-radius:.9rem;padding:.7rem .9rem;border:1px solid #a7f3d0;grid-column:span 2"><p style="font-size:.6rem;color:#059669;text-transform:uppercase;letter-spacing:.1em;font-weight:700">🔗 Vinculada a</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">Cita #'+c.cita_id+'</p></div>':''}
+      </div>
+      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Pruebas complementarias',c.pruebas_complementarias,'#1d4ed8')}${sec('Observaciones',c.observaciones)}
+      ${c.recetas?.length?`<div style="margin-top:1.2rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:1.1rem;padding:1.15rem"><h4 style="font-family:'Playfair Display',serif;font-weight:700;color:#0c4a6e;margin-bottom:.85rem;font-size:.92rem">💊 Recetas (${c.recetas.length})</h4><div style="display:flex;flex-direction:column;gap:.55rem">${c.recetas.map(r=>`<div style="background:#fff;border-radius:.85rem;padding:.85rem 1rem;font-size:.8rem"><p style="font-weight:700">${esc(r.medicamento)}</p><p style="color:var(--ink-soft);margin-top:.2rem">${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias?' · '+r.duracion_dias+' días':''}</p>${r.instrucciones?'<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">📝 '+esc(r.instrucciones)+'</p>':''}</div>`).join('')}</div></div>`:''}`;
+      // Mostrar botón imprimir solo si hay recetas
+      var btnImp = document.getElementById('ver-btn-imprimir');
+      if (btnImp) btnImp.style.display = c.recetas?.length ? '' : 'none';
+      // Guardar consulta actual para impresión
+      window._consultaActual = c;
+  } catch { document.getElementById('ver-body').innerHTML='<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; }
+}
+
+async function guardarConsulta() {
+  if (!mascotaId) { toast('Selecciona una mascota primero.','warning'); return; }
+  const motivo=document.getElementById('co-motivo').value.trim();
+  if (!motivo) { toast('El motivo es obligatorio.','warning'); return; }
+  const recetas=[];
+  for (const div of document.querySelectorAll('#recetas > div')) {
+    const g=f=>div.querySelector('[data-f="'+f+'"]')?.value?.trim()||'';
+    const med=g('medicamento'),dosis=g('dosis'),frec=g('frecuencia');
+    if (!med||!dosis||!frec) { toast('Completa todos los campos de la receta o elimínala.','warning'); return; }
+    recetas.push({medicamento:med,dosis,frecuencia:frec,duracion_dias:parseInt(g('duracion_dias'))||null,instrucciones:g('instrucciones')});
+  }
+  const hayVacuna=document.getElementById('toggle-vacuna-rapida').checked;
+  let vacunaData=null;
+  if (hayVacuna) {
+    const vrN=document.getElementById('vr-nombre').value.trim();
+    const vrF=document.getElementById('vr-fecha').value;
+    if (!vrN||!vrF) { toast('Completa nombre y fecha de la vacuna.','warning'); return; }
+    vacunaData={mascota_id:mascotaId,nombre:vrN,fabricante:document.getElementById('vr-fabricante').value.trim()||null,lote:document.getElementById('vr-lote').value.trim()||null,fecha_aplicacion:vrF,proxima_dosis:document.getElementById('vr-proxima').value||null,notas:document.getElementById('vr-notas').value.trim()||null};
+  }
+  const body={mascota_id:mascotaId,cita_id:citaId||null,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),pruebas_complementarias:document.getElementById('co-pruebas').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
+  const btn=document.getElementById('btn-guardar-consulta');
+  btn.disabled=true; btn.textContent='Guardando…';
+  try {
+    const res=await api('/historia',{method:'POST',body});
+    if (!res) { btn.disabled=false; resetBtn(); return; }
+    const data=await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); btn.disabled=false; resetBtn(); return; }
+    if (vacunaData) {
+      const resV=await api('/vacunas',{method:'POST',body:vacunaData});
+      toast(resV?.ok?'✅ Consulta y vacuna guardadas correctamente':'✅ Consulta guardada · ⚠️ Error al guardar la vacuna',resV?.ok?'success':'warning',5000);
+    } else {
+      toast(citaId?'✅ Consulta guardada · Cita #'+citaId+' completada':'✅ Consulta registrada correctamente','success',5000);
+    }
+    closeModal('modal-consulta'); limpiarForm();
+    if (citaId) {
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      document.getElementById('modal-cita-banner').style.display='none';
+      document.getElementById('modal-consulta-titulo').textContent='📋 Nueva Consulta';
+      document.getElementById('btn-guardar-consulta').textContent='💾 Guardar Consulta';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
+    cargarHistoria(mascotaId);
+    if (vacunaData) setTimeout(()=>mostrarTab('vacunas'),600);
+  } catch { toast('Error de conexión.','danger'); }
+  finally { btn.disabled=false; resetBtn(); }
+}
+
+function resetBtn() { document.getElementById('btn-guardar-consulta').textContent=citaId?'✅ Guardar y Completar Cita':'💾 Guardar Consulta'; }
+
+// ══ ESTÉTICA ═════════════════════════════════════════════════════
+
+function abrirModalEstetica() {
+  document.getElementById('est-fecha').value = fechaHoyInput();
+  openModal('modal-estetica');
+}
+
+async function cargarEstetica(id) {
+  const cont = document.getElementById('estetica-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando estética…</p></div>';
+  try {
+    const res  = await api('/estetica?mascota_id='+id);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+
+    if (!rows.length) {
+      cont.innerHTML = `
+        <div class="vcard" style="padding:2.5rem;text-align:center">
+          <span style="font-size:2.5rem;display:block;margin-bottom:.8rem">✂️</span>
+          <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">
+            Sin servicios de estética registrados.
+          </p>
+          <button onclick="abrirModalEstetica()"
+            style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;
+            border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;
+            font-weight:600;cursor:pointer;font-family:inherit">
+            ✂️ Registrar Primer Baño
+          </button>
+        </div>`;
+      return;
+    }
+
+    const tipoLabel = { basico:'🛁 Básico', completo:'✨ Completo', medicado:'💊 Medicado', deslanado:'✂️ Deslanado' };
+
+    cont.innerHTML = '<div style="display:flex;flex-direction:column;gap:.7rem">'
+      + rows.map(s => `
+        <div class="vcard vcard-pad">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <!-- Encabezado -->
+              <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem;flex-wrap:wrap">
+                <span style="font-size:1.3rem">✂️</span>
+                <h4 style="font-weight:700;font-size:.95rem">${tipoLabel[s.tipo_bano]||s.tipo_bano}</h4>
+                <!-- Badges de servicios -->
+                ${s.incluye_corte  ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">✂️ Corte</span>' : ''}
+                ${s.incluye_unas   ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">💅 Uñas</span>' : ''}
+                ${s.incluye_dental ? '<span style="background:#fdf2f8;color:#db2777;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fbcfe8">🦷 Dental</span>' : ''}
+              </div>
+              <!-- Detalles -->
+              <div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.72rem;color:var(--ink-soft)">
+                <span>📅 <strong>${fDate(s.fecha)}</strong></span>
+                <span>✂️ ${esc(s.atendido_por_nombre||'—')}</span>
+                ${s.productos ? '<span>🧴 '+esc(s.productos)+'</span>' : ''}
+                ${s.cita_id   ? '<span style="background:#ecfdf5;color:#047857;padding:.1rem .45rem;border-radius:999px;border:1px solid #a7f3d0;font-weight:700">Cita #'+s.cita_id+'</span>' : ''}
+              </div>
+              ${s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.4rem;line-height:1.5">📝 '+esc(s.observaciones)+'</p>' : ''}
+            </div>
+            <!-- Precio -->
+            ${s.precio ? `
+              <div style="text-align:right;flex-shrink:0">
+                <p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Precio</p>
+                <p style="font-weight:800;font-size:1.1rem;color:#db2777;margin-top:.15rem">
+                  S/. ${parseFloat(s.precio).toFixed(2)}
+                </p>
+              </div>` : ''}
+          </div>
+          <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+            <button onclick="abrirEditarEstetica(${s.id})"
+              style="font-size:.72rem;color:var(--sky);background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600">
+              ✏️ Editar servicio
+            </button>
+          </div>
+        </div>`).join('')
+      + '</div>';
+  } catch {
+    cont.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error al cargar estética.</p></div>';
+  }
+}
+
+async function guardarEstetica() {
+  if (!mascotaId) { toast('No hay mascota seleccionada.','warning'); return; }
+
+  const fecha    = document.getElementById('est-fecha').value;
+  const tipo     = document.getElementById('est-tipo').value;
+
+  if (!fecha) { toast('La fecha es obligatoria.','warning'); return; }
+  if (!tipo)  { toast('Selecciona el tipo de baño.','warning'); return; }
+
+  const body = {
+    mascota_id     : mascotaId,
+    fecha,
+    tipo_bano      : tipo,
+    incluye_corte  : document.getElementById('est-corte').checked,
+    incluye_unas   : document.getElementById('est-unas').checked,
+    incluye_dental : document.getElementById('est-dental').checked,
+    productos      : document.getElementById('est-productos').value.trim() || null,
+    precio         : parseFloat(document.getElementById('est-precio').value) || null,
+    observaciones  : document.getElementById('est-observaciones').value.trim() || null,
+  };
+
+  try {
+    const res  = await api('/estetica', { method:'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
+
+    var esteticaId = data.data.id;
+    // Subir fotos si hay
+    if (_fotasAntes.length || _fotosDespues.length) {
+      await subirFotosEstetica(esteticaId);
+    } else {
+      toast('✂️ Servicio de estética registrado', 'success');
+    }
+    closeModal('modal-estetica');
+    limpiarFormEstetica();
+    mostrarTab('estetica');
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function limpiarFormEstetica() {
+  document.getElementById('est-fecha').value         = fechaHoyInput();
+  document.getElementById('est-tipo').value          = 'basico';
+  document.getElementById('est-corte').checked       = false;
+  document.getElementById('est-unas').checked        = false;
+  document.getElementById('est-dental').checked      = false;
+  document.getElementById('est-productos').value     = '';
+  document.getElementById('est-precio').value        = '';
+  document.getElementById('est-observaciones').value = '';
+  // Limpiar previews de fotos
+  _fotasAntes   = [];
+  _fotosDespues = [];
+  var pa = document.getElementById('est-fotos-antes-preview');
+  var pd = document.getElementById('est-fotos-despues-preview');
+  if (pa) pa.innerHTML = '';
+  if (pd) pd.innerHTML = '';
+}
+
+function limpiarForm() {
+  ['co-motivo','co-peso','co-temp','co-anamnesis','co-exploracion','co-diagnostico','co-tratamiento','co-pruebas','co-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('recetas').innerHTML='';
+  document.getElementById('toggle-vacuna-rapida').checked=false;
+  document.getElementById('vacuna-rapida-form').style.display='none';
+  ['vr-nombre','vr-fabricante','vr-lote','vr-proxima','vr-notas'].forEach(id=>document.getElementById(id).value='');
+  recetaN=0;
+}
+
+function addReceta() {
+  const id  = recetaN++;
+  const div = document.createElement('div');
+  div.id = 'rec-' + id;
+  div.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:.9rem;display:flex;flex-direction:column;gap:.6rem';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft)">💊 Medicamento ${id+1}</p>
+      <button onclick="document.getElementById('rec-${id}').remove()" class="vlink" style="color:#e11d48">Eliminar</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <!-- Campo medicamento con autocompletado -->
+      <div class="autocomplete-wrap" style="position:relative">
+        <input type="text" placeholder="💊 Busca o escribe medicamento…"
+          class="vinput" data-f="medicamento" style="font-size:.78rem;width:100%"/>
+      </div>
+      <input type="text" placeholder="Dosis *" class="vinput" data-f="dosis" style="font-size:.78rem"/>
+      <input type="text" placeholder="Frecuencia *" class="vinput" data-f="frecuencia" style="font-size:.78rem"/>
+      <input type="number" placeholder="Días" class="vinput" data-f="duracion_dias" style="font-size:.78rem"/>
+    </div>
+    <input type="text" placeholder="Instrucciones adicionales…" class="vinput" data-f="instrucciones" style="font-size:.78rem"/>`;
+
+  document.getElementById('recetas').appendChild(div);
+
+  // Adjuntar autocompletado al campo medicamento
+  const inputMed = div.querySelector('[data-f="medicamento"]');
+  attachAutocomplete(inputMed, ['medicamento', 'insumo', 'otro'], (item) => {
+    // Al seleccionar, pre-rellenar dosis si el campo está vacío
+    const dosisInput = div.querySelector('[data-f="dosis"]');
+    if (dosisInput && !dosisInput.value) {
+      dosisInput.focus();
+    }
+  });
+}
+
+// ══ EDICIÓN CONSULTA ════════════════════════════════════════════
+let ecRecetaN = 0;
+
+async function abrirEditarConsulta(id) {
+  document.getElementById('ec-id').value = id;
+  document.getElementById('ec-recetas').innerHTML = '';
+  ecRecetaN = 0;
+  openModal('modal-editar-consulta');
+  try {
+    const res = await api(`/historia/${id}`);
+    if (!res||!res.ok) { toast('Error al cargar consulta.','danger'); return; }
+    const c   = (await res.json()).data;
+    document.getElementById('ec-motivo').value     = c.motivo      || '';
+    document.getElementById('ec-peso').value       = c.peso_kg     || '';
+    document.getElementById('ec-temp').value       = c.temperatura_c || '';
+    document.getElementById('ec-anamnesis').value  = c.anamnesis   || '';
+    document.getElementById('ec-exploracion').value = c.exploracion || '';
+    document.getElementById('ec-diagnostico').value = c.diagnostico || '';
+    document.getElementById('ec-tratamiento').value = c.tratamiento || '';
+    document.getElementById('ec-pruebas').value    = c.pruebas_complementarias || '';
+    document.getElementById('ec-obs').value        = c.observaciones || '';
+    // Cargar recetas existentes
+    (c.recetas||[]).forEach(r => addRecetaEdit(r));
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function addRecetaEdit(data={}) {
+  const id  = ecRecetaN++;
+  const div = document.createElement('div');
+  div.id = `ecr-${id}`;
+  div.style.cssText = 'background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:.9rem;display:flex;flex-direction:column;gap:.6rem';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft)">💊 Medicamento ${id+1}</p>
+      <button onclick="document.getElementById('ecr-${id}').remove()" class="vlink" style="color:#e11d48">Eliminar</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <input type="text" placeholder="Medicamento *" class="vinput" data-f="medicamento" style="font-size:.78rem" value="${esc(data.medicamento||'')}"/>
+      <input type="text" placeholder="Dosis *" class="vinput" data-f="dosis" style="font-size:.78rem" value="${esc(data.dosis||'')}"/>
+      <input type="text" placeholder="Frecuencia *" class="vinput" data-f="frecuencia" style="font-size:.78rem" value="${esc(data.frecuencia||'')}"/>
+      <input type="number" placeholder="Días" class="vinput" data-f="duracion_dias" style="font-size:.78rem" value="${data.duracion_dias||''}"/>
+    </div>
+    <input type="text" placeholder="Instrucciones…" class="vinput" data-f="instrucciones" style="font-size:.78rem" value="${esc(data.instrucciones||'')}"/>`;
+  document.getElementById('ec-recetas').appendChild(div);
+  // Adjuntar autocomplete al campo medicamento
+  const inputMed = div.querySelector('[data-f="medicamento"]');
+  if (typeof attachAutocomplete === 'function') {
+    attachAutocomplete(inputMed, ['medicamento','insumo','otro'], ()=>{});
+  }
+}
+
+async function guardarEditConsulta() {
+  const id     = document.getElementById('ec-id').value;
+  const motivo = document.getElementById('ec-motivo').value.trim();
+  if (!motivo) { toast('El motivo es obligatorio.','warning'); return; }
+
+  const recetas = [];
+  for (const div of document.querySelectorAll('#ec-recetas > div')) {
+    const g = f => div.querySelector(`[data-f="${f}"]`)?.value?.trim()||'';
+    const med=g('medicamento'),dosis=g('dosis'),frec=g('frecuencia');
+    if (!med||!dosis||!frec) { toast('Completa todos los campos de la receta.','warning'); return; }
+    recetas.push({ medicamento:med, dosis, frecuencia:frec, duracion_dias:parseInt(g('duracion_dias'))||null, instrucciones:g('instrucciones') });
+  }
+
+  const body = {
+    motivo,
+    peso_kg      : parseFloat(document.getElementById('ec-peso').value)||null,
+    temperatura_c: parseFloat(document.getElementById('ec-temp').value)||null,
+    anamnesis    : document.getElementById('ec-anamnesis').value.trim(),
+    exploracion  : document.getElementById('ec-exploracion').value.trim(),
+    diagnostico  : document.getElementById('ec-diagnostico').value.trim(),
+    tratamiento  : document.getElementById('ec-tratamiento').value.trim(),
+    pruebas_complementarias: document.getElementById('ec-pruebas').value.trim(),
+    observaciones: document.getElementById('ec-obs').value.trim(),
+    recetas,
+  };
+
+  try {
+    const res = await api(`/historia/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Consulta actualizada','success');
+    closeModal('modal-editar-consulta');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══ EDICIÓN VACUNA ═══════════════════════════════════════════════
+
+async function abrirEditarVacuna(id) {
+  document.getElementById('ev-id').value = id;
+  openModal('modal-editar-vacuna');
+  try {
+    const res  = await api(`/vacunas?mascota_id=${mascotaId}`);
+    if (!res) return;
+    const rows = (await res.json()).data || [];
+    const v    = rows.find(x => x.id === id);
+    if (!v) { toast('Vacuna no encontrada.','danger'); return; }
+    document.getElementById('ev-nombre').value    = v.nombre            || '';
+    document.getElementById('ev-fabricante').value = v.fabricante       || '';
+    document.getElementById('ev-lote').value       = v.lote             || '';
+    document.getElementById('ev-fecha').value      = v.fecha_aplicacion?.split('T')[0] || '';
+    document.getElementById('ev-proxima').value    = v.proxima_dosis?.split('T')[0]    || '';
+    document.getElementById('ev-notas').value      = v.notas            || '';
+  } catch { toast('Error al cargar vacuna.','danger'); }
+}
+
+async function guardarEditVacuna() {
+  const id     = document.getElementById('ev-id').value;
+  const nombre = document.getElementById('ev-nombre').value.trim();
+  const fecha  = document.getElementById('ev-fecha').value;
+  if (!nombre) { toast('El nombre es obligatorio.','warning'); return; }
+  if (!fecha)  { toast('La fecha es obligatoria.','warning'); return; }
+
+  const body = {
+    nombre,
+    fabricante    : document.getElementById('ev-fabricante').value.trim()||null,
+    lote          : document.getElementById('ev-lote').value.trim()||null,
+    fecha_aplicacion: fecha,
+    proxima_dosis : document.getElementById('ev-proxima').value||null,
+    notas         : document.getElementById('ev-notas').value.trim()||null,
+  };
+
+  try {
+    const res = await api(`/vacunas/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    toast('✅ Vacuna actualizada','success');
+    closeModal('modal-editar-vacuna');
+    cargarVacunas(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+// ══ EDICIÓN ESTÉTICA ═════════════════════════════════════════════
+
+var _eeNuevasAntes   = [];
+var _eeNuevasDespues = [];
+
+async function abrirEditarEstetica(id) {
+  document.getElementById('ee-id').value = id;
+  _eeNuevasAntes   = [];
+  _eeNuevasDespues = [];
+  document.getElementById('ee-fotos-antes-preview').innerHTML   = '';
+  document.getElementById('ee-fotos-despues-preview').innerHTML = '';
+  document.getElementById('ee-fotos-actuales').innerHTML        = '<div style="font-size:.75rem;color:var(--ink-faint)">Cargando fotos...</div>';
+  openModal('modal-editar-estetica');
+  try {
+    // Cargar detalle del servicio con fotos
+    const res = await api('/estetica/' + id);
+    if (!res) return;
+    const s   = (await res.json()).data;
+    if (!s) { toast('Registro no encontrado.','danger'); return; }
+
+    document.getElementById('ee-fecha').value     = s.fecha?.split('T')[0] || '';
+    document.getElementById('ee-tipo').value      = s.tipo_bano             || 'basico';
+    document.getElementById('ee-corte').checked  = !!s.incluye_corte;
+    document.getElementById('ee-unas').checked   = !!s.incluye_unas;
+    document.getElementById('ee-dental').checked = !!s.incluye_dental;
+    document.getElementById('ee-productos').value = s.productos             || '';
+    document.getElementById('ee-precio').value    = s.precio                || '';
+    document.getElementById('ee-obs').value       = s.observaciones         || '';
+
+    // Renderizar fotos existentes
+    renderFotosEdit(s.fotos || [], id);
+  } catch { toast('Error al cargar registro.','danger'); }
+}
+
+function renderFotosEdit(fotos, esteticaId) {
+  var cont = document.getElementById('ee-fotos-actuales');
+  if (!fotos.length) {
+    cont.innerHTML = '<p style="font-size:.75rem;color:var(--ink-faint)">Sin fotos aún.</p>';
+    return;
+  }
+  var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
+  var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
+
+  function appendGridEdit(container, lista, label) {
+    if (!lista.length) return;
+    var section = document.createElement('div');
+    section.style.marginBottom = '.5rem';
+    var title = document.createElement('p');
+    title.style.cssText = 'font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.35rem';
+    title.textContent = label;
+    section.appendChild(title);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:.4rem';
+    lista.forEach(function(f) {
+      var wrap = document.createElement('div');
+      wrap.style.position = 'relative';
+      var img = crearImgSegura(f.id,
+        'width:64px;height:64px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid #fbcfe8',
+        function() { openLightboxSingle(f.id); }
+      );
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#e11d48;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center';
+      btn.onclick = function() { eliminarFotoEdit(f.id, wrap); };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      row.appendChild(wrap);
+    });
+    section.appendChild(row);
+    container.appendChild(section);
+  }
+
+  cont.innerHTML = '';
+  appendGridEdit(cont, antes, '📷 Antes');
+  appendGridEdit(cont, despues, '✨ Después');
+}
+
+async function eliminarFotoEdit(fotoId, wrapper) {
+  try {
+    var res = await api('/estetica/fotos/' + fotoId, { method: 'DELETE' });
+    if (res?.ok) { wrapper.remove(); toast('Foto eliminada.', 'success'); }
+    else toast('Error al eliminar foto.', 'danger');
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+function previewFotosEdit(input, previewId, momento) {
+  var files = Array.from(input.files);
+  var cont  = document.getElementById(previewId);
+  files.forEach(function(file) {
+    if (momento === 'antes') _eeNuevasAntes.push(file);
+    else                     _eeNuevasDespues.push(file);
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:64px;height:64px';
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:.6rem;border:2px solid #fbcfe8';
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#db2777;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;font-weight:700;line-height:1';
+      btn.onclick = function() {
+        if (momento === 'antes') _eeNuevasAntes   = _eeNuevasAntes.filter(function(f) { return f !== file; });
+        else                     _eeNuevasDespues = _eeNuevasDespues.filter(function(f) { return f !== file; });
+        wrap.remove();
+      };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      cont.appendChild(wrap);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+async function guardarEditEstetica() {
+  const id   = document.getElementById('ee-id').value;
+  const fecha = document.getElementById('ee-fecha').value;
+  const tipo  = document.getElementById('ee-tipo').value;
+  if (!fecha) { toast('La fecha es obligatoria.','warning'); return; }
+  if (!tipo)  { toast('El tipo de baño es obligatorio.','warning'); return; }
+
+  const body = {
+    fecha,
+    tipo_bano      : tipo,
+    incluye_corte  : document.getElementById('ee-corte').checked,
+    incluye_unas   : document.getElementById('ee-unas').checked,
+    incluye_dental : document.getElementById('ee-dental').checked,
+    productos      : document.getElementById('ee-productos').value.trim()||null,
+    precio         : parseFloat(document.getElementById('ee-precio').value)||null,
+    observaciones  : document.getElementById('ee-obs').value.trim()||null,
+  };
+
+  try {
+    const res = await api(`/estetica/${id}`, { method:'PUT', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+
+    // Subir nuevas fotos si las hay
+    var todasNuevas = [
+      ..._eeNuevasAntes.map(function(f)   { return { file: f, momento: 'antes' }; }),
+      ..._eeNuevasDespues.map(function(f) { return { file: f, momento: 'despues' }; }),
+    ];
+    if (todasNuevas.length) {
+      var tk = localStorage.getItem('vet_access');
+      for (var i = 0; i < todasNuevas.length; i++) {
+        var item = todasNuevas[i];
+        try {
+          var fd = new FormData();
+          fd.append('foto', item.file);
+          var uRes = await fetch(API_URL + '/api/v1/estetica/upload', {
+            method : 'POST',
+            headers: { 'Authorization': 'Bearer ' + tk, 'X-Tenant-Host': window.location.hostname },
+            body   : fd,
+          });
+          if (!uRes.ok) continue;
+          var ud = (await uRes.json()).data;
+          await api('/estetica/' + id + '/fotos', {
+            method: 'POST',
+            body  : { momento: item.momento, url: ud.public_url, nombre_archivo: item.file.name }
+          });
+        } catch(e) { console.error(e); }
+      }
+      _eeNuevasAntes   = [];
+      _eeNuevasDespues = [];
+    }
+
+    toast('✅ Servicio de estética actualizado','success');
+    closeModal('modal-editar-estetica');
+    cargarEstetica(mascotaId);
+  } catch { toast('Error de conexión.','danger'); }
+}
+
+function fDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }) +
+    ' ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' });
+}
+
+function ib(label,val) { return '<div style="background:#f8faf8;border-radius:.9rem;padding:.7rem .9rem;border:1px solid var(--line)"><p style="font-size:.6rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">'+label+'</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">'+esc(val||'—')+'</p></div>'; }
+function sec(label,val,color,bold) { if (!val) return ''; return '<div style="margin-bottom:.95rem"><p style="font-size:.62rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:.35rem">'+label+'</p><p style="font-size:.85rem;line-height:1.65;'+(color?'color:'+color+';':'')+(bold?'font-weight:600;':'')+'">'+esc(val)+'</p></div>'; }
+
+// ══ AUTOCOMPLETADO INVENTARIO ════════════════════════════════════
+
+// Busqueda server-side con debounce
+async function buscarInventarioServer(q, cats) {
+  try {
+    var catParam = cats && cats.length === 1 ? '&categoria=' + cats[0] : '';
+    var res = await api('/inventario?limit=20&search=' + encodeURIComponent(q) + catParam);
+    if (!res || !res.ok) return [];
+    return (await res.json()).data || [];
+  } catch { return []; }
+}
+
+/**
+ * Adjunta autocompletado a un input.
+ * @param {HTMLInputElement} input   - El campo de texto
+ * @param {string[]}         cats    - Categorías a filtrar: ['medicamento'], ['vacuna'], etc.
+ * @param {Function}         onSelect - Callback(item) cuando el usuario elige una sugerencia
+ */
+function attachAutocomplete(input, cats, onSelect) {
+  input.parentElement.classList.add('autocomplete-wrap');
+  input.parentElement.style.position = 'relative';  // garantizar position:relative
+
+  let list      = null;
+  let timer     = null;
+  let seleccionando = false; // flag para evitar cerrar al hacer click
+
+  function cerrar() {
+    if (seleccionando) return; // no cerrar si estamos seleccionando
+    if (list) { list.remove(); list = null; }
+  }
+
+  function mostrarLista(filtrados) {
+    if (list) { list.remove(); list = null; }
+
+    list = document.createElement('ul');
+    list.className = 'autocomplete-list';
+
+    if (!filtrados.length) {
+      const li = document.createElement('li');
+      li.className = 'ac-empty';
+      li.textContent = 'Sin coincidencias — puedes escribir manualmente';
+      list.appendChild(li);
+    } else {
+      filtrados.forEach(function(item) {
+        const li   = document.createElement('li');
+        const bajo = parseFloat(item.cantidad) <= parseFloat(item.stock_minimo);
+        li.innerHTML =
+          '<span class="ac-cat ac-cat-' + item.categoria + '">' + catIcon(item.categoria) + ' ' + esc(item.categoria) + '</span>' +
+          '<span class="ac-nombre">' + esc(item.nombre) + '</span>' +
+          '<span class="ac-stock" style="' + (bajo ? 'color:#b45309' : '') + '">' +
+            (bajo ? '⚠️' : '📦') + ' ' + item.cantidad + ' ' + esc(item.unidad) +
+          '</span>' +
+          '<span class="ac-hint">seleccionar</span>';
+
+        // mousedown se dispara ANTES que blur — así podemos seleccionar sin que se cierre
+        li.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          seleccionando = true;
+          input.value = item.nombre;
+          if (onSelect) onSelect(item);
+          cerrar();
+          seleccionando = false;
+          // Mover foco al siguiente campo
+          setTimeout(function() {
+            var next = input.closest('div')?.querySelector('input:not(#' + input.id + '), select');
+            if (next) next.focus();
+            else input.blur();
+          }, 30);
+        });
+        list.appendChild(li);
+      });
+    }
+    input.parentElement.appendChild(list);
+  }
+
+  input.addEventListener('input', function() {
+    const q = input.value.trim();
+    clearTimeout(timer);
+    if (list) { list.remove(); list = null; }
+    if (q.length < 1) return;
+
+    timer = setTimeout(async function() {
+      const filtrados = await buscarInventarioServer(q, cats);
+      // Solo mostrar si el input aún tiene el mismo texto
+      if (input.value.trim() === q) mostrarLista(filtrados);
+    }, 350);
+  });
+
+  input.addEventListener('blur', function() {
+    setTimeout(cerrar, 200);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') cerrar();
+  });
+}
+
+
+// ══ SEGUIMIENTOS ═════════════════════════════════════════════════
+
+function renderSeguimientos(seguimientos) {
+  if (!seguimientos || !seguimientos.length) return '';
+  return '<div onclick="event.stopPropagation()" style="margin-top:.85rem;padding:.85rem;background:#f5f3ff;border-radius:.9rem;border:1px solid #ddd6fe">' +
+    '<p style="font-size:.7rem;font-weight:700;color:#6d28d9;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.08em">🔄 Seguimientos (' + seguimientos.length + ')</p>' +
+    '<div style="display:flex;flex-direction:column;gap:.6rem">' +
+    seguimientos.map(function(s) {
+      return '<div style="background:#fff;border-radius:.75rem;padding:.75rem;border:1px solid #ede9fe">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;flex-wrap:wrap;gap:.5rem">' +
+          '<span style="font-size:.72rem;color:#6d28d9;font-weight:700">' + fDate(s.fecha) + ' — Dr(a). ' + esc(s.veterinario_nombre||'') + '</span>' +
+          '<div style="display:flex;gap:.5rem;align-items:center">' +
+            (s.peso_kg ? '<span style="font-size:.65rem;background:#f0f9ff;color:#0369a1;padding:.15rem .45rem;border-radius:999px;font-weight:700">⚖️ ' + s.peso_kg + ' kg</span>' : '') +
+            (s.temperatura_c ? '<span style="font-size:.65rem;background:#fffbeb;color:#b45309;padding:.15rem .45rem;border-radius:999px;font-weight:700">🌡️ ' + s.temperatura_c + '°C</span>' : '') +
+            '<button onclick="event.stopPropagation();editarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
+              'style="font-size:.65rem;color:var(--sky);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">✏️</button>' +
+            '<button onclick="event.stopPropagation();eliminarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
+              'style="font-size:.65rem;color:#e11d48;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">🗑️</button>' +
+          '</div>' +
+        '</div>' +
+        '<p style="font-size:.78rem;color:var(--ink);line-height:1.5"><strong>Evolución:</strong> ' + esc(s.evolucion) + '</p>' +
+        (s.tratamiento ? '<p style="font-size:.75rem;color:var(--ink-soft);margin-top:.3rem;line-height:1.5"><strong>Tratamiento:</strong> ' + esc(s.tratamiento) + '</p>' : '') +
+        (s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.3rem">📝 ' + esc(s.observaciones) + '</p>' : '') +
+      '</div>';
+    }).join('') +
+    '</div></div>';
+}
+
+
+async function editarSeguimiento(segId, historiaId) {
+  // Cargar datos del seguimiento
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos');
+    if (!res) return;
+    var segs = (await res.json()).data || [];
+    var s    = segs.find(function(x) { return x.id === segId; });
+    if (!s) { toast('Seguimiento no encontrado.', 'danger'); return; }
+
+    document.getElementById('seg-historia-id').value  = historiaId;
+    document.getElementById('seg-fecha').value         = s.fecha ? s.fecha.split('T')[0] : fechaHoyInput();
+    document.getElementById('seg-evolucion').value     = s.evolucion || '';
+    document.getElementById('seg-tratamiento').value   = s.tratamiento || '';
+    document.getElementById('seg-observaciones').value = s.observaciones || '';
+    document.getElementById('seg-peso').value          = s.peso_kg || '';
+    document.getElementById('seg-temp').value          = s.temperatura_c || '';
+
+    // Cambiar el botón guardar para que haga PUT en lugar de POST
+    var btnGuardar = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
+    if (btnGuardar) {
+      btnGuardar.textContent = '💾 Guardar Cambios';
+      btnGuardar.onclick = function() { guardarEditSeguimiento(segId, historiaId); };
+    }
+
+    document.getElementById('modal-seguimiento').querySelector('h3').textContent = '✏️ Editar Seguimiento';
+    openModal('modal-seguimiento');
+  } catch { toast('Error al cargar seguimiento.', 'danger'); }
+}
+
+async function guardarEditSeguimiento(segId, historiaId) {
+  var evolucion = document.getElementById('seg-evolucion').value.trim();
+  if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+
+  var body = {
+    fecha        : document.getElementById('seg-fecha').value,
+    evolucion,
+    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
+    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+  };
+
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos/' + segId, { method: 'PUT', body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+    toast('✅ Seguimiento actualizado.', 'success');
+    closeModal('modal-seguimiento');
+    // Restaurar botón a modo crear
+    var btnGuardar = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
+    if (btnGuardar) {
+      btnGuardar.textContent = '🔄 Guardar Seguimiento';
+      btnGuardar.onclick = guardarSeguimiento;
+    }
+    document.getElementById('modal-seguimiento').querySelector('h3').textContent = '🔄 Agregar Seguimiento';
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+async function eliminarSeguimiento(segId, historiaId) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar seguimiento?',
+    mensaje : 'Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res = await api('/historia/' + historiaId + '/seguimientos/' + segId, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+    toast('🗑️ Seguimiento eliminado.', 'success');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+function abrirModalSeguimiento(historiaId) {
+  document.getElementById('seg-historia-id').value = historiaId;
+  document.getElementById('seg-fecha').value        = fechaHoyInput();
+  document.getElementById('seg-evolucion').value    = '';
+  document.getElementById('seg-tratamiento').value  = '';
+  document.getElementById('seg-observaciones').value= '';
+  document.getElementById('seg-peso').value         = '';
+  document.getElementById('seg-temp').value         = '';
+  openModal('modal-seguimiento');
+  setTimeout(function() { document.getElementById('seg-evolucion').focus(); }, 150);
+}
+
+async function guardarSeguimiento() {
+  var historiaId = document.getElementById('seg-historia-id').value;
+  var evolucion  = document.getElementById('seg-evolucion').value.trim();
+  if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+
+  var body = {
+    fecha        : document.getElementById('seg-fecha').value,
+    evolucion,
+    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
+    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+  };
+
+  try {
+    var res  = await api('/historia/' + historiaId + '/seguimientos', { method: 'POST', body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
+    toast('🔄 Seguimiento registrado correctamente.', 'success');
+    closeModal('modal-seguimiento');
+    cargarHistoria(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+// ══ FOTOS ESTÉTICA ════════════════════════════════════════════════
+
+var _fotasAntes   = [];
+var _fotosDespues = [];
+var _lightboxFotos = [];
+var _lightboxIdx   = 0;
+
+function previewFotos(input, previewId, momento) {
+  var files = Array.from(input.files);
+  var cont  = document.getElementById(previewId);
+
+  files.forEach(function(file) {
+    if (momento === 'antes')   _fotasAntes.push(file);
+    else                       _fotosDespues.push(file);
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:72px;height:72px';
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:.65rem;border:2px solid #fbcfe8;cursor:pointer';
+      img.onclick = function() { openLightboxSingle(e.target.result); };
+      var btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.style.cssText = 'position:absolute;top:-6px;right:-6px;background:#db2777;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-weight:700';
+      btn.onclick = function() {
+        if (momento === 'antes') _fotasAntes   = _fotasAntes.filter(function(f) { return f !== file; });
+        else                     _fotosDespues = _fotosDespues.filter(function(f) { return f !== file; });
+        wrap.remove();
+      };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
+      cont.appendChild(wrap);
+    };
+    reader.readAsDataURL(file);
+  });
+  // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
+  input.value = '';
+}
+
+async function subirFotosEstetica(esteticaId) {
+  var todas = [
+    ..._fotasAntes.map(function(f)   { return { file: f, momento: 'antes' };   }),
+    ..._fotosDespues.map(function(f) { return { file: f, momento: 'despues' }; }),
+  ];
+  if (!todas.length) return;
+
+  toast('📸 Subiendo ' + todas.length + ' foto(s)...', 'info', 3000);
+
+  var token = localStorage.getItem('vet_access');
+  var errores = 0;
+
+  for (var i = 0; i < todas.length; i++) {
+    var item = todas[i];
+    try {
+      // Subir via backend (evita problemas de CORS con Azure)
+      var fd = new FormData();
+      fd.append('foto', item.file);
+
+      var uploadRes = await fetch(API_URL + '/api/v1/estetica/upload', {
+        method : 'POST',
+        headers: {
+          'Authorization' : 'Bearer ' + token,
+          'X-Tenant-Host' : window.location.hostname,
+        },
+        body: fd,
+      });
+
+      if (!uploadRes.ok) { errores++; continue; }
+      var uploadData = (await uploadRes.json()).data;
+
+      // Registrar URL en la BD
+      await api('/estetica/' + esteticaId + '/fotos', {
+        method: 'POST',
+        body  : { momento: item.momento, url: uploadData.public_url, nombre_archivo: item.file.name }
+      });
+      // Nota: la foto se sirve via proxy /estetica/foto/:id — no la URL directa de Azure
+    } catch(e) {
+      errores++;
+      console.error('Error subiendo foto:', e.message);
+    }
+  }
+
+  if (errores > 0) {
+    toast('⚠️ ' + (todas.length - errores) + ' fotos subidas, ' + errores + ' fallaron.', 'warning', 5000);
+  } else {
+    toast('✅ ' + todas.length + ' foto(s) subidas correctamente.', 'success');
+  }
+  _fotasAntes   = [];
+  _fotosDespues = [];
+}
+
+// ══ LIGHTBOX ══════════════════════════════════════════════════════
+
+async function openLightboxSingle(fotoId) {
+  _lightboxFotos = [fotoId];
+  _lightboxIdx   = 0;
+  var lb = document.getElementById('lightbox');
+  lb.classList.remove('hidden');
+  lb.style.display = 'flex';
+  document.getElementById('lb-h-prev').style.visibility = 'hidden';
+  document.getElementById('lb-h-next').style.visibility = 'hidden';
+  document.getElementById('lightbox-thumbs').innerHTML = '';
+  document.getElementById('lightbox-counter').textContent = '';
+  await lbHMostrar();
+}
+
+async function openLightbox(ids, idx) {
+  _lightboxFotos = Array.isArray(ids) ? ids.slice() : [ids];
+  _lightboxIdx   = idx || 0;
+  var lb   = document.getElementById('lightbox');
+  var prev = document.getElementById('lb-h-prev');
+  var next = document.getElementById('lb-h-next');
+  lb.classList.remove('hidden');
+  lb.style.display = 'flex';
+  prev.style.visibility = _lightboxFotos.length > 1 ? 'visible' : 'hidden';
+  next.style.visibility = _lightboxFotos.length > 1 ? 'visible' : 'hidden';
+  await lbHMostrar();
+  lbHThumbs();
+}
+
+async function lbHMostrar() {
+  var img     = document.getElementById('lightbox-img');
+  var loading = document.getElementById('lightbox-loading');
+  var counter = document.getElementById('lightbox-counter');
+  img.style.opacity = '0';
+  if (loading) loading.style.display = 'block';
+  if (counter) counter.textContent = _lightboxFotos.length > 1
+    ? (_lightboxIdx + 1) + ' / ' + _lightboxFotos.length : '';
+
+  var item = _lightboxFotos[_lightboxIdx];
+  if (typeof item === 'string' && item.startsWith('blob:')) {
+    // blob URL de preview — asignar directo
+    img.src = item;
+  } else {
+    // ID numérico — cargar via fetch con JWT
+    await cargarFotoSegura(img, item);
+  }
+
+  // Actualizar thumb activo
+  document.querySelectorAll('.lb-h-thumb').forEach(function(t, i) {
+    t.style.border  = i === _lightboxIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,.3)';
+    t.style.opacity = i === _lightboxIdx ? '1' : '0.6';
+  });
+}
+
+function lbHThumbs() {
+  var cont = document.getElementById('lightbox-thumbs');
+  if (!cont) return;
+  cont.innerHTML = '';
+  if (_lightboxFotos.length <= 1) return;
+  _lightboxFotos.forEach(function(fotoId, i) {
+    var thumb = document.createElement('img');
+    thumb.className = 'lb-h-thumb';
+    thumb.style.cssText = 'width:48px;height:48px;object-fit:cover;border-radius:.5rem;cursor:pointer;transition:all .15s;border:2px solid rgba(255,255,255,.3);opacity:.6;flex-shrink:0';
+    thumb.onclick = async function(e) { e.stopPropagation(); _lightboxIdx = i; await lbHMostrar(); };
+    cargarFotoSegura(thumb, fotoId);
+    cont.appendChild(thumb);
+  });
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.getElementById('lightbox').classList.add('hidden');
+}
+
+async function lightboxNav(dir) {
+  _lightboxIdx = (_lightboxIdx + dir + _lightboxFotos.length) % _lightboxFotos.length;
+  await lbHMostrar();
+}
+
+document.addEventListener('keydown', function(e) {
+  var lb = document.getElementById('lightbox');
+  if (lb && !lb.classList.contains('hidden')) {
+    if (e.key === 'ArrowLeft')  lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+    if (e.key === 'Escape')     closeLightbox();
+  }
+});
+
+
+function renderFotosEstetica(fotos, esteticaId) {
+  var antes   = fotos.filter(function(f) { return f.momento === 'antes'; });
+  var despues = fotos.filter(function(f) { return f.momento === 'despues'; });
+  var todasIds  = fotos.map(function(f) { return f.id; });
+
+  function grid(lista, label) {
+    if (!lista.length) return '';
+    return '<div>' +
+      '<p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">' + label + '</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:.4rem">' +
+      lista.map(function(f, i) {
+        var _wid = 'fg-' + f.id + '-' + i;
+        setTimeout(function() {
+          var _w = document.getElementById(_wid);
+          if (!_w) return;
+          var _idx = todasIds.indexOf(f.id);
+          var _img = crearImgSegura(f.id,
+            'width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line)',
+            (function(capturedIdx) { return function() { openLightbox(todasIds.slice(), capturedIdx); }; })(_idx)
+          );
+          _w.appendChild(_img);
+        }, 100);
+        return '<span id="' + _wid + '" style="display:inline-block;width:60px;height:60px;background:#f8faf8;border-radius:.6rem;border:2px solid var(--line)"></span>';
+      }).join('') +
+      '</div></div>';
+  }
+
+  if (!antes.length && !despues.length) return '';
+
+  return '<div style="margin-top:.75rem;padding:.85rem;background:#fdf2f8;border-radius:.85rem;border:1px solid #fbcfe8">' +
+    '<p style="font-size:.7rem;font-weight:700;color:#db2777;margin-bottom:.65rem">📸 Fotos del servicio</p>' +
+    '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">' +
+      grid(antes,   '📷 Antes') +
+      grid(despues, '✨ Después') +
+    '</div>' +
+    '<p style="font-size:.62rem;color:var(--ink-faint);margin-top:.5rem">Click en una foto para ampliar</p>' +
+    '<button onclick="abrirSubidaFotos(' + esteticaId + ')" ' +
+      'style="margin-top:.6rem;font-size:.7rem;color:#db2777;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600">＋ Agregar más fotos</button>' +
+  '</div>';
+}
+
+function abrirSubidaFotos(esteticaId) {
+  // Crear input file temporal para agregar fotos a un servicio existente
+  var inp = document.createElement('input');
+  inp.type     = 'file';
+  inp.accept   = 'image/*';
+  inp.multiple = true;
+  inp.onchange = async function() {
+    var files = Array.from(inp.files);
+    var momento = prompt('Tipo de fotos: "antes" o "despues"', 'despues');
+    if (!['antes','despues'].includes(momento)) return;
+    toast('Subiendo ' + files.length + ' foto(s)...', 'info', 3000);
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      try {
+        var fd2 = new FormData();
+        fd2.append('foto', file);
+        var token2 = localStorage.getItem('vet_access');
+        var uploadRes2 = await fetch(API_URL + '/api/v1/estetica/upload', {
+          method : 'POST',
+          headers: { 'Authorization': 'Bearer ' + token2, 'X-Tenant-Host': window.location.hostname },
+          body   : fd2,
+        });
+        if (!uploadRes2.ok) continue;
+        var ud2 = (await uploadRes2.json()).data;
+        await api('/estetica/' + esteticaId + '/fotos', {
+          method: 'POST',
+          body: { momento, url: ud2.public_url, nombre_archivo: file.name }
+        });
+      } catch(e) { toast('Error: ' + e.message, 'danger'); }
+    }
+    toast('Fotos agregadas.', 'success');
+    cargarEstetica(mascotaId);
+  };
+  inp.click();
+}
+
+
+// Cache de blob URLs para evitar recargas
+var _fotoBlobCache = {};
+
+// Carga una foto via fetch con JWT y crea blob URL local
+async function cargarFotoSegura(imgEl, fotoId) {
+  if (_fotoBlobCache[fotoId]) {
+    imgEl.src = _fotoBlobCache[fotoId];
+    return;
+  }
+  try {
+    var token = localStorage.getItem('vet_access');
+    var res   = await fetch(API_URL + '/api/v1/estetica/foto/' + fotoId, {
+      headers: {
+        'Authorization' : 'Bearer ' + token,
+        'X-Tenant-Host' : window.location.hostname,
+      }
+    });
+    if (!res.ok) { imgEl.src = ''; return; }
+    var blob = await res.blob();
+    var blobUrl = URL.createObjectURL(blob);
+    _fotoBlobCache[fotoId] = blobUrl;
+    imgEl.src = blobUrl;
+  } catch(e) {
+    console.error('Error cargando foto:', e);
+  }
+}
+
+// Crear elemento img con carga segura
+function crearImgSegura(fotoId, style, onclick) {
+  var img = document.createElement('img');
+  img.style.cssText = style || 'width:60px;height:60px;object-fit:cover;border-radius:.6rem;cursor:zoom-in;border:2px solid var(--line)';
+  img.loading = 'lazy';
+  img.alt     = 'foto';
+  if (onclick) img.onclick = onclick;
+  cargarFotoSegura(img, fotoId);
+  return img;
+}
+
+function catIcon(cat) {
+  return { medicamento:'💊', vacuna:'💉', insumo:'🧰', otro:'📎' }[cat] || '📦';
+}
+
+// ── Imprimir receta brandeada ─────────────────────────────────
+async function imprimirReceta() {
+  const c = window._consultaActual;
+  if (!c || !c.recetas?.length) { toast('Sin recetas para imprimir.','warning'); return; }
+  const btn = document.getElementById('ver-btn-imprimir');
+  btn.textContent = '⏳ Generando…'; btn.disabled = true;
+  try {
+    const res = await api(`/historia/${c.id}/receta-pdf`, { method:'POST' });
+    if (!res.ok) { toast('Error al generar PDF.','danger'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank';
+    a.download = `receta_${c.id}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { toast('Error: '+e.message,'danger'); }
+  finally { btn.textContent = '🖨️ Imprimir receta'; btn.disabled = false; }
+}
