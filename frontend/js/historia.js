@@ -1156,11 +1156,17 @@ function attachAutocomplete(input, cats, onSelect) {
           if (onSelect) onSelect(item);
           cerrar();
           seleccionando = false;
-          // Mover foco al siguiente campo
+          // Simular Tab: enfocar el siguiente input dentro del mismo bloque de receta
           setTimeout(function() {
-            var next = input.closest('div')?.querySelector('input:not(#' + input.id + '), select');
-            if (next) next.focus();
-            else input.blur();
+            var recetaDiv = input.closest('[id^="rec-"], [id^="ecr-"]');
+            if (recetaDiv) {
+              var inputs = Array.from(recetaDiv.querySelectorAll('input, select, textarea'));
+              var idx = inputs.indexOf(input);
+              var siguiente = inputs[idx + 1];
+              if (siguiente) siguiente.focus();
+            } else {
+              input.blur();
+            }
           }, 30);
         });
         list.appendChild(li);
@@ -1661,15 +1667,16 @@ async function imprimirReceta() {
     edad = diff < 1 ? 'Menos de 1 año' : diff + ' año(s)';
   }
 
-  const recetasHtml = c.recetas.map((r, i) => `
-    <div style="margin-bottom:.6rem;padding-bottom:.6rem;border-bottom:1px solid #d1fae5;display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;align-items:baseline">
-      <span style="font-weight:700;font-size:12px;grid-column:span 2">${i+1}. ${esc(r.medicamento)}</span>
-      <span style="font-size:10px;color:#6b7280">Dosis:</span><span style="font-size:11px">${esc(r.dosis)}</span>
-      <span style="font-size:10px;color:#6b7280">Frecuencia:</span><span style="font-size:11px">${esc(r.frecuencia)}</span>
-      ${r.duracion_dias ? `<span style="font-size:10px;color:#6b7280">Duración:</span><span style="font-size:11px">${r.duracion_dias} días</span>` : ''}
-      ${r.instrucciones ? `<span style="font-size:10px;color:#6b7280">Notas:</span><span style="font-size:10px;font-style:italic;color:#6b7280">${esc(r.instrucciones)}</span>` : ''}
-    </div>
-  `).join('');
+  const recetasHtml = c.recetas.map((r, i) => {
+    const partes = [esc(r.dosis), esc(r.frecuencia)];
+    if (r.duracion_dias) partes.push(r.duracion_dias + ' días');
+    const detalle = partes.join(' · ');
+    const notas = r.instrucciones ? ` <span style="font-style:italic;color:#6b7280">(${esc(r.instrucciones)})</span>` : '';
+    return `<div style="margin-bottom:.35rem;padding-bottom:.35rem;border-bottom:1px solid #d1fae5;font-size:11px;line-height:1.5">
+      <span style="font-weight:700">${i+1}. ${esc(r.medicamento)}</span>
+      <span style="color:#374151"> — ${detalle}</span>${notas}
+    </div>`;
+  }).join('');
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"/>
