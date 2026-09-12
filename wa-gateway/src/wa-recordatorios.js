@@ -119,6 +119,21 @@ function fHora(d, tz) {
   });
 }
 
+// Mapa tipo_cita → tipo de plantilla WA (con fallback a genérica)
+const TIPO_CITA_PLANTILLA = {
+  medica          : 'recordatorio_cita',
+  vacuna          : 'recordatorio_cita_vacuna',
+  desparasitacion : 'recordatorio_cita_desparasitacion',
+  estetica        : 'recordatorio_cita_estetica',
+};
+
+const FALLBACK_CITA = {
+  medica          : '🐾 Hola [nombre], recuerda tu cita médica para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
+  vacuna          : '💉 Hola [nombre], recuerda la cita de vacunación de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
+  desparasitacion : '🐛 Hola [nombre], recuerda la cita de desparasitación de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
+  estetica        : '✂️ Hola [nombre], recuerda la cita de estética de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
+};
+
 // ── Recordatorios de CITAS ────────────────────────────────────
 async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
   const horas1 = cfg.recordatorio_citas_horas || 24;
@@ -128,7 +143,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
 
   for (const horas of rangos) {
     const [citas] = await conn.execute(
-      `SELECT c.id, c.fecha_hora, c.motivo,
+      `SELECT c.id, c.fecha_hora, c.motivo, c.tipo_cita,
               m.nombre AS mascota,
               CONCAT(p.nombre,' ',p.apellido) AS propietario,
               p.telefono,
@@ -143,7 +158,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
                               AND NOW() + INTERVAL ? HOUR + INTERVAL 30 MINUTE
          AND p.telefono NOT IN (
            SELECT DISTINCT telefono FROM wa_mensajes_log
-           WHERE tipo = 'recordatorio_cita'
+           WHERE tipo LIKE 'recordatorio_cita%'
              AND estado = 'enviado'
              AND enviado_at > NOW() - INTERVAL 1 DAY
          )`,
@@ -155,12 +170,28 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
     for (const cita of citas) {
       if (!cita.telefono) continue;
       try {
-        const [[plantilla]] = await conn.execute(
-          "SELECT contenido FROM wa_plantillas WHERE tipo='recordatorio_cita' AND activo=1 LIMIT 1"
+        const tipoCita     = cita.tipo_cita || 'medica';
+        const tipoPlantilla = TIPO_CITA_PLANTILLA[tipoCita] || 'recordatorio_cita';
+        const fallback      = FALLBACK_CITA[tipoCita] || FALLBACK_CITA.medica;
+
+        // 1. Buscar plantilla específica del tipo de cita
+        // 2. Si no existe, buscar la genérica recordatorio_cita
+        const [[plantillaEspecifica]] = await conn.execute(
+          'SELECT contenido FROM wa_plantillas WHERE tipo = ? AND activo = 1 LIMIT 1',
+          [tipoPlantilla]
         );
+        let contenido = plantillaEspecifica?.contenido;
+
+        if (!contenido && tipoPlantilla !== 'recordatorio_cita') {
+          const [[plantillaGenerica]] = await conn.execute(
+            "SELECT contenido FROM wa_plantillas WHERE tipo = 'recordatorio_cita' AND activo = 1 LIMIT 1"
+          );
+          contenido = plantillaGenerica?.contenido;
+        }
+
         const tz  = tenant.zona_horaria || 'America/Lima';
         const msg = rellenarPlantilla(
-          plantilla?.contenido || '🐾 Hola [nombre], recuerda tu cita para [mascota] el [fecha] a las [hora] en [clinica].',
+          contenido || fallback,
           {
             nombre  : cita.propietario,
             mascota : cita.mascota,
@@ -179,7 +210,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           codigoPais   : cfg.codigo_pais || '+51',
         });
 
-        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono}`);
+        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono} (tipo: ${tipoCita})`);
       } catch (e) {
         console.error(`[WA Citas] ❌ ${tenant.slug} → ${cita.telefono}: ${e.message}`);
       }
