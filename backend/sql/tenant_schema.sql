@@ -503,7 +503,8 @@ CREATE TABLE IF NOT EXISTS wa_config (
 CREATE TABLE IF NOT EXISTS wa_plantillas (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(100) NOT NULL,
-  tipo       ENUM('recordatorio_cita','recordatorio_vacuna','manual','campana','otro')
+  tipo       ENUM('recordatorio_cita','recordatorio_cita_vacuna','recordatorio_cita_desparasitacion',
+                  'recordatorio_cita_estetica','recordatorio_vacuna','manual','campana','otro')
              NOT NULL DEFAULT 'manual',
   contenido  TEXT         NOT NULL,
   activo     TINYINT(1)   NOT NULL DEFAULT 1,
@@ -655,13 +656,27 @@ INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
 INSERT INTO wa_config (activo) VALUES (0);
 
 INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
-  ('Recordatorio de cita', 'recordatorio_cita',
-   '🐾 Hola [nombre], te recordamos que tienes una cita para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Para más info llámanos al [telefono].'),
+  ('Recordatorio de cita médica', 'recordatorio_cita',
+   '🐾 Hola [nombre], te recordamos que tienes una cita médica para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Para más info llámanos al [telefono].'),
+  ('Recordatorio de cita — Vacunación', 'recordatorio_cita_vacuna',
+   '💉 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *vacunación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Es importante no faltar! Llámanos al [telefono].'),
+  ('Recordatorio de cita — Desparasitación', 'recordatorio_cita_desparasitacion',
+   '🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *desparasitación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Llámanos al [telefono].'),
+  ('Recordatorio de cita — Estética', 'recordatorio_cita_estetica',
+   '✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de *estética* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos guapos! Llámanos al [telefono].'),
   ('Recordatorio de vacuna', 'recordatorio_vacuna',
    '💉 Hola [nombre], *[mascota]* tiene pendiente su vacuna *[vacuna]* próximamente. Te recomendamos agendar su cita cuanto antes. Contáctanos en *[clinica]*.'),
   ('Bienvenida', 'manual',
    '🐾 Hola [nombre], bienvenido/a a *[clinica]*. Estamos felices de cuidar a *[mascota]*. Ante cualquier consulta estamos a tu disposición.'),
   ('Campaña general', 'campana',
    '🐾 Hola [nombre], desde *[clinica]* queremos recordarte que estamos disponibles para cuidar a *[mascota]*. ¡Agenda tu cita hoy!');
+
+-- Migración para tenants existentes: ampliar ENUM y agregar plantillas nuevas si no existen
+-- Ejecutar manualmente en cada base de datos tenant existente:
+-- ALTER TABLE wa_plantillas MODIFY tipo ENUM('recordatorio_cita','recordatorio_cita_vacuna','recordatorio_cita_desparasitacion','recordatorio_cita_estetica','recordatorio_vacuna','manual','campana','otro') NOT NULL DEFAULT 'manual';
+-- INSERT IGNORE INTO wa_plantillas (nombre, tipo, contenido) VALUES
+--   ('Recordatorio de cita — Vacunación','recordatorio_cita_vacuna','💉 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *vacunación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Es importante no faltar! Llámanos al [telefono].'),
+--   ('Recordatorio de cita — Desparasitación','recordatorio_cita_desparasitacion','🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *desparasitación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Llámanos al [telefono].'),
+--   ('Recordatorio de cita — Estética','recordatorio_cita_estetica','✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de *estética* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos guapos! Llámanos al [telefono].');
 
 SELECT 'tenant_schema v13 ✅' AS resultado;
