@@ -1662,12 +1662,12 @@ async function imprimirReceta() {
   }
 
   const recetasHtml = c.recetas.map((r, i) => `
-    <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e5e7eb">
-      <p style="font-weight:700;font-size:14px;margin-bottom:.3rem">${i+1}. ${esc(r.medicamento)}</p>
-      <p style="font-size:13px;color:#374151;margin:.2rem 0"><strong>Dosis:</strong> ${esc(r.dosis)}</p>
-      <p style="font-size:13px;color:#374151;margin:.2rem 0"><strong>Frecuencia:</strong> ${esc(r.frecuencia)}</p>
-      ${r.duracion_dias ? `<p style="font-size:13px;color:#374151;margin:.2rem 0"><strong>Duración:</strong> ${r.duracion_dias} días</p>` : ''}
-      ${r.instrucciones ? `<p style="font-size:12px;color:#6b7280;margin-top:.3rem;font-style:italic">📝 ${esc(r.instrucciones)}</p>` : ''}
+    <div style="margin-bottom:.6rem;padding-bottom:.6rem;border-bottom:1px solid #d1fae5;display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;align-items:baseline">
+      <span style="font-weight:700;font-size:12px;grid-column:span 2">${i+1}. ${esc(r.medicamento)}</span>
+      <span style="font-size:10px;color:#6b7280">Dosis:</span><span style="font-size:11px">${esc(r.dosis)}</span>
+      <span style="font-size:10px;color:#6b7280">Frecuencia:</span><span style="font-size:11px">${esc(r.frecuencia)}</span>
+      ${r.duracion_dias ? `<span style="font-size:10px;color:#6b7280">Duración:</span><span style="font-size:11px">${r.duracion_dias} días</span>` : ''}
+      ${r.instrucciones ? `<span style="font-size:10px;color:#6b7280">Notas:</span><span style="font-size:10px;font-style:italic;color:#6b7280">${esc(r.instrucciones)}</span>` : ''}
     </div>
   `).join('');
 
@@ -1675,37 +1675,40 @@ async function imprimirReceta() {
 <html lang="es"><head><meta charset="UTF-8"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1f2937;padding:40px;max-width:680px;margin:0 auto}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #15803d}
-.clinica-nombre{font-size:20px;font-weight:800;color:#15803d}
-.clinica-info{font-size:11px;color:#6b7280;margin-top:4px}
-.seccion{margin-bottom:20px}
-.sec-titulo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.lbl{font-size:10px;color:#9ca3af;text-transform:uppercase;margin-top:6px}
-.val{font-size:13px;font-weight:600;color:#1f2937}
-.recetas-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:20px 0}
-.firma-area{margin-top:40px;display:flex;justify-content:flex-end}
-.footer{margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:10px;color:#9ca3af}
-@media print{body{padding:20px}@page{margin:1cm}button{display:none}}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;padding:20px;max-width:680px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid #15803d}
+.clinica-nombre{font-size:16px;font-weight:800;color:#15803d}
+.clinica-info{font-size:9px;color:#6b7280;margin-top:2px;line-height:1.5}
+.seccion{margin-bottom:10px}
+.sec-titulo{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lbl{font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:3px}
+.val{font-size:11px;font-weight:600;color:#1f2937}
+.recetas-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin:10px 0}
+.firma-area{margin-top:20px;display:flex;justify-content:flex-end}
+.footer{margin-top:12px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:center;font-size:9px;color:#9ca3af}
+@media print{
+  body{padding:12px;font-size:10px}
+  @page{margin:.8cm;size:A4}
+  button{display:none!important}
+  .recetas-box{page-break-inside:avoid}
+  .firma-area{page-break-inside:avoid}
+}
 </style></head><body>
 <div class="header">
-  <div style="display:flex;align-items:center;gap:12px">
-    ${emp.logo_url ? `<img src="${emp.logo_url}" style="width:60px;height:60px;object-fit:contain" onerror="this.style.display='none'"/>` : ''}
+  <div style="display:flex;align-items:center;gap:10px">
+    ${emp.logo_url ? `<img src="${emp.logo_url}" style="width:45px;height:45px;object-fit:contain" onerror="this.style.display='none'"/>` : ''}
     <div>
       <div class="clinica-nombre">${esc(emp.nombre || 'VetClinic')}</div>
       <div class="clinica-info">
-        ${emp.ruc ? `RUC: ${esc(emp.ruc)}<br/>` : ''}
-        ${emp.direccion ? `${esc(emp.direccion)}<br/>` : ''}
-        ${emp.telefono ? `Tel: ${esc(emp.telefono)}` : ''}
-        ${emp.email ? ` · ${esc(emp.email)}` : ''}
+        ${emp.ruc ? `RUC: ${esc(emp.ruc)} · ` : ''}${emp.direccion ? esc(emp.direccion) : ''}${emp.telefono ? ` · Tel: ${esc(emp.telefono)}` : ''}${emp.email ? ` · ${esc(emp.email)}` : ''}
       </div>
     </div>
   </div>
-  <div style="text-align:right;font-size:11px;color:#6b7280">
-    <div style="font-weight:700;font-size:13px;color:#1f2937">RECETA MÉDICA</div>
+  <div style="text-align:right;font-size:9px;color:#6b7280">
+    <div style="font-weight:700;font-size:11px;color:#1f2937">RECETA MÉDICA</div>
     <div>Lima, ${fecha}</div>
-    <div>Nº HC-${String(c.id).padStart(5,'0')}</div>
+    <div>N° HC-${String(c.id).padStart(5,'0')}</div>
   </div>
 </div>
 
@@ -1714,10 +1717,10 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1f2937;
   <div class="grid-2">
     <div>
       <div class="lbl">Nombre</div><div class="val">${esc(c.mascota_nombre || '—')}</div>
-      <div class="lbl">Especie</div><div class="val">${esc(c.especie || '—')}</div>
+      <div class="lbl">Especie / Raza</div><div class="val">${esc(c.especie || '—')}${c.raza ? ' · '+esc(c.raza) : ''}</div>
     </div>
     <div>
-      <div class="lbl">Peso</div><div class="val">${c.peso_kg ? c.peso_kg + ' kg' : '—'}</div>
+      <div class="lbl">Peso</div><div class="val">${c.peso_kg ? c.peso_kg+' kg' : '—'}</div>
       <div class="lbl">Edad</div><div class="val">${edad || '—'}</div>
     </div>
   </div>
@@ -1731,28 +1734,27 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1f2937;
   </div>
 </div>
 
-${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</div><p style="font-size:13px;line-height:1.5">${esc(c.diagnostico)}</p></div>` : ''}
+${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</div><p style="font-size:11px;line-height:1.5">${esc(c.diagnostico)}</p></div>` : ''}
 
 <div class="recetas-box">
-  <p style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:12px">💊 Prescripción Médica</p>
+  <p style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:8px">💊 Prescripción Médica (${c.recetas.length} medicamento${c.recetas.length > 1 ? 's' : ''})</p>
   ${recetasHtml}
 </div>
 
 <div class="firma-area">
-  <div style="text-align:center;min-width:200px">
-    <div style="height:50px"></div>
-    <div style="border-top:1px solid #374151;margin-bottom:6px"></div>
-    <div style="font-size:13px;font-weight:700">Dr/a. ${esc(c.veterinario_nombre || '—')}</div>
-    <div style="font-size:11px;color:#6b7280">Médico Veterinario</div>
+  <div style="text-align:center;min-width:180px">
+    <div style="height:40px"></div>
+    <div style="border-top:1px solid #374151;margin-bottom:4px"></div>
+    <div style="font-size:11px;font-weight:700">Dr/a. ${esc(c.veterinario_nombre || '—')}</div>
+    <div style="font-size:9px;color:#6b7280">Médico Veterinario</div>
   </div>
 </div>
 
 <div class="footer">
-  ${esc(emp.nombre || 'VetClinic')} · ${esc(emp.direccion || '')} · ${esc(emp.telefono || '')}
-  <br/>Documento generado el ${new Date().toLocaleString('es-PE')}
+  ${esc(emp.nombre || 'VetClinic')} · ${esc(emp.direccion || '')} · Documento generado el ${new Date().toLocaleString('es-PE')}
 </div>
-<div style="text-align:center;margin-top:16px">
-  <button onclick="window.print()" style="background:#15803d;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+<div style="text-align:center;margin-top:10px">
+  <button onclick="window.print()" style="background:#15803d;color:#fff;border:none;padding:.5rem 1.2rem;border-radius:.4rem;font-size:.82rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
 </div>
 <script>setTimeout(function(){ window.print(); }, 500);<\/script>
 </body></html>`;

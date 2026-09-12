@@ -38,10 +38,14 @@ router.get('/:id', async (req, res, next) => {
   try {
     const [h] = await req.db.query(
       `SELECT h.*, u.nombre AS veterinario_nombre,
-              m.nombre AS mascota_nombre, m.especie
+              m.nombre AS mascota_nombre, m.especie, m.raza, m.peso_kg,
+              m.fecha_nacimiento,
+              CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
+              p.telefono AS propietario_tel, p.dni
        FROM historia_clinica h
        JOIN usuarios u ON u.id = h.veterinario_id
        JOIN mascotas m ON m.id = h.mascota_id
+       JOIN propietarios p ON p.id = m.propietario_id
        WHERE h.id = ?`, [req.params.id]
     );
     if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
