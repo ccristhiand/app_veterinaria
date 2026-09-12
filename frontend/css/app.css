@@ -226,15 +226,18 @@ body {
 
 /* ── CONTENT AREA ────────────────────────────────────────────────── */
 .page {
-  flex: 1; overflow-y: auto;
-  /* Padding más chico en móvil */
-  padding: 1rem;
+  flex: 1;
+  min-height: 0;          /* Crítico: evita que flex-child ignore overflow */
+  overflow-y: auto;
+  /* Padding móvil con espacio extra abajo para que el paginador sea visible */
+  padding: 1rem 1rem 5rem;
   animation: fadeUp .4s ease;
-  /* Permite scroll suave en iOS */
+  /* Scroll suave en iOS */
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
-@media (min-width: 640px)  { .page { padding: 1.4rem; } }
-@media (min-width: 1024px) { .page { padding: 1.8rem; } }
+@media (min-width: 640px)  { .page { padding: 1.4rem 1.4rem 3rem; } }
+@media (min-width: 1024px) { .page { padding: 1.8rem 1.8rem 2rem; } }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
