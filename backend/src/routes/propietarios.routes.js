@@ -27,13 +27,20 @@ router.get('/', async (req, res, next) => {
        LIMIT ${limitN} OFFSET ${offsetN}`,
       [q, q, q, q, q, q]
     );
-    return res.json({ success: true, data: rows });
+
+    const [{ total }] = await req.db.query(
+      `SELECT COUNT(*) AS total FROM propietarios
+       WHERE nombre LIKE ? OR apellido LIKE ?
+          OR dni LIKE ? OR telefono LIKE ?
+          OR ruc LIKE ? OR razon_social LIKE ?`,
+      [q, q, q, q, q, q]
+    );
+
+    return res.json({ success: true, data: rows, total, page: parseInt(page), limit: limitN });
   } catch (err) { next(err); }
 });
 
 // ── GET /api/v1/propietarios/buscar-documento ─────────────────────
-// Verifica si ya existe un propietario con ese DNI o RUC
-// Usado para autocompletar y prevenir duplicados
 router.get('/buscar-documento', async (req, res, next) => {
   try {
     const { tipo, numero } = req.query;
@@ -95,7 +102,6 @@ router.post('/', auditMiddleware('propietarios:creado', 'propietarios'), async (
     if (dni && !/^\d{8}$/.test(dni.trim()))
       return res.status(422).json({ success: false, message: 'El DNI debe tener 8 dígitos.' });
 
-    // Verificar duplicado por DNI
     if (dni?.trim()) {
       const [dup] = await req.db.query('SELECT id FROM propietarios WHERE dni = ?', [dni.trim()]);
       if (dup) return res.status(409).json({
@@ -106,7 +112,6 @@ router.post('/', auditMiddleware('propietarios:creado', 'propietarios'), async (
       });
     }
 
-    // Verificar duplicado por RUC
     if (ruc?.trim()) {
       const [dup] = await req.db.query('SELECT id FROM propietarios WHERE ruc = ?', [ruc.trim()]);
       if (dup) return res.status(409).json({
@@ -152,6 +157,32 @@ router.put('/:id', auditMiddleware('propietarios:actualizado', 'propietarios'), 
        req.params.id]
     );
     return res.json({ success: true, message: 'Propietario actualizado.' });
+  } catch (err) { next(err); }
+});
+
+// ── DELETE /api/v1/propietarios/:id ──────────────────────────────
+router.delete('/:id', auditMiddleware('propietarios:eliminado', 'propietarios'), async (req, res, next) => {
+  try {
+    const [prop] = await req.db.query('SELECT id, nombre, apellido FROM propietarios WHERE id = ?', [req.params.id]);
+    if (!prop) return res.status(404).json({ success: false, message: 'Propietario no encontrado.' });
+
+    // Validar que no tenga mascotas registradas
+    const [{ total_mascotas }] = await req.db.query(
+      'SELECT COUNT(*) AS total_mascotas FROM mascotas WHERE propietario_id = ?',
+      [req.params.id]
+    );
+
+    if (total_mascotas > 0) {
+      return res.status(409).json({
+        success : false,
+        code    : 'TIENE_MASCOTAS',
+        message : `No se puede eliminar a ${prop.nombre} ${prop.apellido} porque tiene ${total_mascotas} mascota${total_mascotas > 1 ? 's' : ''} registrada${total_mascotas > 1 ? 's' : ''}. Elimina primero sus mascotas.`,
+        total_mascotas,
+      });
+    }
+
+    await req.db.query('DELETE FROM propietarios WHERE id = ?', [req.params.id]);
+    return res.json({ success: true, message: 'Propietario eliminado correctamente.' });
   } catch (err) { next(err); }
 });
 

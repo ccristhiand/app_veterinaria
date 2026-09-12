@@ -33,9 +33,25 @@
     <button onclick="buscar()" class="vbtn vbtn-primary">Buscar</button>
     <button onclick="limpiar()" class="vbtn vbtn-ghost">Ver todas</button>
   </div>
+
+  <!-- Grid -->
   <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     <div class="vempty" style="grid-column:1/-1">
       <div class="vspinner"></div><p>Cargando mascotas…</p>
+    </div>
+  </div>
+
+  <!-- Paginación -->
+  <div id="paginacion" style="display:none;margin-top:1.2rem;padding:.85rem 1rem;
+    background:#fff;border-radius:1rem;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem">
+    <p id="pag-info" style="font-size:.78rem;color:var(--ink-soft)"></p>
+    <div style="display:flex;gap:.4rem;align-items:center">
+      <button id="pag-prev" onclick="cambiarPagina(_paginaActual - 1)"
+        class="vbtn vbtn-ghost" style="padding:.35rem .7rem;font-size:.78rem">← Anterior</button>
+      <div id="pag-nums" style="display:flex;gap:.3rem"></div>
+      <button id="pag-next" onclick="cambiarPagina(_paginaActual + 1)"
+        class="vbtn vbtn-ghost" style="padding:.35rem .7rem;font-size:.78rem">Siguiente →</button>
     </div>
   </div>
 </div>
@@ -141,20 +157,17 @@
       <button onclick="closeModal('modal-carnet')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;padding:1.5rem">
-      <!-- Info mascota -->
       <div style="text-align:center">
         <div id="carnet-especie" style="font-size:3rem;margin-bottom:.35rem">🐾</div>
         <h3 id="carnet-nombre" style="font-weight:800;font-size:1.2rem;color:var(--green-700)">—</h3>
         <p id="carnet-propietario" style="font-size:.8rem;color:var(--ink-soft);margin-top:.2rem">—</p>
       </div>
-      <!-- QR Code -->
       <div style="background:#fff;border:2px solid var(--line);border-radius:1rem;padding:1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
         <div id="qr-container" style="width:180px;height:180px;display:flex;align-items:center;justify-content:center">
           <div class="vspinner"></div>
         </div>
         <p style="font-size:.68rem;color:var(--ink-faint);text-align:center">Escanea para ver el historial completo</p>
       </div>
-      <!-- Link -->
       <div style="width:100%">
         <label style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:.4rem">Enlace del carnet</label>
         <div style="display:flex;gap:.5rem">
@@ -164,7 +177,6 @@
           <button onclick="copiarUrl()" class="vbtn vbtn-ghost" style="flex-shrink:0;padding:.5rem .85rem;font-size:.78rem" id="btn-copiar">📋 Copiar</button>
         </div>
       </div>
-      <!-- Botones de compartir -->
       <div style="display:flex;gap:.6rem;width:100%;flex-wrap:wrap">
         <button onclick="compartirWhatsApp()" style="flex:1;min-width:140px;display:flex;align-items:center;justify-content:center;gap:.4rem;background:#25d366;color:#fff;border:none;padding:.65rem 1rem;border-radius:.85rem;cursor:pointer;font-size:.82rem;font-weight:700;font-family:inherit">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -176,7 +188,6 @@
           🌐 Ver carnet
         </button>
       </div>
-      <!-- Vistas -->
       <p id="carnet-vistas" style="font-size:.72rem;color:var(--ink-faint)">👁️ 0 vistas</p>
     </div>
     <div class="vmodal-foot">
@@ -186,20 +197,61 @@
   </div>
 </div>
 
+<!-- ══ Modal Confirmar Eliminar Mascota ═══════════════════════════ -->
+<div id="modal-eliminar-masc" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3>🗑️ Eliminar Mascota</h3>
+      <button onclick="closeModal('modal-eliminar-masc')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div style="text-align:center;padding:.5rem 0 1rem">
+        <div id="elim-masc-especie" style="font-size:2.5rem;margin-bottom:.4rem">🐾</div>
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:.4rem" id="elim-masc-nombre">—</p>
+        <p style="font-size:.83rem;color:var(--ink-soft)">
+          Esta acción es permanente y no se puede deshacer.
+        </p>
+      </div>
+      <!-- Detalle de bloqueo si tiene registros -->
+      <div id="elim-masc-bloqueo" style="display:none;background:#fff1f2;border:1px solid #fecdd3;
+        border-radius:.9rem;padding:.85rem 1rem">
+        <p style="font-weight:700;color:#be123c;font-size:.83rem;margin-bottom:.5rem">
+          ⛔ No se puede eliminar esta mascota
+        </p>
+        <p style="font-size:.8rem;color:#9f1239" id="elim-masc-msg-bloqueo"></p>
+        <div id="elim-masc-detalle" style="margin-top:.65rem;display:flex;flex-wrap:wrap;gap:.4rem"></div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-eliminar-masc')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="btn-confirmar-elim-masc" onclick="confirmarEliminarMasc()"
+        class="vbtn" style="background:#e11d48;color:#fff;border:none">
+        🗑️ Sí, eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 let propMascotaSel  = null;
 let mascEditandoId  = null;
+let mascEliminandoId = null;
 let _carnetActual   = null;
 let _mascCarnetId   = null;
 let _mascCarnetNom  = null;
+let _paginaActual   = 1;
+let _totalPaginas   = 1;
+let _searchActual   = '';
+const LIMIT         = 20;
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'mascotas', title:'Mascotas', subtitle:'Registro de pacientes' });
   cargar();
 });
 
-function buscar() { cargar(document.getElementById('search').value.trim()); }
-function limpiar() { document.getElementById('search').value=''; cargar(); }
+function buscar() { _paginaActual = 1; _searchActual = document.getElementById('search').value.trim(); cargar(); }
+function limpiar() { document.getElementById('search').value=''; _searchActual=''; _paginaActual=1; cargar(); }
+function cambiarPagina(p) { if (p >= 1 && p <= _totalPaginas) { _paginaActual = p; cargar(); } }
 
 function edad(fnac) {
   if (!fnac) return null;
@@ -211,17 +263,24 @@ function edad(fnac) {
 }
 
 // ── Cargar grid ───────────────────────────────────────────────────
-async function cargar(search='') {
+async function cargar() {
   const grid = document.getElementById('grid');
   grid.innerHTML = `<div class="vempty" style="grid-column:1/-1"><div class="vspinner"></div><p>Cargando…</p></div>`;
+  document.getElementById('paginacion').style.display = 'none';
+
   try {
-    const res  = await api(`/mascotas?search=${encodeURIComponent(search)}&limit=60`);
+    const res  = await api(`/mascotas?search=${encodeURIComponent(_searchActual)}&page=${_paginaActual}&limit=${LIMIT}`);
     if (!res) return;
-    const rows = (await res.json()).data || [];
+    const json = await res.json();
+    const rows = json.data || [];
+    const total = json.total || 0;
+    _totalPaginas = Math.max(1, Math.ceil(total / LIMIT));
+
     if (!rows.length) {
       grid.innerHTML = `<div class="vempty" style="grid-column:1/-1"><span class="icon">🔍</span><p>Sin mascotas encontradas</p></div>`;
       return;
     }
+
     grid.innerHTML = rows.map(m => `
       <div class="pet-card" onclick="verDetalle(${m.id})">
         ${m.alertas_medicas ? `<span class="pet-alert">⚠️ Alerta</span>` : ''}
@@ -235,7 +294,7 @@ async function cargar(search='') {
           <span>👤 ${esc(m.propietario_nombre||'—')}</span>
           ${m.peso_kg ? `<span>⚖️ ${m.peso_kg} kg</span>` : ''}
         </div>
-        <div style="display:flex;gap:.4rem;margin-top:.6rem">
+        <div style="display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap">
           <button onclick="event.stopPropagation();abrirModalEditar(${m.id})"
             style="flex:1;background:none;border:1px solid var(--line);border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;color:var(--sky);cursor:pointer;font-family:inherit;transition:all .15s"
             onmouseover="this.style.borderColor='var(--sky)';this.style.background='#f0f9ff'"
@@ -248,10 +307,133 @@ async function cargar(search='') {
             onmouseout="this.style.borderColor='#ddd6fe';this.style.background='none'">
             🪪 Carnet
           </button>
+          <button onclick="event.stopPropagation();abrirModalEliminarMasc(${m.id},'${esc(m.nombre)}','${esc(m.especie)}')"
+            style="flex:1;min-width:70px;background:none;border:1px solid #fecdd3;border-radius:.65rem;padding:.35rem;font-size:.72rem;font-weight:600;color:#e11d48;cursor:pointer;font-family:inherit;transition:all .15s"
+            onmouseover="this.style.borderColor='#e11d48';this.style.background='#fff1f2'"
+            onmouseout="this.style.borderColor='#fecdd3';this.style.background='none'">
+            🗑️ Eliminar
+          </button>
         </div>
       </div>`).join('');
+
+    renderizarPaginacion(total);
   } catch {
     grid.innerHTML = `<div class="vempty" style="grid-column:1/-1"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="cargar()">Reintentar</button></p></div>`;
+  }
+}
+
+function renderizarPaginacion(total) {
+  const pag = document.getElementById('paginacion');
+  if (_totalPaginas <= 1 && total <= LIMIT) { pag.style.display = 'none'; return; }
+
+  pag.style.display = 'flex';
+  const inicio = (_paginaActual - 1) * LIMIT + 1;
+  const fin    = Math.min(_paginaActual * LIMIT, total);
+  document.getElementById('pag-info').textContent =
+    `Mostrando ${inicio}–${fin} de ${total} mascota${total !== 1 ? 's' : ''}`;
+
+  document.getElementById('pag-prev').disabled = _paginaActual <= 1;
+  document.getElementById('pag-next').disabled = _paginaActual >= _totalPaginas;
+
+  const nums  = document.getElementById('pag-nums');
+  let start   = Math.max(1, _paginaActual - 2);
+  let end     = Math.min(_totalPaginas, start + 4);
+  if (end - start < 4) start = Math.max(1, end - 4);
+
+  let html = '';
+  for (let i = start; i <= end; i++) {
+    const activo = i === _paginaActual;
+    html += `<button onclick="cambiarPagina(${i})"
+      style="width:32px;height:32px;border-radius:.5rem;font-size:.78rem;font-weight:${activo?'700':'500'};
+      border:1px solid ${activo?'var(--green-600)':'var(--line)'};
+      background:${activo?'var(--green-600)':'#fff'};
+      color:${activo?'#fff':'var(--ink-soft)'};cursor:pointer;font-family:inherit">
+      ${i}
+    </button>`;
+  }
+  nums.innerHTML = html;
+}
+
+// ── Eliminar mascota ──────────────────────────────────────────────
+async function abrirModalEliminarMasc(id, nombre, especie) {
+  mascEliminandoId = id;
+  document.getElementById('elim-masc-nombre').textContent  = nombre;
+  document.getElementById('elim-masc-especie').textContent = badgeEspecie(especie);
+  document.getElementById('elim-masc-bloqueo').style.display = 'none';
+  document.getElementById('elim-masc-detalle').innerHTML   = '';
+  document.getElementById('btn-confirmar-elim-masc').style.display = '';
+  openModal('modal-eliminar-masc');
+
+  // Consultar al backend para obtener el detalle de bloqueo
+  try {
+    const res  = await api(`/mascotas/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (!res.ok && data.code === 'TIENE_REGISTROS') {
+      document.getElementById('elim-masc-bloqueo').style.display = 'block';
+      document.getElementById('elim-masc-msg-bloqueo').textContent = data.message;
+      document.getElementById('btn-confirmar-elim-masc').style.display = 'none';
+
+      // Badges del detalle
+      const d = data.detalle || {};
+      const items = [
+        { label: 'Citas',          n: d.citas,              emoji: '📅' },
+        { label: 'Historia clínica', n: d.historia,         emoji: '📋' },
+        { label: 'Desparasitaciones', n: d.desparasitaciones, emoji: '💊' },
+        { label: 'Vacunas',         n: d.vacunas,            emoji: '💉' },
+        { label: 'Estética',        n: d.estetica,           emoji: '✂️' },
+      ].filter(i => i.n > 0);
+
+      document.getElementById('elim-masc-detalle').innerHTML = items.map(i =>
+        `<span style="background:#ffe4e6;color:#be123c;font-size:.72rem;font-weight:700;
+          padding:.25rem .6rem;border-radius:999px;border:1px solid #fecdd3">
+          ${i.emoji} ${i.n} ${i.label}
+        </span>`
+      ).join('');
+
+    } else if (res.ok) {
+      // Se eliminó exitosamente (la petición fue un DELETE real)
+      toast('🗑️ Mascota eliminada', 'success');
+      closeModal('modal-eliminar-masc');
+      cargar();
+    }
+  } catch {
+    toast('Error de conexión.', 'danger');
+    closeModal('modal-eliminar-masc');
+  }
+}
+
+async function confirmarEliminarMasc() {
+  if (!mascEliminandoId) return;
+  const btn = document.getElementById('btn-confirmar-elim-masc');
+  btn.disabled = true;
+  btn.textContent = 'Eliminando…';
+
+  try {
+    const res  = await api(`/mascotas/${mascEliminandoId}`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (data.code === 'TIENE_REGISTROS') {
+        // Mostrar bloqueo en caso de race condition
+        document.getElementById('elim-masc-bloqueo').style.display = 'block';
+        document.getElementById('elim-masc-msg-bloqueo').textContent = data.message;
+        btn.style.display = 'none';
+      } else {
+        toast(data.message || 'No se puede eliminar.', 'danger');
+        closeModal('modal-eliminar-masc');
+      }
+      return;
+    }
+
+    toast('🗑️ Mascota eliminada', 'success');
+    closeModal('modal-eliminar-masc');
+    cargar();
+  } catch {
+    toast('Error de conexión.', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Sí, eliminar';
   }
 }
 
@@ -261,7 +443,6 @@ async function abrirModalCarnet(mascotaId, nombre, especie) {
   _mascCarnetNom = nombre;
   _carnetActual  = null;
 
-  // Limpiar estado anterior
   document.getElementById('carnet-nombre').textContent    = nombre;
   document.getElementById('carnet-propietario').textContent = 'Cargando…';
   document.getElementById('carnet-especie').textContent   = badgeEspecie(especie);
@@ -278,12 +459,10 @@ async function abrirModalCarnet(mascotaId, nombre, especie) {
     const carnet = (await r.json()).data;
     _carnetActual = carnet;
 
-    // URL pública — usa parámetro "t" que lee carnet-publico.html
     const url = `${window.location.origin}/carnet-publico?t=${carnet.token}`;
     document.getElementById('carnet-url').value = url;
     document.getElementById('carnet-vistas').textContent = `👁️ ${carnet.vistas || 0} vista${carnet.vistas !== 1 ? 's' : ''}`;
 
-    // Cargar propietario
     try {
       const rm = await api('/mascotas/'+mascotaId);
       if (rm?.ok) {
@@ -293,7 +472,6 @@ async function abrirModalCarnet(mascotaId, nombre, especie) {
       }
     } catch {}
 
-    // Generar QR
     document.getElementById('qr-container').innerHTML = '';
     new QRCode(document.getElementById('qr-container'), {
       text       : url,
@@ -309,7 +487,6 @@ async function abrirModalCarnet(mascotaId, nombre, especie) {
   }
 }
 
-// Desde la card en el grid (alias)
 async function abrirCarnet(mascotaId) {
   try {
     const r = await api('/mascotas/'+mascotaId);
@@ -326,7 +503,6 @@ function copiarUrl() {
     document.getElementById('btn-copiar').textContent = '✅ Copiado';
     setTimeout(() => document.getElementById('btn-copiar').textContent = '📋 Copiar', 2000);
   }).catch(() => {
-    // Fallback para móviles
     const el = document.getElementById('carnet-url');
     el.select();
     document.execCommand('copy');
@@ -354,7 +530,6 @@ async function regenerarToken() {
     const r = await api('/carnet/mascota/'+_mascCarnetId+'/regenerar', { method:'POST' });
     if (!r?.ok) { toast('Error al regenerar.','danger'); return; }
     toast('🔄 Token regenerado','success');
-    // Recargar el modal con el nuevo token
     abrirModalCarnet(_mascCarnetId, _mascCarnetNom, document.getElementById('carnet-especie').textContent);
   } catch { toast('Error.','danger'); }
 }
@@ -537,7 +712,7 @@ async function guardarMascota() {
     closeModal('modal-mascota');
     limpiarFormMascota();
     limpiarPropMascota();
-    cargar(document.getElementById('search').value.trim());
+    cargar();
   } catch { toast('Error de conexión.','danger'); }
 }
 

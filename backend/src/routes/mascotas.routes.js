@@ -4,7 +4,6 @@ const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
 
-
 const router = Router();
 router.use(authenticate);
 
@@ -26,7 +25,17 @@ router.get('/', async (req, res, next) => {
        LIMIT ${limitN} OFFSET ${offsetN}`,
       [q, q, q, q, q, q]
     );
-    return res.json({ success: true, data: rows });
+
+    const [{ total }] = await req.db.query(
+      `SELECT COUNT(*) AS total
+       FROM mascotas m
+       JOIN propietarios p ON p.id = m.propietario_id
+       WHERE m.nombre LIKE ? OR m.raza LIKE ? OR m.microchip LIKE ?
+          OR p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?`,
+      [q, q, q, q, q, q]
+    );
+
+    return res.json({ success: true, data: rows, total, page: parseInt(page), limit: limitN });
   } catch (err) { next(err); }
 });
 
@@ -89,6 +98,46 @@ router.put('/:id', auditMiddleware('mascotas:actualizado', 'mascotas'), async (r
        alertas_medicas?.trim()||null, req.params.id]
     );
     return res.json({ success: true, message: 'Mascota actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// ── DELETE /api/v1/mascotas/:id ───────────────────────────────────
+router.delete('/:id', auditMiddleware('mascotas:eliminado', 'mascotas'), async (req, res, next) => {
+  try {
+    const [masc] = await req.db.query('SELECT id, nombre FROM mascotas WHERE id = ?', [req.params.id]);
+    if (!masc) return res.status(404).json({ success: false, message: 'Mascota no encontrada.' });
+
+    // Verificar registros vinculados
+    const checks = await Promise.all([
+      req.db.query('SELECT COUNT(*) AS n FROM citas WHERE mascota_id = ?', [req.params.id]),
+      req.db.query('SELECT COUNT(*) AS n FROM historia_clinica WHERE mascota_id = ?', [req.params.id]),
+      req.db.query('SELECT COUNT(*) AS n FROM desparasitaciones WHERE mascota_id = ?', [req.params.id]),
+      req.db.query('SELECT COUNT(*) AS n FROM vacunas WHERE mascota_id = ?', [req.params.id]),
+      req.db.query('SELECT COUNT(*) AS n FROM servicios_estetica WHERE mascota_id = ?', [req.params.id]),
+    ]);
+
+    const [citas, historia, desparasitaciones, vacunas, estetica] = checks.map(r => r[0].n);
+    const impedimentos = [];
+
+    if (citas          > 0) impedimentos.push(`${citas} cita${citas > 1 ? 's' : ''}`);
+    if (historia       > 0) impedimentos.push(`${historia} registro${historia > 1 ? 's' : ''} de historia clínica`);
+    if (desparasitaciones > 0) impedimentos.push(`${desparasitaciones} desparasitación${desparasitaciones > 1 ? 'es' : ''}`);
+    if (vacunas        > 0) impedimentos.push(`${vacunas} vacuna${vacunas > 1 ? 's' : ''}`);
+    if (estetica       > 0) impedimentos.push(`${estetica} servicio${estetica > 1 ? 's' : ''} de estética`);
+
+    if (impedimentos.length > 0) {
+      return res.status(409).json({
+        success      : false,
+        code         : 'TIENE_REGISTROS',
+        message      : `No se puede eliminar a ${masc.nombre} porque tiene: ${impedimentos.join(', ')}. Elimina primero esos registros.`,
+        detalle      : { citas, historia, desparasitaciones, vacunas, estetica },
+      });
+    }
+
+    // Sin registros vinculados — eliminar también el carnet digital si existe
+    await req.db.query('DELETE FROM carnets_digitales WHERE mascota_id = ?', [req.params.id]);
+    await req.db.query('DELETE FROM mascotas WHERE id = ?', [req.params.id]);
+    return res.json({ success: true, message: 'Mascota eliminada correctamente.' });
   } catch (err) { next(err); }
 });
 

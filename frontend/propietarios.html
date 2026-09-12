@@ -57,6 +57,18 @@
         </tbody>
       </table>
     </div>
+    <!-- Paginación -->
+    <div id="paginacion" style="display:none;padding:1rem 1.2rem;border-top:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem">
+      <p id="pag-info" style="font-size:.78rem;color:var(--ink-soft)"></p>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <button id="pag-prev" onclick="cambiarPagina(_paginaActual - 1)"
+          class="vbtn vbtn-ghost" style="padding:.35rem .7rem;font-size:.78rem">← Anterior</button>
+        <div id="pag-nums" style="display:flex;gap:.3rem"></div>
+        <button id="pag-next" onclick="cambiarPagina(_paginaActual + 1)"
+          class="vbtn vbtn-ghost" style="padding:.35rem .7rem;font-size:.78rem">Siguiente →</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -95,7 +107,6 @@
               border:2px solid #e2e8f0;border-top-color:#10b981;
               border-radius:50%;animation:spin .6s linear infinite"></div>
           </div>
-          <!-- Banner propietario existente -->
           <div id="doc-existente" style="display:none;margin-top:.5rem;
             background:#fff7ed;border:1px solid #fed7aa;border-radius:.75rem;
             padding:.65rem .9rem;font-size:.78rem">
@@ -108,7 +119,6 @@
               Ver ficha del propietario →
             </button>
           </div>
-          <!-- Banner autocompletado -->
           <div id="doc-autocomplete" style="display:none;margin-top:.5rem;
             background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.75rem;
             padding:.65rem .9rem;font-size:.78rem">
@@ -141,7 +151,7 @@
         </div>
       </div>
 
-      <!-- Datos empresa (para facturación) -->
+      <!-- Datos empresa -->
       <div style="border-top:1px solid var(--line);padding-top:1rem">
         <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem">
           <span style="font-size:1rem">🏢</span>
@@ -195,8 +205,47 @@
   </div>
 </div>
 
+<!-- ══ Modal Confirmar Eliminar Propietario ═══════════════════════ -->
+<div id="modal-eliminar-prop" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:460px">
+    <div class="vmodal-head">
+      <h3>🗑️ Eliminar Propietario</h3>
+      <button onclick="closeModal('modal-eliminar-prop')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div style="text-align:center;padding:.5rem 0 1rem">
+        <div style="width:56px;height:56px;border-radius:50%;background:#fff1f2;
+          margin:0 auto .75rem;display:flex;align-items:center;justify-content:center;font-size:1.6rem">
+          🗑️
+        </div>
+        <p style="font-weight:700;font-size:.95rem;margin-bottom:.4rem" id="elim-prop-nombre">—</p>
+        <p style="font-size:.83rem;color:var(--ink-soft)">
+          Esta acción es permanente y no se puede deshacer.
+        </p>
+      </div>
+      <!-- Alerta de bloqueo (se muestra si tiene mascotas) -->
+      <div id="elim-prop-bloqueo" style="display:none;background:#fff1f2;border:1px solid #fecdd3;
+        border-radius:.9rem;padding:.85rem 1rem;margin-top:.5rem">
+        <p style="font-weight:700;color:#be123c;font-size:.83rem" id="elim-prop-msg-bloqueo"></p>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-eliminar-prop')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="btn-confirmar-elim-prop" onclick="confirmarEliminarProp()"
+        class="vbtn" style="background:#e11d48;color:#fff;border:none">
+        🗑️ Sí, eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
-let propEditandoId = null;
+let propEditandoId  = null;
+let propEliminandoId = null;
+let _paginaActual   = 1;
+let _totalPaginas   = 1;
+let _searchActual   = '';
+const LIMIT         = 20;
 
 document.addEventListener('DOMContentLoaded', function() {
   initPage({ activePage:'propietarios', title:'Propietarios', subtitle:'Registro de clientes' });
@@ -204,20 +253,25 @@ document.addEventListener('DOMContentLoaded', function() {
   cargarEstadoIntegraciones();
 });
 
-function buscar() { cargar(document.getElementById('search').value.trim()); }
-function limpiar() { document.getElementById('search').value=''; cargar(); }
+function buscar() { _paginaActual = 1; _searchActual = document.getElementById('search').value.trim(); cargar(); }
+function limpiar() { document.getElementById('search').value=''; _searchActual=''; _paginaActual=1; cargar(); }
+function cambiarPagina(p) { if (p >= 1 && p <= _totalPaginas) { _paginaActual = p; cargar(); } }
 
 // ── Cargar tabla ──────────────────────────────────────────────────
-async function cargar(search='') {
+async function cargar() {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = `<tr><td colspan="7">
     <div class="vempty"><div class="vspinner"></div><p>Cargando…</p></div>
   </td></tr>`;
+  document.getElementById('paginacion').style.display = 'none';
 
   try {
-    const res  = await api(`/propietarios?search=${encodeURIComponent(search)}&limit=60`);
+    const res  = await api(`/propietarios?search=${encodeURIComponent(_searchActual)}&page=${_paginaActual}&limit=${LIMIT}`);
     if (!res) return;
-    const rows = (await res.json()).data || [];
+    const json = await res.json();
+    const rows = json.data || [];
+    const total = json.total || 0;
+    _totalPaginas = Math.max(1, Math.ceil(total / LIMIT));
 
     if (!rows.length) {
       tbody.innerHTML = `<tr><td colspan="7">
@@ -287,9 +341,16 @@ async function cargar(search='') {
               style="font-size:.75rem;color:#8b5cf6;font-weight:600">
               ＋🐾 Mascota
             </button>
+            <button class="vlink" onclick="abrirModalEliminarProp(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}',${p.total_mascotas||0})"
+              style="font-size:.75rem;color:#e11d48">
+              🗑️ Eliminar
+            </button>
           </div>
         </td>
       </tr>`).join('');
+
+    // Renderizar paginación
+    renderizarPaginacion(total);
   } catch {
     tbody.innerHTML = `<tr><td colspan="7">
       <div class="vempty"><span class="icon">😿</span>
@@ -300,8 +361,88 @@ async function cargar(search='') {
   }
 }
 
-// ── Nuevo propietario ─────────────────────────────────────────────
-// ── Estado de integraciones del tenant ──────────────────────────
+function renderizarPaginacion(total) {
+  const pag = document.getElementById('paginacion');
+  if (_totalPaginas <= 1 && total <= LIMIT) { pag.style.display = 'none'; return; }
+
+  pag.style.display = 'flex';
+  const inicio = (_paginaActual - 1) * LIMIT + 1;
+  const fin    = Math.min(_paginaActual * LIMIT, total);
+  document.getElementById('pag-info').textContent =
+    `Mostrando ${inicio}–${fin} de ${total} propietario${total !== 1 ? 's' : ''}`;
+
+  document.getElementById('pag-prev').disabled = _paginaActual <= 1;
+  document.getElementById('pag-next').disabled = _paginaActual >= _totalPaginas;
+
+  // Números de página (máximo 5 visibles)
+  const nums   = document.getElementById('pag-nums');
+  let start    = Math.max(1, _paginaActual - 2);
+  let end      = Math.min(_totalPaginas, start + 4);
+  if (end - start < 4) start = Math.max(1, end - 4);
+
+  let html = '';
+  for (let i = start; i <= end; i++) {
+    const activo = i === _paginaActual;
+    html += `<button onclick="cambiarPagina(${i})"
+      style="width:32px;height:32px;border-radius:.5rem;font-size:.78rem;font-weight:${activo?'700':'500'};
+      border:1px solid ${activo?'var(--green-600)':'var(--line)'};
+      background:${activo?'var(--green-600)':'#fff'};
+      color:${activo?'#fff':'var(--ink-soft)'};cursor:pointer;font-family:inherit">
+      ${i}
+    </button>`;
+  }
+  nums.innerHTML = html;
+}
+
+// ── Eliminar propietario ──────────────────────────────────────────
+function abrirModalEliminarProp(id, nombre, totalMascotas) {
+  propEliminandoId = id;
+  document.getElementById('elim-prop-nombre').textContent = nombre;
+  const bloqueo = document.getElementById('elim-prop-bloqueo');
+  const btnConfirmar = document.getElementById('btn-confirmar-elim-prop');
+
+  if (totalMascotas > 0) {
+    bloqueo.style.display = 'block';
+    document.getElementById('elim-prop-msg-bloqueo').textContent =
+      `Este propietario tiene ${totalMascotas} mascota${totalMascotas > 1 ? 's' : ''} registrada${totalMascotas > 1 ? 's' : ''}. Debes eliminar primero sus mascotas antes de poder eliminar al propietario.`;
+    btnConfirmar.style.display = 'none';
+  } else {
+    bloqueo.style.display = 'none';
+    btnConfirmar.style.display = '';
+  }
+
+  openModal('modal-eliminar-prop');
+}
+
+async function confirmarEliminarProp() {
+  if (!propEliminandoId) return;
+  const btn = document.getElementById('btn-confirmar-elim-prop');
+  btn.disabled = true;
+  btn.textContent = 'Eliminando…';
+
+  try {
+    const res  = await api(`/propietarios/${propEliminandoId}`, { method: 'DELETE' });
+    const data = await res.json();
+
+    if (!res.ok) {
+      // El backend rechazó (tiene mascotas — doble seguridad)
+      toast(data.message || 'No se puede eliminar.', 'danger');
+      closeModal('modal-eliminar-prop');
+      return;
+    }
+
+    toast('🗑️ Propietario eliminado', 'success');
+    closeModal('modal-eliminar-prop');
+    cargar();
+  } catch {
+    toast('Error de conexión.', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Sí, eliminar';
+  }
+}
+
+// ── Estado de integraciones ──────────────────────────────────────
 var _integraciones = null;
 
 async function cargarEstadoIntegraciones() {
@@ -328,18 +469,12 @@ function onTipoDocChange() {
   input.maxLength     = maxlens[tipo] || '20';
   input.value         = '';
 
-  // Solo forzar numérico en DNI y RUC
   if (tipo === 'DNI' || tipo === 'RUC') {
     input.oninput = function() { this.value = this.value.replace(/\D/g,''); };
   } else {
     input.oninput = null;
   }
-
-  // Limpiar banners
   ocultarBannersDoc();
-
-  // Si es RUC, autocompletar en el campo DNI/empresa
-  // Si es DNI, limpiar nombre/apellido para autocompletar
 }
 
 function ocultarBannersDoc() {
@@ -347,25 +482,19 @@ function ocultarBannersDoc() {
   document.getElementById('doc-autocomplete').style.display = 'none';
 }
 
-var _docBuscarTimer = null;
-
 async function buscarDocumento() {
   var tipo   = document.getElementById('p-tipo-doc').value;
   var numero = document.getElementById('p-documento').value.trim();
 
-  // Solo buscar para DNI (8 dig) y RUC (11 dig)
   if (tipo === 'DNI'  && numero.length !== 8)  return;
   if (tipo === 'RUC'  && numero.length !== 11) return;
   if (tipo !== 'DNI'  && tipo !== 'RUC')       return;
 
-  // Si estamos editando, no buscar duplicados del mismo propietario
   ocultarBannersDoc();
-
   var loading = document.getElementById('doc-loading');
   loading.style.display = 'block';
 
   try {
-    // 1. Verificar si ya existe en BD
     var res = await api('/propietarios/buscar-documento?tipo=' + tipo + '&numero=' + numero);
     if (res && res.ok) {
       var data = await res.json();
@@ -383,7 +512,6 @@ async function buscarDocumento() {
       }
     }
 
-    // 2. Si no existe, intentar autocompletar via integración
     if (!propEditandoId) {
       await autocompletarDocumento(tipo, numero);
     }
@@ -395,7 +523,6 @@ async function buscarDocumento() {
 
 async function autocompletarDocumento(tipo, numero) {
   if (!_integraciones) await cargarEstadoIntegraciones();
-
   var loading = document.getElementById('doc-loading');
 
   if (tipo === 'DNI' && _integraciones?.reniec) {
@@ -405,17 +532,12 @@ async function autocompletarDocumento(tipo, numero) {
       if (res && res.ok) {
         var data = (await res.json()).data;
         if (data) {
-          // Separar nombres: el primero va a nombre, el resto al apellido
           var nombres   = (data.nombres || '').trim();
           var apPaterno = (data.apellido_paterno || '').trim();
           var apMaterno = (data.apellido_materno || '').trim();
-
           document.getElementById('p-nombre').value  = nombres;
           document.getElementById('p-apellido').value = (apPaterno + ' ' + apMaterno).trim();
-
-          // Poner el DNI en el campo dni oculto (para guardarlo)
           document.getElementById('p-documento').dataset.valorDni = numero;
-
           document.getElementById('doc-autocomplete').style.display = 'block';
           setTimeout(function() { document.getElementById('p-telefono').focus(); }, 100);
         }
@@ -456,11 +578,9 @@ function abrirModalNuevo() {
   document.getElementById('prop-id').value = '';
   limpiarForm();
   openModal('modal-prop');
-  // Cargar estado integraciones si no se ha hecho
   if (!_integraciones) cargarEstadoIntegraciones();
 }
 
-// ── Editar propietario ────────────────────────────────────────────
 async function abrirModalEditar(id) {
   propEditandoId = id;
   document.getElementById('modal-prop-titulo').textContent = '✏️ Editar Propietario';
@@ -489,7 +609,6 @@ async function abrirModalEditar(id) {
   } catch { toast('Error de conexión.','danger'); }
 }
 
-// ── Guardar (crear o actualizar) ──────────────────────────────────
 async function guardarProp() {
   var nombre   = document.getElementById('p-nombre').value.trim();
   var apellido = document.getElementById('p-apellido').value.trim();
@@ -536,7 +655,7 @@ async function guardarProp() {
     toast(esEdicion ? '✅ Propietario actualizado' : '✅ Propietario registrado','success');
     closeModal('modal-prop');
     limpiarForm();
-    cargar(document.getElementById('search').value.trim());
+    cargar();
   } catch { toast('Error de conexión.','danger'); }
 }
 
@@ -564,7 +683,6 @@ async function verDetalle(id) {
   };
   document.getElementById('det-nueva-mascota-btn').onclick = () => {
     closeModal('modal-det');
-    // Buscar el nombre del propietario y abrir modal mascota
     const titulo = document.getElementById('det-titulo').textContent;
     abrirModalNuevaMascota(id, titulo);
   };
@@ -580,7 +698,6 @@ async function verDetalle(id) {
       `${esc(p.nombre)} ${esc(p.apellido)}`;
 
     document.getElementById('det-body').innerHTML = `
-      <!-- Avatar y datos principales -->
       <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.3rem">
         <div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;
           background:linear-gradient(135deg,#8b5cf6,#6d28d9);
@@ -597,16 +714,12 @@ async function verDetalle(id) {
           </p>
         </div>
       </div>
-
-      <!-- Info de contacto -->
       <div class="grid grid-cols-2 gap-3" style="margin-bottom:1.2rem">
         ${ib('🪪 DNI', p.dni)}
         ${ib('📞 Teléfono', p.telefono)}
         ${p.email    ? ib('✉️ Email', p.email)       : ''}
         ${p.direccion? ib('📍 Dirección', p.direccion): ''}
       </div>
-
-      <!-- Datos empresa si tiene RUC -->
       ${p.ruc ? `
         <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);
           border:1px solid #93c5fd;border-radius:1rem;padding:1rem;margin-bottom:1.2rem">
@@ -626,8 +739,6 @@ async function verDetalle(id) {
               </div>` : ''}
           </div>
         </div>` : ''}
-
-      <!-- Mascotas -->
       <h4 style="font-family:'Playfair Display',serif;font-weight:700;
         margin-bottom:.8rem;font-size:.95rem">
         🐾 Mascotas (${p.mascotas?.length||0})
@@ -672,8 +783,6 @@ let _propIdParaMascota = null;
 
 function abrirModalNuevaMascota(propId, propNombre) {
   _propIdParaMascota = propId;
-  // Usar el modal de mascota de forma simplificada
-  // Crear un modal inline rápido
   const existing = document.getElementById('modal-nueva-mascota-rapida');
   if (existing) existing.remove();
 
@@ -749,7 +858,7 @@ async function guardarMascotaRapida() {
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
     toast('🐾 Mascota registrada correctamente','success');
     document.getElementById('modal-nueva-mascota-rapida').remove();
-    cargar(document.getElementById('search').value.trim());
+    cargar();
   } catch { toast('Error de conexión.','danger'); }
 }
 
