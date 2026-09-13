@@ -28,7 +28,7 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', auditMiddleware('vacunas:creado', 'vacunas'), async (req, res, next) => {
   try {
-    const { mascota_id, nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas } = req.body;
+    const { mascota_id, cita_id, nombre, fabricante, lote, fecha_aplicacion, proxima_dosis, notas } = req.body;
     if (!mascota_id || !nombre || !fecha_aplicacion)
       return res.status(422).json({ success: false, message: 'mascota_id, nombre y fecha requeridos.' });
     const result = await req.db.query(
@@ -36,6 +36,9 @@ router.post('/', auditMiddleware('vacunas:creado', 'vacunas'), async (req, res, 
        VALUES (?,?,?,?,?,?,?,?)`,
       [mascota_id, req.user.id, nombre, fabricante||null, lote||null, fecha_aplicacion, proxima_dosis||null, notas||null]
     );
+    if (cita_id) {
+      await req.db.query("UPDATE citas SET estado='completada' WHERE id=?", [cita_id]);
+    }
     return res.status(201).json({ success: true, data: { id: result.insertId } });
   } catch (err) { next(err); }
 });

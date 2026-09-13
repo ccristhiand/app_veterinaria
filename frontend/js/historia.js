@@ -319,13 +319,19 @@ async function guardarVacuna() {
   const fecha=document.getElementById('v-fecha').value;
   if (!nombre) { toast('El nombre de la vacuna es obligatorio.','warning'); return; }
   if (!fecha)  { toast('La fecha de aplicación es obligatoria.','warning'); return; }
-  const body = { mascota_id:mascotaId, nombre, fabricante:document.getElementById('v-fabricante').value.trim()||null, lote:document.getElementById('v-lote').value.trim()||null, fecha_aplicacion:fecha, proxima_dosis:document.getElementById('v-proxima').value||null, notas:document.getElementById('v-notas').value.trim()||null };
+  const body = { mascota_id:mascotaId, cita_id:citaId||null, nombre, fabricante:document.getElementById('v-fabricante').value.trim()||null, lote:document.getElementById('v-lote').value.trim()||null, fecha_aplicacion:fecha, proxima_dosis:document.getElementById('v-proxima').value||null, notas:document.getElementById('v-notas').value.trim()||null };
   try {
     const res=await api('/vacunas',{method:'POST',body});
     if (!res) return;
     const data=await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
-    toast('💉 Vacuna registrada correctamente','success');
+    toast(citaId?'💉 Vacuna guardada · Cita #'+citaId+' completada':'💉 Vacuna registrada correctamente','success');
+    if (citaId) {
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      document.getElementById('modal-cita-banner').style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
     closeModal('modal-vacuna');
     ['v-nombre','v-fabricante','v-lote','v-proxima','v-notas'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('v-fecha').value=fechaHoyInput();
@@ -409,6 +415,7 @@ async function guardarDesparasitacion() {
   if (!fecha)    { toast('La fecha de aplicación es obligatoria.','warning'); return; }
   const body = {
     mascota_id      : mascotaId,
+    cita_id         : citaId || null,
     tipo            : document.getElementById('d-tipo').value,
     producto,
     dosis           : document.getElementById('d-dosis').value.trim() || null,
@@ -421,7 +428,13 @@ async function guardarDesparasitacion() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
-    toast('🐛 Desparasitación registrada correctamente', 'success');
+    toast(citaId?'🐛 Desparasitación guardada · Cita #'+citaId+' completada':'🐛 Desparasitación registrada correctamente', 'success');
+    if (citaId) {
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      document.getElementById('modal-cita-banner').style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
+    }
     closeModal('modal-desparasitacion');
     mostrarTab('desparasitaciones');
   } catch { toast('Error de conexión.', 'danger'); }
@@ -695,6 +708,7 @@ async function guardarEstetica() {
 
   const body = {
     mascota_id     : mascotaId,
+    cita_id        : citaId || null,
     fecha,
     tipo_bano      : tipo,
     incluye_corte  : document.getElementById('est-corte').checked,
@@ -716,7 +730,13 @@ async function guardarEstetica() {
     if (_fotasAntes.length || _fotosDespues.length) {
       await subirFotosEstetica(esteticaId);
     } else {
-      toast('✂️ Servicio de estética registrado', 'success');
+        toast(citaId?'✂️ Estética guardada · Cita #'+citaId+' completada':'✂️ Servicio de estética registrado', 'success');
+    }
+    if (citaId) {
+      citaId=null; motivoCita=null;
+      document.getElementById('banner-cita').style.display='none';
+      document.getElementById('modal-cita-banner').style.display='none';
+      document.getElementById('page-head-sub').textContent='Expedientes médicos';
     }
     closeModal('modal-estetica');
     limpiarFormEstetica();

@@ -27,7 +27,7 @@ router.get('/', async (req, res, next) => {
 // ── POST /api/v1/desparasitaciones ───────────────────────────
 router.post('/', authorize('admin', 'veterinario'), async (req, res, next) => {
   try {
-    const { mascota_id, tipo, producto, dosis, fecha_aplicacion, proxima_dosis, notas } = req.body;
+    const { mascota_id, cita_id, tipo, producto, dosis, fecha_aplicacion, proxima_dosis, notas } = req.body;
     if (!mascota_id || !producto || !fecha_aplicacion) {
       return res.status(422).json({ success: false, message: 'mascota_id, producto y fecha_aplicacion son requeridos' });
     }
@@ -38,6 +38,9 @@ router.post('/', authorize('admin', 'veterinario'), async (req, res, next) => {
       [mascota_id, req.user.id, tipo || 'interna', producto, dosis || null,
        fecha_aplicacion, proxima_dosis || null, notas || null]
     );
+    if (cita_id) {
+      await req.db.query("UPDATE citas SET estado='completada' WHERE id=?", [cita_id]);
+    }
     return res.status(201).json({ success: true, data: { id: r.insertId }, message: 'Desparasitación registrada.' });
   } catch (err) { next(err); }
 });

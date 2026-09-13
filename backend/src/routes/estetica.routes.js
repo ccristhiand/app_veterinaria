@@ -118,6 +118,9 @@ router.post('/', auditMiddleware('estetica:creado', 'estetica'), async (req, res
        incluye_corte?1:0, incluye_unas?1:0, incluye_dental?1:0,
        productos||null, precio||null, observaciones||null]
     );
+    if (cita_id) {
+      await req.db.query("UPDATE citas SET estado='completada' WHERE id=?", [cita_id]);
+    }
     return res.status(201).json({ success: true, data: { id: result.insertId } });
   } catch (err) { next(err); }
 });
