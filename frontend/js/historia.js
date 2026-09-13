@@ -17,25 +17,7 @@ sessionStorage.removeItem('historia_tab');
 initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
 
 if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
-if (ssMascotaId) {
-  requestAnimationFrame(()=>requestAnimationFrame(async ()=>{
-    await cargarHistoria(parseInt(ssMascotaId));
-    // Activar tab y abrir modal según tipo de cita
-    if (ssTab && ['consultas','vacunas','desparasitaciones','estetica'].includes(ssTab)) {
-      mostrarTab(ssTab);
-      const modalMap = {
-        vacunas          : 'modal-vacuna',
-        desparasitaciones: 'modal-desparasitacion',
-        estetica         : 'modal-estetica',
-      };
-      const modal = modalMap[ssTab];
-      if (modal) {
-        setTimeout(() => openModal(modal), 350);
-      }
-      // consultas: ya lo abre cargarHistoria cuando existe citaId+motivoCita
-    }
-  }));
-}
+if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId), ssTab))); }
 
 function mostrarTab(tab) {
   const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
@@ -227,7 +209,7 @@ function resetBusqueda() {
   document.getElementById('b-prop').value='';
 }
 
-async function cargarHistoria(id) {
+async function cargarHistoria(id, tabInicial) {
   mascotaId = id;
   document.getElementById('vacio').style.display              = 'none';
   document.getElementById('panel').style.display              = 'flex';
@@ -258,7 +240,14 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-nombre').textContent = m.nombre;
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
-    if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
+    if (citaId && motivoCita && (!tabInicial || tabInicial === 'consultas')) {
+      setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); }, 300);
+    } else if (tabInicial && tabInicial !== 'consultas') {
+      const modalMap = { vacunas:'modal-vacuna', desparasitaciones:'modal-desparasitacion', estetica:'modal-estetica' };
+      const modal = modalMap[tabInicial];
+      mostrarTab(tabInicial);
+      if (modal) setTimeout(()=>openModal(modal), 300);
+    }
     const rh = await api('/historia?mascota_id='+id);
     if (!rh) return;
     const consultas = (await rh.json()).data||[];
