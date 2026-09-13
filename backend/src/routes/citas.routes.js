@@ -18,7 +18,7 @@ function getSedeFiltro(req) {
 // GET /api/v1/citas
 router.get('/', async (req, res, next) => {
   try {
-    const { fecha, desde, hasta, estado, veterinario_id, mascota_id, tipo_cita } = req.query;
+    const { fecha, desde, hasta, estado, veterinario_id, mascota_id, tipo_cita, search } = req.query;
     const sedeId = getSedeFiltro(req);
 
     let sql = `
@@ -43,6 +43,12 @@ router.get('/', async (req, res, next) => {
     if (veterinario_id) { sql += ' AND c.veterinario_id = ?';  params.push(veterinario_id); }
     if (mascota_id)     { sql += ' AND c.mascota_id = ?';      params.push(mascota_id); }
     if (tipo_cita)      { sql += ' AND c.tipo_cita = ?';       params.push(tipo_cita); }
+    if (search) {
+      sql += ` AND (m.nombre LIKE ? OR p.nombre LIKE ? OR p.apellido LIKE ?
+               OR p.dni LIKE ? OR p.telefono LIKE ? OR c.motivo LIKE ?)`;
+      const q = `%${search}%`;
+      params.push(q, q, q, q, q, q);
+    }
 
     sql += ' ORDER BY c.fecha_hora ASC';
     const rows = await req.db.query(sql, params);

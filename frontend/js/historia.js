@@ -8,14 +8,24 @@ let recetaN    = 0;
 const ssMascotaId = sessionStorage.getItem('historia_mascota_id');
 const ssCitaId    = sessionStorage.getItem('historia_cita_id');
 const ssMotivo    = sessionStorage.getItem('historia_motivo');
+const ssTab       = sessionStorage.getItem('historia_tab');
 sessionStorage.removeItem('historia_mascota_id');
 sessionStorage.removeItem('historia_cita_id');
 sessionStorage.removeItem('historia_motivo');
+sessionStorage.removeItem('historia_tab');
 
 initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
 
 if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
-if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
+if (ssMascotaId) {
+  requestAnimationFrame(()=>requestAnimationFrame(async ()=>{
+    await cargarHistoria(parseInt(ssMascotaId));
+    // Activar el tab correcto según el tipo de cita
+    if (ssTab && ['consultas','vacunas','desparasitaciones','estetica'].includes(ssTab)) {
+      mostrarTab(ssTab);
+    }
+  }));
+}
 
 function mostrarTab(tab) {
   const tabs = ['consultas','vacunas','desparasitaciones','estetica'];

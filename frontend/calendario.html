@@ -129,6 +129,17 @@
     </div>
     <!-- Fila 2: filtros + vistas + botón -->
     <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%">
+      <!-- Buscador -->
+      <div class="search-wrap" style="flex:1;min-width:180px">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input id="f-search" type="text" placeholder="Mascota, propietario, DNI…"
+          class="vinput" style="font-size:.78rem"
+          onkeydown="if(event.key==='Enter')cargarCitas()"
+          oninput="if(!this.value)cargarCitas()"/>
+      </div>
       <select id="f-vet" class="vinput" style="flex:1;min-width:140px;font-size:.78rem" onchange="cargarCitas()">
         <option value="">Todos los veterinarios</option>
       </select>
@@ -412,9 +423,11 @@ async function cargarCitas() {
   var rango  = getRango();
   var vetId  = document.getElementById('f-vet')?.value || '';
   var sedeId = typeof getSedeActiva === 'function' ? getSedeActiva() : '';
+  var search = document.getElementById('f-search')?.value.trim() || '';
   var url    = '/citas?desde='+rango.desde+'&hasta='+rango.hasta+'&limit=500';
   if (vetId)  url += '&veterinario_id='+vetId;
   if (sedeId) url += '&sede_id='+sedeId;
+  if (search) url += '&search='+encodeURIComponent(search);
 
   try {
     var res = await api(url);
@@ -738,7 +751,7 @@ function renderEventosDia() {
   var eventos = _citas
     .filter(c => {
       var d = new Date(c.fecha_hora);
-      return fmt(d)===dStr && d.getHours()>=7 && d.getHours()<=21;
+      return fmt(d)===dStr;
     })
     .map(c => {
       var d = new Date(c.fecha_hora);
