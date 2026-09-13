@@ -20,9 +20,19 @@ if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBanne
 if (ssMascotaId) {
   requestAnimationFrame(()=>requestAnimationFrame(async ()=>{
     await cargarHistoria(parseInt(ssMascotaId));
-    // Activar el tab correcto según el tipo de cita
+    // Activar tab y abrir modal según tipo de cita
     if (ssTab && ['consultas','vacunas','desparasitaciones','estetica'].includes(ssTab)) {
       mostrarTab(ssTab);
+      const modalMap = {
+        vacunas          : 'modal-vacuna',
+        desparasitaciones: 'modal-desparasitacion',
+        estetica         : 'modal-estetica',
+      };
+      const modal = modalMap[ssTab];
+      if (modal) {
+        setTimeout(() => openModal(modal), 350);
+      }
+      // consultas: ya lo abre cargarHistoria cuando existe citaId+motivoCita
     }
   }));
 }
