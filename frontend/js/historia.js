@@ -17,7 +17,7 @@ sessionStorage.removeItem('historia_tab');
 initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
 
 if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
-if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId), ssTab))); }
+if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
 
 function mostrarTab(tab) {
   const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
@@ -209,7 +209,7 @@ function resetBusqueda() {
   document.getElementById('b-prop').value='';
 }
 
-async function cargarHistoria(id, tabInicial) {
+async function cargarHistoria(id) {
   mascotaId = id;
   document.getElementById('vacio').style.display              = 'none';
   document.getElementById('panel').style.display              = 'flex';
@@ -240,13 +240,14 @@ async function cargarHistoria(id, tabInicial) {
     document.getElementById('est-mascota-nombre').textContent = m.nombre;
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
-    if (citaId && motivoCita && (!tabInicial || tabInicial === 'consultas')) {
-      setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); }, 300);
-    } else if (tabInicial && tabInicial !== 'consultas') {
-      const modalMap = { vacunas:'modal-vacuna', desparasitaciones:'modal-desparasitacion', estetica:'modal-estetica' };
-      const modal = modalMap[tabInicial];
-      mostrarTab(tabInicial);
-      if (modal) setTimeout(()=>openModal(modal), 300);
+    // Redireccion desde calendario o citas — abrir tab y modal correcto
+    if (!ssTab || ssTab === 'consultas') {
+      if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
+    } else {
+      const _modalMap = { vacunas:'modal-vacuna', desparasitaciones:'modal-desparasitacion', estetica:'modal-estetica' };
+      const _modal = _modalMap[ssTab];
+      mostrarTab(ssTab);
+      if (_modal) setTimeout(()=>openModal(_modal), 300);
     }
     const rh = await api('/historia?mascota_id='+id);
     if (!rh) return;
