@@ -27,26 +27,24 @@ async function masterQuery(sql, params = []) {
   return rows;
 }
 
-// Convierte zona horaria IANA a offset MySQL (+HH:MM)
-// Mapa de zonas horarias a offsets MySQL
 const TZ_OFFSETS = {
-  'America/Lima'                       : '-05:00',
-  'America/Bogota'                     : '-05:00',
-  'America/Guayaquil'                  : '-05:00',
-  'America/Mexico_City'                : '-06:00',
-  'America/Santiago'                   : '-04:00',
-  'America/Argentina/Buenos_Aires'     : '-03:00',
-  'America/Caracas'                    : '-04:00',
-  'America/La_Paz'                     : '-04:00',
-  'America/Asuncion'                   : '-04:00',
-  'America/Montevideo'                 : '-03:00',
-  'America/Panama'                     : '-05:00',
-  'America/Guatemala'                  : '-06:00',
-  'America/New_York'                   : '-05:00',
-  'America/Chicago'                    : '-06:00',
-  'America/Denver'                     : '-07:00',
-  'America/Los_Angeles'                : '-08:00',
-  'Europe/Madrid'                      : '+01:00',
+  'America/Lima'                   : '-05:00',
+  'America/Bogota'                 : '-05:00',
+  'America/Guayaquil'              : '-05:00',
+  'America/Mexico_City'            : '-06:00',
+  'America/Santiago'               : '-04:00',
+  'America/Argentina/Buenos_Aires' : '-03:00',
+  'America/Caracas'                : '-04:00',
+  'America/La_Paz'                 : '-04:00',
+  'America/Asuncion'               : '-04:00',
+  'America/Montevideo'             : '-03:00',
+  'America/Panama'                 : '-05:00',
+  'America/Guatemala'              : '-06:00',
+  'America/New_York'               : '-05:00',
+  'America/Chicago'                : '-06:00',
+  'America/Denver'                 : '-07:00',
+  'America/Los_Angeles'            : '-08:00',
+  'Europe/Madrid'                  : '+01:00',
 };
 
 function getTimezoneOffset(ianaZone) {
@@ -65,10 +63,10 @@ async function getTenantConn(t) {
   });
 }
 
-function callGateway(method, path, body = null) {
+function callGateway(method, endpath, body = null) {
   return new Promise((resolve, reject) => {
     const bodyStr = body ? JSON.stringify(body) : null;
-    const url     = new URL(WA_GATEWAY + path);
+    const url     = new URL(WA_GATEWAY + endpath);
     const options = {
       hostname: url.hostname,
       port    : url.port || 5001,
@@ -119,7 +117,7 @@ function fHora(d, tz) {
   });
 }
 
-// Mapa tipo_cita → tipo de plantilla WA (con fallback a genérica)
+// Mapa tipo_cita → tipo plantilla WA
 const TIPO_CITA_PLANTILLA = {
   medica          : 'recordatorio_cita',
   vacuna          : 'recordatorio_cita_vacuna',
@@ -127,8 +125,9 @@ const TIPO_CITA_PLANTILLA = {
   estetica        : 'recordatorio_cita_estetica',
 };
 
+// Mensajes hardcodeados por si no existe plantilla en BD
 const FALLBACK_CITA = {
-  medica          : '🐾 Hola [nombre], recuerda tu cita médica para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
+  medica          : '🐾 Hola [nombre], recuerda la cita médica de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
   vacuna          : '💉 Hola [nombre], recuerda la cita de vacunación de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
   desparasitacion : '🐛 Hola [nombre], recuerda la cita de desparasitación de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
   estetica        : '✂️ Hola [nombre], recuerda la cita de estética de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
@@ -170,18 +169,18 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
     for (const cita of citas) {
       if (!cita.telefono) continue;
       try {
-        const tipoCita     = cita.tipo_cita || 'medica';
+        const tipoCita      = cita.tipo_cita || 'medica';
         const tipoPlantilla = TIPO_CITA_PLANTILLA[tipoCita] || 'recordatorio_cita';
-        const fallback      = FALLBACK_CITA[tipoCita] || FALLBACK_CITA.medica;
+        const tz            = tenant.zona_horaria || 'America/Lima';
 
         // 1. Buscar plantilla específica del tipo de cita
-        // 2. Si no existe, buscar la genérica recordatorio_cita
         const [[plantillaEspecifica]] = await conn.execute(
           'SELECT contenido FROM wa_plantillas WHERE tipo = ? AND activo = 1 LIMIT 1',
           [tipoPlantilla]
         );
         let contenido = plantillaEspecifica?.contenido;
 
+        // 2. Fallback a plantilla genérica si no existe la específica
         if (!contenido && tipoPlantilla !== 'recordatorio_cita') {
           const [[plantillaGenerica]] = await conn.execute(
             "SELECT contenido FROM wa_plantillas WHERE tipo = 'recordatorio_cita' AND activo = 1 LIMIT 1"
@@ -189,17 +188,19 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           contenido = plantillaGenerica?.contenido;
         }
 
-        const tz  = tenant.zona_horaria || 'America/Lima';
-        const msg = rellenarPlantilla(
-          contenido || fallback,
-          {
-            nombre  : cita.propietario,
-            mascota : cita.mascota,
-            fecha   : fDate(cita.fecha_hora, tz),
-            hora    : fHora(cita.fecha_hora, tz),
-            clinica,
-          }
-        );
+        // 3. Fallback hardcodeado por tipo
+        if (!contenido) {
+          contenido = FALLBACK_CITA[tipoCita] || FALLBACK_CITA.medica;
+        }
+
+        const msg = rellenarPlantilla(contenido, {
+          nombre  : cita.propietario,
+          mascota : cita.mascota,
+          fecha   : fDate(cita.fecha_hora, tz),
+          hora    : fHora(cita.fecha_hora, tz),
+          clinica,
+          telefono: tenant.tel_clinica || '',
+        });
 
         await callGateway('POST', '/wa/enviar', {
           tenantId     : tenant.id,
@@ -210,7 +211,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           codigoPais   : cfg.codigo_pais || '+51',
         });
 
-        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono} (tipo: ${tipoCita})`);
+        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono} (${tipoCita})`);
       } catch (e) {
         console.error(`[WA Citas] ❌ ${tenant.slug} → ${cita.telefono}: ${e.message}`);
       }
@@ -337,9 +338,9 @@ async function procesarRecordatorios() {
       `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
               tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria
        FROM tenants t
-       JOIN tenant_config tc ON tc.tenant_id = t.id
-       JOIN wa_sesiones ws ON ws.tenant_id = t.id
-       JOIN wa_config_global wcg ON wcg.tenant_id = t.id
+       JOIN tenant_config tc      ON tc.tenant_id  = t.id
+       JOIN wa_sesiones ws        ON ws.tenant_id  = t.id
+       JOIN wa_config_global wcg  ON wcg.tenant_id = t.id
        WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
     );
 
@@ -360,11 +361,12 @@ async function procesarRecordatorios() {
 
         if (cfg.recordatorio_citas_activo) {
           await procesarRecordatoriosCitas(tenant, conn, cfg, clinica);
+        } else {
+          console.log(`[WA Recordatorios] ${tenant.slug}: recordatorio citas desactivado`);
         }
         if (cfg.recordatorio_vacunas_activo) {
           await procesarRecordatoriosVacunas(tenant, conn, cfg, clinica);
         }
-        // Desparasitaciones — usa mismos días que vacunas
         if (cfg.recordatorio_desparasitaciones_activo) {
           await procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica);
         }
