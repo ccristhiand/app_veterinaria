@@ -188,7 +188,7 @@
         <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">① Propietario</p>
         <div style="display:flex;gap:.5rem">
           <div style="flex:1;position:relative">
-            <input id="nc-prop-q" type="text" placeholder="DNI, nombre o teléfono…"
+            <input id="nc-prop-q" type="text" placeholder="DNI, nombre, teléfono o mascota…"
               class="vinput" style="width:100%" onkeydown="if(event.key==='Enter')buscarPropNC()"/>
             <ul id="nc-prop-ac" class="ac-list" style="display:none"></ul>
           </div>
@@ -1026,19 +1026,34 @@ function selTipoNC(tipo) {
 
 // Buscar propietario con autocompletado
 async function buscarPropNC() {
-  var q   = document.getElementById('nc-prop-q').value.trim();
-  var ul  = document.getElementById('nc-prop-ac');
+  var q  = document.getElementById('nc-prop-q').value.trim();
+  var ul = document.getElementById('nc-prop-ac');
   if (!q) return;
   ul.innerHTML = '<li style="color:var(--ink-faint)">Buscando…</li>';
   ul.style.display = 'block';
   try {
-    var res  = await api('/propietarios?search='+encodeURIComponent(q)+'&limit=6');
-    var rows = res?.ok ? (await res.json()).data || [] : [];
-    ul.innerHTML = rows.length
-      ? rows.map(p => '<li onclick="selPropNC('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" >'+
+    var [resProp, resMasc] = await Promise.all([
+      api('/propietarios?search='+encodeURIComponent(q)+'&limit=6'),
+      api('/mascotas?search='+encodeURIComponent(q)+'&limit=4'),
+    ]);
+    var propRows = resProp?.ok ? (await resProp.json()).data || [] : [];
+    var mascRows = resMasc?.ok ? (await resMasc.json()).data || [] : [];
+    // Incluir propietarios encontrados por nombre de mascota
+    var propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id))];
+    for (var pid of propIdsFromMasc) {
+      if (!propRows.find(p => p.id === pid)) {
+        var rp = await api('/propietarios/'+pid);
+        if (rp?.ok) { var d = (await rp.json()).data; propRows.push(d); }
+      }
+    }
+    ul.innerHTML = propRows.length
+      ? propRows.map(p =>
+          '<li onclick="selPropNC('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" >'+
           '<strong>'+esc(p.nombre+' '+p.apellido)+'</strong> '+
-          '<span style="font-size:.72rem;color:var(--ink-faint)">'+(p.dni?'· DNI '+p.dni:'')+' 📞'+esc(p.telefono||'')+'</span>' +
-        '</li>').join('')
+          '<span style="font-size:.72rem;color:var(--ink-faint)">'+(p.dni?'\xc2\xb7 DNI '+p.dni:'')+' \xf0\x9f\x93\x9e'+esc(p.telefono||'')+'</span>'+
+          (p.total_mascotas ? ' <span style="font-size:.68rem;background:#ecfdf5;color:#047857;padding:.15rem .45rem;border-radius:999px;font-weight:600">\xf0\x9f\x90\xbe '+p.total_mascotas+'</span>' : '')+
+          '</li>'
+        ).join('')
       : '<li style="color:var(--ink-faint)">Sin resultados</li>';
   } catch { ul.innerHTML = '<li style="color:#e11d48">Error</li>'; }
 }

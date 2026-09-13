@@ -242,6 +242,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-fecha').value = fechaHoyInput();
     // Redireccion desde calendario o citas — abrir tab y modal correcto
     if (!ssTab || ssTab === 'consultas') {
+      mostrarTab('consultas');
       if (citaId&&motivoCita) { setTimeout(()=>{ document.getElementById('co-motivo').value=motivoCita; openModal('modal-consulta'); },300); }
     } else {
       const _modalMap = { vacunas:'modal-vacuna', desparasitaciones:'modal-desparasitacion', estetica:'modal-estetica' };
