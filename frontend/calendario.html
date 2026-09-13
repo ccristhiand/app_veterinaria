@@ -1014,11 +1014,11 @@ async function cargarVets() {
 function abrirNuevaCita(fecha, hora) {
   _ncPropSel = null; _ncMascSel = null;
   document.getElementById('nc-prop-q').value = '';
+  document.getElementById('nc-prop-resultados').innerHTML  = '';
   document.getElementById('nc-prop-sel').style.display     = 'none';
   document.getElementById('nc-paso-mascota').style.display = 'none';
   document.getElementById('nc-paso-cita').style.display    = 'none';
   document.getElementById('nc-btn-guardar').style.display  = 'none';
-  document.getElementById('nc-prop-ac').style.display      = 'none';
   document.getElementById('nc-notas').value  = '';
   document.getElementById('nc-motivo').value = '';
   document.getElementById('nc-duracion').value = '30';
@@ -1047,7 +1047,12 @@ function abrirNuevaCita(fecha, hora) {
   openModal('modal-ncita');
 }
 
-function cerrarModalNcita() { closeModal('modal-ncita'); _ncPropSel=null; _ncMascSel=null; }
+function cerrarModalNcita() {
+  closeModal('modal-ncita');
+  _ncPropSel = null; _ncMascSel = null;
+  document.getElementById('nc-prop-resultados').innerHTML = '';
+  document.getElementById('nc-prop-q').value = '';
+}
 
 function selTipoNC(tipo) {
   document.getElementById('nc-tipo').value = tipo;
