@@ -125,7 +125,6 @@ const TIPO_CITA_PLANTILLA = {
   estetica        : 'recordatorio_cita_estetica',
 };
 
-// Mensajes hardcodeados por si no existe plantilla en BD
 const FALLBACK_CITA = {
   medica          : '🐾 Hola [nombre], recuerda la cita médica de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
   vacuna          : '💉 Hola [nombre], recuerda la cita de vacunación de *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*.',
@@ -153,12 +152,13 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
        JOIN usuarios u ON u.id = c.veterinario_id
        WHERE c.estado IN ('pendiente','confirmada')
          AND p.telefono IS NOT NULL
-         AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 45 MINUTE
-                              AND NOW() + INTERVAL ? HOUR + INTERVAL 45 MINUTE
-         AND c.id NOT IN (
-           SELECT DISTINCT cita_id FROM wa_mensajes_log
-           WHERE tipo LIKE 'recordatorio_cita%'
+         AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 30 MINUTE
+                              AND NOW() + INTERVAL ? HOUR + INTERVAL 30 MINUTE
+         AND p.telefono NOT IN (
+           SELECT DISTINCT telefono FROM wa_mensajes_log
+           WHERE tipo = 'recordatorio_cita'
              AND estado = 'enviado'
+             AND enviado_at > NOW() - INTERVAL 1 DAY
          )`,
       [horas, horas]
     );
@@ -179,7 +179,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
         );
         let contenido = plantillaEspecifica?.contenido;
 
-        // 2. Fallback a plantilla genérica si no existe la específica
+        // 2. Fallback a plantilla genérica
         if (!contenido && tipoPlantilla !== 'recordatorio_cita') {
           const [[plantillaGenerica]] = await conn.execute(
             "SELECT contenido FROM wa_plantillas WHERE tipo = 'recordatorio_cita' AND activo = 1 LIMIT 1"
@@ -187,7 +187,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           contenido = plantillaGenerica?.contenido;
         }
 
-        // 3. Fallback hardcodeado por tipo
+        // 3. Fallback hardcodeado
         if (!contenido) {
           contenido = FALLBACK_CITA[tipoCita] || FALLBACK_CITA.medica;
         }
@@ -206,7 +206,6 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           telefono     : cita.telefono,
           mensaje      : msg,
           propietarioId: null,
-          citaId       : cita.id,
           tipo         : 'recordatorio_cita',
           codigoPais   : cfg.codigo_pais || '+51',
         });
@@ -253,12 +252,7 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
         );
         const msg = rellenarPlantilla(
           plantilla?.contenido || '💉 Hola [nombre], [mascota] tiene pendiente su vacuna [vacuna]. ¡Agenda tu cita en [clinica]!',
-          {
-            nombre  : vac.propietario,
-            mascota : vac.mascota,
-            vacuna  : vac.nombre,
-            clinica,
-          }
+          { nombre: vac.propietario, mascota: vac.mascota, vacuna: vac.nombre, clinica }
         );
 
         await callGateway('POST', '/wa/enviar', {
@@ -338,9 +332,9 @@ async function procesarRecordatorios() {
       `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
               tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria
        FROM tenants t
-       JOIN tenant_config tc      ON tc.tenant_id  = t.id
-       JOIN wa_sesiones ws        ON ws.tenant_id  = t.id
-       JOIN wa_config_global wcg  ON wcg.tenant_id = t.id
+       JOIN tenant_config tc     ON tc.tenant_id  = t.id
+       JOIN wa_sesiones ws       ON ws.tenant_id  = t.id
+       JOIN wa_config_global wcg ON wcg.tenant_id = t.id
        WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
     );
 
@@ -361,8 +355,6 @@ async function procesarRecordatorios() {
 
         if (cfg.recordatorio_citas_activo) {
           await procesarRecordatoriosCitas(tenant, conn, cfg, clinica);
-        } else {
-          console.log(`[WA Recordatorios] ${tenant.slug}: recordatorio citas desactivado`);
         }
         if (cfg.recordatorio_vacunas_activo) {
           await procesarRecordatoriosVacunas(tenant, conn, cfg, clinica);
