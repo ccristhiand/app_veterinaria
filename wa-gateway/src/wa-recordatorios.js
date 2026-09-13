@@ -153,13 +153,12 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
        JOIN usuarios u ON u.id = c.veterinario_id
        WHERE c.estado IN ('pendiente','confirmada')
          AND p.telefono IS NOT NULL
-         AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 30 MINUTE
-                              AND NOW() + INTERVAL ? HOUR + INTERVAL 30 MINUTE
-         AND p.telefono NOT IN (
-           SELECT DISTINCT telefono FROM wa_mensajes_log
+         AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 45 MINUTE
+                              AND NOW() + INTERVAL ? HOUR + INTERVAL 45 MINUTE
+         AND c.id NOT IN (
+           SELECT DISTINCT cita_id FROM wa_mensajes_log
            WHERE tipo LIKE 'recordatorio_cita%'
              AND estado = 'enviado'
-             AND enviado_at > NOW() - INTERVAL 1 DAY
          )`,
       [horas, horas]
     );
@@ -207,6 +206,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           telefono     : cita.telefono,
           mensaje      : msg,
           propietarioId: null,
+          citaId       : cita.id,
           tipo         : 'recordatorio_cita',
           codigoPais   : cfg.codigo_pais || '+51',
         });
