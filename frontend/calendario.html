@@ -184,26 +184,27 @@
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
 
       <!-- Buscar propietario -->
-      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1rem">
-        <p style="font-size:.7rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">① Propietario</p>
-        <div style="display:flex;gap:.5rem">
-          <div style="flex:1;position:relative">
-            <input id="nc-prop-q" type="text" placeholder="DNI, nombre, teléfono o mascota…"
-              class="vinput" style="width:100%" onkeydown="if(event.key==='Enter')buscarPropNC()"/>
-            <ul id="nc-prop-ac" class="ac-list" style="display:none"></ul>
+      <div style="background:#f8faf8;border:1px solid var(--line);border-radius:1rem;padding:1.1rem">
+        <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem">① Buscar propietario</p>
+        <div style="display:flex;gap:.6rem">
+          <div class="search-wrap" style="flex:1">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input id="nc-prop-q" type="text" placeholder="DNI, nombre del propietario o nombre de mascota…"
+              class="vinput" onkeydown="if(event.key==='Enter')buscarPropNC()"/>
           </div>
-          <button onclick="buscarPropNC()" class="vbtn vbtn-primary">Buscar</button>
+          <button onclick="buscarPropNC()" class="vbtn vbtn-primary" style="flex-shrink:0">Buscar</button>
         </div>
-        <div id="nc-prop-sel" style="display:none;margin-top:.6rem;background:#ecfdf5;border:1px solid #a7f3d0;
-          border-radius:.75rem;padding:.6rem .85rem;align-items:center;gap:.65rem">
-          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
-            color:#fff;font-weight:700;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"
+        <div id="nc-prop-resultados" style="margin-top:.75rem;display:flex;flex-direction:column;gap:.4rem;max-height:180px;overflow-y:auto"></div>
+        <div id="nc-prop-sel" style="display:none;margin-top:.75rem;background:#ecfdf5;border:1px solid #a7f3d0;
+          border-radius:.8rem;padding:.75rem 1rem;align-items:center;gap:.75rem">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
+            color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"
             id="nc-prop-avatar">?</div>
           <div style="flex:1">
-            <p style="font-weight:700;font-size:.83rem" id="nc-prop-nombre">—</p>
-            <p style="font-size:.68rem;color:var(--ink-soft)" id="nc-prop-info">—</p>
+            <p style="font-weight:700;font-size:.9rem" id="nc-prop-nombre">—</p>
+            <p style="font-size:.72rem;color:var(--ink-soft)" id="nc-prop-info">—</p>
           </div>
-          <button onclick="limpiarPropNC()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>
+          <button onclick="limpiarPropNC()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:1.1rem" title="Cambiar propietario">✕</button>
         </div>
       </div>
 
@@ -900,7 +901,7 @@ function verCita(c) {
   // Botones de acción
   var foot = '<button onclick="closeModal(\'modal-ver-cita\')" class="vbtn vbtn-ghost">Cerrar</button>';
   if (puedAtender) {
-    foot += '<button onclick="abrirAtenderCal('+JSON.stringify(JSON.stringify(c))+');closeModal(\'modal-ver-cita\')" '+
+    foot += '<button onclick="abrirAtenderCal('+JSON.stringify(c)+');closeModal(\'modal-ver-cita\')" '+
       'class="vbtn vbtn-primary">'+tipo.icon+' Atender</button>';
   }
   // Cambio de estado rápido
@@ -985,7 +986,7 @@ function abrirNuevaCita(fecha, hora) {
   document.getElementById('nc-paso-mascota').style.display = 'none';
   document.getElementById('nc-paso-cita').style.display    = 'none';
   document.getElementById('nc-btn-guardar').style.display  = 'none';
-  document.getElementById('nc-prop-ac').style.display      = 'none';
+  document.getElementById('nc-prop-resultados').innerHTML  = '';
   document.getElementById('nc-notas').value  = '';
   document.getElementById('nc-motivo').value = '';
   document.getElementById('nc-duracion').value = '30';
@@ -1024,79 +1025,80 @@ function selTipoNC(tipo) {
   });
 }
 
-// Buscar propietario con autocompletado
+// Buscar propietario (igual que citas no calendarizadas)
 async function buscarPropNC() {
-  var q  = document.getElementById('nc-prop-q').value.trim();
-  var ul = document.getElementById('nc-prop-ac');
-  if (!q) return;
-  ul.innerHTML = '<li style="color:var(--ink-faint)">Buscando…</li>';
-  ul.style.display = 'block';
+  var q = document.getElementById('nc-prop-q').value.trim();
+  if (!q) { toast('Ingresa DNI, nombre o teléfono','warning'); return; }
+  var cont = document.getElementById('nc-prop-resultados');
+  cont.innerHTML = '<div style="font-size:.78rem;color:var(--ink-faint);padding:.4rem">Buscando…</div>';
   try {
     var [resProp, resMasc] = await Promise.all([
       api('/propietarios?search='+encodeURIComponent(q)+'&limit=6'),
       api('/mascotas?search='+encodeURIComponent(q)+'&limit=4'),
     ]);
-    var propRows = resProp?.ok ? (await resProp.json()).data || [] : [];
-    var mascRows = resMasc?.ok ? (await resMasc.json()).data || [] : [];
-    // Incluir propietarios encontrados por nombre de mascota
+    var propRows = resProp ? (await resProp.json()).data || [] : [];
+    var mascRows = resMasc ? (await resMasc.json()).data || [] : [];
     var propIdsFromMasc = [...new Set(mascRows.map(m => m.propietario_id))];
+    var propFromMasc = [];
     for (var pid of propIdsFromMasc) {
       if (!propRows.find(p => p.id === pid)) {
         var rp = await api('/propietarios/'+pid);
-        if (rp?.ok) { var d = (await rp.json()).data; propRows.push(d); }
+        if (rp?.ok) { var d = (await rp.json()).data; propFromMasc.push(d); }
       }
     }
-    ul.innerHTML = propRows.length
-      ? propRows.map(p =>
-          '<li onclick="selPropNC('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" >'+
-          '<strong>'+esc(p.nombre+' '+p.apellido)+'</strong> '+
-          '<span style="font-size:.72rem;color:var(--ink-faint)">'+(p.dni?'\xc2\xb7 DNI '+p.dni:'')+' \xf0\x9f\x93\x9e'+esc(p.telefono||'')+'</span>'+
-          (p.total_mascotas ? ' <span style="font-size:.68rem;background:#ecfdf5;color:#047857;padding:.15rem .45rem;border-radius:999px;font-weight:600">\xf0\x9f\x90\xbe '+p.total_mascotas+'</span>' : '')+
-          '</li>'
-        ).join('')
-      : '<li style="color:var(--ink-faint)">Sin resultados</li>';
-  } catch { ul.innerHTML = '<li style="color:#e11d48">Error</li>'; }
+    var rows = [...propRows, ...propFromMasc];
+    cont.innerHTML = rows.length ? rows.map(p =>
+      '<button onclick="selPropNC('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" '+
+      'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;'+
+      'background:#fff;border:1px solid var(--line);border-radius:.85rem;'+
+      'cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
+      'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+      'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
+        '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
+        '<div style="flex:1;min-width:0"><p style="font-weight:700;font-size:.85rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+' 📞 '+esc(p.telefono||'')+'</p></div>' +
+        '<span style="font-size:.7rem;background:#ecfdf5;color:#047857;padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
+      '</button>'
+    ).join('')
+    : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">No se encontraron propietarios</div>';
+  } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>'; }
 }
 
-document.addEventListener('click', e => {
-  var ul = document.getElementById('nc-prop-ac');
-  if (ul && !ul.contains(e.target) && e.target.id!=='nc-prop-q') ul.style.display='none';
-});
-
 async function selPropNC(id, nombre, apellido, dni, telefono) {
-  _ncPropSel = { id };
-  document.getElementById('nc-prop-ac').style.display      = 'none';
-  document.getElementById('nc-prop-q').value               = '';
-  document.getElementById('nc-prop-sel').style.display     = 'flex';
-  document.getElementById('nc-prop-avatar').textContent    = nombre[0]+apellido[0];
-  document.getElementById('nc-prop-nombre').textContent    = nombre+' '+apellido;
-  document.getElementById('nc-prop-info').textContent      = (dni?'🪪 '+dni+' · ':'')+'📞 '+telefono;
+  _ncPropSel = { id, nombre: nombre+' '+apellido, dni, telefono };
+  document.getElementById('nc-prop-resultados').innerHTML = '';
+  document.getElementById('nc-prop-q').value              = '';
+  var sel = document.getElementById('nc-prop-sel');
+  sel.style.display = 'flex';
+  document.getElementById('nc-prop-avatar').textContent = nombre.charAt(0)+apellido.charAt(0);
+  document.getElementById('nc-prop-nombre').textContent = nombre+' '+apellido;
+  document.getElementById('nc-prop-info').textContent   = (dni?'🪪 '+dni+' · ':'')+' 📞 '+telefono;
   document.getElementById('nc-paso-mascota').style.display = 'block';
-  document.getElementById('nc-mascotas').innerHTML         = '<p style="font-size:.78rem;color:var(--ink-faint)">Cargando…</p>';
+  document.getElementById('nc-mascotas').innerHTML        = '<div style="font-size:.78rem;color:var(--ink-faint)">Cargando mascotas…</div>';
   try {
     var res      = await api('/propietarios/'+id);
-    var mascotas = res?.ok ? (await res.json()).data?.mascotas || [] : [];
+    if (!res) return;
+    var mascotas = (await res.json()).data?.mascotas || [];
     document.getElementById('nc-mascotas').innerHTML = mascotas.length
       ? mascotas.map(m =>
           '<button onclick="selMascotaNC('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
-          'style="display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;background:#fff;border:1px solid var(--line);border-radius:.75rem;cursor:pointer;font-family:inherit;width:100%;text-align:left;transition:all .15s" '+
+          'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
           'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
           'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
-            '<span style="font-size:1.3rem">'+badgeEspecie(m.especie)+'</span>'+
-            '<div><p style="font-weight:700;font-size:.83rem">'+esc(m.nombre)+'</p>'+
-            '<p style="font-size:.68rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'')+'</p></div>' +
+            '<span style="font-size:1.5rem">'+badgeEspecie(m.especie)+'</span>' +
+            '<div style="flex:1"><p style="font-weight:700;font-size:.85rem">'+esc(m.nombre)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'Sin raza')+' · '+esc(m.sexo)+'</p></div>' +
+            (m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3">⚠️ Alerta</span>':'') +
           '</button>'
         ).join('')
-      : '<p style="font-size:.78rem;color:var(--ink-faint)">No tiene mascotas registradas.</p>';
-  } catch {}
+      : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">Este propietario no tiene mascotas. <a href="mascotas.html" style="color:var(--green-600);font-weight:600">Registrar mascota</a></div>';
+  } catch { document.getElementById('nc-mascotas').innerHTML = '<div style="font-size:.78rem;color:#e11d48">Error al cargar mascotas</div>'; }
 }
-
 function limpiarPropNC() {
   _ncPropSel = null; _ncMascSel = null;
-  document.getElementById('nc-prop-sel').style.display     = 'none';
-  document.getElementById('nc-paso-mascota').style.display = 'none';
-  document.getElementById('nc-paso-cita').style.display    = 'none';
-  document.getElementById('nc-btn-guardar').style.display  = 'none';
+  document.getElementById('nc-prop-sel').style.display      = 'none';
+  document.getElementById('nc-paso-mascota').style.display  = 'none';
+  document.getElementById('nc-paso-cita').style.display     = 'none';
+  document.getElementById('nc-btn-guardar').style.display   = 'none';
+  document.getElementById('nc-prop-resultados').innerHTML   = '';
 }
 
 function selMascotaNC(id, nombre, especie, raza) {
