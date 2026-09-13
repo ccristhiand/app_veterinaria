@@ -901,7 +901,8 @@ function verCita(c) {
   // Botones de acción
   var foot = '<button onclick="closeModal(\'modal-ver-cita\')" class="vbtn vbtn-ghost">Cerrar</button>';
   if (puedAtender) {
-    foot += '<button onclick="abrirAtenderCal('+JSON.stringify(c)+');closeModal(\'modal-ver-cita\')" '+
+    _citaAtender = c;  // guardar antes de generar el HTML
+    foot += '<button onclick="closeModal(\'modal-ver-cita\');abrirAtenderCal()" '+
       'class="vbtn vbtn-primary">'+tipo.icon+' Atender</button>';
   }
   // Cambio de estado rápido
@@ -928,10 +929,10 @@ async function cambiarEstadoCita(id, estado) {
 // ══════════════════════════════════════════════════════════════════
 // ATENDER
 // ══════════════════════════════════════════════════════════════════
-function abrirAtenderCal(cStr) {
-  var c    = JSON.parse(cStr);
+function abrirAtenderCal() {
+  var c    = _citaAtender;
+  if (!c) return;
   var tipo = TIPOS[c.tipo_cita] || TIPOS.medica;
-  _citaAtender = c;
 
   document.getElementById('atender-cal-titulo').textContent   = tipo.icon+' Iniciar Atención';
   document.getElementById('atender-cal-paciente').textContent = badgeEspecie(c.especie)+' '+esc(c.mascota_nombre)+' · '+esc(c.propietario_nombre||'');
