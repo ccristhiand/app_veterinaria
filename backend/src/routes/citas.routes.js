@@ -35,10 +35,10 @@ router.get('/', async (req, res, next) => {
     const params = [];
 
     if (sedeId)         { sql += ' AND c.sede_id = ?';        params.push(sedeId); }
-    const tz = req.tzOffset || '-05:00';
-    if (fecha)          { sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) = ?'; params.push(tz, fecha); }
-    if (desde && !fecha){ sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) >= ?'; params.push(tz, desde); }
-    if (hasta && !fecha){ sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) <= ?'; params.push(tz, hasta); }
+    // fecha_hora se guarda en hora local (Lima) via timezone del pool — DATE() directo, sin CONVERT_TZ
+    if (fecha)          { sql += ' AND DATE(c.fecha_hora) = ?';  params.push(fecha); }
+    if (desde && !fecha){ sql += ' AND DATE(c.fecha_hora) >= ?'; params.push(desde); }
+    if (hasta && !fecha){ sql += ' AND DATE(c.fecha_hora) <= ?'; params.push(hasta); }
     if (estado)         { sql += ' AND c.estado = ?';          params.push(estado); }
     if (veterinario_id) { sql += ' AND c.veterinario_id = ?';  params.push(veterinario_id); }
     if (mascota_id)     { sql += ' AND c.mascota_id = ?';      params.push(mascota_id); }
