@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre               VARCHAR(100) NOT NULL,
   email                VARCHAR(150) NOT NULL UNIQUE,
   password             VARCHAR(255) NOT NULL,
-  rol                  ENUM('admin','veterinario','recepcionista') NOT NULL DEFAULT 'recepcionista',
+  rol                  ENUM('admin','veterinario','recepcionista','veterinario_recepcionista') NOT NULL DEFAULT 'recepcionista',
   sede_id              INT UNSIGNED NULL DEFAULT NULL,
   activo               TINYINT(1)   NOT NULL DEFAULT 1,
   must_change_password TINYINT(1)   NOT NULL DEFAULT 1,

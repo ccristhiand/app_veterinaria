@@ -106,7 +106,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ── POST /api/v1/usuarios — crear (solo admin) ────────────────────
-router.post('/', authorize('admin'), async (req, res, next) => {
+router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuarios'), async (req, res, next) => {
   try {
     // CAMBIO: recibir sede_id
     const { nombre, email, password, rol = 'recepcionista', sede_id = null } = req.body;
@@ -167,7 +167,7 @@ router.post('/', authorize('admin'), async (req, res, next) => {
 });
 
 // ── PUT /api/v1/usuarios/:id — editar (solo admin) ────────────────
-router.put('/:id', authorize('admin'), async (req, res, next) => {
+router.put('/:id', authorize('admin'), auditMiddleware('usuarios:actualizado', 'usuarios'), async (req, res, next) => {
   try {
     // CAMBIO: recibir sede_id
     const { nombre, email, rol, password, sede_id = null } = req.body;
@@ -213,7 +213,7 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ── PATCH /api/v1/usuarios/:id/toggle — activar/desactivar ────────
-router.patch('/:id/toggle', authorize('admin'), async (req, res, next) => {
+router.patch('/:id/toggle', authorize('admin'), auditMiddleware('usuarios:toggle', 'usuarios'), async (req, res, next) => {
   try {
     if (parseInt(req.params.id) === req.user.id) {
       return res.status(422).json({ success:false, message:'No puedes desactivar tu propio usuario.' });
