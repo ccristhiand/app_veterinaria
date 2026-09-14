@@ -123,7 +123,7 @@ async function editar(req, res, next) {
     }
 
     // Control de rol: veterinario solo edita las suyas
-    if (req.user.rol === 'veterinario' && consulta.veterinario_id !== req.user.id) {
+    if ((req.user.rol === 'veterinario' || req.user.rol === 'veterinario_recepcionista') && consulta.veterinario_id !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Solo puedes editar tus propias consultas.',

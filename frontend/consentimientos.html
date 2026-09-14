@@ -300,7 +300,7 @@ async function cargarPlantillasSelect() {
 
 async function cargarVeterinarios() {
   try {
-    const res = await api('/usuarios?rol=veterinario');
+    const res = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
     if (!res?.ok) return;
     const rows = (await res.json()).data || [];
     const sel  = document.getElementById('g-vet');
@@ -310,7 +310,7 @@ async function cargarVeterinarios() {
     });
     // Preseleccionar el usuario actual si es vet
     const me = JSON.parse(localStorage.getItem('vet_user')||'{}');
-    if (me.rol==='veterinario') sel.value = me.id;
+    if (me.rol==='veterinario' || me.rol==='veterinario_recepcionista') sel.value = me.id;
   } catch {}
 }
 

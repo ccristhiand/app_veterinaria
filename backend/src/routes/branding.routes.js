@@ -131,6 +131,16 @@ function permisosDefault(rol) {
     todos.consentimientos.firmar = true;
   }
 
+  if (rol === 'veterinario_recepcionista') {
+    // Combinación: acceso médico completo + caja/facturación del recepcionista
+    todos.reportes     = { ver:false, exportar:false };
+    todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };
+    todos.configuracion= { ver:false, editar:false };
+    todos.servicios    = { ver:true, crear:false, editar:false };
+    todos.citas.ver_todas = false;  // solo ve sus propias citas (como veterinario)
+    todos.consentimientos.firmar = true;
+  }
+
   if (rol === 'recepcionista') {
     todos.reportes     = { ver:false, exportar:false };
     todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };

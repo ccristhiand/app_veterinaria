@@ -47,7 +47,15 @@ router.get('/', async (req, res, next) => {
 
     // Filtrar por sede solo para no-admins
     if (sedeId)               { sql += ' AND u.sede_id = ?';  params.push(sedeId); }
-    if (rol !== undefined)    { sql += ' AND u.rol = ?';       params.push(rol); }
+    if (rol !== undefined) {
+      // Soporta ?rol=veterinario&rol2=veterinario_recepcionista (múltiples roles)
+      const { rol2 } = req.query;
+      if (rol2) {
+        sql += ' AND u.rol IN (?,?)'; params.push(rol, rol2);
+      } else {
+        sql += ' AND u.rol = ?'; params.push(rol);
+      }
+    }
     if (activo !== undefined) { sql += ' AND u.activo = ?';    params.push(activo === 'false' ? 0 : 1); }
     sql += ' ORDER BY u.nombre';
     const rows = await req.db.query(sql, params);
@@ -108,7 +116,7 @@ router.post('/', authorize('admin'), async (req, res, next) => {
     if (!password)       return res.status(422).json({ success:false, message:'Password obligatorio.' });
     if (password.length < 8) return res.status(422).json({ success:false, message:'El password debe tener al menos 8 caracteres.' });
 
-    const rolesValidos = ['admin','veterinario','recepcionista'];
+    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista'];
     if (!rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
     // Validar que la sede existe (si se proporciona)
@@ -167,7 +175,7 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
 
-    const rolesValidos = ['admin','veterinario','recepcionista'];
+    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista'];
     if (rol && !rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
     // Validar que la sede existe (si se proporciona)

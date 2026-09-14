@@ -25,7 +25,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ── POST /api/v1/desparasitaciones ───────────────────────────
-router.post('/', authorize('admin', 'veterinario'), async (req, res, next) => {
+router.post('/', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
     const { mascota_id, cita_id, tipo, producto, dosis, fecha_aplicacion, proxima_dosis, notas } = req.body;
     if (!mascota_id || !producto || !fecha_aplicacion) {
@@ -46,7 +46,7 @@ router.post('/', authorize('admin', 'veterinario'), async (req, res, next) => {
 });
 
 // ── PUT /api/v1/desparasitaciones/:id ────────────────────────
-router.put('/:id', authorize('admin', 'veterinario'), async (req, res, next) => {
+router.put('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
     const { tipo, producto, dosis, fecha_aplicacion, proxima_dosis, notas } = req.body;
     await req.db.query(

@@ -422,7 +422,7 @@ async function cargarVets() {
   if (!sel) return;
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var res  = await api('/usuarios?rol=veterinario');
+    var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
     if (!res) return;
     var vets = (await res.json()).data || [];
     sel.innerHTML = vets.length
@@ -742,7 +742,7 @@ async function abrirEditarCita(id) {
   var sel = document.getElementById('edit-cita-vet');
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var rv   = await api('/usuarios?rol=veterinario');
+    var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
     var vets = rv ? (await rv.json()).data || [] : [];
     sel.innerHTML = '<option value="">Seleccionar…</option>' +
       vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');

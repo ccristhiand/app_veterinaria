@@ -971,7 +971,7 @@ function irAAtenderCal() {
 // ══════════════════════════════════════════════════════════════════
 async function cargarVets() {
   try {
-    var res = await api('/usuarios?rol=veterinario');
+    var res = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
     _vets   = res?.ok ? (await res.json()).data || [] : [];
     var opts = '<option value="">Todos los veterinarios</option>' +
       _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');

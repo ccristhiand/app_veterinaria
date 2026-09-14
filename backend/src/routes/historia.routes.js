@@ -195,7 +195,7 @@ router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actuali
 });
 
 // DELETE /api/v1/historia/:id/seguimientos/:segId
-router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), async (req, res, next) => {
+router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
     await req.db.query(
       'DELETE FROM historia_seguimientos WHERE id = ? AND historia_id = ?',
@@ -206,7 +206,7 @@ router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario'), asy
 });
 
 // DELETE /api/v1/historia/:id
-router.delete('/:id', authorize('admin', 'veterinario'), auditMiddleware('historia_clinica:eliminado', 'historia_clinica'), async (req, res, next) => {
+router.delete('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'), auditMiddleware('historia_clinica:eliminado', 'historia_clinica'), async (req, res, next) => {
   try {
     const [h] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
     if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });

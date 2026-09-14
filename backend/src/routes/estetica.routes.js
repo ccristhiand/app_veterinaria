@@ -267,7 +267,7 @@ router.post('/:id/fotos', async (req, res, next) => {
 });
 
 // ── DELETE /api/v1/estetica/fotos/:fotoId — eliminar foto ─────────
-router.delete('/fotos/:fotoId', authorize('admin', 'veterinario'), async (req, res, next) => {
+router.delete('/fotos/:fotoId', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
     const [foto] = await req.db.query('SELECT * FROM estetica_fotos WHERE id = ?', [req.params.fotoId]);
     if (!foto) return res.status(404).json({ success: false, message: 'Foto no encontrada.' });
