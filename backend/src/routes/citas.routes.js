@@ -1,202 +1,161 @@
 'use strict';
 
-const { validationResult }       = require('express-validator');
-const { query, withTransaction } = require('../config/database');
-const { emitirNuevaCita }        = require('../sockets');
-const logger                     = require('../config/logger');
+const { Router } = require('express');
+const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { auditMiddleware } = require('../middlewares/audit.middleware');
 
-// ── Listar citas ──────────────────────────────────────────────────
-async function listar(req, res, next) {
+const router = Router();
+router.use(authenticate);
+
+// ── Helper: filtro de sede ────────────────────────────────────────
+function getSedeFiltro(req) {
+  const user   = req.user;
+  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
+  if (user.rol === 'admin') return header || null;
+  return user.sede_id || header || null;
+}
+
+// GET /api/v1/citas
+router.get('/', async (req, res, next) => {
   try {
-    const { fecha, veterinario_id, estado, page = 1, limit = 20 } = req.query;
-    const limitNum  = Math.min(parseInt(limit) || 20, 100);
-    const offsetNum = (Math.max(parseInt(page) || 1, 1) - 1) * limitNum;
+    const { fecha, desde, hasta, estado, veterinario_id, mascota_id, tipo_cita, search } = req.query;
+    const sedeId = getSedeFiltro(req);
 
     let sql = `
-      SELECT
-        c.id, c.fecha_hora, c.duracion_min, c.motivo, c.estado, c.notas,
-        m.id   AS mascota_id,     m.nombre AS mascota_nombre,   m.especie,
-        p.id   AS propietario_id, CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
-        u.id   AS veterinario_id, u.nombre AS veterinario_nombre,
-        c.created_at
+      SELECT c.*, m.nombre AS mascota_nombre, m.especie,
+             CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre, p.telefono,
+             u.nombre AS veterinario_nombre,
+             s.nombre AS sede_nombre
       FROM citas c
-      JOIN mascotas     m ON m.id = c.mascota_id
+      JOIN mascotas m ON m.id = c.mascota_id
       JOIN propietarios p ON p.id = m.propietario_id
-      JOIN usuarios     u ON u.id = c.veterinario_id
+      JOIN usuarios u ON u.id = c.veterinario_id
+      LEFT JOIN sedes s ON s.id = c.sede_id
       WHERE 1=1`;
     const params = [];
 
-    if (fecha)           { sql += ' AND DATE(c.fecha_hora) = ?'; params.push(fecha); }
-    if (veterinario_id)  { sql += ' AND c.veterinario_id = ?';   params.push(veterinario_id); }
-    if (estado)          { sql += ' AND c.estado = ?';            params.push(estado); }
-    if (req.user.rol === 'veterinario' || req.user.rol === 'veterinario_recepcionista') {
-      sql += ' AND c.veterinario_id = ?'; params.push(req.user.id);
+    if (sedeId)         { sql += ' AND c.sede_id = ?';        params.push(sedeId); }
+    const tz = req.tzOffset || '-05:00';
+    if (fecha)          { sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) = ?'; params.push(tz, fecha); }
+    if (desde && !fecha){ sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) >= ?'; params.push(tz, desde); }
+    if (hasta && !fecha){ sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) <= ?'; params.push(tz, hasta); }
+    if (estado)         { sql += ' AND c.estado = ?';          params.push(estado); }
+    if (veterinario_id) { sql += ' AND c.veterinario_id = ?';  params.push(veterinario_id); }
+    if (mascota_id)     { sql += ' AND c.mascota_id = ?';      params.push(mascota_id); }
+    if (tipo_cita)      { sql += ' AND c.tipo_cita = ?';       params.push(tipo_cita); }
+    if (search) {
+      sql += ` AND (m.nombre LIKE ? OR p.nombre LIKE ? OR p.apellido LIKE ?
+               OR p.dni LIKE ? OR p.telefono LIKE ? OR c.motivo LIKE ?)`;
+      const q = `%${search}%`;
+      params.push(q, q, q, q, q, q);
     }
 
-    sql += ` ORDER BY c.fecha_hora ASC LIMIT ${limitNum} OFFSET ${offsetNum}`;
-
-    const rows = await query(sql, params);
-    return res.json({ success: true, data: rows, page: parseInt(page) });
+    sql += ' ORDER BY c.fecha_hora ASC';
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
-}
+});
 
-// ── Obtener cita por ID ───────────────────────────────────────────
-async function obtener(req, res, next) {
+// GET /api/v1/citas/:id
+router.get('/:id', async (req, res, next) => {
   try {
-    const [cita] = await query(
-      `SELECT c.*, m.nombre AS mascota_nombre, m.especie,
+    const [cita] = await req.db.query(
+      `SELECT c.*, m.nombre AS mascota_nombre, m.especie, m.raza,
               CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre, p.telefono,
-              u.nombre AS veterinario_nombre
+              u.nombre AS veterinario_nombre,
+              s.nombre AS sede_nombre
        FROM citas c
        JOIN mascotas m ON m.id = c.mascota_id
        JOIN propietarios p ON p.id = m.propietario_id
        JOIN usuarios u ON u.id = c.veterinario_id
-       WHERE c.id = ?`,
-      [req.params.id],
+       LEFT JOIN sedes s ON s.id = c.sede_id
+       WHERE c.id = ?`, [req.params.id]
     );
     if (!cita) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
     return res.json({ success: true, data: cita });
   } catch (err) { next(err); }
-}
+});
 
-// ── Crear cita ────────────────────────────────────────────────────
-async function crear(req, res, next) {
+// POST /api/v1/citas
+router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(422).json({ success: false, errors: errors.array() });
+    const { mascota_id, veterinario_id, fecha_hora, duracion_min, motivo, notas,
+            tipo_cita = 'medica' } = req.body;
 
-    const { mascota_id, veterinario_id, fecha_hora, duracion_min = 30, motivo, notas } = req.body;
+    if (!mascota_id || !veterinario_id || !fecha_hora || !motivo)
+      return res.status(422).json({ success: false, message: 'Campos obligatorios faltantes.' });
 
-    const result = await withTransaction(async (conn) => {
-      const [[mascota]] = await conn.execute(
-        `SELECT m.id, m.nombre, p.nombre AS p_nombre, p.apellido AS p_apellido
-         FROM mascotas m JOIN propietarios p ON p.id = m.propietario_id WHERE m.id = ?`,
-        [mascota_id],
+    const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
+    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
+
+    let sedeId = req.user.sede_id ||
+                 (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+
+    if (!sedeId && veterinario_id) {
+      const [vet] = await req.db.query(
+        'SELECT sede_id FROM usuarios WHERE id = ?', [veterinario_id]
       );
-      if (!mascota) throw Object.assign(new Error('Mascota no encontrada.'), { status: 404 });
+      if (vet?.sede_id) sedeId = vet.sede_id;
+    }
 
-      const [[vet]] = await conn.execute(
-        "SELECT id, nombre FROM usuarios WHERE id = ? AND rol = 'veterinario' AND activo = 1",
-        [veterinario_id],
-      );
-      if (!vet) throw Object.assign(new Error('Veterinario no válido.'), { status: 404 });
-
-      const [ins] = await conn.execute(
-        `INSERT INTO citas (mascota_id, veterinario_id, creada_por_id, fecha_hora, duracion_min, motivo, notas)
-         VALUES (?,?,?,?,?,?,?)`,
-        [mascota_id, veterinario_id, req.user.id, fecha_hora, duracion_min, motivo, notas || null],
-      );
-
-      return {
-        id: ins.insertId, mascota_id,
-        mascota_nombre    : mascota.nombre,
-        propietario_nombre: `${mascota.p_nombre} ${mascota.p_apellido}`,
-        veterinario_id, veterinario_nombre: vet.nombre,
-        fecha_hora, duracion_min, motivo, estado: 'pendiente',
-        notas, creada_por_id: req.user.id,
-      };
-    });
+    const result = await req.db.query(
+      `INSERT INTO citas
+         (mascota_id, veterinario_id, creada_por_id, sede_id, fecha_hora, duracion_min, motivo, notas, tipo_cita)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [mascota_id, veterinario_id, req.user.id, sedeId,
+       fecha_hora, duracion_min || 30, motivo, notas || null, tipoCitaFinal]
+    );
 
     const io = req.app.get('io');
-    await emitirNuevaCita(io, result);
+    if (io) {
+      const [cita] = await req.db.query(
+        `SELECT c.*, m.nombre AS mascota_nombre,
+                CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre
+         FROM citas c
+         JOIN mascotas m ON m.id = c.mascota_id
+         JOIN propietarios p ON p.id = m.propietario_id
+         WHERE c.id = ?`, [result.insertId]
+      );
+      io.emit('cita:nueva', { type: 'cita:nueva', payload: cita });
+    }
 
-    logger.info(`📅 Cita #${result.id} creada por user #${req.user.id}`);
-    return res.status(201).json({ success: true, data: result });
+    return res.status(201).json({ success: true, data: { id: result.insertId } });
   } catch (err) { next(err); }
-}
+});
 
-// ── Editar cita ───────────────────────────────────────────────────
-// Roles: admin, recepcionista
-// Campos editables: veterinario_id, fecha_hora, duracion_min, motivo, notas
-// NO se puede cambiar: mascota_id, estado (usar PATCH /estado)
-async function editar(req, res, next) {
+// PUT /api/v1/citas/:id
+router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { veterinario_id, fecha_hora, duracion_min, motivo, notas } = req.body;
+    const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id,
+            tipo_cita } = req.body;
 
-    if (!fecha_hora || !motivo || !veterinario_id) {
-      return res.status(422).json({
-        success: false,
-        message: 'veterinario_id, fecha_hora y motivo son obligatorios.',
-      });
-    }
+    const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
+    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
 
-    // Verificar que la cita existe
-    const [cita] = await query('SELECT id, estado FROM citas WHERE id = ?', [id]);
-    if (!cita) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
-
-    // No permitir editar citas ya completadas o canceladas
-    if (['completada', 'cancelada'].includes(cita.estado)) {
-      return res.status(422).json({
-        success: false,
-        message: `No se puede editar una cita ${cita.estado}.`,
-      });
-    }
-
-    // Verificar que el veterinario existe
-    const [vet] = await query(
-      "SELECT id, nombre FROM usuarios WHERE id = ? AND rol = 'veterinario' AND activo = 1",
-      [veterinario_id],
-    );
-    if (!vet) return res.status(404).json({ success: false, message: 'Veterinario no válido.' });
-
-    await query(
+    await req.db.query(
       `UPDATE citas
-       SET veterinario_id = ?, fecha_hora = ?, duracion_min = ?, motivo = ?, notas = ?
-       WHERE id = ?`,
-      [veterinario_id, fecha_hora, duracion_min || 30, motivo, notas || null, id],
+         SET fecha_hora=?, duracion_min=?, motivo=?, notas=?, estado=?,
+             veterinario_id=?, tipo_cita=?
+       WHERE id=?`,
+      [fecha_hora, duracion_min || 30, motivo, notas || null,
+       estado || 'pendiente', veterinario_id, tipoCitaFinal, req.params.id]
     );
 
-    // Notificar actualización en tiempo real
-    const citaActualizada = await query(
-      `SELECT c.*, m.nombre AS mascota_nombre, m.especie,
-              CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
-              u.nombre AS veterinario_nombre
-       FROM citas c
-       JOIN mascotas m ON m.id = c.mascota_id
-       JOIN propietarios p ON p.id = m.propietario_id
-       JOIN usuarios u ON u.id = c.veterinario_id
-       WHERE c.id = ?`,
-      [id],
-    );
-
-    req.app.get('io').emit('cita:actualizada', {
-      id     : parseInt(id),
-      estado : cita.estado,
-      payload: citaActualizada[0],
-      ts     : new Date().toISOString(),
-    });
-
-    logger.info(`✏️ Cita #${id} editada por user #${req.user.id}`);
-    return res.json({ success: true, message: 'Cita actualizada correctamente.', data: citaActualizada[0] });
-
+    const io = req.app.get('io');
+    if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id } });
+    return res.json({ success: true, message: 'Cita actualizada.' });
   } catch (err) { next(err); }
-}
+});
 
-// ── Actualizar estado ─────────────────────────────────────────────
-async function actualizarEstado(req, res, next) {
+// PATCH /api/v1/citas/:id/estado
+router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
-    const { id } = req.params;
     const { estado } = req.body;
-
-    const valid = ['pendiente', 'confirmada', 'en_curso', 'completada', 'cancelada'];
-    if (!valid.includes(estado)) {
-      return res.status(422).json({ success: false, message: 'Estado inválido.' });
-    }
-
-    const rows = await query('UPDATE citas SET estado = ? WHERE id = ?', [estado, id]);
-    if (rows.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
-    }
-
-    req.app.get('io').emit('cita:actualizada', {
-      id    : parseInt(id),
-      estado,
-      ts    : new Date().toISOString(),
-    });
-
+    await req.db.query('UPDATE citas SET estado=? WHERE id=?', [estado, req.params.id]);
+    const io = req.app.get('io');
+    if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id, estado } });
     return res.json({ success: true, message: 'Estado actualizado.' });
   } catch (err) { next(err); }
-}
+});
 
-module.exports = { listar, obtener, crear, editar, actualizarEstado };
+module.exports = router;

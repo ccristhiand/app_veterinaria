@@ -29,7 +29,7 @@ async function listar(req, res, next) {
     if (fecha)           { sql += ' AND DATE(c.fecha_hora) = ?'; params.push(fecha); }
     if (veterinario_id)  { sql += ' AND c.veterinario_id = ?';   params.push(veterinario_id); }
     if (estado)          { sql += ' AND c.estado = ?';            params.push(estado); }
-    if (req.user.rol === 'veterinario') {
+    if (req.user.rol === 'veterinario' || req.user.rol === 'veterinario_recepcionista') {
       sql += ' AND c.veterinario_id = ?'; params.push(req.user.id);
     }
 
