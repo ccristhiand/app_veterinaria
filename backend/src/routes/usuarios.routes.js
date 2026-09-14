@@ -158,10 +158,15 @@ router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuario
       [nombre.trim(), email.trim().toLowerCase(), hash, rol, sede_id || null]
     );
 
+    const [nuevoUsuario] = await req.db.query(
+      `SELECT id, nombre, email, rol, sede_id, activo, must_change_password, created_at
+       FROM usuarios WHERE id = ?`, [result.insertId]
+    );
+
     return res.status(201).json({
       success: true,
       message: 'Usuario creado correctamente.',
-      data   : { id: result.insertId },
+      data   : nuevoUsuario,
     });
   } catch (err) { next(err); }
 });
