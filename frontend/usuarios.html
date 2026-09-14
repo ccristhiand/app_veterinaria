@@ -57,6 +57,7 @@
         <option value="admin">👑 Admin</option>
         <option value="veterinario">🩺 Veterinario</option>
         <option value="recepcionista">💁 Recepcionista</option>
+        <option value="veterinario_recepcionista">🩺💁 Vet. Recepcionista</option>
       </select>
     </div>
     <div>
@@ -122,6 +123,7 @@
           <select id="u-rol" class="vinput">
             <option value="recepcionista">💁 Recepcionista</option>
             <option value="veterinario">🩺 Veterinario</option>
+            <option value="veterinario_recepcionista">🩺💁 Vet. Recepcionista</option>
             <option value="admin">👑 Administrador</option>
           </select>
         </div>
@@ -290,6 +292,7 @@ async function cargar() {
     }
 
     var rolConfig = {
+      veterinario_recepcionista: { label:'🩺💁 Vet. Recepcionista', bg:'#ede9fe', color:'#5b21b6', border:'#c4b5fd' },
       admin         : { label:'👑 Admin',         bg:'#fef3c7', color:'#b45309', border:'#fde68a' },
       veterinario   : { label:'🩺 Veterinario',    bg:'#ecfdf5', color:'#047857', border:'#a7f3d0' },
       recepcionista : { label:'💁 Recepcionista',  bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
