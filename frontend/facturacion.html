@@ -620,9 +620,16 @@ var _catalogoCache = null;
 async function getCatalogo() {
   if (_catalogoCache) return _catalogoCache;
   try {
-    var [rs, ri] = await Promise.all([api('/servicios'), api('/inventario')]);
+    var [rs, ri] = await Promise.all([
+      api('/servicios'),
+      api('/inventario?limit=200&page=1'),
+    ]);
     var servicios  = rs?.ok  ? ((await rs.json()).data  || []).map(s=>({ ...s, _tipo:'servicio' }))  : [];
-    var inventario = ri?.ok  ? ((await ri.json()).data  || []).map(i=>({ ...i, _tipo:'inventario' })) : [];
+    var inventario = ri?.ok  ? ((await ri.json()).data  || [])
+      .filter(i => i.cantidad > 0)                              // solo con stock
+      .map(i => ({ ...i, _tipo:'inventario',
+                   precio: parseFloat(i.precio_unitario) || 0   // normalizar precio
+      })) : [];
     _catalogoCache = [...servicios, ...inventario];
     return _catalogoCache;
   } catch { return []; }
@@ -854,7 +861,7 @@ function limpiarFormFac() {
   document.getElementById('nf-prop-resultados').innerHTML = '';
   document.getElementById('nf-pagos').innerHTML = '';
   document.getElementById('nf-items').innerHTML = '';
-  propFacSel = null; itemN = 0; pagoN = 0; _catalogoCache = null;
+  propFacSel = null; itemN = 0; pagoN = 0; _catalogoCache = null; // forzar recarga de inventario con stock actual
   calcularTotales();
 }
 
@@ -985,7 +992,7 @@ async function buscarItemAC(input, id) {
   };
   ul.innerHTML = matches.map(item => {
     var cat    = item.categoria || item._tipo;
-    var precio = item.precio || item.precio_unitario || 0;
+    var precio = parseFloat(item.precio || item.precio_unitario || 0);
     var colores= catColors[cat] || '#f8faf8;color:#4b5f57';
     var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
     var invId = item._tipo==='inventario' ? item.id : 0;
