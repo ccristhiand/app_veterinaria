@@ -620,19 +620,23 @@ var _catalogoCache = null;
 async function getCatalogo() {
   if (_catalogoCache) return _catalogoCache;
   try {
-    var [rs, ri] = await Promise.all([
-      api('/servicios'),
-      api('/inventario?limit=200&page=1'),
-    ]);
-    var servicios  = rs?.ok  ? ((await rs.json()).data  || []).map(s=>({ ...s, _tipo:'servicio' }))  : [];
-    var inventario = ri?.ok  ? ((await ri.json()).data  || [])
-      .filter(i => i.cantidad > 0)                              // solo con stock
-      .map(i => ({ ...i, _tipo:'inventario',
-                   precio: parseFloat(i.precio_unitario) || 0   // normalizar precio
-      })) : [];
+    var rsSvc = await api('/servicios');
+    var rInv  = await api('/inventario?limit=200&page=1');
+    var servicios  = [];
+    var inventario = [];
+    if (rsSvc?.ok) {
+      var dSvc = await rsSvc.json();
+      servicios = (dSvc.data || []).map(function(s){ return Object.assign({}, s, { _tipo:'servicio', precio: parseFloat(s.precio)||0 }); });
+    }
+    if (rInv?.ok) {
+      var dInv = await rInv.json();
+      inventario = (dInv.data || [])
+        .filter(function(i){ return parseFloat(i.cantidad) > 0; })
+        .map(function(i){ return Object.assign({}, i, { _tipo:'inventario', precio: parseFloat(i.precio_unitario)||0 }); });
+    }
     _catalogoCache = [...servicios, ...inventario];
     return _catalogoCache;
-  } catch { return []; }
+  } catch(e) { console.error('getCatalogo error', e); return []; }
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────
@@ -983,8 +987,8 @@ async function buscarItemAC(input, id) {
   if (q.length < 1) { ul.style.display='none'; return; }
   var catalogo = await getCatalogo();
   // Separar: primero los que empiezan con q, luego los que lo contienen
-  var starts   = catalogo.filter(c => c.nombre.toLowerCase().startsWith(q));
-  var contains = catalogo.filter(c => !c.nombre.toLowerCase().startsWith(q) && c.nombre.toLowerCase().includes(q));
+  var starts   = catalogo.filter(function(it){ return it.nombre.toLowerCase().startsWith(q); });
+  var contains = catalogo.filter(function(it){ return !it.nombre.toLowerCase().startsWith(q) && it.nombre.toLowerCase().includes(q); });
   var matches  = [...starts, ...contains].slice(0, 12);
   if (!matches.length) { ul.innerHTML='<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Sin resultados para "'+esc(q)+'"</li>'; ul.style.display='block'; return; }
   var catColors = {
