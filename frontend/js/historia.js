@@ -240,6 +240,7 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-nombre').textContent = m.nombre;
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
+    document.getElementById('co-fecha').value  = fechaHoraAhoraInput();
     // Redireccion desde calendario o citas — abrir tab y modal correcto
     if (!ssTab || ssTab === 'consultas') {
       mostrarTab('consultas');
@@ -586,7 +587,8 @@ async function guardarConsulta() {
     if (!vrN||!vrF) { toast('Completa nombre y fecha de la vacuna.','warning'); return; }
     vacunaData={mascota_id:mascotaId,nombre:vrN,fabricante:document.getElementById('vr-fabricante').value.trim()||null,lote:document.getElementById('vr-lote').value.trim()||null,fecha_aplicacion:vrF,proxima_dosis:document.getElementById('vr-proxima').value||null,notas:document.getElementById('vr-notas').value.trim()||null};
   }
-  const body={mascota_id:mascotaId,cita_id:citaId||null,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),pruebas_complementarias:document.getElementById('co-pruebas').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
+  const fechaAtencion=document.getElementById('co-fecha').value||null;
+  const body={mascota_id:mascotaId,cita_id:citaId||null,fecha:fechaAtencion,motivo,peso_kg:parseFloat(document.getElementById('co-peso').value)||null,temperatura_c:parseFloat(document.getElementById('co-temp').value)||null,anamnesis:document.getElementById('co-anamnesis').value.trim(),exploracion:document.getElementById('co-exploracion').value.trim(),diagnostico:document.getElementById('co-diagnostico').value.trim(),tratamiento:document.getElementById('co-tratamiento').value.trim(),pruebas_complementarias:document.getElementById('co-pruebas').value.trim(),observaciones:document.getElementById('co-obs').value.trim(),recetas};
   const btn=document.getElementById('btn-guardar-consulta');
   btn.disabled=true; btn.textContent='Guardando…';
   try {
@@ -763,6 +765,7 @@ function limpiarFormEstetica() {
 }
 
 function limpiarForm() {
+  document.getElementById('co-fecha').value = fechaHoraAhoraInput();
   ['co-motivo','co-peso','co-temp','co-anamnesis','co-exploracion','co-diagnostico','co-tratamiento','co-pruebas','co-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('recetas').innerHTML='';
   document.getElementById('toggle-vacuna-rapida').checked=false;
