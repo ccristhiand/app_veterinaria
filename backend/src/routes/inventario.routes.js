@@ -20,7 +20,7 @@ router.get('/', async (req, res, next) => {
   try {
     const { categoria, bajo, search, vencimiento, page = 1, limit = 50 } = req.query;
     const sedeId  = getSedeFiltro(req);
-    const limitN  = Math.min(parseInt(limit) || 50, 200);
+    const limitN  = Math.min(parseInt(limit) || 50, 500);
     const offsetN = (Math.max(parseInt(page) || 1, 1) - 1) * limitN;
 
     let where  = 'WHERE 1=1';

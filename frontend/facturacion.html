@@ -631,7 +631,6 @@ async function getCatalogo() {
     if (rInv?.ok) {
       var dInv = await rInv.json();
       inventario = (dInv.data || [])
-        .filter(function(i){ return parseFloat(i.cantidad) > 0; })
         .map(function(i){ return Object.assign({}, i, { _tipo:'inventario', precio: parseFloat(i.precio_unitario)||0 }); });
     }
     _catalogoCache = [...servicios, ...inventario];
