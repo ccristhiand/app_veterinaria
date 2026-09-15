@@ -621,7 +621,7 @@ async function getCatalogo() {
   if (_catalogoCache) return _catalogoCache;
   try {
     var rsSvc = await api('/servicios');
-    var rInv  = await api('/inventario?limit=200&page=1');
+    var rInv  = await api('/inventario?limit=500&page=1');
     var servicios  = [];
     var inventario = [];
     if (rsSvc?.ok) {
