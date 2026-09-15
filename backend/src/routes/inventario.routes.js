@@ -26,7 +26,7 @@ router.get('/', async (req, res, next) => {
     let where  = 'WHERE 1=1';
     const params = [];
 
-    if (sedeId)       { where += ' AND i.sede_id = ?';               params.push(sedeId); }
+    if (sedeId)       { where += ' AND (i.sede_id = ? OR i.sede_id IS NULL)'; params.push(sedeId); }
     if (categoria)    { where += ' AND i.categoria = ?';             params.push(categoria); }
     if (bajo === '1') { where += ' AND i.cantidad < i.stock_minimo'; }
     if (search)       { where += ' AND i.nombre LIKE ?';             params.push(`%${search}%`); }
