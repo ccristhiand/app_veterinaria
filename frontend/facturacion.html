@@ -616,26 +616,35 @@ if (_userSede.sede_nombre) {
 })();
 
 // ── Catálogo combinado ────────────────────────────────────────────
-var _catalogoCache = null;
-async function getCatalogo() {
-  if (_catalogoCache) return _catalogoCache;
+// Servicios cacheados al abrir la factura (pocos registros)
+var _serviciosCache = null;
+
+async function _cargarServicios() {
+  if (_serviciosCache) return _serviciosCache;
   try {
-    var rsSvc = await api('/servicios');
-    var rInv  = await api('/inventario?limit=500&page=1');
-    var servicios  = [];
-    var inventario = [];
-    if (rsSvc?.ok) {
-      var dSvc = await rsSvc.json();
-      servicios = (dSvc.data || []).map(function(s){ return Object.assign({}, s, { _tipo:'servicio', precio: parseFloat(s.precio)||0 }); });
+    var res = await api('/servicios');
+    if (res?.ok) {
+      var d = await res.json();
+      _serviciosCache = (d.data || []).map(function(s){
+        return Object.assign({}, s, { _tipo:'servicio', precio: parseFloat(s.precio)||0 });
+      });
     }
-    if (rInv?.ok) {
-      var dInv = await rInv.json();
-      inventario = (dInv.data || [])
-        .map(function(i){ return Object.assign({}, i, { _tipo:'inventario', precio: parseFloat(i.precio_unitario)||0 }); });
+  } catch(e) {}
+  return _serviciosCache || [];
+}
+
+// Búsqueda de inventario: siempre contra el backend con el texto
+async function _buscarInventario(q) {
+  try {
+    var res = await api('/inventario?search='+encodeURIComponent(q)+'&limit=20&page=1');
+    if (res?.ok) {
+      var d = await res.json();
+      return (d.data || []).map(function(i){
+        return Object.assign({}, i, { _tipo:'inventario', precio: parseFloat(i.precio_unitario)||0 });
+      });
     }
-    _catalogoCache = [...servicios, ...inventario];
-    return _catalogoCache;
-  } catch(e) { console.error('getCatalogo error', e); return []; }
+  } catch(e) {}
+  return [];
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────
@@ -864,7 +873,7 @@ function limpiarFormFac() {
   document.getElementById('nf-prop-resultados').innerHTML = '';
   document.getElementById('nf-pagos').innerHTML = '';
   document.getElementById('nf-items').innerHTML = '';
-  propFacSel = null; itemN = 0; pagoN = 0; _catalogoCache = null; // forzar recarga de inventario con stock actual
+  propFacSel = null; itemN = 0; pagoN = 0; _serviciosCache = null;
   calcularTotales();
 }
 
@@ -981,41 +990,60 @@ function addItem(desc, cant, pu) {
 }
 
 var _acTimers = {};
+var _catColors = {
+  consulta:'#f0fdf4;color:#15803d', vacunacion:'#f5f3ff;color:#6d28d9',
+  estetica:'#fdf2f8;color:#db2777', cirugia:'#fff1f2;color:#be123c',
+  laboratorio:'#eff6ff;color:#1d4ed8', medicamento:'#f0f9ff;color:#0369a1',
+  servicio:'#f0fdf4;color:#15803d', inventario:'#f0f9ff;color:#0369a1',
+  otro:'#f8faf8;color:#4b5f57',
+};
+
+function _renderItemAC(matches, id) {
+  return matches.map(function(item) {
+    var cat    = item.categoria || item._tipo;
+    var precio = parseFloat(item.precio || item.precio_unitario || 0);
+    var colores= _catColors[cat] || '#f8faf8;color:#4b5f57';
+    var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
+    var invId  = item._tipo==='inventario' ? item.id : 0;
+    return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+','+invId+')">' +
+      '<span class="ac-cat-pill" style="background:'+colores+'">'+cat+'</span>' +
+      '<span style="flex:1;font-weight:600">'+esc(item.nombre)+'</span>' +
+      '<span style="font-size:.7rem;color:var(--ink-faint)">S/. '+parseFloat(precio).toFixed(2)+stock+'</span>' +
+      '</li>';
+  }).join('');
+}
+
 async function buscarItemAC(input, id) {
-  // Debounce: cancelar búsqueda previa si el usuario sigue escribiendo
   clearTimeout(_acTimers[id]);
   _acTimers[id] = setTimeout(async function() {
-    var q  = input.value.trim().toLowerCase();
+    var q  = input.value.trim();
     var ul = document.getElementById('ac-'+id);
     if (!ul) return;
-    if (q.length < 1) { ul.style.display='none'; return; }
-    var catalogo = await getCatalogo();
-    // Verificar que el input no cambió mientras esperábamos
-    if (input.value.trim().toLowerCase() !== q) return;
-    var starts   = catalogo.filter(function(it){ return it.nombre.toLowerCase().startsWith(q); });
-    var contains = catalogo.filter(function(it){ return !it.nombre.toLowerCase().startsWith(q) && it.nombre.toLowerCase().includes(q); });
-    var matches  = [...starts, ...contains].slice(0, 12);
-    if (!matches.length) { ul.innerHTML='<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Sin resultados para "'+esc(q)+'"</li>'; ul.style.display='block'; return; }
-    var catColors = {
-      consulta:'#f0fdf4;color:#15803d', vacunacion:'#f5f3ff;color:#6d28d9',
-      estetica:'#fdf2f8;color:#db2777', cirugia:'#fff1f2;color:#be123c',
-      laboratorio:'#eff6ff;color:#1d4ed8', medicamento:'#f0f9ff;color:#0369a1',
-      otro:'#f8faf8;color:#4b5f57',
-    };
-    ul.innerHTML = matches.map(function(item) {
-      var cat    = item.categoria || item._tipo;
-      var precio = parseFloat(item.precio || item.precio_unitario || 0);
-      var colores= catColors[cat] || '#f8faf8;color:#4b5f57';
-      var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
-      var invId  = item._tipo==='inventario' ? item.id : 0;
-      return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+','+invId+')">' +
-        '<span class="ac-cat-pill" style="background:'+colores+'">'+cat+'</span>' +
-        '<span style="flex:1;font-weight:600">'+esc(item.nombre)+'</span>' +
-        '<span style="font-size:.7rem;color:var(--ink-faint)">S/. '+parseFloat(precio).toFixed(2)+stock+'</span>' +
-        '</li>';
-    }).join('');
-    ul.style.display='block';
-  }, 180);
+    if (q.length < 2) { ul.style.display='none'; return; }
+    ul.innerHTML = '<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Buscando…</li>';
+    ul.style.display = 'block';
+
+    // Buscar en paralelo: servicios (cache) + inventario (backend)
+    var qL = q.toLowerCase();
+    var servicios  = await _cargarServicios();
+    var svcMatches = servicios.filter(function(s){ return s.nombre.toLowerCase().includes(qL); }).slice(0, 5);
+
+    // Verificar que el input no cambió
+    if (input.value.trim() !== q) return;
+
+    var invMatches = await _buscarInventario(q);
+
+    // Verificar de nuevo después del await
+    if (input.value.trim() !== q) return;
+
+    var matches = [...svcMatches, ...invMatches];
+    if (!matches.length) {
+      ul.innerHTML = '<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Sin resultados para "'+esc(q)+'"</li>';
+      return;
+    }
+    ul.innerHTML = _renderItemAC(matches, id);
+    ul.style.display = 'block';
+  }, 250);
 }
 
 function selItemAC(e, id, nombre, precio, invId) {
