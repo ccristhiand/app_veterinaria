@@ -981,35 +981,42 @@ function addItem(desc, cant, pu) {
   div.querySelector('[data-f="pu"]').addEventListener('blur', calcularTotales);
 }
 
+var _acTimers = {};
 async function buscarItemAC(input, id) {
-  var q   = input.value.trim().toLowerCase();
-  var ul  = document.getElementById('ac-'+id);
-  if (q.length < 1) { ul.style.display='none'; return; }
-  var catalogo = await getCatalogo();
-  // Separar: primero los que empiezan con q, luego los que lo contienen
-  var starts   = catalogo.filter(function(it){ return it.nombre.toLowerCase().startsWith(q); });
-  var contains = catalogo.filter(function(it){ return !it.nombre.toLowerCase().startsWith(q) && it.nombre.toLowerCase().includes(q); });
-  var matches  = [...starts, ...contains].slice(0, 12);
-  if (!matches.length) { ul.innerHTML='<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Sin resultados para "'+esc(q)+'"</li>'; ul.style.display='block'; return; }
-  var catColors = {
-    consulta:'#f0fdf4;color:#15803d', vacunacion:'#f5f3ff;color:#6d28d9',
-    estetica:'#fdf2f8;color:#db2777', cirugia:'#fff1f2;color:#be123c',
-    laboratorio:'#eff6ff;color:#1d4ed8', medicamento:'#f0f9ff;color:#0369a1',
-    otro:'#f8faf8;color:#4b5f57',
-  };
-  ul.innerHTML = matches.map(item => {
-    var cat    = item.categoria || item._tipo;
-    var precio = parseFloat(item.precio || item.precio_unitario || 0);
-    var colores= catColors[cat] || '#f8faf8;color:#4b5f57';
-    var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
-    var invId = item._tipo==='inventario' ? item.id : 0;
-    return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+','+invId+')">' +
-      '<span class="ac-cat-pill" style="background:'+colores+'">'+cat+'</span>' +
-      '<span style="flex:1;font-weight:600">'+esc(item.nombre)+'</span>' +
-      '<span style="font-size:.7rem;color:var(--ink-faint)">S/. '+parseFloat(precio).toFixed(2)+stock+'</span>' +
-      '</li>';
-  }).join('');
-  ul.style.display='block';
+  // Debounce: cancelar búsqueda previa si el usuario sigue escribiendo
+  clearTimeout(_acTimers[id]);
+  _acTimers[id] = setTimeout(async function() {
+    var q  = input.value.trim().toLowerCase();
+    var ul = document.getElementById('ac-'+id);
+    if (!ul) return;
+    if (q.length < 1) { ul.style.display='none'; return; }
+    var catalogo = await getCatalogo();
+    // Verificar que el input no cambió mientras esperábamos
+    if (input.value.trim().toLowerCase() !== q) return;
+    var starts   = catalogo.filter(function(it){ return it.nombre.toLowerCase().startsWith(q); });
+    var contains = catalogo.filter(function(it){ return !it.nombre.toLowerCase().startsWith(q) && it.nombre.toLowerCase().includes(q); });
+    var matches  = [...starts, ...contains].slice(0, 12);
+    if (!matches.length) { ul.innerHTML='<li style="color:var(--ink-faint);font-size:.78rem;padding:.5rem">Sin resultados para "'+esc(q)+'"</li>'; ul.style.display='block'; return; }
+    var catColors = {
+      consulta:'#f0fdf4;color:#15803d', vacunacion:'#f5f3ff;color:#6d28d9',
+      estetica:'#fdf2f8;color:#db2777', cirugia:'#fff1f2;color:#be123c',
+      laboratorio:'#eff6ff;color:#1d4ed8', medicamento:'#f0f9ff;color:#0369a1',
+      otro:'#f8faf8;color:#4b5f57',
+    };
+    ul.innerHTML = matches.map(function(item) {
+      var cat    = item.categoria || item._tipo;
+      var precio = parseFloat(item.precio || item.precio_unitario || 0);
+      var colores= catColors[cat] || '#f8faf8;color:#4b5f57';
+      var stock  = item._tipo==='inventario' ? ' · 📦 '+item.cantidad+' '+(item.unidad||'') : '';
+      var invId  = item._tipo==='inventario' ? item.id : 0;
+      return '<li onmousedown="selItemAC(event,'+id+',\''+esc(item.nombre)+'\','+parseFloat(precio)+','+invId+')">' +
+        '<span class="ac-cat-pill" style="background:'+colores+'">'+cat+'</span>' +
+        '<span style="flex:1;font-weight:600">'+esc(item.nombre)+'</span>' +
+        '<span style="font-size:.7rem;color:var(--ink-faint)">S/. '+parseFloat(precio).toFixed(2)+stock+'</span>' +
+        '</li>';
+    }).join('');
+    ul.style.display='block';
+  }, 180);
 }
 
 function selItemAC(e, id, nombre, precio, invId) {
