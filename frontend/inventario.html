@@ -183,6 +183,12 @@
           <label class="vlabel">Proveedor</label>
           <input id="i-proveedor" type="text" class="vinput" placeholder="Nombre del proveedor…"/>
         </div>
+        <div class="sm:col-span-2" id="i-sede-wrap">
+          <label class="vlabel">🏥 Sede *</label>
+          <select id="i-sede" class="vinput">
+            <option value="">— Selecciona una sede —</option>
+          </select>
+        </div>
         <div class="sm:col-span-2">
           <label class="vlabel">Fecha de vencimiento</label>
           <input id="i-venc" type="date" class="vinput" style="width:auto"/>
@@ -301,6 +307,27 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
     }
   }
+
+  // Cargar sedes en el selector del modal
+  (async function() {
+    var resSedes = await api('/sedes');
+    if (resSedes?.ok) {
+      var sedes = (await resSedes.json()).data || [];
+      var sel = document.getElementById('i-sede');
+      sedes.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = (s.es_principal ? '⭐ ' : '🏥 ') + s.nombre;
+        sel.appendChild(opt);
+      });
+      // Si el usuario tiene sede asignada, preseleccionarla y ocultar el selector
+      var _u = getUser();
+      if (_u.sede_id) {
+        sel.value = _u.sede_id;
+        document.getElementById('i-sede-wrap').style.display = 'none';
+      }
+    }
+  })();
 
   initSelectorSede('selector-sede-inv', function() {
     cargar(true);
@@ -507,6 +534,10 @@ function abrirNuevo() {
   document.getElementById('i-precio').value   = '';
   document.getElementById('i-proveedor').value= '';
   document.getElementById('i-venc').value     = '';
+  // Preseleccionar sede del usuario si tiene una asignada
+  var _u = getUser();
+  if (_u.sede_id) document.getElementById('i-sede').value = _u.sede_id;
+  else document.getElementById('i-sede').value = '';
   openModal('modal-item');
 }
 
@@ -528,6 +559,7 @@ async function abrirEditar(id) {
     calcularMargenInv();
     document.getElementById('i-proveedor').value = item.proveedor || '';
     document.getElementById('i-venc').value      = item.fecha_vencimiento?.split('T')[0] || '';
+    document.getElementById('i-sede').value      = item.sede_id || '';
   }
 }
 
@@ -588,6 +620,9 @@ async function guardarItem() {
   const nombre = document.getElementById('i-nombre').value.trim();
   if (!nombre) { toast('El nombre es obligatorio.','warning'); return; }
 
+  const sedeId = parseInt(document.getElementById('i-sede').value) || null;
+  if (!sedeId) { toast('Debes seleccionar una sede.','warning'); return; }
+
   const body = {
     nombre,
     categoria       : document.getElementById('i-cat').value,
@@ -598,6 +633,7 @@ async function guardarItem() {
     precio_compra   : parseFloat(document.getElementById('i-precio-compra').value) || 0,
     proveedor       : document.getElementById('i-proveedor').value.trim() || null,
     fecha_vencimiento: document.getElementById('i-venc').value || null,
+    sede_id         : sedeId,
   };
 
   const url    = id ? `/inventario/${id}` : '/inventario';

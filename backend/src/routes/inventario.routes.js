@@ -192,11 +192,13 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
       nombre, categoria = 'medicamento', cantidad = 0, unidad = 'unidad',
       stock_minimo = 5, precio_unitario = null, precio_compra = 0,
       proveedor = null, fecha_vencimiento = null, descripcion = null,
+      sede_id = null,
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
 
-    const sedeId = req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    const sedeId = parseInt(sede_id) || req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    if (!sedeId) return res.status(422).json({ success: false, message: 'Debes seleccionar una sede.' });
 
     const result = await req.db.query(
       `INSERT INTO inventario
@@ -224,22 +226,25 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
     const {
       nombre, categoria, cantidad, unidad,
       stock_minimo, precio_unitario, precio_compra = 0,
-      proveedor, fecha_vencimiento, descripcion,
+      proveedor, fecha_vencimiento, descripcion, sede_id = null,
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
+
+    const sedeIdPut = parseInt(sede_id) || req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    if (!sedeIdPut) return res.status(422).json({ success: false, message: 'Debes seleccionar una sede.' });
 
     await req.db.query(
       `UPDATE inventario SET
          nombre=?, categoria=?, cantidad=?, unidad=?, stock_minimo=?,
          precio_unitario=?, precio_compra=?, proveedor=?,
-         fecha_vencimiento=?, descripcion=?, updated_at=NOW()
+         fecha_vencimiento=?, descripcion=?, sede_id=?, updated_at=NOW()
        WHERE id=?`,
       [nombre.trim(), categoria||'medicamento',
        parseFloat(cantidad)||0, unidad||'unidad',
        parseFloat(stock_minimo)||5, precio_unitario||null,
        parseFloat(precio_compra)||0, proveedor||null,
-       fecha_vencimiento||null, descripcion||null, req.params.id]
+       fecha_vencimiento||null, descripcion||null, sedeIdPut, req.params.id]
     );
 
     const cantF = parseFloat(cantidad)||0;
