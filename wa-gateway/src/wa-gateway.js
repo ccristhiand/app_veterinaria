@@ -187,7 +187,11 @@ function descargarImagen(url) {
 }
 
 // ── Crear / restaurar sesión Baileys ──────────────────────────
-async function crearSesion(tenantId, tenantSlug, tenantNombre) {
+// ── Control de reintentos por tenant ─────────────────────────────
+const _reintentos = new Map(); // tenantId → { count, lastAt }
+const MAX_REINTENTOS = 5;
+
+async function crearSesion(tenantId, tenantSlug, tenantNombre, _intento = 1) {
   if (sesiones.has(tenantId)) {
     const s = sesiones.get(tenantId);
     if (s.estado === 'conectado') return { ok: true, message: 'Ya conectado' };
@@ -240,14 +244,50 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre) {
     if (connection === 'close') {
       const codigo = (lastDisconnect?.error instanceof Boom)
         ? lastDisconnect.error.output?.statusCode : null;
-      const debeReconectar = codigo !== DisconnectReason.loggedOut;
-      if (debeReconectar) {
+
+      // loggedOut o banned → no reconectar, limpiar sesión
+      const esBanned = [401, 403, 405].includes(codigo);
+      const esLogout = codigo === DisconnectReason.loggedOut;
+
+      if (esLogout || esBanned) {
+        const motivo = esBanned ? 'bloqueado/baneado' : 'logout';
+        console.log(`[WA] ${tenantSlug} desconectado definitivamente (${motivo} — código ${codigo})`);
+        await masterQuery(
+          "UPDATE wa_sesiones SET estado='desconectado', error_msg=? WHERE tenant_id=?",
+          [`Desconectado: ${motivo} (código ${codigo})`, tenantId]
+        ).catch(() => {});
         sesiones.delete(tenantId);
-        setTimeout(() => crearSesion(tenantId, tenantSlug, tenantNombre), 5000);
-      } else {
-        await limpiarSesion(tenantId, tenantSlug, 'desconectado');
-        io.to(`tenant:${tenantId}`).emit('wa:desconectado', { tenantId });
+        io.to(`tenant:${tenantId}`).emit('wa:desconectado', { tenantId, motivo });
+        _reintentos.delete(tenantId);
+        return;
       }
+
+      // Reconexión con backoff exponencial y límite de intentos
+      const intento = _intento || 1;
+      if (intento > MAX_REINTENTOS) {
+        console.log(`[WA] ${tenantSlug} — máximo de reintentos alcanzado (${MAX_REINTENTOS}). Marcando como desconectado.`);
+        await masterQuery(
+          "UPDATE wa_sesiones SET estado='desconectado', error_msg='Sin conexión tras 5 intentos' WHERE tenant_id=?",
+          [tenantId]
+        ).catch(() => {});
+        sesiones.delete(tenantId);
+        io.to(`tenant:${tenantId}`).emit('wa:desconectado', { tenantId, motivo: 'max_reintentos' });
+        _reintentos.delete(tenantId);
+        return;
+      }
+
+      // Backoff: 5s, 15s, 30s, 60s, 120s
+      const delays = [5000, 15000, 30000, 60000, 120000];
+      const delay  = delays[intento - 1] || 120000;
+      console.log(`[WA] ${tenantSlug} — reintento ${intento}/${MAX_REINTENTOS} en ${delay/1000}s (código ${codigo})`);
+
+      await masterQuery(
+        "UPDATE wa_sesiones SET estado='conectando', error_msg=? WHERE tenant_id=?",
+        [`Reintentando conexión (${intento}/${MAX_REINTENTOS})`, tenantId]
+      ).catch(() => {});
+
+      sesiones.delete(tenantId);
+      setTimeout(() => crearSesion(tenantId, tenantSlug, tenantNombre, intento + 1), delay);
     }
   });
 
