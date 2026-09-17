@@ -378,7 +378,7 @@
 <!-- Modal QR -->
 <div id="modal-qr" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:420px">
-    <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="detenerPollingQR();closeModal('modal-qr')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="closeModal('modal-qr')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="text-align:center;padding:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem 1rem;font-size:.82rem;color:#15803d;width:100%">
         📱 Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo → Escanea el QR
@@ -387,7 +387,7 @@
       <p id="qr-status" style="font-size:.78rem;color:var(--ink-faint)">Generando QR…</p>
       <button onclick="refrescarQR()" class="vbtn vbtn-ghost" style="font-size:.78rem">🔄 Refrescar QR</button>
     </div>
-    <div class="vmodal-foot"><button onclick="detenerPollingQR();closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button></div>
+    <div class="vmodal-foot"><button onclick="closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button></div>
   </div>
 </div>
 
@@ -549,7 +549,7 @@ function iniciarSocket() {
     _waSocket.on('wa:conectado', (data) => {
       _waEstado = 'conectado';
       actualizarBadgeEstado('conectado', data.numero);
-      detenerPollingQR(); closeModal('modal-qr');
+      closeModal('modal-qr');
       clearInterval(_qrInterval);
       toast(`✅ WhatsApp conectado: ${data.numero}`, 'success', 5000);
       cargarEstado();
@@ -688,10 +688,9 @@ async function conectarWA() {
     const res  = await api('/wa/conectar', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al conectar.', 'danger'); actualizarBadgeEstado('desconectado'); return; }
-    detenerPollingQR();
     openModal('modal-qr');
     document.getElementById('qr-status').textContent = 'Esperando QR del servidor…';
-    _qrPolling = setTimeout(refrescarQR, 2000);
+    setTimeout(refrescarQR, 2000);
   } catch(e) { toast('Error al conectar.', 'danger'); actualizarBadgeEstado('desconectado'); }
 }
 
@@ -709,38 +708,13 @@ async function confirmarDesconectar() {
   } catch(e) { toast('Error al desconectar.', 'danger'); }
 }
 
-var _qrPolling = null;
-var _qrIntentos = 0;
-const _QR_MAX_INTENTOS = 20; // máximo 20 intentos = 60 segundos
-
-function detenerPollingQR() {
-  if (_qrPolling) { clearTimeout(_qrPolling); _qrPolling = null; }
-  _qrIntentos = 0;
-}
-
 async function refrescarQR() {
-  // Parar si el modal está cerrado
-  if (!document.getElementById('modal-qr')?.classList.contains('modal-open') &&
-      !document.getElementById('modal-qr')?.style.display?.includes('flex') &&
-      !document.getElementById('modal-qr')?.getAttribute('data-open')) {
-    detenerPollingQR(); return;
-  }
-  // Parar si se superó el límite de intentos
-  _qrIntentos++;
-  if (_qrIntentos > _QR_MAX_INTENTOS) {
-    document.getElementById('qr-status').textContent = 'No se pudo obtener el QR. Intenta de nuevo.';
-    detenerPollingQR(); return;
-  }
   try {
     const res = await api('/wa/qr');
-    if (!res?.ok) {
-      document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera… ('+_qrIntentos+'/'+_QR_MAX_INTENTOS+')';
-      _qrPolling = setTimeout(refrescarQR, 3000); return;
-    }
+    if (!res?.ok) { document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…'; setTimeout(refrescarQR, 3000); return; }
     const { data } = await res.json();
-    detenerPollingQR();
     mostrarQR(data.qr);
-  } catch(e) { _qrPolling = setTimeout(refrescarQR, 3000); }
+  } catch(e) { setTimeout(refrescarQR, 3000); }
 }
 
 function mostrarQR(qrData) {
