@@ -191,6 +191,7 @@ function descargarImagen(url) {
 const _reintentos = new Map(); // tenantId → { count, lastAt }
 const MAX_REINTENTOS = 5;
 
+
 async function crearSesion(tenantId, tenantSlug, tenantNombre, _intento = 1) {
   if (sesiones.has(tenantId)) {
     const s = sesiones.get(tenantId);
@@ -261,6 +262,12 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre, _intento = 1) {
           "UPDATE wa_sesiones SET estado='desconectado', error_msg=? WHERE tenant_id=?",
           [`Desconectado: ${motivo} (código ${codigo})`, tenantId]
         ).catch(() => {});
+        // Limpiar sesión del disco para forzar QR nuevo
+        const dirSesion = sessionDir(tenantSlug);
+        if (fs.existsSync(dirSesion)) {
+          fs.rmSync(dirSesion, { recursive: true, force: true });
+          console.log(`[WA] ${tenantSlug} — sesión en disco eliminada`);
+        }
         sesiones.delete(tenantId);
         io.to(`tenant:${tenantId}`).emit('wa:desconectado', { tenantId, motivo });
         _reintentos.delete(tenantId);
