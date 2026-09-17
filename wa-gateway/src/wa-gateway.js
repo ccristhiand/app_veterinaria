@@ -195,6 +195,11 @@ async function crearSesion(tenantId, tenantSlug, tenantNombre, _intento = 1) {
   if (sesiones.has(tenantId)) {
     const s = sesiones.get(tenantId);
     if (s.estado === 'conectado') return { ok: true, message: 'Ya conectado' };
+    // Si es solicitud manual (intento 1) y hay una sesión rota en curso, limpiarla primero
+    if (_intento === 1 && s.estado === 'conectando') {
+      try { s.socket?.end?.(); } catch {}
+      sesiones.delete(tenantId);
+    }
   }
 
   console.log(`[WA] Iniciando sesión: ${tenantSlug}`);
