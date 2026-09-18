@@ -251,28 +251,25 @@ async function procesarCampana(campana, conn, cfg, tenant) {
       await cargarContactosCampana(campana, conn);
     }
 
-    // ── RESERVA ATÓMICA con SELECT ... FOR UPDATE ────────────────────────────
-    // Sin nuevo estado en el schema. Usamos una transacción con FOR UPDATE:
-    // MySQL lockea la fila seleccionada a nivel de registro — si dos ciclos
-    // llegan aquí al mismo tiempo, el segundo espera hasta que el primero
-    // haga COMMIT/ROLLBACK antes de poder leer esa misma fila.
+    // ── RESERVA ATÓMICA con transacción + FOR UPDATE ─────────────────────────
+    // FOR UPDATE no es compatible con GROUP BY, por eso se hace en dos pasos:
+    // 1) Seleccionar y lockear solo el ID del contacto (sin JOIN ni GROUP BY)
+    // 2) Marcar como 'enviado' dentro de la misma transacción
+    // 3) Hacer COMMIT — recién ahí otro ciclo puede ver ese contacto
     await conn.beginTransaction();
     let contacto = null;
     try {
-      const [[candidato]] = await conn.execute(
-        `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
-                GROUP_CONCAT(m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-         FROM wa_campana_contactos wcc
-         LEFT JOIN mascotas m ON m.propietario_id = wcc.propietario_id
-         WHERE wcc.campana_id=? AND wcc.estado='pendiente'
-         GROUP BY wcc.id
-         ORDER BY wcc.id ASC
+      // Paso 1: lockear solo el ID — sin GROUP BY ni JOIN para que FOR UPDATE funcione
+      const [[candidatoId]] = await conn.execute(
+        `SELECT id FROM wa_campana_contactos
+         WHERE campana_id=? AND estado='pendiente'
+         ORDER BY id ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED`,
         [campana.id]
       );
 
-      if (!candidato) {
+      if (!candidatoId) {
         await conn.commit();
         // No quedan pendientes — verificar si completó
         const [[{ pendientes }]] = await conn.execute(
@@ -295,15 +292,24 @@ async function procesarCampana(campana, conn, cfg, tenant) {
         return;
       }
 
-      // Marcar inmediatamente como 'enviado' dentro de la transacción
-      // El FOR UPDATE + este UPDATE dentro de la misma transacción garantiza
-      // que ningún otro ciclo pueda tocar este contacto hasta el COMMIT
+      // Paso 2: marcar como 'enviado' dentro de la misma transacción
       await conn.execute(
         "UPDATE wa_campana_contactos SET estado='enviado', enviado_at=NOW() WHERE id=?",
-        [candidato.id]
+        [candidatoId.id]
       );
       await conn.commit();
-      contacto = candidato;
+
+      // Paso 3: obtener los datos completos del contacto ya reservado
+      const [[datos]] = await conn.execute(
+        `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
+                GROUP_CONCAT(m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+         FROM wa_campana_contactos wcc
+         LEFT JOIN mascotas m ON m.propietario_id = wcc.propietario_id
+         WHERE wcc.id=?
+         GROUP BY wcc.id`,
+        [candidatoId.id]
+      );
+      contacto = datos;
     } catch (e) {
       await conn.rollback();
       throw e;
