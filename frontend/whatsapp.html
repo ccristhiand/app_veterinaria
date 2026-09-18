@@ -1439,6 +1439,10 @@ function abrirModalNuevaCampana() {
   document.getElementById('camp-nombre').value  = '';
   document.getElementById('camp-mensaje').value = '';
   document.getElementById('camp-segmento').value = 'todos';
+  _campPropietariosSeleccionados = [];
+  _campPropietariosTodos = [];
+  var be = document.getElementById('camp-bloque-especie'); if(be) be.style.display='none';
+  var bp = document.getElementById('camp-bloque-personalizado'); if(bp) bp.style.display='none';
   document.getElementById('camp-proyeccion').style.display = 'none';
   document.getElementById('det-modal-campana-titulo').textContent = '📢 Nueva campaña';
   limpiarImagenCampana();
@@ -1497,8 +1501,23 @@ var _campTotal = 0, _campImagenUrl = null, _campImagenBlob = null;
 
 async function calcularProyeccion() {
   var seg = document.getElementById('camp-segmento')?.value || 'todos';
+
+  // Segmento personalizado: contar los seleccionados localmente
+  if (seg === 'personalizado') {
+    _campTotal = _campPropietariosSeleccionados.length;
+    if (_campTotal) renderProyeccion(_campTotal, _campLimite);
+    return;
+  }
+
+  // Segmento por_especie: incluir el valor de especie
+  var url = '/wa/campanas/proyeccion?segmento=' + seg;
+  if (seg === 'por_especie') {
+    var especie = document.getElementById('camp-especie')?.value || 'perro';
+    url += '&segmento_valor=' + especie;
+  }
+
   try {
-    var res = await api('/wa/campanas/proyeccion?segmento='+seg); if (!res?.ok) return;
+    var res = await api(url); if (!res?.ok) return;
     _campTotal = (await res.json()).data?.total || 0;
     renderProyeccion(_campTotal, _campLimite);
   } catch(e) { _campTotal = 0; }
@@ -1524,6 +1543,98 @@ function renderProyeccion(total, limite) {
   body.innerHTML = html + '</div>';
 }
 
+// ── Variables para segmento personalizado ──────────────────────────────────
+var _campPropietariosSeleccionados = [];
+var _campPropietariosTodos = []; // cache de todos los propietarios
+
+function onSegmentoCampoChange() {
+  var seg = document.getElementById('camp-segmento').value;
+  // Mostrar/ocultar campo especie
+  var bloqueEspecie = document.getElementById('camp-bloque-especie');
+  if (bloqueEspecie) bloqueEspecie.style.display = seg === 'por_especie' ? '' : 'none';
+  // Mostrar/ocultar lista personalizada
+  var bloquePersonalizado = document.getElementById('camp-bloque-personalizado');
+  if (bloquePersonalizado) bloquePersonalizado.style.display = seg === 'personalizado' ? '' : 'none';
+  // Cargar propietarios si es la primera vez
+  if (seg === 'personalizado' && !_campPropietariosTodos.length) {
+    cargarListaPropietarios();
+  }
+  calcularProyeccion();
+}
+
+async function cargarListaPropietarios() {
+  var lista = document.getElementById('camp-prop-lista');
+  if (!lista) return;
+  lista.innerHTML = '<p style="text-align:center;color:var(--ink-faint);font-size:.8rem;padding:1rem">Cargando…</p>';
+  try {
+    var res = await api('/propietarios?limit=500&fields=id,nombre,apellido,telefono');
+    if (!res?.ok) throw new Error('Error');
+    var data = (await res.json()).data || [];
+    _campPropietariosTodos = data;
+    renderListaProp(data);
+  } catch(e) {
+    lista.innerHTML = '<p style="text-align:center;color:#e53e3e;font-size:.8rem;padding:1rem">Error al cargar propietarios</p>';
+  }
+}
+
+function renderListaProp(lista) {
+  var cont = document.getElementById('camp-prop-lista');
+  if (!cont) return;
+  if (!lista.length) {
+    cont.innerHTML = '<p style="text-align:center;color:var(--ink-faint);font-size:.8rem;padding:1rem">Sin resultados</p>';
+    return;
+  }
+  cont.innerHTML = lista.map(p => {
+    var sel = _campPropietariosSeleccionados.includes(p.id);
+    return '<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.4rem;cursor:pointer;font-size:.82rem;' +
+           (sel ? 'background:#f0fff4;' : '') + '">' +
+           '<input type="checkbox" ' + (sel ? 'checked' : '') + ' ' +
+           'onchange="togglePropietario(' + p.id + ', this.checked)" ' +
+           'style="accent-color:#25d366;width:15px;height:15px;flex-shrink:0"/>' +
+           '<span><strong>' + (p.nombre||'') + ' ' + (p.apellido||'') + '</strong>' +
+           (p.telefono ? '<span style="color:var(--ink-faint);font-size:.75rem"> · ' + p.telefono + '</span>' : '') +
+           '</span></label>';
+  }).join('');
+  actualizarContadorProp();
+}
+
+function filtrarListaProp() {
+  var q = (document.getElementById('camp-prop-buscar')?.value || '').toLowerCase();
+  var filtrados = q
+    ? _campPropietariosTodos.filter(p =>
+        ((p.nombre||'') + ' ' + (p.apellido||'')).toLowerCase().includes(q) ||
+        (p.telefono||'').includes(q))
+    : _campPropietariosTodos;
+  renderListaProp(filtrados);
+}
+
+function togglePropietario(id, checked) {
+  if (checked && !_campPropietariosSeleccionados.includes(id)) {
+    _campPropietariosSeleccionados.push(id);
+  } else if (!checked) {
+    _campPropietariosSeleccionados = _campPropietariosSeleccionados.filter(x => x !== id);
+  }
+  actualizarContadorProp();
+  calcularProyeccion();
+}
+
+function seleccionarTodosProp(todos) {
+  _campPropietariosSeleccionados = todos ? _campPropietariosTodos.map(p => p.id) : [];
+  var q = (document.getElementById('camp-prop-buscar')?.value || '').toLowerCase();
+  var filtrados = q
+    ? _campPropietariosTodos.filter(p =>
+        ((p.nombre||'') + ' ' + (p.apellido||'')).toLowerCase().includes(q) ||
+        (p.telefono||'').includes(q))
+    : _campPropietariosTodos;
+  renderListaProp(filtrados);
+  calcularProyeccion();
+}
+
+function actualizarContadorProp() {
+  var el = document.getElementById('camp-prop-contador');
+  if (el) el.textContent = _campPropietariosSeleccionados.length + ' propietario(s) seleccionado(s)';
+}
+
 async function guardarCampana(iniciar) {
   var nombre   = document.getElementById('camp-nombre').value.trim();
   var mensaje  = document.getElementById('camp-mensaje').value.trim();
@@ -1534,8 +1645,23 @@ async function guardarCampana(iniciar) {
   if (_campSubiendo) { toast('Espera a que termine de subir la imagen.', 'warning'); return; }
   var programar   = document.getElementById('camp-programar')?.checked;
   var fechaInicio = document.getElementById('camp-fecha-inicio')?.value;
+  // segmento_valor: especie si es por_especie, null si no
+  var segmento_valor = null;
+  if (segmento === 'por_especie') {
+    segmento_valor = document.getElementById('camp-especie')?.value || 'perro';
+  }
+  // propietarios_ids: array de ids si es personalizado
+  var propietarios_ids = null;
+  if (segmento === 'personalizado') {
+    propietarios_ids = _campPropietariosSeleccionados;
+    if (!propietarios_ids.length) { toast('Debes seleccionar al menos un propietario.', 'warning'); return; }
+  }
+  // Para personalizado: serializar los IDs en segmento_valor
+  if (segmento === 'personalizado' && propietarios_ids) {
+    segmento_valor = JSON.stringify(propietarios_ids);
+  }
   var body = {
-    nombre, mensaje, segmento,
+    nombre, mensaje, segmento, segmento_valor,
     imagen_url: _campImagenUrl || null,
     imagen_blob_name: _campImagenBlob || null,
     estado: iniciar ? (programar && fechaInicio ? 'programada' : 'enviando') : 'borrador',
@@ -2015,12 +2141,41 @@ async function eliminarHistoria(id) {
 
       <div>
         <label class="vlabel">Segmento de destinatarios *</label>
-        <select id="camp-segmento" class="vinput" onchange="calcularProyeccion()">
+        <select id="camp-segmento" class="vinput" onchange="onSegmentoCampoChange()">
           <option value="todos">👥 Todos los propietarios</option>
           <option value="por_especie">🐕 Por especie de mascota</option>
           <option value="vacunas_vencidas">💉 Vacunas vencidas o próximas</option>
           <option value="sin_citas_60d">😴 Sin citas en 60+ días</option>
+          <option value="personalizado">✅ Personalizado (elegir propietarios)</option>
         </select>
+
+        <!-- Campo especie — visible solo cuando segmento = por_especie -->
+        <div id="camp-bloque-especie" style="display:none;margin-top:.5rem">
+          <select id="camp-especie" class="vinput" onchange="calcularProyeccion()">
+            <option value="perro">🐕 Caninos (perros)</option>
+            <option value="gato">🐈 Felinos (gatos)</option>
+            <option value="ave">🦜 Aves</option>
+            <option value="reptil">🦎 Reptiles</option>
+            <option value="roedor">🐹 Roedores</option>
+            <option value="otro">🐾 Otro</option>
+          </select>
+        </div>
+
+        <!-- Lista de propietarios — visible solo cuando segmento = personalizado -->
+        <div id="camp-bloque-personalizado" style="display:none;margin-top:.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+            <span style="font-size:.8rem;font-weight:600;color:var(--ink)">Seleccionar propietarios</span>
+            <div style="display:flex;gap:.4rem">
+              <button onclick="seleccionarTodosProp(true)" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.2rem .5rem">✅ Todos</button>
+              <button onclick="seleccionarTodosProp(false)" class="vbtn vbtn-ghost" style="font-size:.72rem;padding:.2rem .5rem">☐ Ninguno</button>
+            </div>
+          </div>
+          <input type="text" id="camp-prop-buscar" class="vinput" placeholder="🔍 Buscar propietario…" oninput="filtrarListaProp()" style="margin-bottom:.5rem;font-size:.82rem"/>
+          <div id="camp-prop-lista" style="max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:.6rem;padding:.25rem">
+            <p style="text-align:center;color:var(--ink-faint);font-size:.8rem;padding:1rem">Cargando propietarios…</p>
+          </div>
+          <p id="camp-prop-contador" style="font-size:.72rem;color:var(--ink-faint);margin-top:.35rem">0 propietarios seleccionados</p>
+        </div>
       </div>
 
       <div>

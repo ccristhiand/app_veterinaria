@@ -162,6 +162,21 @@ async function obtenerContactosCampana(conn, campana) {
          ) AND p.telefono IS NOT NULL AND p.telefono != ''
          GROUP BY p.id`
       ).then(([r]) => r);
+    case 'personalizado':
+      // propietarios_ids viene serializado en segmento_valor como JSON
+      try {
+        const ids = JSON.parse(campana.segmento_valor || '[]');
+        if (!ids.length) return [];
+        const placeholders = ids.map(() => '?').join(',');
+        return conn.execute(
+          `SELECT DISTINCT p.id, CONCAT(p.nombre,' ',p.apellido) AS nombre,
+                  p.telefono, GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+           FROM propietarios p LEFT JOIN mascotas m ON m.propietario_id = p.id
+           WHERE p.id IN (${placeholders}) AND p.telefono IS NOT NULL AND p.telefono != ''
+           GROUP BY p.id`,
+          ids
+        ).then(([r]) => r);
+      } catch { return []; }
     default:
       return [];
   }
