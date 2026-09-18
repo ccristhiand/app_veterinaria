@@ -1,13 +1,12 @@
 'use strict';
 
 /**
- * VetNetcodip SaaS — Procesador de Campañas WA v3
- * Mejoras:
- * - Límite diario anti-spam configurable por tenant
- * - Respeto de horario de envío (hora_inicio / hora_fin)
- * - Log en vivo por WebSocket de cada envío
- * - Reset automático del contador diario
- * - Soporte imagen Azure Blob
+ * VetNetcodip SaaS — Procesador de Campañas WA v4
+ * Fixes:
+ * - Loop recursivo con await: el siguiente ciclo solo arranca cuando el anterior terminó
+ * - Reserva atómica con SELECT ... FOR UPDATE SKIP LOCKED dentro de transacción
+ * - Sin cambios al schema — no se necesitan columnas ni estados nuevos
+ * - Límite diario leído desde la tabla real, no desde objeto en memoria
  */
 
 const mysql = require('mysql2/promise');
@@ -19,12 +18,12 @@ const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5001';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY  || 'wa-internal-secret-2026';
 
 const masterPool = mysql.createPool({
-  host              : process.env.MASTER_DB_HOST,
-  port              : process.env.MASTER_DB_PORT || 3306,
-  user              : process.env.MASTER_DB_USER,
-  password          : process.env.MASTER_DB_PASS,
-  database          : process.env.MASTER_DB_NAME,
-  connectionLimit   : 3,
+  host            : process.env.MASTER_DB_HOST,
+  port            : process.env.MASTER_DB_PORT || 3306,
+  user            : process.env.MASTER_DB_USER,
+  password        : process.env.MASTER_DB_PASS,
+  database        : process.env.MASTER_DB_NAME,
+  connectionLimit : 3,
 });
 
 async function masterQuery(sql, params = []) {
@@ -82,7 +81,6 @@ function rellenarPlantilla(msg, vars) {
     .replace(/\[telefono\]/gi, vars.telefono || '');
 }
 
-// ── Obtener config anti-spam del tenant ───────────────────────
 async function getConfigCampana(conn) {
   const [cfg] = await conn.execute(
     `SELECT campana_limite_dia, campana_delay_ms, campana_hora_inicio, campana_hora_fin
@@ -96,7 +94,6 @@ async function getConfigCampana(conn) {
   };
 }
 
-// ── Verificar si estamos en horario permitido ─────────────────
 function dentroDeHorario(horaInicio, horaFin) {
   const ahora = new Date();
   const hh    = ahora.getHours().toString().padStart(2, '0');
@@ -105,25 +102,25 @@ function dentroDeHorario(horaInicio, horaFin) {
   return horaActual >= horaInicio && horaActual <= horaFin;
 }
 
-// ── Verificar y resetear contador diario ─────────────────────
-async function verificarLimiteDiario(conn, campana, limiteDia) {
+// ── Límite diario leído desde la tabla real, no desde objeto cacheado ──────
+async function verificarLimiteDiario(conn, campanaId, limiteDia) {
   const hoy = new Date().toISOString().split('T')[0];
 
-  // Si el último envío fue otro día → resetear enviados_hoy
-  if (!campana.fecha_ultimo_envio ||
-      campana.fecha_ultimo_envio.toString().substring(0, 10) !== hoy) {
-    await conn.execute(
-      'UPDATE wa_campanas SET enviados_hoy=0, fecha_ultimo_envio=? WHERE id=?',
-      [hoy, campana.id]
-    );
-    campana.enviados_hoy = 0;
-  }
+  const [[{ enviados_hoy }]] = await conn.execute(
+    `SELECT COUNT(*) AS enviados_hoy
+     FROM wa_campana_contactos
+     WHERE campana_id = ? AND estado = 'enviado' AND DATE(enviado_at) = ?`,
+    [campanaId, hoy]
+  );
 
-  const disponibleHoy = limiteDia - (campana.enviados_hoy || 0);
-  return { disponible: Math.max(disponibleHoy, 0), agotado: disponibleHoy <= 0 };
+  const disponible = limiteDia - (enviados_hoy || 0);
+  return {
+    disponible : Math.max(disponible, 0),
+    agotado    : disponible <= 0,
+    enviados_hoy,
+  };
 }
 
-// ── Obtener contactos de la campaña ──────────────────────────
 async function obtenerContactosCampana(conn, campana) {
   switch (campana.segmento) {
     case 'todos':
@@ -170,7 +167,6 @@ async function obtenerContactosCampana(conn, campana) {
   }
 }
 
-// ── Procesar todas las campañas de todos los tenants ──────────
 async function procesarCampanas() {
   try {
     const tenants = await masterQuery(
@@ -209,8 +205,7 @@ async function procesarCampanasTenant(tenant, conn) {
 
   const [campanas] = await conn.execute(
     `SELECT id, nombre, mensaje, imagen_url, segmento, segmento_valor,
-            estado, total, enviados, fallidos, enviados_hoy,
-            fecha_ultimo_envio
+            estado, total, enviados, fallidos
      FROM wa_campanas
      WHERE estado = 'enviando'
      ORDER BY id ASC`
@@ -220,11 +215,7 @@ async function procesarCampanasTenant(tenant, conn) {
 
   const cfg = await getConfigCampana(conn);
 
-  // Verificar horario
-  if (!dentroDeHorario(cfg.hora_inicio, cfg.hora_fin)) {
-    // Fuera de horario — no procesar
-    return;
-  }
+  if (!dentroDeHorario(cfg.hora_inicio, cfg.hora_fin)) return;
 
   for (const campana of campanas) {
     campana.tenant_id      = tenant.tenant_id;
@@ -235,47 +226,59 @@ async function procesarCampanasTenant(tenant, conn) {
 
 async function procesarCampana(campana, conn, cfg, tenant) {
   try {
-    // Verificar límite diario
-    const limite = await verificarLimiteDiario(conn, campana, cfg.limite_dia);
+    // ── Verificar límite diario leyendo desde la tabla real ────────────────
+    const limite = await verificarLimiteDiario(conn, campana.id, cfg.limite_dia);
 
     if (limite.agotado) {
-      console.log(`[WA Campanas] ⏳ Campaña #${campana.id} — límite diario alcanzado (${cfg.limite_dia}/día). Retomará mañana.`);
+      console.log(`[WA Campanas] ⏳ Campaña #${campana.id} — límite diario alcanzado (${limite.enviados_hoy}/${cfg.limite_dia}). Retomará mañana.`);
       await emitirProgreso(tenant.tenant_id, campana.id, {
-        estado    : 'limite_diario',
-        enviados  : campana.enviados,
-        fallidos  : campana.fallidos,
-        total     : campana.total,
-        enviados_hoy: campana.enviados_hoy,
-        limite_dia: cfg.limite_dia,
-        mensaje   : `Límite diario alcanzado. Los ${campana.total - campana.enviados} mensajes restantes se enviarán mañana.`,
+        estado      : 'limite_diario',
+        enviados    : campana.enviados,
+        fallidos    : campana.fallidos,
+        total       : campana.total,
+        enviados_hoy: limite.enviados_hoy,
+        limite_dia  : cfg.limite_dia,
+        mensaje     : `Límite diario alcanzado. Retomará mañana.`,
       });
       return;
     }
 
-    // Obtener lote de contactos pendientes respetando el disponible de hoy
-    // JOIN mascotas a demanda — sin columna extra en la tabla
-    const [contactos] = await conn.execute(
-      `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
-              GROUP_CONCAT(m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
-       FROM wa_campana_contactos wcc
-       LEFT JOIN mascotas m ON m.propietario_id = wcc.propietario_id
-       WHERE wcc.campana_id=? AND wcc.estado='pendiente'
-       GROUP BY wcc.id
-       ORDER BY wcc.id ASC
-       LIMIT ${parseInt(limite.disponible)}`,
-      [campana.id]
+    // ── Cargar contactos si aún no se hizo ────────────────────────────────
+    const [[{ n }]] = await conn.execute(
+      'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?', [campana.id]
     );
+    if (!n) {
+      await cargarContactosCampana(campana, conn);
+    }
 
-    if (!contactos.length) {
-      // ¿Ya cargamos contactos?
-      const [[{ n }]] = await conn.execute(
-        'SELECT COUNT(*) AS n FROM wa_campana_contactos WHERE campana_id=?', [campana.id]
+    // ── RESERVA ATÓMICA con SELECT ... FOR UPDATE ────────────────────────────
+    // Sin nuevo estado en el schema. Usamos una transacción con FOR UPDATE:
+    // MySQL lockea la fila seleccionada a nivel de registro — si dos ciclos
+    // llegan aquí al mismo tiempo, el segundo espera hasta que el primero
+    // haga COMMIT/ROLLBACK antes de poder leer esa misma fila.
+    await conn.beginTransaction();
+    let contacto = null;
+    try {
+      const [[candidato]] = await conn.execute(
+        `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
+                GROUP_CONCAT(m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+         FROM wa_campana_contactos wcc
+         LEFT JOIN mascotas m ON m.propietario_id = wcc.propietario_id
+         WHERE wcc.campana_id=? AND wcc.estado='pendiente'
+         GROUP BY wcc.id
+         ORDER BY wcc.id ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED`,
+        [campana.id]
       );
-      if (!n) {
-        await cargarContactosCampana(campana, conn);
-      } else {
+
+      if (!candidato) {
+        await conn.commit();
+        // No quedan pendientes — verificar si completó
         const [[{ pendientes }]] = await conn.execute(
-          "SELECT COUNT(*) AS pendientes FROM wa_campana_contactos WHERE campana_id=? AND estado='pendiente'",
+          `SELECT COUNT(*) AS pendientes
+           FROM wa_campana_contactos
+           WHERE campana_id=? AND estado='pendiente'`,
           [campana.id]
         );
         if (!pendientes) {
@@ -284,94 +287,106 @@ async function procesarCampana(campana, conn, cfg, tenant) {
             [campana.id]
           );
           await emitirProgreso(tenant.tenant_id, campana.id, {
-            estado: 'completada', enviados: campana.enviados, fallidos: campana.fallidos,
-            total: campana.total, porcentaje: 100,
+            estado: 'completada', enviados: campana.enviados,
+            fallidos: campana.fallidos, total: campana.total, porcentaje: 100,
           });
           console.log(`[WA Campanas] ✅ Completada: "${campana.nombre}" (tenant: ${tenant.slug})`);
         }
+        return;
       }
+
+      // Marcar inmediatamente como 'enviado' dentro de la transacción
+      // El FOR UPDATE + este UPDATE dentro de la misma transacción garantiza
+      // que ningún otro ciclo pueda tocar este contacto hasta el COMMIT
+      await conn.execute(
+        "UPDATE wa_campana_contactos SET estado='enviado', enviado_at=NOW() WHERE id=?",
+        [candidato.id]
+      );
+      await conn.commit();
+      contacto = candidato;
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    }
+
+    if (!contacto) return;
+
+    // Verificar que la campaña sigue en estado 'enviando'
+    const [[estadoActual]] = await conn.execute(
+      'SELECT estado FROM wa_campanas WHERE id=?', [campana.id]
+    );
+    if (!estadoActual || estadoActual.estado !== 'enviando') {
+      console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada`);
       return;
     }
 
-    // Enviar lote
-    for (const contacto of contactos) {
-      // Verificar que sigue en estado enviando
-      const [[estadoActual]] = await conn.execute(
-        'SELECT estado, enviados_hoy FROM wa_campanas WHERE id=?', [campana.id]
-      );
-      if (!estadoActual || estadoActual.estado !== 'enviando') {
-        console.log(`[WA Campanas] ⏸️  Campaña ${campana.id} pausada — deteniendo`);
-        break;
-      }
+    const msg = rellenarPlantilla(campana.mensaje, {
+      nombre  : contacto.nombre,
+      mascota : contacto.mascotas || '',
+      clinica : campana.nombre_clinica || 'VetNetcodip',
+      telefono: tenant.tel_clinica || '',
+    });
 
-      const msg = rellenarPlantilla(campana.mensaje, {
-        nombre  : contacto.nombre,
-        mascota : contacto.mascotas || '',
-        clinica : campana.nombre_clinica || 'VetNetcodip',
-        telefono: tenant.tel_clinica || '',
+    const inicio = Date.now();
+    let ok = false;
+
+    try {
+      await callGateway('POST', '/wa/enviar', {
+        tenantId  : campana.tenant_id,
+        telefono  : contacto.telefono,
+        mensaje   : msg || null,
+        imagen_url: campana.imagen_url || null,
+        tipo      : 'campana',
+        codigoPais: '+51',
       });
 
-      const inicio = Date.now();
-      let ok = false;
-
-      try {
-        await callGateway('POST', '/wa/enviar', {
-          tenantId  : campana.tenant_id,
-          telefono  : contacto.telefono,
-          mensaje   : msg || null,
-          imagen_url: campana.imagen_url || null,
-          tipo      : 'campana',
-          codigoPais: '+51',
-        });
-
-        await conn.execute(
-          "UPDATE wa_campana_contactos SET estado='enviado', enviado_at=NOW() WHERE id=?",
-          [contacto.id]
-        );
-        await conn.execute(
-          'UPDATE wa_campanas SET enviados=enviados+1, enviados_hoy=enviados_hoy+1, fecha_ultimo_envio=CURDATE() WHERE id=?',
-          [campana.id]
-        );
-        ok = true;
-        console.log(`[WA Campanas] ✅ → ${contacto.telefono} (${contacto.nombre})`);
-      } catch (e) {
-        await conn.execute(
-          "UPDATE wa_campana_contactos SET estado='fallido', error=? WHERE id=?",
-          [e.message.substring(0, 255), contacto.id]
-        );
-        await conn.execute(
-          'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?', [campana.id]
-        );
-        console.error(`[WA Campanas] ❌ → ${contacto.telefono}: ${e.message}`);
-      }
-
-      // Emitir progreso + log en vivo
-      const [[prog]] = await conn.execute(
-        'SELECT enviados, fallidos, total, enviados_hoy FROM wa_campanas WHERE id=?', [campana.id]
+      await conn.execute(
+        `UPDATE wa_campanas
+         SET enviados=enviados+1, enviados_hoy=enviados_hoy+1, fecha_ultimo_envio=CURDATE()
+         WHERE id=?`,
+        [campana.id]
       );
-      if (prog) {
-        const pct = prog.total > 0 ? Math.round((prog.enviados / prog.total) * 100) : 0;
-        await emitirProgreso(campana.tenant_id, campana.id, {
-          estado    : 'enviando',
-          enviados  : prog.enviados,
-          fallidos  : prog.fallidos,
-          total     : prog.total,
-          enviados_hoy: prog.enviados_hoy,
-          limite_dia: cfg.limite_dia,
-          porcentaje: pct,
-        });
-        await emitirLog(campana.tenant_id, campana.id, {
-          telefono   : contacto.telefono,
-          nombre     : contacto.nombre,
-          estado     : ok ? 'enviado' : 'fallido',
-          timestamp  : new Date().toISOString(),
-          duracion_ms: Date.now() - inicio,
-        });
-      }
-
-      // Delay anti-spam
-      await new Promise(r => setTimeout(r, cfg.delay_ms));
+      ok = true;
+      console.log(`[WA Campanas] ✅ → ${contacto.telefono} (${contacto.nombre})`);
+    } catch (e) {
+      // Si falló el gateway, revertir a pendiente para reintentar en el próximo ciclo
+      await conn.execute(
+        "UPDATE wa_campana_contactos SET estado='pendiente', enviado_at=NULL, error=? WHERE id=?",
+        [e.message.substring(0, 255), contacto.id]
+      );
+      await conn.execute(
+        'UPDATE wa_campanas SET fallidos=fallidos+1 WHERE id=?', [campana.id]
+      );
+      console.error(`[WA Campanas] ❌ → ${contacto.telefono}: ${e.message}`);
     }
+
+    // Emitir progreso en tiempo real
+    const [[prog]] = await conn.execute(
+      'SELECT enviados, fallidos, total, enviados_hoy FROM wa_campanas WHERE id=?', [campana.id]
+    );
+    if (prog) {
+      const pct = prog.total > 0 ? Math.round((prog.enviados / prog.total) * 100) : 0;
+      await emitirProgreso(campana.tenant_id, campana.id, {
+        estado      : 'enviando',
+        enviados    : prog.enviados,
+        fallidos    : prog.fallidos,
+        total       : prog.total,
+        enviados_hoy: prog.enviados_hoy,
+        limite_dia  : cfg.limite_dia,
+        porcentaje  : pct,
+      });
+      await emitirLog(campana.tenant_id, campana.id, {
+        telefono   : contacto.telefono,
+        nombre     : contacto.nombre,
+        estado     : ok ? 'enviado' : 'fallido',
+        timestamp  : new Date().toISOString(),
+        duracion_ms: Date.now() - inicio,
+      });
+    }
+
+    // Delay anti-spam
+    await new Promise(r => setTimeout(r, cfg.delay_ms));
+
   } catch (e) {
     console.error(`[WA Campanas] Error campaña ${campana.id}:`, e.message);
   }
@@ -401,8 +416,22 @@ async function cargarContactosCampana(campana, conn) {
   console.log(`[WA Campanas] ${contactos.length} contactos cargados para campaña #${campana.id}`);
 }
 
-setInterval(procesarCampanas, 10000);
-procesarCampanas();
+// ── LOOP RECURSIVO CON AWAIT ───────────────────────────────────────────────
+// El próximo ciclo solo arranca cuando el anterior terminó completamente.
+// Esto elimina la posibilidad de que setInterval acumule ejecuciones paralelas.
+async function loop() {
+  console.log('[WA Campanas v4] ✅ Procesador activo — loop recursivo con await');
+  while (true) {
+    try {
+      await procesarCampanas();
+    } catch (e) {
+      console.error('[WA Campanas] Error en loop principal:', e.message);
+    }
+    // Esperar 10s DESPUÉS de que terminó el ciclo — nunca se solapan
+    await new Promise(r => setTimeout(r, 10000));
+  }
+}
 
-console.log(`[WA Campanas v3] ✅ Procesador activo`);
+loop();
+
 module.exports = { procesarCampanas };

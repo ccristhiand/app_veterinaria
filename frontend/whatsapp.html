@@ -378,7 +378,7 @@
 <!-- Modal QR -->
 <div id="modal-qr" class="hidden vmodal-backdrop">
   <div class="vmodal" style="max-width:420px">
-    <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="closeModal('modal-qr')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="_esperandoConexion=false; closeModal('modal-qr')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="text-align:center;padding:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem 1rem;font-size:.82rem;color:#15803d;width:100%">
         📱 Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo → Escanea el QR
@@ -387,7 +387,7 @@
       <p id="qr-status" style="font-size:.78rem;color:var(--ink-faint)">Generando QR…</p>
       <button onclick="refrescarQR()" class="vbtn vbtn-ghost" style="font-size:.78rem">🔄 Refrescar QR</button>
     </div>
-    <div class="vmodal-foot"><button onclick="closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button></div>
+    <div class="vmodal-foot"><button onclick="_esperandoConexion=false; closeModal('modal-qr')" class="vbtn vbtn-ghost">Cancelar</button></div>
   </div>
 </div>
 
@@ -445,7 +445,8 @@
 </div>
 
 <script>
-let _waEstado      = 'desconectado';
+let _waEstado         = 'desconectado';
+let _esperandoConexion = false; // flag para cortar polling QR al conectar
 let _propWASel     = null;
 let _plantillaEdit = null;
 let _qrInterval    = null;
@@ -545,11 +546,20 @@ function iniciarSocket() {
       const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
       _waSocket.emit('wa:suscribir', user.tenant_id || '');
     });
-    _waSocket.on('wa:qr', (data) => { mostrarQR(data.qr); });
+    _waSocket.on('wa:qr', (data) => {
+      if (_esperandoConexion) mostrarQR(data.qr);
+    });
     _waSocket.on('wa:conectado', (data) => {
+      _esperandoConexion = false;          // detener polling QR
       _waEstado = 'conectado';
       actualizarBadgeEstado('conectado', data.numero);
-      closeModal('modal-qr');
+      // Limpiar el QR del modal antes de cerrarlo
+      const qrCont = document.getElementById('qr-container');
+      if (qrCont) qrCont.innerHTML = '<div style="font-size:2rem">✅</div>';
+      const qrStatus = document.getElementById('qr-status');
+      if (qrStatus) qrStatus.textContent = '¡Conectado exitosamente!';
+      // Cerrar modal después de un momento para que el usuario vea la confirmación
+      setTimeout(() => closeModal('modal-qr'), 1200);
       clearInterval(_qrInterval);
       toast(`✅ WhatsApp conectado: ${data.numero}`, 'success', 5000);
       cargarEstado();
@@ -688,6 +698,7 @@ async function conectarWA() {
     const res  = await api('/wa/conectar', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al conectar.', 'danger'); actualizarBadgeEstado('desconectado'); return; }
+    _esperandoConexion = true;  // activar polling QR
     openModal('modal-qr');
     document.getElementById('qr-status').textContent = 'Esperando QR del servidor…';
     setTimeout(refrescarQR, 2000);
@@ -709,12 +720,19 @@ async function confirmarDesconectar() {
 }
 
 async function refrescarQR() {
+  if (!_esperandoConexion) return; // ya conectó o canceló — no seguir
   try {
     const res = await api('/wa/qr');
-    if (!res?.ok) { document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…'; setTimeout(refrescarQR, 3000); return; }
+    if (!res?.ok) {
+      document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…';
+      setTimeout(refrescarQR, 3000);
+      return;
+    }
     const { data } = await res.json();
-    mostrarQR(data.qr);
-  } catch(e) { setTimeout(refrescarQR, 3000); }
+    if (_esperandoConexion) mostrarQR(data.qr); // doble check por si conectó mientras esperaba
+  } catch(e) {
+    if (_esperandoConexion) setTimeout(refrescarQR, 3000);
+  }
 }
 
 function mostrarQR(qrData) {
