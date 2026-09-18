@@ -541,39 +541,55 @@ function actualizarCampanaActiva(data) {
 function iniciarSocket() {
   try {
     const WA_SOCKET_URL = window.location.protocol + '//' + window.location.hostname;
-    _waSocket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'] });
+    _waSocket = io(WA_SOCKET_URL, { transports: ['websocket', 'polling'], timeout: 5000 });
+
     _waSocket.on('connect', () => {
       const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
       _waSocket.emit('wa:suscribir', user.tenant_id || '');
     });
+
+    // QR — solo mostrar si el modal está abierto
     _waSocket.on('wa:qr', (data) => {
       if (_esperandoConexion) mostrarQR(data.qr);
     });
+
+    // Conexión exitosa — el polling también detecta esto como fallback
     _waSocket.on('wa:conectado', (data) => {
-      _esperandoConexion = false;          // detener polling QR
-      _waEstado = 'conectado';
-      actualizarBadgeEstado('conectado', data.numero);
-      // Limpiar el QR del modal antes de cerrarlo
-      const qrCont = document.getElementById('qr-container');
-      if (qrCont) qrCont.innerHTML = '<div style="font-size:2rem">✅</div>';
-      const qrStatus = document.getElementById('qr-status');
-      if (qrStatus) qrStatus.textContent = '¡Conectado exitosamente!';
-      // Cerrar modal después de un momento para que el usuario vea la confirmación
-      setTimeout(() => closeModal('modal-qr'), 1200);
-      clearInterval(_qrInterval);
-      toast(`✅ WhatsApp conectado: ${data.numero}`, 'success', 5000);
-      cargarEstado();
+      onConectado(data.numero);
     });
+
     _waSocket.on('wa:desconectado', () => {
-      _waEstado = 'desconectado';
-      actualizarBadgeEstado('desconectado');
-      cargarEstado();
+      if (_waEstado === 'conectado') {
+        _waEstado = 'desconectado';
+        actualizarBadgeEstado('desconectado');
+        cargarEstado();
+      }
     });
+
     // Progreso de campañas en tiempo real
-    _waSocket.on('wa:campana:progreso', function(data) {
+    _waSocket.on('wa:campana:progreso', (data) => {
       actualizarCampanaActiva(data);
     });
-  } catch(e) { console.warn('[WA Socket]', e.message); }
+
+  } catch(e) {
+    console.warn('[WA Socket] No disponible, usando solo polling:', e.message);
+  }
+}
+
+// ── onConectado: detecta conexión exitosa — global para que polling y socket la usen
+function onConectado(numero) {
+  if (_waEstado === 'conectado') return; // evitar doble ejecución
+  _esperandoConexion = false;
+  _waEstado = 'conectado';
+  actualizarBadgeEstado('conectado', numero);
+  const qrCont = document.getElementById('qr-container');
+  if (qrCont) qrCont.innerHTML = '<p style="font-size:2.5rem;margin:0">✅</p>';
+  const qrStatus = document.getElementById('qr-status');
+  if (qrStatus) qrStatus.textContent = '¡Conectado exitosamente!';
+  setTimeout(() => closeModal('modal-qr'), 1200);
+  clearInterval(_qrInterval);
+  toast(`✅ WhatsApp conectado: ${numero || ''}`, 'success', 5000);
+  cargarEstado();
 }
 
 async function cargarEstado() {
@@ -721,15 +737,31 @@ async function confirmarDesconectar() {
 
 async function refrescarQR() {
   if (!_esperandoConexion) return; // ya conectó o canceló — no seguir
+
   try {
-    const res = await api('/wa/qr');
-    if (!res?.ok) {
-      document.getElementById('qr-status').textContent = 'QR aún no disponible. Espera…';
-      setTimeout(refrescarQR, 3000);
+    // Primero verificar si ya conectó (por si el socket no llegó el evento)
+    const resEstado = await api('/wa/estado');
+    if (resEstado?.ok) {
+      const { data: estado } = await resEstado.json();
+      if (estado?.estado === 'conectado') {
+        onConectado(estado.numero);
+        return; // ya conectó, no seguir con el QR
+      }
+    }
+
+    // Si no conectó aún, refrescar el QR
+    const resQR = await api('/wa/qr');
+    if (!resQR?.ok) {
+      const el = document.getElementById('qr-status');
+      if (el) el.textContent = 'QR aún no disponible. Espera…';
+      if (_esperandoConexion) setTimeout(refrescarQR, 3000);
       return;
     }
-    const { data } = await res.json();
-    if (_esperandoConexion) mostrarQR(data.qr); // doble check por si conectó mientras esperaba
+    const { data } = await resQR.json();
+    if (_esperandoConexion) mostrarQR(data.qr);
+
+    // Seguir polineando cada 3s para detectar conexión aunque el socket falle
+    if (_esperandoConexion) setTimeout(refrescarQR, 3000);
   } catch(e) {
     if (_esperandoConexion) setTimeout(refrescarQR, 3000);
   }
