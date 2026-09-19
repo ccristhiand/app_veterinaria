@@ -1884,3 +1884,102 @@ ${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</di
   ventana.document.write(html);
   ventana.document.close();
 }
+// ══ DICTADO POR VOZ ══════════════════════════════════════════════
+
+var _micReconocimiento = null;  // instancia activa de SpeechRecognition
+var _micBtn            = null;  // botón activo actualmente
+var _micCampoId        = null;  // id del textarea activo
+var _micTextoBase      = '';    // texto que había en el campo antes de empezar a dictar
+
+function toggleMic(campoId, btn) {
+  // Si el navegador no soporta Web Speech API, avisar y salir
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    toast('Tu navegador no soporta dictado por voz. Usa Chrome o Edge.', 'warning', 4000);
+    return;
+  }
+
+  // Si hay una sesión activa en ESTE mismo campo, detenerla
+  if (_micReconocimiento && _micCampoId === campoId) {
+    _micReconocimiento.stop();
+    return;
+  }
+
+  // Si hay una sesión activa en OTRO campo, detenerla primero
+  if (_micReconocimiento) {
+    _micReconocimiento.stop();
+    _micReconocimiento = null;
+  }
+
+  // Restaurar botón anterior si era otro
+  if (_micBtn && _micBtn !== btn) {
+    _micBtn.textContent    = '🎤';
+    _micBtn.style.color    = '';
+    _micBtn.style.animation = '';
+  }
+
+  var campo = document.getElementById(campoId);
+  if (!campo) return;
+
+  // Guardar el texto actual del campo para acumular encima
+  _micTextoBase = campo.value;
+  _micCampoId   = campoId;
+  _micBtn       = btn;
+
+  // Activar estado visual del botón
+  btn.textContent     = '🔴';
+  btn.style.color     = '#ef4444';
+  btn.style.animation = 'mic-pulso 1s infinite';
+
+  // Crear instancia
+  var rec = new SR();
+  rec.lang           = 'es-PE';
+  rec.interimResults = true;   // ver texto en tiempo real mientras habla
+  rec.continuous     = true;   // no parar tras silencio corto
+
+  rec.onresult = function(e) {
+    var finalTexto    = '';
+    var interimTexto  = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        finalTexto   += t + ' ';
+      } else {
+        interimTexto += t;
+      }
+    }
+    // Mostrar en tiempo real: texto base + lo ya finalizado + lo interim
+    if (finalTexto) _micTextoBase += finalTexto;
+    campo.value = _micTextoBase + interimTexto;
+  };
+
+  rec.onerror = function(e) {
+    if (e.error === 'not-allowed') {
+      toast('Permiso de micrófono denegado. Habilítalo en la configuración del navegador.', 'danger', 5000);
+    } else if (e.error !== 'aborted') {
+      toast('Error de micrófono: ' + e.error, 'warning', 3000);
+    }
+    detenerMic();
+  };
+
+  rec.onend = function() {
+    // Si terminó solo (pausa larga), limpiar estado
+    detenerMic();
+  };
+
+  _micReconocimiento = rec;
+  rec.start();
+  campo.focus();
+}
+
+function detenerMic() {
+  if (_micBtn) {
+    _micBtn.textContent     = '🎤';
+    _micBtn.style.color     = '';
+    _micBtn.style.animation = '';
+  }
+  _micReconocimiento = null;
+  _micBtn            = null;
+  _micCampoId        = null;
+  _micTextoBase      = '';
+}

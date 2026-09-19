@@ -153,12 +153,12 @@
         <div><label class="vlabel">⚖️ Peso en consulta (kg)</label><input id="co-peso" type="number" step="0.1" class="vinput" placeholder="3.5"/></div>
         <div><label class="vlabel">🌡️ Temperatura (°C)</label><input id="co-temp" type="number" step="0.1" class="vinput" placeholder="38.5"/></div>
       </div>
-      <div><label class="vlabel">Anamnesis</label><textarea id="co-anamnesis" rows="2" class="vinput" placeholder="¿Qué reporta el propietario?"></textarea></div>
-      <div><label class="vlabel">Exploración física</label><textarea id="co-exploracion" rows="2" class="vinput" placeholder="Hallazgos del examen físico…"></textarea></div>
-      <div><label class="vlabel">Diagnóstico</label><textarea id="co-diagnostico" rows="2" class="vinput" placeholder="Diagnóstico definitivo o presuntivo…"></textarea></div>
-      <div><label class="vlabel">Tratamiento</label><textarea id="co-tratamiento" rows="2" class="vinput" placeholder="Plan de tratamiento indicado…"></textarea></div>
-      <div><label class="vlabel">Pruebas complementarias</label><textarea id="co-pruebas" rows="4" class="vinput" placeholder="Resultados de laboratorio, radiografías, ecografías, hemograma, análisis, estudios diagnósticos…"></textarea></div>
-      <div><label class="vlabel">Observaciones</label><textarea id="co-obs" rows="2" class="vinput" placeholder="Notas adicionales…"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Anamnesis</label><button type="button" class="mic-btn" onclick="toggleMic('co-anamnesis',this)" title="Dictar">🎤</button></div><textarea id="co-anamnesis" rows="2" class="vinput" placeholder="¿Qué reporta el propietario?"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Exploración física</label><button type="button" class="mic-btn" onclick="toggleMic('co-exploracion',this)" title="Dictar">🎤</button></div><textarea id="co-exploracion" rows="2" class="vinput" placeholder="Hallazgos del examen físico…"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Diagnóstico</label><button type="button" class="mic-btn" onclick="toggleMic('co-diagnostico',this)" title="Dictar">🎤</button></div><textarea id="co-diagnostico" rows="2" class="vinput" placeholder="Diagnóstico definitivo o presuntivo…"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Tratamiento</label><button type="button" class="mic-btn" onclick="toggleMic('co-tratamiento',this)" title="Dictar">🎤</button></div><textarea id="co-tratamiento" rows="2" class="vinput" placeholder="Plan de tratamiento indicado…"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Pruebas complementarias</label><button type="button" class="mic-btn" onclick="toggleMic('co-pruebas',this)" title="Dictar">🎤</button></div><textarea id="co-pruebas" rows="4" class="vinput" placeholder="Resultados de laboratorio, radiografías, ecografías, hemograma, análisis, estudios diagnósticos…"></textarea></div>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Observaciones</label><button type="button" class="mic-btn" onclick="toggleMic('co-obs',this)" title="Dictar">🎤</button></div><textarea id="co-obs" rows="2" class="vinput" placeholder="Notas adicionales…"></textarea></div>
       <!-- Recetas -->
       <div style="border-top:1px solid var(--line);padding-top:1.1rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
@@ -399,17 +399,17 @@
         <div><label class="vlabel">🌡️ Temperatura (°C)</label>
           <input id="ec-temp" type="number" step="0.1" class="vinput" placeholder="38.5"/></div>
       </div>
-      <div><label class="vlabel">Anamnesis</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Anamnesis</label><button type="button" class="mic-btn" onclick="toggleMic('ec-anamnesis',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-anamnesis" rows="2" class="vinput"></textarea></div>
-      <div><label class="vlabel">Exploración física</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Exploración física</label><button type="button" class="mic-btn" onclick="toggleMic('ec-exploracion',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-exploracion" rows="2" class="vinput"></textarea></div>
-      <div><label class="vlabel">Diagnóstico</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Diagnóstico</label><button type="button" class="mic-btn" onclick="toggleMic('ec-diagnostico',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-diagnostico" rows="2" class="vinput"></textarea></div>
-      <div><label class="vlabel">Tratamiento</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Tratamiento</label><button type="button" class="mic-btn" onclick="toggleMic('ec-tratamiento',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-tratamiento" rows="2" class="vinput"></textarea></div>
-      <div><label class="vlabel">Pruebas complementarias</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Pruebas complementarias</label><button type="button" class="mic-btn" onclick="toggleMic('ec-pruebas',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-pruebas" rows="4" class="vinput" placeholder="Resultados de laboratorio, radiografías, ecografías…"></textarea></div>
-      <div><label class="vlabel">Observaciones</label>
+      <div><div class="vlabel-mic-row"><label class="vlabel">Observaciones</label><button type="button" class="mic-btn" onclick="toggleMic('ec-obs',this)" title="Dictar">🎤</button></div>
         <textarea id="ec-obs" rows="2" class="vinput"></textarea></div>
       <!-- Recetas -->
       <div style="border-top:1px solid var(--line);padding-top:1rem">
@@ -599,22 +599,22 @@
         </div>
       </div>
       <div>
-        <label class="vlabel">Evolución *</label>
+        <div class="vlabel-mic-row"><label class="vlabel">Evolución *</label><button type="button" class="mic-btn" onclick="toggleMic('seg-evolucion',this)" title="Dictar">🎤</button></div>
         <textarea id="seg-evolucion" rows="3" class="vinput"
           placeholder="¿Cómo evolucionó el paciente? Estado actual, síntomas, mejoría…"></textarea>
       </div>
       <div>
-        <label class="vlabel">Ajuste de tratamiento</label>
+        <div class="vlabel-mic-row"><label class="vlabel">Tratamiento médico / Ajuste de tratamiento</label><button type="button" class="mic-btn" onclick="toggleMic('seg-tratamiento',this)" title="Dictar">🎤</button></div>
         <textarea id="seg-tratamiento" rows="2" class="vinput"
           placeholder="Cambios al plan de tratamiento, nuevos medicamentos…"></textarea>
       </div>
       <div>
-        <label class="vlabel">Pruebas complementarias</label>
+        <div class="vlabel-mic-row"><label class="vlabel">Pruebas complementarias</label><button type="button" class="mic-btn" onclick="toggleMic('seg-pruebas',this)" title="Dictar">🎤</button></div>
         <textarea id="seg-pruebas" rows="2" class="vinput"
           placeholder="Resultados de laboratorio, radiografías, ecografías…"></textarea>
       </div>
       <div>
-        <label class="vlabel">Observaciones</label>
+        <div class="vlabel-mic-row"><label class="vlabel">Observaciones</label><button type="button" class="mic-btn" onclick="toggleMic('seg-observaciones',this)" title="Dictar">🎤</button></div>
         <textarea id="seg-observaciones" rows="2" class="vinput"
           placeholder="Indicaciones al propietario, próxima cita…"></textarea>
       </div>
