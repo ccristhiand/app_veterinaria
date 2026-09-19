@@ -1892,6 +1892,7 @@ var _micCampoId         = null;
 var _micTextoBase       = '';   // texto previo al inicio del dictado (para cancelar)
 var _micPausado         = false;
 var _micPanel           = null; // referencia al panel flotante activo
+var _micParandoPorPausa = false; // flag para que onend no cierre el panel al pausar
 
 function toggleMic(campoId, btn) {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1959,7 +1960,8 @@ function toggleMic(campoId, btn) {
   };
 
   rec.onend = function() {
-    if (!_micPausado) _cerrarPanelMic();
+    if (!_micPausado && !_micParandoPorPausa) _cerrarPanelMic();
+    _micParandoPorPausa = false;
   };
 
   _micReconocimiento = rec;
@@ -2077,13 +2079,15 @@ function pausarMic() {
   var micBtn   = _micBtn;
 
   if (_micPausado) {
-    // Detener reconocimiento temporalmente
+    // Marcar que el stop es intencional (pausa), no un cierre
+    _micParandoPorPausa = true;
     if (_micReconocimiento) _micReconocimiento.stop();
     if (btnPausa) btnPausa.innerHTML = '▶ Reanudar';
     if (dot) dot.style.animation = 'none';
     if (micBtn) { micBtn.textContent = '⏸'; micBtn.style.animation = 'none'; }
   } else {
     // Reanudar reconocimiento
+    _micParandoPorPausa = false;
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR && _micCampoId) {
       var campo = document.getElementById(_micCampoId);
@@ -2105,7 +2109,10 @@ function pausarMic() {
         if (e.error!=='aborted') toast('Error de micrófono: '+e.error,'warning',3000);
         _cerrarPanelMic();
       };
-      rec.onend = function() { if (!_micPausado) _cerrarPanelMic(); };
+      rec.onend = function() {
+        if (!_micPausado && !_micParandoPorPausa) _cerrarPanelMic();
+        _micParandoPorPausa = false;
+      };
       _micReconocimiento = rec;
       rec.start();
     }
