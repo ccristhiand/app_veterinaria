@@ -8,6 +8,8 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
 <div id="main-content" class="page">
@@ -17,7 +19,13 @@
       <h2>Propietarios</h2>
       <p>Busca por DNI, nombre o teléfono</p>
     </div>
-    <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary">＋ Nuevo Propietario</button>
+    <div style="display:flex;gap:.6rem;align-items:center">
+      <button onclick="descargarExcelMasivo()" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.4rem">
+        📊 Exportar clientes
+      </button>
+      <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary">＋ Nuevo Propietario</button>
+    </div>
   </div>
 
   <!-- Búsqueda -->
@@ -201,6 +209,14 @@
       <button onclick="closeModal('modal-det')" class="vbtn vbtn-ghost">Cerrar</button>
       <button id="det-nueva-mascota-btn" class="vbtn" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none">＋🐾 Nueva Mascota</button>
       <button id="det-editar-btn" class="vbtn vbtn-primary">✏️ Editar</button>
+      <button id="det-excel-btn" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.35rem">
+        📊 Excel
+      </button>
+      <button id="det-pdf-btn" class="vbtn vbtn-ghost"
+        style="display:inline-flex;align-items:center;gap:.35rem">
+        📄 PDF
+      </button>
     </div>
   </div>
 </div>
@@ -686,6 +702,8 @@ async function verDetalle(id) {
     const titulo = document.getElementById('det-titulo').textContent;
     abrirModalNuevaMascota(id, titulo);
   };
+  document.getElementById('det-excel-btn').onclick = () => descargarExcelPropietario(id);
+  document.getElementById('det-pdf-btn').onclick   = () => descargarPDFPropietario(id);
 
   openModal('modal-det');
 
@@ -870,6 +888,240 @@ function ib(label, val) {
       letter-spacing:.1em;font-weight:700">${label}</p>
     <p style="font-size:.82rem;font-weight:600;margin-top:.2rem">${esc(val||'—')}</p>
   </div>`;
+}
+
+// ── PDF individual ────────────────────────────────────────────────
+async function descargarPDFPropietario(id) {
+  const btn = document.getElementById('det-pdf-btn');
+  btn.textContent = '⏳ Generando…';
+  btn.disabled = true;
+  try {
+    const res  = await api(`/propietarios/${id}/informe/pdf`);
+    if (!res || !res.ok) { toast('Error al generar el PDF.', 'danger'); return; }
+    const html = await res.text();
+    const win  = window.open('', '_blank', 'width=820,height=900');
+    win.document.write(html);
+    win.document.close();
+  } catch { toast('Error de conexión.', 'danger'); }
+  finally  { btn.textContent = '📄 PDF'; btn.disabled = false; }
+}
+
+// ── Excel individual ──────────────────────────────────────────────
+async function descargarExcelPropietario(id) {
+  const btn = document.getElementById('det-excel-btn');
+  btn.textContent = '⏳ Generando…';
+  btn.disabled = true;
+  try {
+    const res  = await api(`/propietarios/${id}/informe`);
+    if (!res || !res.ok) { toast('Error al obtener datos.', 'danger'); return; }
+    const { data: p } = await res.json();
+
+    const XS = window.XLSXStyle || window.XLSX;
+    const VD = '166534', VC = 'ECFDF5', BL = 'FFFFFF', NG = '1A2E28';
+
+    const borde = (c) => ({ top:{style:'thin',color:{rgb:c}}, bottom:{style:'thin',color:{rgb:c}},
+                             left:{style:'thin',color:{rgb:c}}, right:{style:'thin',color:{rgb:c}} });
+    const sTit  = { font:{bold:true,sz:13,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}},
+                    alignment:{horizontal:'left',vertical:'center'}, border:borde(BL) };
+    const sSub  = { font:{bold:true,sz:10,color:{rgb:VD}}, fill:{fgColor:{rgb:VC}},
+                    alignment:{horizontal:'left'} };
+    const sHdr  = { font:{bold:true,sz:9,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}},
+                    alignment:{horizontal:'center',wrapText:true}, border:borde(BL) };
+    const sD    = (par) => ({ font:{sz:9,color:{rgb:NG}},
+                    fill:{fgColor:{rgb:par?'F6F8F6':BL}},
+                    alignment:{horizontal:'left',vertical:'center'},
+                    border:borde('E8EDE9') });
+
+    const rows = [];
+    const merge = [];
+
+    // Título
+    rows.push([{ v:`EXPEDIENTE CLÍNICO — ${p.nombre.toUpperCase()} ${p.apellido.toUpperCase()}`, s:sTit },'','','','','','']);
+    merge.push({ s:{r:0,c:0}, e:{r:0,c:6} });
+
+    // Datos del propietario
+    rows.push([{ v:'DATOS DEL PROPIETARIO', s:sSub },'','','','','','']);
+    merge.push({ s:{r:1,c:0}, e:{r:1,c:6} });
+    rows.push([
+      { v:'Nombre',    s:sHdr }, { v:`${p.nombre} ${p.apellido}`, s:sD(false) },
+      { v:'DNI/Doc',  s:sHdr }, { v:p.dni||p.ruc||'—', s:sD(false) },
+      { v:'Teléfono', s:sHdr }, { v:p.telefono||'—', s:sD(false) }, { v:'', s:sD(false) }
+    ]);
+    rows.push([
+      { v:'Email',     s:sHdr }, { v:p.email||'—', s:sD(true) },
+      { v:'Dirección', s:sHdr }, { v:p.direccion||'—', s:sD(true) },
+      { v:'', s:sD(true) }, { v:'', s:sD(true) }, { v:'', s:sD(true) }
+    ]);
+    rows.push([{ v:'', s:{} },'','','','','','']);
+
+    // Por cada mascota
+    const mascotas = p.mascotas || [];
+    for (const m of mascotas) {
+      // Cargar historia completa
+      const hRes  = await api(`/historia?mascota_id=${m.id}`);
+      const hData = hRes && hRes.ok ? (await hRes.json()).data || [] : [];
+      const vacRes = await api(`/vacunas?mascota_id=${m.id}`);
+      const vacunas = vacRes && vacRes.ok ? (await vacRes.json()).data || [] : [];
+      const desRes = await api(`/desparasitaciones?mascota_id=${m.id}`);
+      const desparas = desRes && desRes.ok ? (await desRes.json()).data || [] : [];
+
+      const startRow = rows.length;
+      rows.push([{ v:`🐾 ${m.nombre.toUpperCase()} — ${m.especie} ${m.raza?'('+m.raza+')':''}`, s:{...sSub,fill:{fgColor:{rgb:'EDE9FE'}}} },'','','','','','']);
+      merge.push({ s:{r:startRow,c:0}, e:{r:startRow,c:6} });
+
+      // Ficha mascota
+      rows.push([
+        { v:'Especie', s:sHdr }, { v:m.especie, s:sD(false) },
+        { v:'Raza',    s:sHdr }, { v:m.raza||'—', s:sD(false) },
+        { v:'Sexo',    s:sHdr }, { v:m.sexo||'—', s:sD(false) }, { v:'', s:sD(false) }
+      ]);
+      rows.push([
+        { v:'Peso',       s:sHdr }, { v:m.peso_kg ? m.peso_kg+'kg' : '—', s:sD(true) },
+        { v:'Microchip',  s:sHdr }, { v:m.microchip||'—', s:sD(true) },
+        { v:'F.Nacimiento', s:sHdr }, { v:m.fecha_nacimiento ? m.fecha_nacimiento.split('T')[0] : '—', s:sD(true) },
+        { v:'', s:sD(true) }
+      ]);
+      if (m.alertas_medicas) {
+        const aR = rows.length;
+        rows.push([{ v:'⚠️ Alertas: '+m.alertas_medicas, s:{font:{sz:9,color:{rgb:'BE123C'},bold:true},fill:{fgColor:{rgb:'FFF1F2'}}} },'','','','','','']);
+        merge.push({ s:{r:aR,c:0}, e:{r:aR,c:6} });
+      }
+
+      // Historia clínica
+      if (hData.length) {
+        const hR = rows.length;
+        rows.push([{ v:'CONSULTAS ('+hData.length+')', s:{...sHdr,fill:{fgColor:{rgb:'0F766E'}},alignment:{horizontal:'left'}} },'','','','','','']);
+        merge.push({ s:{r:hR,c:0}, e:{r:hR,c:6} });
+        rows.push([
+          { v:'Fecha', s:sHdr }, { v:'Motivo', s:sHdr }, { v:'Diagnóstico', s:sHdr },
+          { v:'Tratamiento', s:sHdr }, { v:'Pruebas', s:sHdr }, { v:'Vet', s:sHdr },
+          { v:'Seguimientos', s:sHdr }
+        ]);
+        hData.forEach((h, i) => {
+          rows.push([
+            { v:h.fecha?h.fecha.split('T')[0]:'—', s:sD(i%2===0) },
+            { v:h.motivo||'—', s:sD(i%2===0) },
+            { v:h.diagnostico||'—', s:sD(i%2===0) },
+            { v:h.tratamiento||'—', s:sD(i%2===0) },
+            { v:h.pruebas_complementarias||'—', s:sD(i%2===0) },
+            { v:h.veterinario_nombre||'—', s:sD(i%2===0) },
+            { v:h.seguimientos?.length||0, s:sD(i%2===0) },
+          ]);
+        });
+      }
+
+      // Vacunas
+      if (vacunas.length) {
+        const vR = rows.length;
+        rows.push([{ v:'VACUNAS ('+vacunas.length+')', s:{...sHdr,fill:{fgColor:{rgb:'0284C7'}},alignment:{horizontal:'left'}} },'','','','','','']);
+        merge.push({ s:{r:vR,c:0}, e:{r:vR,c:6} });
+        rows.push([{ v:'Fecha', s:sHdr },{ v:'Vacuna', s:sHdr },{ v:'Fabricante', s:sHdr },{ v:'Lote', s:sHdr },{ v:'Próxima dosis', s:sHdr },{ v:'Vet', s:sHdr },{ v:'', s:sHdr }]);
+        vacunas.forEach((v, i) => rows.push([
+          { v:v.fecha_aplicacion?v.fecha_aplicacion.split('T')[0]:'—', s:sD(i%2===0) },
+          { v:v.nombre||'—', s:sD(i%2===0) },
+          { v:v.fabricante||'—', s:sD(i%2===0) },
+          { v:v.lote||'—', s:sD(i%2===0) },
+          { v:v.proxima_dosis?v.proxima_dosis.split('T')[0]:'—', s:sD(i%2===0) },
+          { v:v.veterinario_nombre||'—', s:sD(i%2===0) },
+          { v:'', s:sD(i%2===0) },
+        ]));
+      }
+
+      // Desparasitaciones
+      if (desparas.length) {
+        const dR = rows.length;
+        rows.push([{ v:'DESPARASITACIONES ('+desparas.length+')', s:{...sHdr,fill:{fgColor:{rgb:'7C3AED'}},alignment:{horizontal:'left'}} },'','','','','','']);
+        merge.push({ s:{r:dR,c:0}, e:{r:dR,c:6} });
+        rows.push([{ v:'Fecha', s:sHdr },{ v:'Tipo', s:sHdr },{ v:'Producto', s:sHdr },{ v:'Dosis', s:sHdr },{ v:'Próxima', s:sHdr },{ v:'Vet', s:sHdr },{ v:'', s:sHdr }]);
+        desparas.forEach((d, i) => rows.push([
+          { v:d.fecha_aplicacion?d.fecha_aplicacion.split('T')[0]:'—', s:sD(i%2===0) },
+          { v:d.tipo||'—', s:sD(i%2===0) },
+          { v:d.producto||'—', s:sD(i%2===0) },
+          { v:d.dosis||'—', s:sD(i%2===0) },
+          { v:d.proxima_dosis?d.proxima_dosis.split('T')[0]:'—', s:sD(i%2===0) },
+          { v:d.veterinario_nombre||'—', s:sD(i%2===0) },
+          { v:'', s:sD(i%2===0) },
+        ]));
+      }
+
+      rows.push([{ v:'', s:{} },'','','','','','']);
+    }
+
+    const ws = XS.utils.aoa_to_sheet(rows.map(r => r.map(c => c.v !== undefined ? c : { v:c })));
+    rows.forEach((row, ri) => row.forEach((cell, ci) => {
+      if (cell && cell.s) {
+        const addr = XS.utils.encode_cell({ r:ri, c:ci });
+        if (!ws[addr]) ws[addr] = { v: cell.v };
+        ws[addr].s = cell.s;
+      }
+    }));
+    ws['!merges'] = merge;
+    ws['!cols']   = [{ wch:14 },{ wch:28 },{ wch:28 },{ wch:28 },{ wch:24 },{ wch:18 },{ wch:14 }];
+
+    const wb = XS.utils.book_new();
+    XS.utils.book_append_sheet(wb, ws, 'Expediente');
+    const nombre = `Expediente_${p.nombre}_${p.apellido}_${new Date().toISOString().slice(0,10)}`;
+    XS.writeFile(wb, nombre + '.xlsx');
+    toast('📊 Excel descargado', 'success');
+  } catch(e) { console.error(e); toast('Error al generar Excel.', 'danger'); }
+  finally { btn.textContent = '📊 Excel'; btn.disabled = false; }
+}
+
+// ── Excel masivo (todos los propietarios) ─────────────────────────
+async function descargarExcelMasivo() {
+  const btn = document.querySelector('[onclick="descargarExcelMasivo()"]');
+  if (btn) { btn.textContent = '⏳ Generando…'; btn.disabled = true; }
+  try {
+    const res  = await api('/propietarios?limit=1000&page=1');
+    if (!res || !res.ok) { toast('Error al obtener datos.', 'danger'); return; }
+    const { data: props } = await res.json();
+
+    const XS = window.XLSXStyle || window.XLSX;
+    const VD = '166534', VC = 'ECFDF5', BL = 'FFFFFF', NG = '1A2E28';
+    const borde = (c) => ({ top:{style:'thin',color:{rgb:c}}, bottom:{style:'thin',color:{rgb:c}},
+                             left:{style:'thin',color:{rgb:c}}, right:{style:'thin',color:{rgb:c}} });
+    const sTit = { font:{bold:true,sz:13,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}}, alignment:{horizontal:'left'}, border:borde(BL) };
+    const sHdr = { font:{bold:true,sz:9,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}}, alignment:{horizontal:'center',wrapText:true}, border:borde(BL) };
+    const sD   = (par) => ({ font:{sz:9,color:{rgb:NG}}, fill:{fgColor:{rgb:par?'F6F8F6':BL}}, alignment:{horizontal:'left'}, border:borde('E8EDE9') });
+
+    const rows = [];
+    rows.push([{ v:`LISTADO DE CLIENTES — ${new Date().toLocaleDateString('es-PE')}`, s:sTit },'','','','','','','','']);
+    rows.push([
+      { v:'#',             s:sHdr }, { v:'Nombre',        s:sHdr }, { v:'Apellido',   s:sHdr },
+      { v:'Tipo Doc',      s:sHdr }, { v:'DNI/Doc',       s:sHdr }, { v:'Teléfono',   s:sHdr },
+      { v:'Email',         s:sHdr }, { v:'Dirección',     s:sHdr },
+      { v:'N° Mascotas',   s:sHdr },
+    ]);
+
+    props.forEach((p, i) => rows.push([
+      { v:i+1,                    s:sD(i%2===0) },
+      { v:p.nombre||'—',          s:sD(i%2===0) },
+      { v:p.apellido||'—',        s:sD(i%2===0) },
+      { v:p.tipo_documento||'DNI',s:sD(i%2===0) },
+      { v:p.dni||p.ruc||'—',     s:sD(i%2===0) },
+      { v:p.telefono||'—',        s:sD(i%2===0) },
+      { v:p.email||'—',           s:sD(i%2===0) },
+      { v:p.direccion||'—',       s:sD(i%2===0) },
+      { v:p.total_mascotas||0,    s:sD(i%2===0) },
+    ]));
+
+    const ws = XS.utils.aoa_to_sheet(rows.map(r => r.map(c => c.v !== undefined ? c : { v:c })));
+    rows.forEach((row, ri) => row.forEach((cell, ci) => {
+      if (cell && cell.s) {
+        const addr = XS.utils.encode_cell({ r:ri, c:ci });
+        if (!ws[addr]) ws[addr] = { v: cell.v };
+        ws[addr].s = cell.s;
+      }
+    }));
+    ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:8} }];
+    ws['!cols']   = [{ wch:5 },{ wch:18 },{ wch:18 },{ wch:10 },{ wch:14 },{ wch:14 },{ wch:24 },{ wch:28 },{ wch:10 }];
+
+    const wb = XS.utils.book_new();
+    XS.utils.book_append_sheet(wb, ws, 'Clientes');
+    XS.writeFile(wb, `Clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast(`📊 Excel de ${props.length} clientes descargado`, 'success');
+  } catch(e) { console.error(e); toast('Error al generar Excel.', 'danger'); }
+  finally { if (btn) { btn.textContent = '📊 Exportar clientes'; btn.disabled = false; } }
 }
 </script>
 </body>
