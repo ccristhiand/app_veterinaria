@@ -1886,71 +1886,67 @@ ${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</di
 }
 // ══ DICTADO POR VOZ ══════════════════════════════════════════════
 
-var _micReconocimiento = null;  // instancia activa de SpeechRecognition
-var _micBtn            = null;  // botón activo actualmente
-var _micCampoId        = null;  // id del textarea activo
-var _micTextoBase      = '';    // texto que había en el campo antes de empezar a dictar
+var _micReconocimiento  = null;
+var _micBtn             = null;
+var _micCampoId         = null;
+var _micTextoBase       = '';   // texto previo al inicio del dictado (para cancelar)
+var _micPausado         = false;
+var _micPanel           = null; // referencia al panel flotante activo
 
 function toggleMic(campoId, btn) {
-  // Si el navegador no soporta Web Speech API, avisar y salir
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
     toast('Tu navegador no soporta dictado por voz. Usa Chrome o Edge.', 'warning', 4000);
     return;
   }
 
-  // Si hay una sesión activa en ESTE mismo campo, detenerla
+  // Si hay sesión activa en ESTE campo → detener (guardar texto)
   if (_micReconocimiento && _micCampoId === campoId) {
     _micReconocimiento.stop();
     return;
   }
 
-  // Si hay una sesión activa en OTRO campo, detenerla primero
+  // Si hay sesión activa en OTRO campo → detenerla primero
   if (_micReconocimiento) {
-    _micReconocimiento.stop();
-    _micReconocimiento = null;
-  }
-
-  // Restaurar botón anterior si era otro
-  if (_micBtn && _micBtn !== btn) {
-    _micBtn.textContent    = '🎤';
-    _micBtn.style.color    = '';
-    _micBtn.style.animation = '';
+    _micReconocimiento.abort ? _micReconocimiento.abort() : _micReconocimiento.stop();
+    _cerrarPanelMic();
   }
 
   var campo = document.getElementById(campoId);
   if (!campo) return;
 
-  // Guardar el texto actual del campo para acumular encima
-  _micTextoBase = campo.value;
-  _micCampoId   = campoId;
-  _micBtn       = btn;
+  _micTextoBase  = campo.value;  // guardar para poder cancelar
+  _micCampoId    = campoId;
+  _micBtn        = btn;
+  _micPausado    = false;
 
-  // Activar estado visual del botón
+  // Activar botón
   btn.textContent     = '🔴';
   btn.style.color     = '#ef4444';
   btn.style.animation = 'mic-pulso 1s infinite';
 
-  // Crear instancia
+  // Crear y mostrar panel flotante
+  _micPanel = _crearPanelMic(campo, btn);
+
+  // Crear instancia de reconocimiento
   var rec = new SR();
   rec.lang           = 'es-PE';
-  rec.interimResults = true;   // ver texto en tiempo real mientras habla
-  rec.continuous     = true;   // no parar tras silencio corto
+  rec.interimResults = true;
+  rec.continuous     = true;
 
   rec.onresult = function(e) {
-    var finalTexto    = '';
-    var interimTexto  = '';
+    if (_micPausado) return;
+    var finalTexto = '', interimTexto = '';
     for (var i = e.resultIndex; i < e.results.length; i++) {
       var t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) {
-        finalTexto   += t + ' ';
-      } else {
-        interimTexto += t;
-      }
+      if (e.results[i].isFinal) { finalTexto   += t + ' '; }
+      else                       { interimTexto += t; }
     }
-    // Mostrar en tiempo real: texto base + lo ya finalizado + lo interim
     if (finalTexto) _micTextoBase += finalTexto;
     campo.value = _micTextoBase + interimTexto;
+    // Actualizar preview en el panel
+    var prev = document.getElementById('mic-panel-preview');
+    if (prev) prev.textContent = campo.value;
   };
 
   rec.onerror = function(e) {
@@ -1959,12 +1955,11 @@ function toggleMic(campoId, btn) {
     } else if (e.error !== 'aborted') {
       toast('Error de micrófono: ' + e.error, 'warning', 3000);
     }
-    detenerMic();
+    _cerrarPanelMic();
   };
 
   rec.onend = function() {
-    // Si terminó solo (pausa larga), limpiar estado
-    detenerMic();
+    if (!_micPausado) _cerrarPanelMic();
   };
 
   _micReconocimiento = rec;
@@ -1972,7 +1967,183 @@ function toggleMic(campoId, btn) {
   campo.focus();
 }
 
-function detenerMic() {
+function _crearPanelMic(campo, btn) {
+  // Eliminar panel previo si existe
+  var prev = document.getElementById('mic-panel-flotante');
+  if (prev) prev.remove();
+
+  // Label del campo
+  var labelEl = btn.closest('.vlabel-mic-row') && btn.closest('.vlabel-mic-row').querySelector('.vlabel');
+  var labelTxt = labelEl ? labelEl.textContent : 'Campo';
+
+  var panel = document.createElement('div');
+  panel.id = 'mic-panel-flotante';
+  panel.style.cssText = [
+    'position:fixed',
+    'bottom:1.5rem',
+    'left:50%',
+    'transform:translateX(-50%)',
+    'z-index:9999',
+    'background:#fff',
+    'border:1.5px solid #fca5a5',
+    'border-radius:16px',
+    'padding:1rem 1.1rem',
+    'box-shadow:0 8px 32px rgba(0,0,0,.14)',
+    'min-width:320px',
+    'max-width:460px',
+    'width:calc(100vw - 3rem)',
+    'display:flex',
+    'flex-direction:column',
+    'gap:.7rem',
+    'font-family:inherit'
+  ].join(';');
+
+  panel.innerHTML = [
+    // Fila superior: nombre campo + animación
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">',
+      '<div style="display:flex;align-items:center;gap:.5rem">',
+        '<span id="mic-dot" style="width:9px;height:9px;border-radius:50%;background:#ef4444;display:inline-block;animation:mic-pulso 1s infinite;flex-shrink:0"></span>',
+        '<span style="font-size:.78rem;font-weight:600;color:#ef4444">Dictando en:</span>',
+        '<span style="font-size:.78rem;font-weight:700;color:#1f2937">'+labelTxt+'</span>',
+      '</div>',
+      '<span id="mic-timer" style="font-size:.72rem;color:#6b7280;font-variant-numeric:tabular-nums;font-weight:600">0:00</span>',
+    '</div>',
+    // Visualizador de barras
+    '<canvas id="mic-waveform" height="36" style="width:100%;height:36px;border-radius:8px;background:#fef2f2;display:block"></canvas>',
+    // Preview del texto
+    '<div id="mic-panel-preview" style="font-size:.75rem;color:#374151;line-height:1.55;min-height:2rem;max-height:4.5rem;overflow:hidden;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:.4rem .6rem;word-break:break-word">',
+      campo.value || '<span style="color:#9ca3af">Comienza a hablar…</span>',
+    '</div>',
+    // Controles
+    '<div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end">',
+      // Cancelar
+      '<button onclick="cancelarMic()" style="display:flex;align-items:center;gap:.3rem;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:.38rem .75rem;font-size:.74rem;color:#6b7280;cursor:pointer;font-family:inherit;font-weight:600">',
+        '✕ Cancelar',
+      '</button>',
+      // Pausar
+      '<button id="mic-btn-pausa" onclick="pausarMic()" style="display:flex;align-items:center;gap:.3rem;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:.38rem .75rem;font-size:.74rem;color:#374151;cursor:pointer;font-family:inherit;font-weight:600">',
+        '⏸ Pausar',
+      '</button>',
+      // Guardar
+      '<button onclick="guardarMic()" style="display:flex;align-items:center;gap:.3rem;background:#16a34a;border:none;border-radius:8px;padding:.38rem .85rem;font-size:.74rem;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">',
+        '✓ Listo',
+      '</button>',
+    '</div>'
+  ].join('');
+
+  document.body.appendChild(panel);
+
+  // Timer
+  var seg = 0;
+  panel._timerInt = setInterval(function() {
+    if (_micPausado) return;
+    seg++;
+    var m = Math.floor(seg/60), s = seg%60;
+    var el = document.getElementById('mic-timer');
+    if (el) el.textContent = m+':'+(s<10?'0':'')+s;
+  }, 1000);
+
+  // Waveform
+  var canvas = document.getElementById('mic-waveform');
+  var ctx = canvas.getContext('2d');
+  var bars = [];
+  panel._waveInt = setInterval(function() {
+    canvas.width = canvas.offsetWidth;
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    var amp = _micPausado ? 3 : (Math.random()*14+3);
+    bars.push(amp);
+    if (bars.length > 55) bars.shift();
+    var bw = W/55;
+    for (var i=0; i<bars.length; i++) {
+      var h = bars[i];
+      var x = i*bw + bw/2;
+      var reciente = i > bars.length-6;
+      ctx.fillStyle = reciente && !_micPausado ? '#ef4444' : '#fca5a5';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x-1.5,(H-h)/2,3,h,2);
+      else ctx.rect(x-1.5,(H-h)/2,3,h);
+      ctx.fill();
+    }
+  }, 50);
+
+  return panel;
+}
+
+function pausarMic() {
+  _micPausado = !_micPausado;
+  var btnPausa = document.getElementById('mic-btn-pausa');
+  var dot      = document.getElementById('mic-dot');
+  var micBtn   = _micBtn;
+
+  if (_micPausado) {
+    // Detener reconocimiento temporalmente
+    if (_micReconocimiento) _micReconocimiento.stop();
+    if (btnPausa) btnPausa.innerHTML = '▶ Reanudar';
+    if (dot) dot.style.animation = 'none';
+    if (micBtn) { micBtn.textContent = '⏸'; micBtn.style.animation = 'none'; }
+  } else {
+    // Reanudar reconocimiento
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR && _micCampoId) {
+      var campo = document.getElementById(_micCampoId);
+      var rec = new SR();
+      rec.lang = 'es-PE'; rec.interimResults = true; rec.continuous = true;
+      rec.onresult = function(e) {
+        if (_micPausado) return;
+        var ft='', it='';
+        for (var i=e.resultIndex;i<e.results.length;i++) {
+          var t=e.results[i][0].transcript;
+          if (e.results[i].isFinal) ft+=t+' '; else it+=t;
+        }
+        if (ft) _micTextoBase+=ft;
+        campo.value = _micTextoBase+it;
+        var prev=document.getElementById('mic-panel-preview');
+        if (prev) prev.textContent=campo.value;
+      };
+      rec.onerror = function(e) {
+        if (e.error!=='aborted') toast('Error de micrófono: '+e.error,'warning',3000);
+        _cerrarPanelMic();
+      };
+      rec.onend = function() { if (!_micPausado) _cerrarPanelMic(); };
+      _micReconocimiento = rec;
+      rec.start();
+    }
+    if (btnPausa) btnPausa.innerHTML = '⏸ Pausar';
+    if (dot) dot.style.animation = 'mic-pulso 1s infinite';
+    if (micBtn) { micBtn.textContent = '🔴'; micBtn.style.animation = 'mic-pulso 1s infinite'; }
+  }
+}
+
+function guardarMic() {
+  // Detener y dejar el texto en el campo (ya está acumulado)
+  if (_micReconocimiento) _micReconocimiento.stop();
+  _cerrarPanelMic();
+  toast('✓ Dictado guardado en el campo.', 'success', 2500);
+}
+
+function cancelarMic() {
+  // Detener Y restaurar el texto original
+  if (_micReconocimiento) {
+    _micReconocimiento.abort ? _micReconocimiento.abort() : _micReconocimiento.stop();
+  }
+  var campo = document.getElementById(_micCampoId);
+  if (campo) campo.value = _micTextoBase;  // restaurar texto previo
+  _cerrarPanelMic();
+  toast('Dictado cancelado.', 'warning', 2000);
+}
+
+function _cerrarPanelMic() {
+  if (_micPanel) {
+    clearInterval(_micPanel._timerInt);
+    clearInterval(_micPanel._waveInt);
+    _micPanel.remove();
+    _micPanel = null;
+  }
+  // Quitar también por id por si acaso
+  var p = document.getElementById('mic-panel-flotante');
+  if (p) p.remove();
+
   if (_micBtn) {
     _micBtn.textContent     = '🎤';
     _micBtn.style.color     = '';
@@ -1981,5 +2152,6 @@ function detenerMic() {
   _micReconocimiento = null;
   _micBtn            = null;
   _micCampoId        = null;
+  _micPausado        = false;
   _micTextoBase      = '';
 }
