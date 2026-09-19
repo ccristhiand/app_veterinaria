@@ -665,19 +665,27 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: .9rem;
-  padding: .15rem .35rem;
-  border-radius: .45rem;
+  padding: .2rem .3rem;
+  border-radius: .4rem;
   line-height: 1;
-  transition: background .15s;
+  display: flex;
+  align-items: center;
+  color: #374151;
+  transition: color .15s, background .15s;
   flex-shrink: 0;
 }
 
 .mic-btn:hover {
-  background: #fee2e2;
+  color: #0ea5e9;
+  background: #f0f9ff;
+}
+
+.mic-btn.grabando {
+  color: #0ea5e9;
+  animation: mic-pulso 1s infinite;
 }
 
 @keyframes mic-pulso {
   0%, 100% { opacity: 1;   transform: scale(1);    }
-  50%       { opacity: .5; transform: scale(1.25); }
+  50%       { opacity: .5; transform: scale(1.2); }
 }
