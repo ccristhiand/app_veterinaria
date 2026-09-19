@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS historia_seguimientos (
   fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   evolucion      TEXT         NOT NULL,
   tratamiento    TEXT         NULL,
+  pruebas_complementarias TEXT         NULL,
   observaciones  TEXT         NULL,
   peso_kg        DECIMAL(6,2) NULL,
   temperatura_c  DECIMAL(4,1) NULL,
@@ -536,7 +537,7 @@ CREATE TABLE IF NOT EXISTS wa_campanas (
                     COMMENT 'URL de imagen en Azure Blob Storage',
   imagen_blob_name  VARCHAR(200)   NULL
                     COMMENT 'Nombre del blob en Azure para gestión',
-  segmento          ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d')
+  segmento          ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d','personalizado')
                     NOT NULL DEFAULT 'todos',
   segmento_valor    VARCHAR(50)    NULL,
   estado            ENUM('borrador','programada','enviando','pausada','completada','cancelada')

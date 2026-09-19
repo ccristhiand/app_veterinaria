@@ -59,7 +59,7 @@ router.put('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'
 });
 
 // ── DELETE /api/v1/desparasitaciones/:id ─────────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
     await req.db.query('DELETE FROM desparasitaciones WHERE id=?', [req.params.id]);
     return res.json({ success: true, message: 'Desparasitación eliminada.' });

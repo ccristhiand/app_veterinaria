@@ -141,6 +141,34 @@ router.put('/:id', auditMiddleware('estetica:actualizado', 'estetica'), async (r
   } catch (err) { next(err); }
 });
 
+// ── DELETE /api/v1/estetica/:id ───────────────────────────────────
+router.delete('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
+  try {
+    const [servicio] = await req.db.query('SELECT id FROM servicios_estetica WHERE id = ?', [req.params.id]);
+    if (!servicio) return res.status(404).json({ success: false, message: 'Servicio no encontrado.' });
+
+    // Eliminar fotos de Azure antes de borrar los registros
+    try {
+      const { BlobServiceClient } = require('@azure/storage-blob');
+      const connStr   = process.env.AZURE_STORAGE_CONNECTION_STRING;
+      const container = process.env.AZURE_STORAGE_CONTAINER || 'vet-fotos';
+      if (connStr) {
+        const fotos = await req.db.query('SELECT url FROM estetica_fotos WHERE estetica_id = ?', [req.params.id]);
+        const client = BlobServiceClient.fromConnectionString(connStr);
+        const contClient = client.getContainerClient(container);
+        for (const foto of fotos) {
+          const blobName = foto.url.split(`/${container}/`)[1];
+          if (blobName) await contClient.deleteBlob(blobName).catch(() => {});
+        }
+      }
+    } catch {}
+
+    await req.db.query('DELETE FROM estetica_fotos WHERE estetica_id = ?', [req.params.id]);
+    await req.db.query('DELETE FROM servicios_estetica WHERE id = ?', [req.params.id]);
+    return res.json({ success: true, message: 'Servicio de estética eliminado.' });
+  } catch (err) { next(err); }
+});
+
 // ── POST /api/v1/estetica/upload — sube foto via backend a Azure ──
 // El navegador manda la foto como multipart/form-data al backend
 // El backend la sube a Azure y devuelve la URL pública

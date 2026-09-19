@@ -150,18 +150,18 @@ router.get('/:id/seguimientos', async (req, res, next) => {
 // POST /api/v1/historia/:id/seguimientos
 router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
-    const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
+    const { evolucion, tratamiento, pruebas_complementarias, observaciones, peso_kg, temperatura_c, fecha } = req.body;
     if (!evolucion?.trim())
       return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
     const [historia] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
     if (!historia) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
     const result = await req.db.query(
       `INSERT INTO historia_seguimientos
-         (historia_id, veterinario_id, fecha, evolucion, tratamiento, observaciones, peso_kg, temperatura_c)
-       VALUES (?,?,?,?,?,?,?,?)`,
+         (historia_id, veterinario_id, fecha, evolucion, tratamiento, pruebas_complementarias, observaciones, peso_kg, temperatura_c)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
       [req.params.id, req.user.id, fecha || new Date(),
-       evolucion.trim(), tratamiento?.trim()||null, observaciones?.trim()||null,
-       peso_kg||null, temperatura_c||null]
+       evolucion.trim(), tratamiento?.trim()||null, pruebas_complementarias?.trim()||null,
+       observaciones?.trim()||null, peso_kg||null, temperatura_c||null]
     );
     return res.status(201).json({
       success: true,
@@ -174,7 +174,7 @@ router.post('/:id/seguimientos', auditMiddleware('historia_clinica:actualizado',
 // PUT /api/v1/historia/:id/seguimientos/:segId
 router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actualizado', 'historia_clinica'), async (req, res, next) => {
   try {
-    const { evolucion, tratamiento, observaciones, peso_kg, temperatura_c, fecha } = req.body;
+    const { evolucion, tratamiento, pruebas_complementarias, observaciones, peso_kg, temperatura_c, fecha } = req.body;
     if (!evolucion?.trim())
       return res.status(422).json({ success: false, message: 'La evolución es obligatoria.' });
     const [seg] = await req.db.query(
@@ -184,11 +184,11 @@ router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actuali
     if (!seg) return res.status(404).json({ success: false, message: 'Seguimiento no encontrado.' });
     await req.db.query(
       `UPDATE historia_seguimientos SET
-         fecha=?, evolucion=?, tratamiento=?, observaciones=?, peso_kg=?, temperatura_c=?
+         fecha=?, evolucion=?, tratamiento=?, pruebas_complementarias=?, observaciones=?, peso_kg=?, temperatura_c=?
        WHERE id=?`,
       [fecha || new Date(), evolucion.trim(),
-       tratamiento?.trim()||null, observaciones?.trim()||null,
-       peso_kg||null, temperatura_c||null, req.params.segId]
+       tratamiento?.trim()||null, pruebas_complementarias?.trim()||null,
+       observaciones?.trim()||null, peso_kg||null, temperatura_c||null, req.params.segId]
     );
     return res.json({ success: true, message: 'Seguimiento actualizado.' });
   } catch (err) { next(err); }

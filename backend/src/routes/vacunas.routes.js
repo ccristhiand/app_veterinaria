@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { authenticate } = require('../middlewares/auth.middleware');
+const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
 
 
@@ -52,6 +52,16 @@ router.put('/:id', auditMiddleware('vacunas:actualizado', 'vacunas'), async (req
       [nombre, fabricante||null, lote||null, fecha_aplicacion, proxima_dosis||null, notas||null, req.params.id]
     );
     return res.json({ success: true, message: 'Vacuna actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// ── DELETE /api/v1/vacunas/:id ────────────────────────────────
+router.delete('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
+  try {
+    const [vacuna] = await req.db.query('SELECT id FROM vacunas WHERE id = ?', [req.params.id]);
+    if (!vacuna) return res.status(404).json({ success: false, message: 'Vacuna no encontrada.' });
+    await req.db.query('DELETE FROM vacunas WHERE id = ?', [req.params.id]);
+    return res.json({ success: true, message: 'Vacuna eliminada.' });
   } catch (err) { next(err); }
 });
 

@@ -302,11 +302,16 @@ async function cargarVacunas(id) {
             ${dias!==null?'<p style="font-size:.7rem;color:'+(vencida?'#be123c':proxima30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>':''}
           </div>`:''}
         </div>
-        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.8rem">
           <button onclick="abrirEditarVacuna(${v.id})"
             style="font-size:.72rem;color:var(--sky);background:none;border:none;
             cursor:pointer;font-family:inherit;font-weight:600">
             ✏️ Editar vacuna
+          </button>
+          <button onclick="eliminarVacuna(${v.id})"
+            style="font-size:.72rem;color:#ef4444;background:none;border:none;
+            cursor:pointer;font-family:inherit;font-weight:600">
+            🗑️ Eliminar
           </button>
         </div>
       </div>`;
@@ -390,6 +395,13 @@ async function cargarDesparasitaciones(id) {
             <p style="font-weight:700;font-size:.88rem;margin-top:.2rem;color:${vencida?'#be123c':prox30?'#b45309':'var(--ink)'}">${fDate(d.proxima_dosis)}</p>
             ${dias !== null ? '<p style="font-size:.7rem;color:'+(vencida?'#be123c':prox30?'#b45309':'var(--ink-faint)')+'">'+( vencida?'Hace '+Math.abs(dias)+' días':dias===0?'Hoy':'En '+dias+' días')+'</p>' : ''}
           </div>` : ''}
+        </div>
+        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+          <button onclick="eliminarDesparasitacion(${d.id})"
+            style="font-size:.72rem;color:#ef4444;background:none;border:none;
+            cursor:pointer;font-family:inherit;font-weight:600">
+            🗑️ Eliminar
+          </button>
         </div>
       </div>`;
     }).join('') + '</div>';
@@ -685,11 +697,16 @@ async function cargarEstetica(id) {
                 </p>
               </div>` : ''}
           </div>
-          <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end">
+          <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.8rem">
             <button onclick="abrirEditarEstetica(${s.id})"
               style="font-size:.72rem;color:var(--sky);background:none;border:none;
               cursor:pointer;font-family:inherit;font-weight:600">
               ✏️ Editar servicio
+            </button>
+            <button onclick="eliminarEstetica(${s.id})"
+              style="font-size:.72rem;color:#ef4444;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600">
+              🗑️ Eliminar
             </button>
           </div>
         </div>`).join('')
@@ -1254,6 +1271,7 @@ function renderSeguimientos(seguimientos) {
         '</div>' +
         '<p style="font-size:.78rem;color:var(--ink);line-height:1.5"><strong>Evolución:</strong> ' + esc(s.evolucion) + '</p>' +
         (s.tratamiento ? '<p style="font-size:.75rem;color:var(--ink-soft);margin-top:.3rem;line-height:1.5"><strong>Tratamiento:</strong> ' + esc(s.tratamiento) + '</p>' : '') +
+        (s.pruebas_complementarias ? '<p style="font-size:.75rem;color:#1d4ed8;margin-top:.3rem;line-height:1.5"><strong>Pruebas:</strong> ' + esc(s.pruebas_complementarias) + '</p>' : '') +
         (s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.3rem">📝 ' + esc(s.observaciones) + '</p>' : '') +
       '</div>';
     }).join('') +
@@ -1274,6 +1292,7 @@ async function editarSeguimiento(segId, historiaId) {
     document.getElementById('seg-fecha').value         = s.fecha ? s.fecha.split('T')[0] : fechaHoyInput();
     document.getElementById('seg-evolucion').value     = s.evolucion || '';
     document.getElementById('seg-tratamiento').value   = s.tratamiento || '';
+    document.getElementById('seg-pruebas').value       = s.pruebas_complementarias || '';
     document.getElementById('seg-observaciones').value = s.observaciones || '';
     document.getElementById('seg-peso').value          = s.peso_kg || '';
     document.getElementById('seg-temp').value          = s.temperatura_c || '';
@@ -1295,12 +1314,13 @@ async function guardarEditSeguimiento(segId, historiaId) {
   if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
 
   var body = {
-    fecha        : document.getElementById('seg-fecha').value,
+    fecha                  : document.getElementById('seg-fecha').value,
     evolucion,
-    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
-    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
-    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
-    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+    tratamiento            : document.getElementById('seg-tratamiento').value.trim() || null,
+    pruebas_complementarias: document.getElementById('seg-pruebas').value.trim() || null,
+    observaciones          : document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg                : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c          : parseFloat(document.getElementById('seg-temp').value) || null,
   };
 
   try {
@@ -1340,13 +1360,14 @@ async function eliminarSeguimiento(segId, historiaId) {
 }
 
 function abrirModalSeguimiento(historiaId) {
-  document.getElementById('seg-historia-id').value = historiaId;
-  document.getElementById('seg-fecha').value        = fechaHoyInput();
-  document.getElementById('seg-evolucion').value    = '';
-  document.getElementById('seg-tratamiento').value  = '';
-  document.getElementById('seg-observaciones').value= '';
-  document.getElementById('seg-peso').value         = '';
-  document.getElementById('seg-temp').value         = '';
+  document.getElementById('seg-historia-id').value  = historiaId;
+  document.getElementById('seg-fecha').value         = fechaHoyInput();
+  document.getElementById('seg-evolucion').value     = '';
+  document.getElementById('seg-tratamiento').value   = '';
+  document.getElementById('seg-pruebas').value       = '';
+  document.getElementById('seg-observaciones').value = '';
+  document.getElementById('seg-peso').value          = '';
+  document.getElementById('seg-temp').value          = '';
   openModal('modal-seguimiento');
   setTimeout(function() { document.getElementById('seg-evolucion').focus(); }, 150);
 }
@@ -1357,12 +1378,13 @@ async function guardarSeguimiento() {
   if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
 
   var body = {
-    fecha        : document.getElementById('seg-fecha').value,
+    fecha                  : document.getElementById('seg-fecha').value,
     evolucion,
-    tratamiento  : document.getElementById('seg-tratamiento').value.trim() || null,
-    observaciones: document.getElementById('seg-observaciones').value.trim() || null,
-    peso_kg      : parseFloat(document.getElementById('seg-peso').value) || null,
-    temperatura_c: parseFloat(document.getElementById('seg-temp').value) || null,
+    tratamiento            : document.getElementById('seg-tratamiento').value.trim() || null,
+    pruebas_complementarias: document.getElementById('seg-pruebas').value.trim() || null,
+    observaciones          : document.getElementById('seg-observaciones').value.trim() || null,
+    peso_kg                : parseFloat(document.getElementById('seg-peso').value) || null,
+    temperatura_c          : parseFloat(document.getElementById('seg-temp').value) || null,
   };
 
   try {
@@ -1676,6 +1698,63 @@ function crearImgSegura(fotoId, style, onclick) {
 
 function catIcon(cat) {
   return { medicamento:'💊', vacuna:'💉', insumo:'🧰', otro:'📎' }[cat] || '📦';
+}
+
+// ── ELIMINAR VACUNA ───────────────────────────────────────────
+async function eliminarVacuna(id) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta vacuna?',
+    mensaje : 'Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res  = await api('/vacunas/' + id, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Vacuna eliminada.', 'success');
+    cargarVacunas(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+// ── ELIMINAR DESPARASITACIÓN ──────────────────────────────────
+async function eliminarDesparasitacion(id) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar esta desparasitación?',
+    mensaje : 'Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res  = await api('/desparasitaciones/' + id, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Desparasitación eliminada.', 'success');
+    cargarDesparasitaciones(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+// ── ELIMINAR ESTÉTICA ─────────────────────────────────────────
+async function eliminarEstetica(id) {
+  var ok = await vconfirm({
+    titulo  : '¿Eliminar este servicio de estética?',
+    mensaje : 'Se eliminarán también las fotos del servicio. Esta acción no se puede deshacer.',
+    labelOk : '🗑️ Sí, eliminar',
+    tipo    : 'danger',
+  });
+  if (!ok) return;
+  try {
+    var res  = await api('/estetica/' + id, { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { toast(data.message || 'Error al eliminar.', 'danger'); return; }
+    toast('🗑️ Servicio de estética eliminado.', 'success');
+    cargarEstetica(mascotaId);
+  } catch { toast('Error de conexión.', 'danger'); }
 }
 
 // ── Imprimir receta brandeada ─────────────────────────────────
