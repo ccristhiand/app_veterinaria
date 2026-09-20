@@ -21,7 +21,6 @@
                   transition:all .15s;color:var(--ink); }
     .metodo-btn.activo { border-color:var(--green-500);background:var(--green-50);color:var(--green-700); }
     .metodo-btn.pendiente { border-color:#fde68a;background:#fffbeb;color:#b45309; }
-    /* Autocomplete items */
     .ac-factura-list { position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:200;
       background:#fff;border:1.5px solid var(--green-500);border-radius:.85rem;
       box-shadow:0 8px 24px rgba(13,59,46,.12);max-height:200px;overflow-y:auto;
@@ -34,9 +33,138 @@
     #pdf-preview table { width:100%;border-collapse:collapse; }
     #pdf-preview th { background:#166534;color:#fff;padding:.4rem .6rem;text-align:left;font-size:.72rem; }
     #pdf-preview td { padding:.38rem .6rem;border-bottom:1px solid #f0f0f0;font-size:.72rem; }
-    /* descuento-badge en item */
     .desc-badge { font-size:.62rem;font-weight:700;color:#be123c;background:#fff1f2;
                   border:1px solid #fecdd3;border-radius:999px;padding:.1rem .4rem;white-space:nowrap; }
+
+    /* ══ RESPONSIVE MÓVIL ══════════════════════════════════════ */
+
+    /* 1. Header de página: botón full-width en móvil */
+    @media (max-width:639px) {
+      .page-head { flex-direction:column; align-items:stretch; gap:.75rem; }
+      .page-head > .vbtn { width:100%; justify-content:center; }
+    }
+
+    /* 2. Scroll contenedor — usar dvh para evitar bug Safari iOS */
+    .tab-content-scroll {
+      overflow-y:auto;
+      max-height:calc(100vh - 160px);
+      max-height:calc(100dvh - 160px);
+    }
+
+    /* 3. Dashboard: 1 columna en móvil */
+    .dash-graficas { display:grid;grid-template-columns:1fr 1fr;gap:1.3rem; }
+    @media (max-width:639px) { .dash-graficas { grid-template-columns:1fr;gap:.85rem; } }
+
+    /* 4. Filtros lista: wrap limpio en móvil */
+    .filtros-wrap {
+      display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-end;
+    }
+    @media (max-width:479px) {
+      .filtros-wrap { flex-direction:column;align-items:stretch; }
+      .filtros-wrap input, .filtros-wrap select { width:100%; }
+      .filtros-wrap .vbtn { width:100%; justify-content:center; }
+    }
+
+    /* 5. Subtabs: scroll horizontal limpio */
+    .subtabs-wrap {
+      display:flex;gap:.2rem;border-bottom:2px solid var(--line);
+      margin-bottom:1rem;overflow-x:auto;
+      scrollbar-width:none;-ms-overflow-style:none;
+      -webkit-overflow-scrolling:touch;
+    }
+    .subtabs-wrap::-webkit-scrollbar { display:none; }
+    .subtabs-wrap .tab-btn { white-space:nowrap;flex-shrink:0; }
+
+    /* 6. Tabla → cards en móvil */
+    @media (max-width:639px) {
+      .tabla-facturas-wrap { display:none; }
+      #cards-facturas { display:flex;flex-direction:column;gap:.75rem; }
+    }
+    @media (min-width:640px) { #cards-facturas { display:none; } }
+
+    /* 7. Header items en modal: ocultar en móvil */
+    .item-header-grid {
+      display:grid;
+      grid-template-columns:1fr 60px 100px 72px 36px;
+      gap:.4rem;padding:0 .2rem;margin-bottom:.3rem;
+    }
+    @media (max-width:639px) { .item-header-grid { display:none; } }
+
+    /* 8. Cada ítem: stack en móvil */
+    .item-row {
+      display:grid;
+      grid-template-columns:1fr 60px 100px 72px 36px;
+      gap:.4rem;align-items:center;position:relative;
+    }
+    @media (max-width:639px) {
+      .item-row {
+        grid-template-columns:1fr 36px;
+        grid-template-rows:auto auto;
+        gap:.35rem;
+        background:#fafcfa;border:1px solid var(--line);
+        border-radius:.75rem;padding:.6rem .7rem;
+      }
+      .item-row .item-desc-col { grid-column:1;grid-row:1; }
+      .item-row .item-nums-col {
+        grid-column:1;grid-row:2;
+        display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;
+      }
+      .item-row .item-num-input { flex:1;min-width:60px;max-width:90px; }
+      .item-row .item-del-col   { grid-column:2;grid-row:1;justify-self:end;align-self:start; }
+    }
+
+    /* 9. Totales: eliminar gap fijo en móvil */
+    @media (max-width:479px) {
+      #nf-totales .tot-row { gap:1rem !important; }
+      #nf-totales { font-size:.77rem; }
+      #tot-bruto, #tot-sub, #tot-igv, #tot-total,
+      #tot-desc-items, #tot-desc-global { min-width:70px !important; }
+    }
+
+    /* 10. Footer modal ver-fac: grid 2 col en móvil */
+    .ver-fac-footer {
+      display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;
+      padding:1rem 1.3rem;border-top:1px solid var(--line);
+    }
+    @media (max-width:639px) {
+      .ver-fac-footer {
+        display:grid;grid-template-columns:1fr 1fr;gap:.5rem;
+        padding:.85rem 1rem;
+      }
+      .ver-fac-footer .btn-full { grid-column:span 2; }
+    }
+
+    /* 11. Modal ancho en móvil */
+    @media (max-width:639px) {
+      #modal-factura .vmodal,
+      #modal-ver-fac .vmodal { max-width:100%; }
+    }
+
+    /* 12. Pago fila en móvil muy chico */
+    @media (max-width:479px) {
+      .pago-fila { grid-template-columns:1fr 85px 28px; }
+    }
+
+    /* 13. Acciones ver-fac (Registrar Pago, etc.) */
+    #ver-fac-acciones { display:flex;gap:.5rem;flex-wrap:wrap; }
+    @media (max-width:479px) {
+      #ver-fac-acciones .vbtn { width:100%; justify-content:center; }
+    }
+
+    /* 14. Bloque empresa factura: 1 col en móvil */
+    @media (max-width:479px) {
+      #bloque-empresa .grid { grid-template-columns:1fr !important; }
+    }
+
+    /* 15. Gráfico 7 días: reducir altura en móvil */
+    @media (max-width:479px) {
+      #grafico-7dias { height:100px !important; }
+    }
+
+    /* 16. Stats grid auto-fit mínimo más chico en móvil */
+    @media (max-width:479px) {
+      .stats-grid { grid-template-columns:1fr 1fr !important; }
+    }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -61,7 +189,7 @@
   </div>
 
   <!-- ── TAB DASHBOARD ── -->
-  <div id="contenido-dashboard" style="overflow-y:auto;max-height:calc(100vh - 160px)">
+  <div id="contenido-dashboard" class="tab-content-scroll">
     <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
       <div><label class="vlabel">Desde</label><input type="date" id="d-desde" class="vinput" style="width:auto"/></div>
       <div><label class="vlabel">Hasta</label><input type="date" id="d-hasta" class="vinput" style="width:auto"/></div>
@@ -70,8 +198,7 @@
       <button onclick="setPeriodo('semana')" class="vbtn vbtn-ghost">Esta semana</button>
       <button onclick="setPeriodo('mes')" class="vbtn vbtn-ghost">Este mes</button>
     </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.3rem">
+    <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.3rem">
       <div class="vcard vcard-pad">
         <p style="font-size:.68rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Ingresos del período</p>
         <p style="font-size:1.6rem;font-weight:800;color:#15803d;margin-top:.3rem" id="stat-ingresos">S/. 0.00</p>
@@ -89,7 +216,7 @@
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.3rem">
+    <div class="dash-graficas">
       <div class="vcard vcard-pad">
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:1rem">📈 Ingresos últimos 7 días</h3>
         <div id="grafico-7dias" style="display:flex;align-items:flex-end;gap:.5rem;height:140px;padding-top:.5rem"></div>
@@ -108,8 +235,8 @@
   </div>
 
   <!-- ── TAB LISTA ── -->
-  <div id="contenido-lista" style="display:none;overflow-y:auto;max-height:calc(100vh - 160px)">
-    <div class="vcard vcard-pad" style="margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+  <div id="contenido-lista" class="tab-content-scroll" style="display:none">
+    <div class="vcard vcard-pad filtros-wrap" style="margin-bottom:1rem">
       <div><label class="vlabel">Fecha</label><input type="date" id="f-fecha" class="vinput" style="width:auto"/></div>
       <div>
         <label class="vlabel">Tipo</label>
@@ -123,7 +250,7 @@
       <button onclick="limpiarFiltros()" class="vbtn vbtn-ghost">Limpiar</button>
     </div>
 
-    <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1rem;overflow-x:auto">
+    <div class="subtabs-wrap">
       <button class="tab-btn active" id="subtab-todos"     onclick="mostrarSubTab('todos')">📋 Todos</button>
       <button class="tab-btn"       id="subtab-pendiente"  onclick="mostrarSubTab('pendiente')">⏳ Por cobrar</button>
       <button class="tab-btn"       id="subtab-pagado"     onclick="mostrarSubTab('pagado')">✅ Pagados</button>
@@ -145,7 +272,7 @@
       </button>
     </div>
 
-    <div class="vcard">
+    <div class="vcard tabla-facturas-wrap">
       <div style="overflow-x:auto">
         <table class="vtable">
           <thead>
@@ -162,6 +289,8 @@
         </table>
       </div>
     </div>
+    <!-- Cards móvil -->
+    <div id="cards-facturas"></div>
   </div>
 
 </div><!-- /main-content -->
@@ -176,7 +305,7 @@
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
 
       <!-- Tipo y fecha -->
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="vlabel">Tipo de documento</label>
           <select id="nf-tipo" class="vinput" onchange="onTipoChange()">
@@ -281,7 +410,7 @@
           <button onclick="addItem()" class="vbtn vbtn-primary" style="font-size:.78rem;padding:.4rem .9rem">＋ Agregar ítem</button>
         </div>
         <!-- Header de columnas — ahora incluye Desc. % -->
-        <div style="display:grid;grid-template-columns:1fr 60px 100px 72px 36px;gap:.4rem;padding:0 .2rem;margin-bottom:.3rem">
+        <div class="item-header-grid">
           <p style="font-size:.63rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em">Descripción</p>
           <p style="font-size:.63rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em;text-align:center">Cant.</p>
           <p style="font-size:.63rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em;text-align:right">P. Unit.</p>
@@ -406,27 +535,27 @@
       <div id="ver-fac-sunat-links" style="display:none;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem"></div>
       <div id="pdf-preview" style="border:1px solid var(--line);border-radius:.9rem;padding:1.4rem;background:#fff"></div>
     </div>
-    <div class="vmodal-foot">
+    <div class="ver-fac-footer">
       <button onclick="closeModal('modal-ver-fac')" class="vbtn vbtn-ghost">Cerrar</button>
       <button onclick="imprimirTicket()" class="vbtn vbtn-ghost"
         style="display:inline-flex;align-items:center;gap:.4rem">
-        🖨️ Ticket 80mm
+        🖨️ Ticket
       </button>
       <button onclick="descargarImagen()" class="vbtn vbtn-ghost"
         style="display:inline-flex;align-items:center;gap:.4rem">
-        🖼️ Guardar imagen
+        🖼️ Imagen
       </button>
       <button onclick="compartirWhatsApp()" class="vbtn"
         style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;
-        border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;
+        border:none;border-radius:.85rem;font-size:.84rem;
         font-weight:600;cursor:pointer;font-family:inherit;
         display:inline-flex;align-items:center;gap:.5rem">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
         </svg>
-        Enviar por WhatsApp
+        WA
       </button>
-      <button onclick="descargarPDF()" class="vbtn vbtn-primary">⬇️ Descargar PDF</button>
+      <button onclick="descargarPDF()" class="vbtn vbtn-primary btn-full">⬇️ Descargar PDF</button>
     </div>
   </div>
 </div>
@@ -780,7 +909,9 @@ function badgeSUNAT(f) {
 
 async function cargarFacturas() {
   var tbody = document.getElementById('tbody-facturas');
+  var cardsEl = document.getElementById('cards-facturas');
   tbody.innerHTML='<tr><td colspan="9"><div class="vempty"><div class="vspinner"></div></div></td></tr>';
+  if (cardsEl) cardsEl.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
   try {
     var fecha  = document.getElementById('f-fecha').value;
     var tipo   = document.getElementById('f-tipo').value;
@@ -793,7 +924,11 @@ async function cargarFacturas() {
     _rowsCache = rows;
     if (_subTabActual === 'emitido') rows = rows.filter(f=>f.sunat_estado==='0');
     if (_subTabActual === 'nota')    rows = rows.filter(f=>f.tipo==='nota_credito');
-    if (!rows.length) { tbody.innerHTML='<tr><td colspan="9"><div class="vempty">Sin documentos</div></td></tr>'; return; }
+    if (!rows.length) {
+      tbody.innerHTML='<tr><td colspan="9"><div class="vempty">Sin documentos</div></td></tr>';
+      if (cardsEl) cardsEl.innerHTML = '<div class="vempty"><span class="icon">🧾</span><p>Sin documentos</p></div>';
+      return;
+    }
     tbody.innerHTML = rows.map(f=>{
       var estadoBadge =
         f.estado==='pagado'   ? '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Pagado</span>' :
@@ -822,6 +957,42 @@ async function cargarFacturas() {
         '</td>' +
       '</tr>';
     }).join('');
+
+    // ── Cards para móvil ─────────────────────────────────────
+    var cardsEl = document.getElementById('cards-facturas');
+    if (cardsEl) {
+      cardsEl.innerHTML = rows.map(f => {
+        var estadoColor = f.estado==='pagado' ? '#15803d' : f.estado==='pendiente' ? '#b45309' : '#be123c';
+        var estadoBg    = f.estado==='pagado' ? '#f0fdf4' : f.estado==='pendiente' ? '#fffbeb' : '#fff1f2';
+        var estadoLabel = f.estado==='pagado' ? '✅ Pagado' : f.estado==='pendiente' ? '⏳ Pendiente' : '❌ Anulado';
+        var tieneDesc   = (parseFloat(f.descuento_items||0)+parseFloat(f.descuento_global||0)) > 0;
+        return `<div style="background:#fff;border:1px solid var(--line);border-radius:1rem;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.6rem">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+            <div>
+              <span style="font-family:monospace;font-size:.82rem;font-weight:700;color:#166534">${esc(f.numero)}</span>
+              <span style="font-size:.65rem;background:${f.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${f.tipo==='factura'?'#1d4ed8':'#15803d'};padding:.1rem .4rem;border-radius:999px;font-weight:700;margin-left:.3rem">${f.tipo}</span>
+            </div>
+            <span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:${estadoBg};color:${estadoColor};border:1px solid ${estadoBg}">${estadoLabel}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <p style="font-size:.85rem;font-weight:700">${esc(f.propietario_nombre||'—')}</p>
+              ${f.mascota_nombre ? `<p style="font-size:.72rem;color:var(--ink-faint)">${esc(f.mascota_nombre)}</p>` : ''}
+              <p style="font-size:.72rem;color:var(--ink-faint)">${fDate(f.fecha)}</p>
+            </div>
+            <div style="text-align:right">
+              <p style="font-size:1.15rem;font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</p>
+              ${tieneDesc ? '<p style="font-size:.62rem;color:#be123c;font-weight:700">con descuento</p>' : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;padding-top:.5rem;border-top:1px solid var(--line)">
+            <button class="vbtn vbtn-ghost" onclick="verFactura(${f.id})" style="font-size:.75rem;padding:.38rem .75rem;flex:1">👁️ Ver</button>
+            ${f.estado==='pendiente' ? `<button class="vbtn vbtn-primary" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.75rem;padding:.38rem .75rem;flex:1">💳 Cobrar</button>` : ''}
+            ${f.estado!=='anulado' && !f.sunat_estado ? `<button class="vbtn" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},false)" style="font-size:.75rem;padding:.38rem .75rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;flex:1">🚫 Anular</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
   } catch(e) { console.error(e); tbody.innerHTML='<tr><td colspan="9"><div class="vempty">Error</div></td></tr>'; }
 }
 
@@ -959,35 +1130,70 @@ function addItem(desc, cant, pu) {
   desc = desc || ''; cant = cant || 1; pu = pu || 0;
   var id  = itemN++;
   var div = document.createElement('div');
-  div.id  = 'item-'+id;
-  // columnas: desc | cant | precio | desc% | ✕
-  div.style.cssText = 'display:grid;grid-template-columns:1fr 60px 100px 72px 36px;gap:.4rem;align-items:center;position:relative';
+  div.id        = 'item-'+id;
+  div.className = 'item-row';
   div.innerHTML =
-    '<div style="position:relative">' +
+    '<div class="item-desc-col" style="position:relative">' +
       '<input type="text" placeholder="Busca servicio o escribe…" class="vinput" data-f="desc"' +
         ' style="font-size:.8rem;width:100%" value="'+esc(desc)+'"' +
         ' oninput="calcularTotales();buscarItemAC(this,'+id+')"/>' +
       '<ul id="ac-'+id+'" class="ac-factura-list" style="display:none"></ul>' +
     '</div>' +
-    '<input type="number" placeholder="1" min="0.5" step="0.5"' +
-      ' class="vinput" data-f="cant" style="font-size:.8rem;text-align:center" value="'+cant+'"' +
-      ' oninput="calcularTotales()"/>' +
-    '<input type="number" placeholder="0.00" min="0" step="0.50"' +
-      ' class="vinput" data-f="pu" style="font-size:.8rem;text-align:right" value="'+(pu||'')+'"' +
-      ' oninput="calcularTotales()"/>' +
-    '<div style="position:relative;display:flex;align-items:center;gap:.2rem">' +
-      '<input type="number" placeholder="0" min="0" max="100" step="0.5"' +
-        ' class="vinput" data-f="dpct" title="Descuento por ítem (%)"' +
-        ' style="font-size:.78rem;text-align:center;border-color:#fecdd3;padding:.4rem .3rem" value="0"' +
+    '<div class="item-nums-col">' +
+      '<input type="number" placeholder="Cant" min="0.5" step="0.5"' +
+        ' class="vinput item-num-input" data-f="cant" title="Cantidad"' +
+        ' style="font-size:.8rem;text-align:center" value="'+cant+'"' +
         ' oninput="calcularTotales()"/>' +
-      '<span style="font-size:.72rem;color:#be123c;font-weight:700">%</span>' +
-      '<input type="hidden" data-f="inv-id" value="0"/>' +
+      '<input type="number" placeholder="Precio" min="0" step="0.50"' +
+        ' class="vinput item-num-input" data-f="pu" title="Precio unitario"' +
+        ' style="font-size:.8rem;text-align:right" value="'+(pu||'')+'"' +
+        ' oninput="calcularTotales()"/>' +
+      '<div style="display:flex;align-items:center;gap:.2rem;flex-shrink:0">' +
+        '<input type="number" placeholder="0" min="0" max="100" step="0.5"' +
+          ' class="vinput item-num-input" data-f="dpct" title="Descuento %"' +
+          ' style="font-size:.78rem;text-align:center;border-color:#fecdd3;padding:.4rem .3rem;max-width:58px" value="0"' +
+          ' oninput="calcularTotales()"/>' +
+        '<span style="font-size:.72rem;color:#be123c;font-weight:700">%</span>' +
+        '<input type="hidden" data-f="inv-id" value="0"/>' +
+      '</div>' +
     '</div>' +
-    '<button onclick="document.getElementById(\'item-'+id+'\').remove();calcularTotales()"' +
-      ' style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:.2rem">✕</button>';
+    '<div class="item-del-col">' +
+      '<button onclick="document.getElementById(\'item-'+id+'\').remove();calcularTotales()"' +
+        ' style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1.1rem;padding:.2rem">✕</button>' +
+    '</div>';
   document.getElementById('nf-items').appendChild(div);
   div.querySelector('[data-f="pu"]').addEventListener('blur', calcularTotales);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 var _acTimers = {};
 var _catColors = {
