@@ -1919,8 +1919,9 @@ async function compartirWhatsApp() {
 
   // ── Intentar enviar por gateway WA si está activo ────────────
   try {
-    var cfgRes = await api('/wa/status');
-    var waActivo = cfgRes && cfgRes.ok && (await cfgRes.json()).conectado === true;
+    var cfgRes  = await api('/wa/estado');
+    var waData  = cfgRes && cfgRes.ok ? await cfgRes.json() : null;
+    var waActivo = waData?.data?.estado === 'conectado';
 
     if (waActivo && telPE) {
       toast('Generando imagen…','info',2000);
