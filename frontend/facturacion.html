@@ -96,12 +96,17 @@
     }
     @media (max-width:639px) { .item-header-grid { display:none; } }
 
-    /* 8. Cada ítem: stack en móvil */
+    /* 8. Cada ítem: 5 columnas en desktop, stack en móvil */
     .item-row {
       display:grid;
       grid-template-columns:1fr 60px 100px 72px 36px;
       gap:.4rem;align-items:center;position:relative;
     }
+    /* En desktop, item-nums-col e item-del-col son transparentes —
+       sus hijos participan directamente en el grid de 5 columnas */
+    .item-nums-col { display:contents; }
+    .item-del-col  { display:contents; }
+
     @media (max-width:639px) {
       .item-row {
         grid-template-columns:1fr 36px;
@@ -112,11 +117,15 @@
       }
       .item-row .item-desc-col { grid-column:1;grid-row:1; }
       .item-row .item-nums-col {
+        display:flex;
         grid-column:1;grid-row:2;
-        display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;
+        gap:.35rem;align-items:center;flex-wrap:wrap;
       }
       .item-row .item-num-input { flex:1;min-width:60px;max-width:90px; }
-      .item-row .item-del-col   { grid-column:2;grid-row:1;justify-self:end;align-self:start; }
+      .item-row .item-del-col {
+        display:flex;
+        grid-column:2;grid-row:1;justify-self:end;align-self:start;
+      }
     }
 
     /* 9. Totales: eliminar gap fijo en móvil */
@@ -1919,16 +1928,22 @@ async function compartirWhatsApp() {
 
   // ── Intentar enviar por gateway WA si está activo ────────────
   try {
-    var cfgRes  = await api('/wa/estado');
-    var waData  = cfgRes && cfgRes.ok ? await cfgRes.json() : null;
+    var cfgRes = await api('/wa/estado');
+    var waData = cfgRes && cfgRes.ok ? await cfgRes.json() : null;
     var waActivo = waData?.data?.estado === 'conectado';
 
-    if (waActivo && telPE) {
+    if (waActivo) {
+      if (!telPE) {
+        toast('El cliente no tiene teléfono registrado.','warning',3000);
+        if (btn) { btn.disabled=false; btn.innerHTML=textoOriginal; }
+        return;
+      }
+
       toast('Generando imagen…','info',2000);
       var canvas = await capturarImagen();
-      if (!canvas) throw new Error('Sin imagen');
+      if (!canvas) throw new Error('Error al generar imagen');
 
-      var base64 = canvas.toDataURL('image/png').split(',')[1];
+      var base64  = canvas.toDataURL('image/png').split(',')[1];
       var mensaje = '🐾 *Comprobante de pago*\n\n' +
         '📄 *'+(f.tipo==='factura'?'Factura':'Boleta')+'*: '+f.numero+'\n' +
         '📅 Fecha: '+fDate(f.fecha)+'\n' +
@@ -1936,9 +1951,11 @@ async function compartirWhatsApp() {
         '✅ Estado: '+(f.estado==='pagado'?'PAGADO':'PENDIENTE')+'\n\n' +
         '¡Gracias por su preferencia! 🙏';
 
+      if (btn) btn.textContent = 'Enviando…';
+
       var res = await api('/wa/enviar', {
-        method : 'POST',
-        body   : {
+        method: 'POST',
+        body: {
           telefono       : telPE,
           mensaje,
           imagen_base64  : base64,
@@ -1947,21 +1964,27 @@ async function compartirWhatsApp() {
         }
       });
 
-      if (res && res.ok) {
-        toast('✅ Comprobante enviado por WhatsApp','success',4000);
+      var resData = res ? await res.json().catch(()=>({})) : {};
+
+      if (res && res.ok && resData.success) {
+        toast('✅ Comprobante enviado por WhatsApp a +'+telPE,'success',5000);
         if (btn) { btn.disabled=false; btn.innerHTML=textoOriginal; }
         return;
       }
-      // Si falla el gateway, caer al fallback
-      var errData = res ? await res.json().catch(()=>({})) : {};
-      toast((errData.message||'No se pudo enviar por WA')+' — usando enlace directo','warning',4000);
+
+      // Error conocido del backend — mostrar y no hacer fallback
+      var errMsg = resData.message || ('Error '+res?.status);
+      toast('❌ No se pudo enviar por WA: '+errMsg,'danger',6000);
+      if (btn) { btn.disabled=false; btn.innerHTML=textoOriginal; }
+      return;
     }
   } catch(e) {
-    console.warn('WA gateway no disponible, usando fallback:', e.message);
+    console.error('WA gateway error:', e.message);
+    // Solo si es error de red/conexión caemos al fallback
   }
 
   // ── Fallback: descargar imagen + abrir wa.me ─────────────────
-  toast('Preparando imagen para WhatsApp…','info',2500);
+  toast('WhatsApp no conectado — usando enlace directo…','info',2500);
   var canvas2 = await capturarImagen();
   if (!canvas2) {
     toast('Error al generar la imagen.','danger');
@@ -1969,14 +1992,9 @@ async function compartirWhatsApp() {
     return;
   }
   canvas2.toBlob(async (blob) => {
-    // Intentar Web Share API (móvil nativo)
     if (navigator.share && navigator.canShare) {
       var file = new File([blob], f.numero+'.png', { type:'image/png' });
-      var shareData = {
-        title : 'Comprobante '+f.numero,
-        text  : 'Hola 👋, te adjunto tu comprobante '+f.numero,
-        files : [file],
-      };
+      var shareData = { title:'Comprobante '+f.numero, text:'Hola 👋, te adjunto tu comprobante '+f.numero, files:[file] };
       if (navigator.canShare(shareData)) {
         try {
           await navigator.share(shareData);
@@ -1986,22 +2004,18 @@ async function compartirWhatsApp() {
         } catch(e) { if (e.name !== 'AbortError') console.error(e); }
       }
     }
-    // Descargar + abrir wa.me
     var link = document.createElement('a');
     link.download = f.numero+'.png';
     link.href     = canvas2.toDataURL('image/png');
     link.click();
     var msg = encodeURIComponent(
-      'Hola 👋, te compartimos tu comprobante de pago:\n\n' +
+      'Hola 👋, te compartimos tu comprobante:\n\n' +
       '📄 *'+(f.tipo==='factura'?'Factura':'Boleta')+'*: '+f.numero+'\n' +
       '📅 Fecha: '+fDate(f.fecha)+'\n' +
-      '💰 Total: S/. '+parseFloat(f.total).toFixed(2)+'\n' +
-      '✅ Estado: '+f.estado.toUpperCase()+'\n\n' +
-      'La imagen del comprobante ha sido descargada. Por favor adjúntala a este chat.'
+      '💰 Total: S/. '+parseFloat(f.total).toFixed(2)+'\n\n' +
+      'La imagen ha sido descargada, por favor adjúntala.'
     );
-    var waUrl = telPE
-      ? 'https://wa.me/'+telPE+'?text='+msg
-      : 'https://wa.me/?text='+msg;
+    var waUrl = telPE ? 'https://wa.me/'+telPE+'?text='+msg : 'https://wa.me/?text='+msg;
     setTimeout(() => window.open(waUrl,'_blank'), 800);
     toast('✅ Imagen descargada · Abriendo WhatsApp…','success',5000);
     if (btn) { btn.disabled=false; btn.innerHTML=textoOriginal; }
