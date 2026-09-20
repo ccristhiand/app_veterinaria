@@ -539,7 +539,7 @@ CREATE TABLE IF NOT EXISTS wa_campanas (
                     COMMENT 'Nombre del blob en Azure para gestión',
   segmento          ENUM('todos','por_especie','vacunas_vencidas','citas_semana','sin_citas_60d','personalizado')
                     NOT NULL DEFAULT 'todos',
-  segmento_valor    VARCHAR(50)    NULL,
+  segmento_valor    TEXT   NULL,
   estado            ENUM('borrador','programada','enviando','pausada','completada','cancelada')
                     NOT NULL DEFAULT 'borrador',
   total             INT UNSIGNED   NOT NULL DEFAULT 0,
