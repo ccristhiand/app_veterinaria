@@ -19,6 +19,7 @@
       <p id="page-head-sub">Expedientes médicos de los pacientes</p>
     </div>
     <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button id="btn-volver-historico" onclick="volverHistorico()" class="vbtn vbtn-ghost" style="display:none">← Histórico</button>
       <button onclick="openModal('modal-buscar')" class="vbtn vbtn-ghost">🔍 Buscar Paciente</button>
       <button id="btn-nueva-consulta" onclick="openModal('modal-consulta')" class="vbtn vbtn-primary" style="display:none">➕ Nueva Consulta</button>
       <button id="btn-nueva-vacuna" onclick="abrirModalVacuna()" class="vbtn" style="display:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:.62rem 1.25rem;border-radius:.85rem;font-size:.84rem;font-weight:600;cursor:pointer;align-items:center;gap:.5rem">💉 Registrar Vacuna</button>
@@ -36,11 +37,53 @@
     <span style="background:#d1fae5;color:#047857;font-size:.7rem;font-weight:700;padding:.4rem .9rem;border-radius:999px;border:1px solid #6ee7b7;white-space:nowrap">✓ Cita vinculada</span>
   </div>
 
-  <div id="vacio" class="vcard" style="padding:4.5rem 2rem;text-align:center">
-    <div style="width:90px;height:90px;margin:0 auto 1.4rem;border-radius:50%;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.6rem">📋</div>
-    <h3 style="font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:700;margin-bottom:.5rem">Expediente Médico</h3>
-    <p style="font-size:.85rem;color:var(--ink-faint);margin-bottom:1.6rem">Busca un paciente por el <strong>DNI o nombre del propietario</strong>,<br/>o ve al panel de <a href="citas.html" style="color:var(--green-600);font-weight:600">Citas</a> y usa el botón <strong>🩺 Atender</strong>.</p>
-    <button onclick="openModal('modal-buscar')" class="vbtn vbtn-primary" style="margin:0 auto">🔍 Buscar Paciente</button>
+  <div id="vacio">
+    <!-- Buscar paciente (compacto) -->
+    <div class="vcard vcard-pad" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.3rem">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.7rem;flex-shrink:0">📋</div>
+      <div style="flex:1;min-width:220px">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700">Expediente Médico</h3>
+        <p style="font-size:.8rem;color:var(--ink-faint);margin-top:.15rem">Busca un paciente por el <strong>DNI o nombre del propietario</strong>, o haz click en una atención del histórico.</p>
+      </div>
+      <button onclick="openModal('modal-buscar')" class="vbtn vbtn-primary">🔍 Buscar Paciente</button>
+    </div>
+
+    <!-- Histórico general de atenciones y seguimientos (js/historia-historico.js) -->
+    <div class="vcard vcard-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700">🗂️ Histórico de atenciones</h3>
+        <div id="hh-contadores" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1.1rem">
+        <div id="hh-chips" style="display:flex;gap:.35rem;flex-wrap:wrap">
+          <button data-rango="hoy"   onclick="hhSetRango('hoy')"   class="hh-chip">Hoy</button>
+          <button data-rango="ayer"  onclick="hhSetRango('ayer')"  class="hh-chip">Ayer</button>
+          <button data-rango="7d"    onclick="hhSetRango('7d')"    class="hh-chip">7 días</button>
+          <button data-rango="30d"   onclick="hhSetRango('30d')"   class="hh-chip">30 días</button>
+          <button data-rango="rango" onclick="hhSetRango('rango')" class="hh-chip">📅 Rango</button>
+        </div>
+        <div id="hh-rango-box" style="display:none;gap:.5rem;align-items:center">
+          <input id="hh-desde" type="date" class="vinput" style="width:auto" onchange="hhCargar(true)"/>
+          <span style="font-size:.75rem;color:var(--ink-faint)">a</span>
+          <input id="hh-hasta" type="date" class="vinput" style="width:auto" onchange="hhCargar(true)"/>
+        </div>
+        <select id="hh-tipo" class="vinput" style="width:auto" onchange="hhCargar(true)">
+          <option value="todos">Atenciones y seguimientos</option>
+          <option value="atencion">🩺 Solo atenciones</option>
+          <option value="seguimiento">🔄 Solo seguimientos</option>
+        </select>
+        <select id="hh-vet" class="vinput" style="width:auto" onchange="hhCargar(true)">
+          <option value="">Todos los veterinarios</option>
+        </select>
+        <input id="hh-q" type="text" class="vinput" style="flex:1;min-width:180px" placeholder="Mascota, propietario o DNI…" oninput="hhBuscarDebounce()"/>
+      </div>
+
+      <div id="hh-lista"></div>
+    </div>
+    <style>
+      .hh-chip { background:#fff;border:1px solid var(--line);border-radius:999px;padding:.4rem .85rem;font-size:.76rem;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit;transition:all .15s }
+    </style>
   </div>
 
   <div id="panel" style="display:none;flex-direction:column;gap:1.3rem">
@@ -579,6 +622,7 @@
 
 <script src="js/examenes.js"></script>
 <script src="js/historia.js"></script>
+<script src="js/historia-historico.js"></script>
 
 <!-- Modal Seguimiento -->
 <div id="modal-seguimiento" class="hidden vmodal-backdrop">

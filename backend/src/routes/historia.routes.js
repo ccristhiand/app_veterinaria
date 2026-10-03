@@ -34,6 +34,111 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/historia/recientes ────────────────────────────────
+// Histórico general de atenciones + seguimientos (todas las mascotas) por rango de fechas.
+//   ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD   (obligatorios)
+//   &tipo=todos|atencion|seguimiento     (opcional, por defecto todos)
+//   &veterinario_id=X                    (opcional)
+//   &q=texto                             (opcional: mascota, propietario o DNI)
+//   &limit=50&offset=0
+// Va ANTES de '/:id' para que Express no tome "recientes" como un id.
+router.get('/recientes', async (req, res, next) => {
+  try {
+    const reFecha = /^\d{4}-\d{2}-\d{2}$/;
+    let { desde, hasta, tipo = 'todos', veterinario_id, q = '' } = req.query;
+    if (!reFecha.test(desde || '') || !reFecha.test(hasta || '')) {
+      return res.status(422).json({ success: false, message: 'desde y hasta son requeridos (YYYY-MM-DD).' });
+    }
+    if (desde > hasta) [desde, hasta] = [hasta, desde];
+    const limit  = Math.min(parseInt(req.query.limit)  || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const vetId  = parseInt(veterinario_id) || null;
+    const texto  = String(q || '').trim();
+
+    // Filtros comunes (se aplican igual a atenciones y seguimientos)
+    const filtros = (aliasFecha, aliasVet) => {
+      let sql = ` AND ${aliasFecha} >= ? AND ${aliasFecha} < DATE_ADD(?, INTERVAL 1 DAY)`;
+      const params = [desde, hasta];
+      if (vetId) { sql += ` AND ${aliasVet} = ?`; params.push(vetId); }
+      if (texto) {
+        sql += ` AND (m.nombre LIKE ? OR p.nombre LIKE ? OR p.apellido LIKE ?
+                  OR CONCAT(p.nombre,' ',p.apellido) LIKE ? OR p.dni LIKE ?)`;
+        const like = '%' + texto + '%';
+        params.push(like, like, like, like, like);
+      }
+      return { sql, params };
+    };
+
+    const fa = filtros('h.fecha', 'h.veterinario_id');
+    const fs = filtros('s.fecha', 's.veterinario_id');
+
+    const sqlAtenciones = `
+      SELECT 'atencion' AS tipo, h.id AS historia_id, NULL AS seguimiento_id, h.fecha,
+             h.motivo, h.diagnostico AS detalle, h.cita_id,
+             h.mascota_id, m.nombre AS mascota_nombre, m.especie, m.foto_updated_at,
+             CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
+             h.veterinario_id, u.nombre AS veterinario_nombre
+      FROM historia_clinica h
+      JOIN mascotas m     ON m.id = h.mascota_id
+      JOIN propietarios p ON p.id = m.propietario_id
+      JOIN usuarios u     ON u.id = h.veterinario_id
+      WHERE 1=1 ${fa.sql}`;
+
+    const sqlSeguimientos = `
+      SELECT 'seguimiento' AS tipo, s.historia_id, s.id AS seguimiento_id, s.fecha,
+             h.motivo, s.evolucion AS detalle, h.cita_id,
+             h.mascota_id, m.nombre AS mascota_nombre, m.especie, m.foto_updated_at,
+             CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
+             s.veterinario_id, u.nombre AS veterinario_nombre
+      FROM historia_seguimientos s
+      JOIN historia_clinica h ON h.id = s.historia_id
+      JOIN mascotas m         ON m.id = h.mascota_id
+      JOIN propietarios p     ON p.id = m.propietario_id
+      JOIN usuarios u         ON u.id = s.veterinario_id
+      WHERE 1=1 ${fs.sql}`;
+
+    let sql, params;
+    if (tipo === 'atencion')         { sql = sqlAtenciones;   params = [...fa.params]; }
+    else if (tipo === 'seguimiento') { sql = sqlSeguimientos; params = [...fs.params]; }
+    else { sql = sqlAtenciones + ' UNION ALL ' + sqlSeguimientos; params = [...fa.params, ...fs.params]; }
+
+    // Pedimos 1 más para saber si hay más páginas
+    const rows = await req.db.query(
+      `SELECT * FROM (${sql}) t ORDER BY t.fecha DESC, t.historia_id DESC LIMIT ${limit + 1} OFFSET ${offset}`,
+      params
+    );
+    const hayMas = rows.length > limit;
+    if (hayMas) rows.pop();
+
+    // Totales del rango (sin filtro de tipo) para los contadores
+    const [{ total: totalAtenciones }] = await req.db.query(
+      `SELECT COUNT(*) AS total FROM (${sqlAtenciones}) a`, fa.params);
+    const [{ total: totalSeguimientos }] = await req.db.query(
+      `SELECT COUNT(*) AS total FROM (${sqlSeguimientos}) b`, fs.params);
+
+    // Veterinarios que atendieron en el rango (para el filtro)
+    const fr = [desde, hasta, desde, hasta];
+    const veterinarios = await req.db.query(
+      `SELECT DISTINCT u.id, u.nombre FROM usuarios u
+       WHERE u.id IN (
+         SELECT veterinario_id FROM historia_clinica
+          WHERE fecha >= ? AND fecha < DATE_ADD(?, INTERVAL 1 DAY)
+         UNION
+         SELECT veterinario_id FROM historia_seguimientos
+          WHERE fecha >= ? AND fecha < DATE_ADD(?, INTERVAL 1 DAY)
+       )
+       ORDER BY u.nombre`, fr);
+
+    return res.json({
+      success: true,
+      data   : rows,
+      hay_mas: hayMas,
+      totales: { atenciones: totalAtenciones, seguimientos: totalSeguimientos },
+      veterinarios,
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/v1/historia/:id
 router.get('/:id', async (req, res, next) => {
   try {

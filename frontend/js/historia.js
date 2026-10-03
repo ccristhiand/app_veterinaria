@@ -218,6 +218,8 @@ async function cargarHistoria(id) {
   document.getElementById('btn-nueva-consulta').style.display  = 'inline-flex';
   document.getElementById('btn-nueva-vacuna').style.display    = 'inline-flex';
   document.getElementById('btn-nueva-estetica').style.display  = 'inline-flex';
+  var _btnVolverHist = document.getElementById('btn-volver-historico');
+  if (_btnVolverHist) _btnVolverHist.style.display = 'inline-flex';
   document.getElementById('consultas').innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div>';
   try {
     const rm = await api('/mascotas/'+id);
