@@ -159,7 +159,7 @@
         <!-- Mascota seleccionada -->
         <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.8rem;
           padding:.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem">
-          <span style="font-size:1.6rem" id="masc-sel-icon">🐾</span>
+          <span style="width:44px;height:44px;border-radius:.85rem;background:#fff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;overflow:hidden;flex-shrink:0" id="masc-sel-icon">🐾</span>
           <div style="flex:1">
             <p style="font-weight:700;font-size:.9rem" id="masc-sel-nombre">—</p>
             <p style="font-size:.72rem;color:var(--ink-soft)" id="masc-sel-info">—</p>
@@ -592,13 +592,15 @@ async function seleccionarProp(id, nombre, apellido, dni, telefono) {
     var res      = await api('/propietarios/'+id);
     if (!res) return;
     var mascotas = (await res.json()).data?.mascotas || [];
+    _mascotasCitaCache = {};
+    mascotas.forEach(function(m) { _mascotasCitaCache[m.id] = m; });
     document.getElementById('mascotas-lista').innerHTML = mascotas.length
       ? mascotas.map(m =>
           '<button onclick="seleccionarMascota('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
           'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
           'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
           'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
-            '<span style="font-size:1.5rem">'+badgeEspecie(m.especie)+'</span>' +
+            '<span style="width:40px;height:40px;border-radius:.8rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden;flex-shrink:0">'+mascotaFotoHTML(m)+'</span>' +
             '<div style="flex:1"><p style="font-weight:700;font-size:.85rem">'+esc(m.nombre)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'Sin raza')+' · '+esc(m.sexo)+'</p></div>' +
             (m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3">⚠️ Alerta</span>':'') +
           '</button>'
@@ -607,12 +609,14 @@ async function seleccionarProp(id, nombre, apellido, dni, telefono) {
   } catch { document.getElementById('mascotas-lista').innerHTML = '<div style="font-size:.78rem;color:#e11d48">Error al cargar mascotas</div>'; }
 }
 
+var _mascotasCitaCache = {}; // id → mascota (para mostrar su foto al seleccionarla)
+
 function seleccionarMascota(id, nombre, especie, raza) {
   mascotaSel = { id, nombre, especie };
   document.getElementById('paso-mascota').style.display      = 'none';
   document.getElementById('paso-cita').style.display         = 'block';
   document.getElementById('btn-guardar-cita').style.display  = 'inline-flex';
-  document.getElementById('masc-sel-icon').textContent       = badgeEspecie(especie);
+  document.getElementById('masc-sel-icon').innerHTML         = mascotaFotoHTML(_mascotasCitaCache[id] || { especie: especie });
   document.getElementById('masc-sel-nombre').textContent     = nombre;
   document.getElementById('masc-sel-info').textContent       = especie+' · '+raza;
 }

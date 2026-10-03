@@ -92,6 +92,22 @@ function procesarUpload(req, res) {
   });
 }
 
+/** Envía la imagen del blob al cliente (lo usa también el carnet público). */
+async function pipeFotoMascota(res, blobName) {
+  const cont = await getContainerClient();
+  if (!cont) return res.status(500).json({ success: false, message: 'Azure Storage no configurado.' });
+  try {
+    const download = await cont.getBlobClient(blobName).download();
+    res.setHeader('Content-Type', download.contentType || 'image/jpeg');
+    // El frontend pide ?v=<foto_updated_at>, así que se puede cachear sin miedo
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    download.readableStreamBody.pipe(res);
+  } catch (err) {
+    if (err.statusCode === 404) return res.status(404).json({ success: false, message: 'Foto no encontrada.' });
+    throw err;
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════
 
 // GET /api/v1/mascotas/:id/foto
@@ -99,19 +115,8 @@ router.get('/:id/foto', async (req, res, next) => {
   try {
     const [m] = await req.db.query('SELECT foto_blob FROM mascotas WHERE id = ?', [req.params.id]);
     if (!m || !m.foto_blob) return res.status(404).json({ success: false, message: 'La mascota no tiene foto.' });
-
-    const cont = await getContainerClient();
-    if (!cont) return res.status(500).json({ success: false, message: 'Azure Storage no configurado.' });
-
-    const download = await cont.getBlobClient(m.foto_blob).download();
-    res.setHeader('Content-Type', download.contentType || 'image/jpeg');
-    // El frontend pide ?v=<foto_updated_at>, así que se puede cachear sin miedo
-    res.setHeader('Cache-Control', 'private, max-age=86400');
-    download.readableStreamBody.pipe(res);
-  } catch (err) {
-    if (err.statusCode === 404) return res.status(404).json({ success: false, message: 'Foto no encontrada.' });
-    next(err);
-  }
+    await pipeFotoMascota(res, m.foto_blob);
+  } catch (err) { next(err); }
 });
 
 // POST /api/v1/mascotas/:id/foto  (multipart, campo 'foto')
@@ -166,4 +171,5 @@ router.delete('/:id/foto', auditMiddleware('mascotas:actualizado', 'mascotas'), 
 });
 
 module.exports = router;
-module.exports.borrarFotoBlob = borrarFotoBlob;
+module.exports.borrarFotoBlob  = borrarFotoBlob;
+module.exports.pipeFotoMascota = pipeFotoMascota;

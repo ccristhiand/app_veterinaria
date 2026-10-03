@@ -765,7 +765,7 @@ async function verDetalle(id) {
         ${p.mascotas?.length ? p.mascotas.map(m => `
           <div style="display:flex;align-items:center;gap:.85rem;padding:.75rem 1rem;
             background:#f8faf8;border-radius:.9rem;border:1px solid var(--line)">
-            <span style="font-size:1.4rem">${badgeEspecie(m.especie)}</span>
+            <span style="width:40px;height:40px;border-radius:.8rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden;flex-shrink:0">${mascotaFotoHTML(m)}</span>
             <div style="flex:1">
               <p style="font-weight:700;font-size:.85rem">${esc(m.nombre)}</p>
               <p style="font-size:.7rem;color:var(--ink-faint)">

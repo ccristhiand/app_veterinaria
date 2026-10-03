@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const crypto     = require('crypto');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { pipeFotoMascota } = require('./mascotas-foto.routes'); // ← NUEVO: foto en carnet público
 
 const router = Router();
 
@@ -53,12 +54,26 @@ router.post('/mascota/:id/regenerar', authenticate, authorize('admin'), async (r
 });
 
 // ── GET PÚBLICO /api/v1/carnet/:token — al final para no capturar /mascota/* ──
+// ── GET /api/v1/carnet/:token/foto — foto de la mascota (PÚBLICO, valida el token) ──
+router.get('/:token/foto', async (req, res, next) => {
+  try {
+    const [row] = await req.db.query(
+      `SELECT m.foto_blob
+       FROM carnets_digitales c
+       JOIN mascotas m ON m.id = c.mascota_id
+       WHERE c.token = ? AND c.activo = 1`, [req.params.token]
+    );
+    if (!row || !row.foto_blob) return res.status(404).json({ success: false, message: 'Sin foto.' });
+    await pipeFotoMascota(res, row.foto_blob);
+  } catch (err) { next(err); }
+});
+
 router.get('/:token', async (req, res, next) => {
   try {
     const [carnet] = await req.db.query(
       `SELECT c.*, m.nombre AS mascota_nombre, m.especie, m.raza,
               m.sexo, m.fecha_nacimiento, m.peso_kg, m.color, m.microchip,
-              m.alergias, m.alertas_medicas,
+              m.alergias, m.alertas_medicas, m.foto_updated_at,
               CONCAT(p.nombre,' ',p.apellido) AS propietario,
               p.telefono, p.email
        FROM carnets_digitales c

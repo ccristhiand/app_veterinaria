@@ -193,6 +193,7 @@
 
         // Header
         document.getElementById('especie-icon').textContent   = icons[m.especie] || '🐾';
+        if (m.foto_updated_at) cargarFotoMascotaCarnet(m.foto_updated_at);
         document.getElementById('mascota-nombre').textContent = m.mascota_nombre;
         document.getElementById('mascota-sub').textContent    = [m.especie, m.raza, m.sexo].filter(Boolean).join(' · ');
 
@@ -398,6 +399,18 @@
     }
 
 
+
+    // Foto de perfil de la mascota (si falla, se queda el emoji)
+    async function cargarFotoMascotaCarnet(version) {
+      try {
+        var res = await fetch(API + '/carnet/' + token + '/foto?v=' + encodeURIComponent(version), { headers: { 'X-Tenant-Host': host } });
+        if (!res.ok) return;
+        var url = URL.createObjectURL(await res.blob());
+        var box = document.getElementById('especie-icon');
+        box.style.overflow = 'hidden';
+        box.innerHTML = '<img src="' + url + '" alt="foto" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit"/>';
+      } catch (e) { /* se queda el emoji */ }
+    }
 
     // Cache de blob URLs para el carnet
     var _carnetFotoCache = {};
