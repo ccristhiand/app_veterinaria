@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v13
+-- VETNETCODIP SaaS — TENANT SCHEMA v15
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -13,6 +13,9 @@
 -- v12: + campana_limite_dia / campana_delay_ms / campana_hora_inicio / campana_hora_fin en wa_config
 --       + imagen_url / imagen_blob_name / enviados_hoy / fecha_ultimo_envio en wa_campanas
 -- v13: + tabla wa_historias (WhatsApp Stories — imagen/texto, programable)
+-- v14: + categoría 'imagenologia' en servicios_catalogo (maestra de exámenes = laboratorio + imagenologia)
+--       + historia_examenes / historia_examen_archivos (exámenes en atenciones y seguimientos)
+-- v15: + mascotas.foto_blob / foto_updated_at (foto de perfil, contenedor privado vet-mascotas)
 -- Ejecutar al crear nueva clínica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
@@ -78,6 +81,8 @@ CREATE TABLE IF NOT EXISTS mascotas (
   microchip        VARCHAR(100) NULL,
   alergias         TEXT         NULL,
   alertas_medicas  TEXT         NULL,
+  foto_blob        VARCHAR(500) NULL DEFAULT NULL,
+  foto_updated_at  DATETIME     NULL DEFAULT NULL,
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (propietario_id) REFERENCES propietarios(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
@@ -272,11 +277,51 @@ CREATE TABLE IF NOT EXISTS servicios_catalogo (
   id          INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre      VARCHAR(150)  NOT NULL,
   categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio',
-                   'medicamento','otro','eutanasia','internamiento') NOT NULL DEFAULT 'consulta',
+                   'medicamento','otro','eutanasia','internamiento','imagenologia') NOT NULL DEFAULT 'consulta',
   precio      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   descripcion VARCHAR(255)  NULL,
   activo      TINYINT(1)    NOT NULL DEFAULT 1,
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ── Exámenes en atenciones y seguimientos (v14) ─────────────
+-- servicio_id apunta a servicios_catalogo (categoria laboratorio / imagenologia)
+-- nombre_examen guarda copia del nombre para no depender del catálogo
+CREATE TABLE IF NOT EXISTS historia_examenes (
+  id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  historia_id       INT UNSIGNED  NOT NULL,
+  seguimiento_id    INT UNSIGNED  NULL DEFAULT NULL,
+  mascota_id        INT UNSIGNED  NOT NULL,
+  servicio_id       INT UNSIGNED  NULL DEFAULT NULL,
+  nombre_examen     VARCHAR(150)  NOT NULL,
+  categoria         VARCHAR(30)   NULL DEFAULT NULL,
+  fecha             DATETIME      NOT NULL,
+  observaciones     TEXT          NULL,
+  registrado_por_id INT UNSIGNED  NOT NULL,
+  created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (historia_id)       REFERENCES historia_clinica(id)      ON DELETE CASCADE,
+  FOREIGN KEY (seguimiento_id)    REFERENCES historia_seguimientos(id) ON DELETE CASCADE,
+  FOREIGN KEY (mascota_id)        REFERENCES mascotas(id)              ON DELETE RESTRICT,
+  FOREIGN KEY (servicio_id)       REFERENCES servicios_catalogo(id)    ON DELETE SET NULL,
+  FOREIGN KEY (registrado_por_id) REFERENCES usuarios(id)              ON DELETE RESTRICT,
+  INDEX idx_historia    (historia_id),
+  INDEX idx_seguimiento (seguimiento_id),
+  INDEX idx_mascota     (mascota_id, fecha)
+) ENGINE=InnoDB;
+
+-- Archivos adjuntos (contenedor privado de Azure: vet-examenes)
+CREATE TABLE IF NOT EXISTS historia_examen_archivos (
+  id              INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  examen_id       INT UNSIGNED  NOT NULL,
+  blob_name       VARCHAR(500)  NOT NULL,
+  nombre_original VARCHAR(255)  NOT NULL,
+  mime_type       VARCHAR(100)  NOT NULL,
+  tamano_bytes    INT UNSIGNED  NOT NULL DEFAULT 0,
+  subido_por_id   INT UNSIGNED  NOT NULL,
+  created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (examen_id)     REFERENCES historia_examenes(id) ON DELETE CASCADE,
+  FOREIGN KEY (subido_por_id) REFERENCES usuarios(id)          ON DELETE RESTRICT,
+  INDEX idx_examen (examen_id)
 ) ENGINE=InnoDB;
 
 -- ── Empresa config ───────────────────────────────────────────
@@ -652,7 +697,22 @@ INSERT INTO servicios_catalogo (nombre, categoria, precio) VALUES
   ('Baño básico',             'estetica',    35.00),
   ('Baño completo + corte',   'estetica',    60.00),
   ('Desparasitación interna', 'otro',        30.00),
-  ('Examen de sangre',        'laboratorio', 80.00);
+  ('Examen de sangre',        'laboratorio', 80.00),
+  ('Hemograma completo',      'laboratorio',  0.00),
+  ('Perfil bioquímico',       'laboratorio',  0.00),
+  ('Perfil renal',            'laboratorio',  0.00),
+  ('Perfil hepático',         'laboratorio',  0.00),
+  ('Urianálisis',             'laboratorio',  0.00),
+  ('Coproparasitológico',     'laboratorio',  0.00),
+  ('Raspado de piel',         'laboratorio',  0.00),
+  ('Citología',               'laboratorio',  0.00),
+  ('Test rápido Distemper',   'laboratorio',  0.00),
+  ('Test rápido Parvovirus',  'laboratorio',  0.00),
+  ('Test rápido Ehrlichia',   'laboratorio',  0.00),
+  ('Test rápido VIF/ViLeF',   'laboratorio',  0.00),
+  ('Radiografía',             'imagenologia', 0.00),
+  ('Ecografía abdominal',     'imagenologia', 0.00),
+  ('Electrocardiograma',      'imagenologia', 0.00);
 
 INSERT INTO wa_config (activo) VALUES (0);
 
@@ -680,4 +740,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 --   ('Recordatorio de cita — Desparasitación','recordatorio_cita_desparasitacion','🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *desparasitación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Llámanos al [telefono].'),
 --   ('Recordatorio de cita — Estética','recordatorio_cita_estetica','✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de *estética* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos guapos! Llámanos al [telefono].');
 
-SELECT 'tenant_schema v13 ✅' AS resultado;
+SELECT 'tenant_schema v15 ✅' AS resultado;
