@@ -449,6 +449,129 @@ function badgeEspecie(especie) {
   return icons[especie] || '🐾';
 }
 
+// ── Foto de perfil de la mascota ─────────────────────────────────
+// Si la mascota tiene foto (m.foto_updated_at) devuelve un <img> que se carga solo
+// con el token (contenedor privado). Si no tiene, devuelve el emoji de la especie.
+// El <img> ocupa el 100% de su contenedor: el contenedor define tamaño y bordes
+// (debe tener overflow:hidden).
+var _mascotaFotoCache = {}; // 'id:version' → Promise<blobUrl|null>
+
+function mascotaFotoHTML(m) {
+  var emoji = badgeEspecie(m && m.especie);
+  if (!m || !m.id || !m.foto_updated_at) return emoji;
+  var v = encodeURIComponent(String(m.foto_updated_at));
+  return '<img data-mfoto="' + m.id + '" data-mfv="' + v + '" data-emoji="' + emoji + '" alt="' + esc(m.nombre || 'foto') + '"' +
+    ' style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;opacity:0;transition:opacity .25s"/>';
+}
+
+function _cargarFotoMascota(img) {
+  img.setAttribute('data-mfoto-ok', '1');
+  var id  = img.getAttribute('data-mfoto');
+  var v   = img.getAttribute('data-mfv');
+  var key = id + ':' + v;
+  if (!_mascotaFotoCache[key]) {
+    var headers = { 'X-Tenant-Host': window.location.hostname };
+    var token = localStorage.getItem('vet_access');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    _mascotaFotoCache[key] = fetch(API_URL + '/api/v1/mascotas/' + id + '/foto?v=' + v, { headers: headers })
+      .then(function(r) { return r.ok ? r.blob() : null; })
+      .then(function(b) { return b ? URL.createObjectURL(b) : null; })
+      .catch(function() { return null; });
+  }
+  _mascotaFotoCache[key].then(function(url) {
+    if (url) {
+      img.onload = function() { img.style.opacity = '1'; };
+      img.src = url;
+    } else {
+      // No se pudo cargar → volver al emoji
+      var span = document.createElement('span');
+      span.textContent = img.getAttribute('data-emoji') || '🐾';
+      if (img.parentNode) img.parentNode.replaceChild(span, img);
+      delete _mascotaFotoCache[key];
+    }
+  });
+}
+
+function cargarFotosMascotas(root) {
+  (root || document).querySelectorAll('img[data-mfoto]:not([data-mfoto-ok])').forEach(_cargarFotoMascota);
+}
+
+// Carga automática: cualquier <img data-mfoto> que aparezca en la página se carga solo
+(function() {
+  var pendiente = false;
+  function programar() {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(function() { pendiente = false; cargarFotosMascotas(); });
+  }
+  function iniciar() {
+    cargarFotosMascotas();
+    new MutationObserver(programar).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
+  else iniciar();
+})();
+
+/** Reduce la foto en el navegador (máx. 600 px, JPG) antes de subirla. */
+function comprimirFotoMascota(file, maxLado, calidad) {
+  maxLado = maxLado || 600;
+  calidad = calidad || 0.85;
+  return new Promise(function(resolve, reject) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function() {
+      var esc_ = Math.min(1, maxLado / Math.max(img.width, img.height));
+      var w = Math.round(img.width * esc_), h = Math.round(img.height * esc_);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';            // fondo blanco para PNG con transparencia
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function(blob) {
+        if (blob) resolve(blob); else reject(new Error('No se pudo procesar la imagen.'));
+      }, 'image/jpeg', calidad);
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('El archivo no es una imagen válida.')); };
+    img.src = url;
+  });
+}
+
+/** Sube (o reemplaza) la foto de la mascota. Devuelve { ok, foto_updated_at, message } */
+async function subirFotoMascota(mascotaId, file) {
+  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(file.type) === -1) {
+    return { ok: false, message: 'Solo se permiten imágenes JPG, PNG o WEBP.' };
+  }
+  showLoader();
+  try {
+    var blob = await comprimirFotoMascota(file);
+    var fd = new FormData();
+    fd.append('foto', blob, 'foto.jpg');
+    var headers = { 'X-Tenant-Host': window.location.hostname };
+    var token = localStorage.getItem('vet_access');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var sede = getSedeActiva();
+    if (sede) headers['X-Sede-Id'] = String(sede);
+    var res = await fetch(API_URL + '/api/v1/mascotas/' + mascotaId + '/foto', { method: 'POST', headers: headers, body: fd });
+    var data = {};
+    try { data = await res.json(); } catch (e) {}
+    return { ok: res.ok, foto_updated_at: data.data && data.data.foto_updated_at, message: data.message || '' };
+  } catch (e) {
+    return { ok: false, message: e.message || 'Error al subir la foto.' };
+  } finally {
+    hideLoader();
+  }
+}
+
+/** Quita la foto de la mascota (vuelve el emoji). Devuelve true/false */
+async function eliminarFotoMascota(mascotaId) {
+  try {
+    var res = await api('/mascotas/' + mascotaId + '/foto', { method: 'DELETE' });
+    return !!(res && res.ok);
+  } catch (e) { return false; }
+}
+
 // ── Branding dinámico ─────────────────────────────────────────────
 let _branding  = null;
 let _permisos  = null;

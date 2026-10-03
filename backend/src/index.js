@@ -16,6 +16,7 @@ const authRoutes        = require('./routes/auth.routes');
 const tenantRoutes      = require('./routes/tenant.routes');
 const propietarioRoutes = require('./routes/propietarios.routes');
 const mascotaRoutes     = require('./routes/mascotas.routes');
+const mascotaFotoRoutes = require('./routes/mascotas-foto.routes');   // ← NUEVO: foto de perfil de la mascota
 const citaRoutes        = require('./routes/citas.routes');
 const historiaRoutes    = require('./routes/historia.routes');
 const inventarioRoutes  = require('./routes/inventario.routes');
@@ -157,6 +158,7 @@ app.use(`${API}/auth`,             authRoutes);
 app.use(`${API}/tenant`,           tenantRoutes);
 app.use(`${API}/propietarios`,     propietarioRoutes);
 app.use(`${API}/mascotas`,         mascotaRoutes);
+app.use(`${API}/mascotas`,         mascotaFotoRoutes);        // ← NUEVO: /mascotas/:id/foto
 app.use(`${API}/citas`,            citaRoutes);
 app.use(`${API}/historia`,         historiaRoutes);
 app.use(`${API}/inventario`,       inventarioRoutes);

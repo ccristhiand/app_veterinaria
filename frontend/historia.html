@@ -45,7 +45,13 @@
 
   <div id="panel" style="display:none;flex-direction:column;gap:1.3rem">
     <div class="vcard vcard-pad" style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:center">
-      <div style="width:70px;height:70px;border-radius:1.4rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.3rem;flex-shrink:0" id="h-icon">🐾</div>
+      <div style="position:relative;flex-shrink:0">
+        <div style="width:70px;height:70px;border-radius:1.4rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.3rem;overflow:hidden" id="h-icon">🐾</div>
+        <!-- Cambiar foto de la mascota -->
+        <label title="Cambiar foto" style="position:absolute;right:-6px;bottom:-6px;width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;font-size:.8rem;cursor:pointer">📷
+          <input type="file" id="h-foto-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="cambiarFotoMascotaH(this)"/>
+        </label>
+      </div>
       <div style="flex:1;min-width:180px">
         <h3 style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700" id="h-nombre">—</h3>
         <p style="font-size:.8rem;color:var(--ink-soft);margin-top:.15rem" id="h-info">—</p>

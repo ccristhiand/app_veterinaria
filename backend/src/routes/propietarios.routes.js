@@ -80,7 +80,7 @@ router.get('/:id', async (req, res, next) => {
     if (!prop) return res.status(404).json({ success: false, message: 'Propietario no encontrado.' });
 
     const mascotas = await req.db.query(
-      'SELECT id, nombre, especie, raza, sexo, peso_kg, alertas_medicas, fecha_nacimiento, microchip FROM mascotas WHERE propietario_id = ? ORDER BY nombre',
+      'SELECT id, nombre, especie, raza, sexo, peso_kg, alertas_medicas, fecha_nacimiento, microchip, foto_updated_at FROM mascotas WHERE propietario_id = ? ORDER BY nombre',
       [req.params.id]
     );
     return res.json({ success: true, data: { ...prop, mascotas } });

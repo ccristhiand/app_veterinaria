@@ -96,10 +96,21 @@
         </div>
       </div>
       <p id="label-datos-mascota" style="font-size:.72rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.1em">② Datos de la mascota</p>
+      <!-- Foto de perfil (opcional) -->
+      <div style="display:flex;align-items:center;gap:1rem">
+        <div id="m-foto-preview" style="width:76px;height:76px;border-radius:1.2rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:2.3rem;overflow:hidden;flex-shrink:0;border:1px solid var(--line)">🐾</div>
+        <div style="display:flex;flex-direction:column;gap:.35rem;align-items:flex-start">
+          <label class="vbtn vbtn-ghost" style="font-size:.76rem;padding:.45rem .9rem;cursor:pointer">📷 <span id="m-foto-label">Subir foto</span>
+            <input type="file" id="m-foto-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="onFotoMascotaSel(this)"/>
+          </label>
+          <button type="button" id="m-foto-quitar" onclick="quitarFotoMascotaForm()" class="vlink" style="color:#e11d48;font-size:.72rem;display:none">🗑️ Quitar foto</button>
+          <span style="font-size:.66rem;color:var(--ink-faint)">Opcional · JPG, PNG o WEBP. Sin foto se muestra el ícono de la especie.</span>
+        </div>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label class="vlabel">Nombre *</label><input id="m-nombre" type="text" class="vinput" placeholder="Max, Luna, Coco…"/></div>
         <div><label class="vlabel">Especie *</label>
-          <select id="m-especie" class="vinput">
+          <select id="m-especie" class="vinput" onchange="refrescarPreviewFotoMascota()">
             <option value="">Seleccionar…</option>
             <option value="perro">🐕 Canino</option>
             <option value="gato">🐈 Felino</option>
@@ -284,7 +295,7 @@ async function cargar() {
     grid.innerHTML = rows.map(m => `
       <div class="pet-card" onclick="verDetalle(${m.id})">
         ${m.alertas_medicas ? `<span class="pet-alert">⚠️ Alerta</span>` : ''}
-        <div class="pet-avatar">${badgeEspecie(m.especie)}</div>
+        <div class="pet-avatar" style="overflow:hidden">${mascotaFotoHTML(m)}</div>
         <h3 class="pet-name">${esc(m.nombre)}</h3>
         <p class="pet-meta">
           ${esc(m.raza||m.especie)} · ${esc(m.sexo)}
@@ -559,6 +570,9 @@ async function verDetalle(id) {
     const d   = (await res.json()).data;
     document.getElementById('det-titulo').textContent = `${badgeEspecie(d.especie)} ${d.nombre}`;
     document.getElementById('det-body').innerHTML = `
+      <div style="display:flex;justify-content:center;margin-bottom:1rem">
+        <div style="width:110px;height:110px;border-radius:1.6rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:3.4rem;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow-md)">${mascotaFotoHTML(d)}</div>
+      </div>
       <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:1rem;padding:.85rem 1.1rem;margin-bottom:1.2rem;display:flex;align-items:center;gap:.85rem">
         <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           ${esc((d.propietario_nombre||'?').charAt(0))}
@@ -635,6 +649,8 @@ async function abrirModalEditar(id) {
     document.getElementById('m-chip').value     = m.microchip                   || '';
     document.getElementById('m-alergias').value = m.alergias                    || '';
     document.getElementById('m-alertas').value  = m.alertas_medicas             || '';
+    _fotoMascotaActual = m.foto_updated_at ? m : null;
+    refrescarPreviewFotoMascota();
   } catch { toast('Error de conexión.','danger'); }
 }
 
@@ -708,6 +724,15 @@ async function guardarMascota() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    // Foto de perfil
+    const mascId = esEdicion ? mascEditandoId : data.data?.id;
+    if (mascId && _fotoMascotaNueva) {
+      const up = await subirFotoMascota(mascId, _fotoMascotaNueva);
+      if (!up.ok) toast('⚠️ Los datos se guardaron, pero la foto no: ' + (up.message || 'error al subir.'), 'warning', 6000);
+    } else if (mascId && _fotoMascotaQuitar && _fotoMascotaActual) {
+      const okDel = await eliminarFotoMascota(mascId);
+      if (!okDel) toast('⚠️ No se pudo quitar la foto.', 'warning');
+    }
     toast(esEdicion ? '✅ Mascota actualizada' : '🐾 Mascota registrada','success');
     closeModal('modal-mascota');
     limpiarFormMascota();
@@ -721,6 +746,57 @@ function limpiarFormMascota() {
     .forEach(id => document.getElementById(id).value = '');
   document.getElementById('m-especie').value = '';
   document.getElementById('m-sexo').value    = 'desconocido';
+  // Foto
+  _fotoMascotaNueva  = null;
+  _fotoMascotaQuitar = false;
+  _fotoMascotaActual = null;
+  document.getElementById('m-foto-input').value = '';
+  refrescarPreviewFotoMascota();
+}
+
+// ── Foto de perfil en el formulario ───────────────────────────────
+var _fotoMascotaNueva  = null;   // File elegido (se sube al guardar)
+var _fotoMascotaQuitar = false;  // true = quitar la foto actual al guardar
+var _fotoMascotaActual = null;   // mascota que ya tiene foto (modo edición)
+var _fotoMascotaPreviewUrl = null;
+
+function refrescarPreviewFotoMascota() {
+  var box    = document.getElementById('m-foto-preview');
+  var quitar = document.getElementById('m-foto-quitar');
+  var label  = document.getElementById('m-foto-label');
+  if (!box) return;
+  if (_fotoMascotaPreviewUrl) { URL.revokeObjectURL(_fotoMascotaPreviewUrl); _fotoMascotaPreviewUrl = null; }
+
+  if (_fotoMascotaNueva) {
+    _fotoMascotaPreviewUrl = URL.createObjectURL(_fotoMascotaNueva);
+    box.innerHTML = '<img src="' + _fotoMascotaPreviewUrl + '" style="width:100%;height:100%;object-fit:cover;display:block" alt="foto"/>';
+  } else if (_fotoMascotaActual && !_fotoMascotaQuitar) {
+    box.innerHTML = mascotaFotoHTML(_fotoMascotaActual);
+  } else {
+    box.textContent = badgeEspecie(document.getElementById('m-especie').value);
+  }
+  var tieneFoto = !!_fotoMascotaNueva || (!!_fotoMascotaActual && !_fotoMascotaQuitar);
+  quitar.style.display = tieneFoto ? 'inline' : 'none';
+  label.textContent    = tieneFoto ? 'Cambiar foto' : 'Subir foto';
+}
+
+function onFotoMascotaSel(input) {
+  var f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  if (['image/jpeg','image/png','image/webp'].indexOf(f.type) === -1) {
+    toast('Solo se permiten imágenes JPG, PNG o WEBP.', 'warning'); return;
+  }
+  if (f.size > 15 * 1024 * 1024) { toast('La imagen es demasiado grande (máx. 15 MB).', 'warning'); return; }
+  _fotoMascotaNueva  = f;
+  _fotoMascotaQuitar = false;
+  refrescarPreviewFotoMascota();
+}
+
+function quitarFotoMascotaForm() {
+  if (_fotoMascotaNueva) { _fotoMascotaNueva = null; }   // quita la recién elegida
+  else { _fotoMascotaQuitar = true; }                     // marca la actual para quitar al guardar
+  refrescarPreviewFotoMascota();
 }
 
 function ib(label, val) {

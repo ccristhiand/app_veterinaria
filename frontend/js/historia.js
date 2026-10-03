@@ -138,7 +138,7 @@ async function buscarMascotaH() {
       btn.onmouseout  = function() { this.style.borderColor = 'var(--line)'; this.style.background = '#fff'; };
       btn.onclick     = function() { selMascotaH(m.id); };
       btn.innerHTML =
-        '<span style="font-size:1.6rem">' + badgeEspecie(m.especie) + '</span>' +
+        '<span style="width:44px;height:44px;border-radius:.9rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.6rem;overflow:hidden;flex-shrink:0">' + mascotaFotoHTML(m) + '</span>' +
         '<div style="flex:1;min-width:0">' +
           '<p style="font-weight:700;font-size:.88rem">' + esc(m.nombre) + '</p>' +
           '<p style="font-size:.7rem;color:var(--ink-faint)">' + esc(m.especie) + ' - ' + esc(m.raza || 'Sin raza') + '</p>' +
@@ -194,7 +194,7 @@ async function selPropH(propId, propNombre) {
             style="display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
             onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
             onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
-            <span style="font-size:1.6rem">${badgeEspecie(m.especie)}</span>
+            <span style="width:44px;height:44px;border-radius:.9rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.6rem;overflow:hidden;flex-shrink:0">${mascotaFotoHTML(m)}</span>
             <div style="flex:1"><p style="font-weight:700;font-size:.88rem">${esc(m.nombre)}</p><p style="font-size:.7rem;color:var(--ink-faint)">${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}</p></div>
             ${m.alertas_medicas?'<span style="font-size:.62rem;background:#fff1f2;color:#be123c;padding:.2rem .5rem;border-radius:999px;font-weight:700;border:1px solid #fecdd3;white-space:nowrap">⚠️ Alerta</span>':''}
           </button>`).join('')
@@ -223,7 +223,8 @@ async function cargarHistoria(id) {
     const rm = await api('/mascotas/'+id);
     if (!rm||!rm.ok) { toast('Mascota no encontrada.','danger'); return; }
     const m = (await rm.json()).data;
-    document.getElementById('h-icon').textContent    = badgeEspecie(m.especie);
+    _mascotaHActual = m;
+    document.getElementById('h-icon').innerHTML      = mascotaFotoHTML(m);
     document.getElementById('h-nombre').textContent  = m.nombre;
     document.getElementById('h-info').textContent    = m.especie+' · '+(m.raza||'Sin raza')+' · '+m.sexo+(m.peso_kg?' · '+m.peso_kg+' kg':'');
     const propEl = document.getElementById('h-propietario');
@@ -260,6 +261,21 @@ async function cargarHistoria(id) {
     console.error(e);
     document.getElementById('consultas').innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar el historial.</p></div>';
   }
+}
+
+// ── Foto de la mascota desde la cabecera ─────────────────────────
+var _mascotaHActual = null;
+
+async function cambiarFotoMascotaH(input) {
+  var f = input.files && input.files[0];
+  input.value = '';
+  if (!f || !_mascotaHActual) return;
+  if (f.size > 15 * 1024 * 1024) { toast('La imagen es demasiado grande (máx. 15 MB).', 'warning'); return; }
+  var up = await subirFotoMascota(_mascotaHActual.id, f);
+  if (!up.ok) { toast(up.message || 'Error al subir la foto.', 'danger'); return; }
+  _mascotaHActual.foto_updated_at = up.foto_updated_at || new Date().toISOString();
+  document.getElementById('h-icon').innerHTML = mascotaFotoHTML(_mascotaHActual);
+  toast('📷 Foto actualizada.', 'success');
 }
 
 async function cargarVacunas(id) {

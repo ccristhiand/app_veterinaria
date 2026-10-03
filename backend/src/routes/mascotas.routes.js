@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+const { borrarFotoBlob } = require('./mascotas-foto.routes'); // ← NUEVO: limpiar foto en Azure al eliminar
 
 const router = Router();
 router.use(authenticate);
@@ -104,7 +105,7 @@ router.put('/:id', auditMiddleware('mascotas:actualizado', 'mascotas'), async (r
 // ── DELETE /api/v1/mascotas/:id ───────────────────────────────────
 router.delete('/:id', auditMiddleware('mascotas:eliminado', 'mascotas'), async (req, res, next) => {
   try {
-    const [masc] = await req.db.query('SELECT id, nombre FROM mascotas WHERE id = ?', [req.params.id]);
+    const [masc] = await req.db.query('SELECT id, nombre, foto_blob FROM mascotas WHERE id = ?', [req.params.id]);
     if (!masc) return res.status(404).json({ success: false, message: 'Mascota no encontrada.' });
 
     // Verificar registros vinculados
@@ -137,6 +138,7 @@ router.delete('/:id', auditMiddleware('mascotas:eliminado', 'mascotas'), async (
     // Sin registros vinculados — eliminar también el carnet digital si existe
     await req.db.query('DELETE FROM carnets_digitales WHERE mascota_id = ?', [req.params.id]);
     await req.db.query('DELETE FROM mascotas WHERE id = ?', [req.params.id]);
+    if (masc.foto_blob) borrarFotoBlob(masc.foto_blob); // ← NUEVO: fire & forget
     return res.json({ success: true, message: 'Mascota eliminada correctamente.' });
   } catch (err) { next(err); }
 });
