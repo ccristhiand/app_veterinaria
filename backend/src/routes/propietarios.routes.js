@@ -23,7 +23,7 @@ router.get('/', async (req, res, next) => {
           OR p.dni LIKE ? OR p.telefono LIKE ?
           OR p.ruc LIKE ? OR p.razon_social LIKE ?
        GROUP BY p.id
-       ORDER BY p.nombre, p.apellido
+       ORDER BY p.apellido, p.nombre
        LIMIT ${limitN} OFFSET ${offsetN}`,
       [q, q, q, q, q, q]
     );
