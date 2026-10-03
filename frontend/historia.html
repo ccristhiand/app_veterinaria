@@ -167,6 +167,8 @@
         </div>
         <div id="recetas" style="display:flex;flex-direction:column;gap:.8rem"></div>
       </div>
+      <!-- Exámenes (lo pinta js/examenes.js) -->
+      <div id="co-examenes-wrap"></div>
       <!-- Vacuna rápida -->
       <div style="border-top:1px solid var(--line);padding-top:1.1rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem">
@@ -419,6 +421,8 @@
         </div>
         <div id="ec-recetas" style="display:flex;flex-direction:column;gap:.7rem"></div>
       </div>
+      <!-- Exámenes nuevos (lo pinta js/examenes.js) -->
+      <div id="ec-examenes-wrap"></div>
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-editar-consulta')" class="vbtn vbtn-ghost">Cancelar</button>
@@ -567,6 +571,7 @@
   </div>
 </div>
 
+<script src="js/examenes.js"></script>
 <script src="js/historia.js"></script>
 
 <!-- Modal Seguimiento -->
@@ -618,6 +623,8 @@
         <textarea id="seg-observaciones" rows="2" class="vinput"
           placeholder="Indicaciones al propietario, próxima cita…"></textarea>
       </div>
+      <!-- Exámenes (lo pinta js/examenes.js) -->
+      <div id="seg-examenes-wrap"></div>
     </div>
     <div class="vmodal-foot">
       <button onclick="closeModal('modal-seguimiento')" class="vbtn vbtn-ghost">Cancelar</button>
@@ -627,6 +634,29 @@
         font-weight:600;cursor:pointer;font-family:inherit">
         🔄 Guardar Seguimiento
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gestionar Exámenes (atención / seguimiento) -->
+<div id="modal-examenes" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:600px">
+    <div class="vmodal-head">
+      <h3 id="mex-titulo">🧪 Exámenes</h3>
+      <button onclick="closeModal('modal-examenes')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+      <div>
+        <p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Registrados</p>
+        <div id="mex-lista" style="display:flex;flex-direction:column;gap:.7rem"></div>
+      </div>
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <div id="mex-examenes-wrap"></div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-examenes')" class="vbtn vbtn-ghost">Cerrar</button>
+      <button onclick="guardarExamenesModal()" id="mex-btn-guardar" class="vbtn vbtn-primary">💾 Guardar exámenes</button>
     </div>
   </div>
 </div>

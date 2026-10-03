@@ -13,8 +13,25 @@
 <div id="main-content" class="page">
 
   <div class="page-head">
-    <div><h2>🛎️ Catálogo de Servicios</h2><p>Gestiona los servicios y precios de la clínica</p></div>
+    <div><h2>🛎️ Catálogo de Servicios</h2><p>Gestiona los servicios, exámenes y precios de la clínica</p></div>
     <button onclick="abrirNuevo()" class="vbtn vbtn-primary" id="btn-nuevo">＋ Nuevo Servicio</button>
+  </div>
+
+  <!-- Pestañas -->
+  <div style="display:flex;gap:1.5rem;border-bottom:1px solid var(--line);margin-bottom:1.3rem">
+    <button id="tab-servicios" onclick="cambiarTab('servicios')"
+      style="background:none;border:none;border-bottom:2px solid transparent;padding:.6rem .2rem;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink-faint)">
+      🛎️ Servicios
+    </button>
+    <button id="tab-examenes" onclick="cambiarTab('examenes')"
+      style="background:none;border:none;border-bottom:2px solid transparent;padding:.6rem .2rem;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink-faint)">
+      🧪 Exámenes
+    </button>
+  </div>
+
+  <!-- Aviso pestaña exámenes -->
+  <div id="aviso-examenes" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.9rem;padding:.75rem 1rem;font-size:.78rem;color:#1e3a8a;margin-bottom:1.3rem">
+    🧪 Los exámenes de esta lista aparecen en <strong>Facturación</strong> y se pueden registrar en las <strong>atenciones y seguimientos</strong> de la Historia Clínica.
   </div>
 
   <!-- Stats por categoría -->
@@ -27,22 +44,13 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
-      <input id="f-search" type="text" placeholder="Buscar servicio…"
+      <input id="f-search" type="text" placeholder="Buscar…"
         class="vinput" oninput="filtrar()"/>
     </div>
     <div>
       <label class="vlabel">Categoría</label>
       <select id="f-cat" class="vinput" style="width:auto" onchange="filtrar()">
         <option value="">Todas</option>
-        <option value="consulta">🩺 Consulta</option>
-        <option value="vacunacion">💉 Vacunación</option>
-        <option value="estetica">✂️ Estética</option>
-        <option value="cirugia">🔬 Cirugía</option>
-        <option value="laboratorio">🧪 Pruebas complementarias</option>
-        <option value="medicamento">💊 Medicamento</option>
-        <option value="eutanasia">🕊️ Eutanasia</option>
-        <option value="internamiento">🏨 Internamiento</option>
-        <option value="otro">📎 Otro</option>
       </select>
     </div>
     <div>
@@ -72,23 +80,13 @@
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="svc-id"/>
       <div>
-        <label class="vlabel">Nombre del servicio *</label>
+        <label class="vlabel" id="svc-nombre-label">Nombre del servicio *</label>
         <input id="svc-nombre" type="text" class="vinput" placeholder="Consulta general, Baño básico…"/>
       </div>
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="vlabel">Categoría *</label>
-          <select id="svc-cat" class="vinput">
-            <option value="consulta">🩺 Consulta</option>
-            <option value="vacunacion">💉 Vacunación</option>
-            <option value="estetica">✂️ Estética</option>
-            <option value="cirugia">🔬 Cirugía</option>
-            <option value="laboratorio">🧪 Pruebas complementarias</option>
-            <option value="medicamento">💊 Medicamento</option>
-            <option value="eutanasia">🕊️ Eutanasia</option>
-            <option value="internamiento">🏨 Internamiento</option>
-            <option value="otro">📎 Otro</option>
-          </select>
+          <select id="svc-cat" class="vinput"></select>
         </div>
         <div>
           <label class="vlabel">Precio (S/.) *</label>
@@ -117,6 +115,11 @@
 <script>
 let todosLosServicios = [];
 let esAdmin = false;
+let tabActual = (location.hash === '#examenes') ? 'examenes' : 'servicios';
+
+// Exámenes = servicios con estas categorías (se usan en Historia Clínica y Facturación)
+const CATS_EXAMEN = ['laboratorio', 'imagenologia'];
+function esExamen(s) { return CATS_EXAMEN.includes(s.categoria); }
 
 document.addEventListener('DOMContentLoaded', () => {
   const user = initPage({ activePage:'servicios', title:'Servicios', subtitle:'Catálogo de precios' });
@@ -127,8 +130,42 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-nuevo').style.display = 'none';
   }
 
+  cambiarTab(tabActual, true);
   cargar();
 });
+
+function cambiarTab(tab, sinRecargar) {
+  tabActual = tab;
+  history.replaceState(null, '', tab === 'examenes' ? '#examenes' : location.pathname + location.search);
+  ['servicios', 'examenes'].forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    const on  = t === tab;
+    btn.style.color             = on ? (t === 'examenes' ? '#1d4ed8' : 'var(--green-600)') : 'var(--ink-faint)';
+    btn.style.borderBottomColor = on ? (t === 'examenes' ? '#3b82f6' : '#10b981') : 'transparent';
+    btn.style.fontWeight        = on ? '700' : '600';
+  });
+  document.getElementById('aviso-examenes').style.display = tab === 'examenes' ? 'block' : 'none';
+  document.getElementById('btn-nuevo').textContent = tab === 'examenes' ? '＋ Nuevo Examen' : '＋ Nuevo Servicio';
+
+  // Filtro de categorías según pestaña
+  const sel = document.getElementById('f-cat');
+  sel.innerHTML = '<option value="">Todas</option>' + opcionesCategoria(tab);
+  document.getElementById('f-search').value = '';
+
+  if (!sinRecargar) { renderStats(); filtrar(); }
+}
+
+function catsDeTab(tab) {
+  return Object.keys(catConfig).filter(c => tab === 'examenes' ? CATS_EXAMEN.includes(c) : !CATS_EXAMEN.includes(c));
+}
+
+function opcionesCategoria(tab) {
+  return catsDeTab(tab).map(c => '<option value="' + c + '">' + catConfig[c].icon + ' ' + catConfig[c].label + '</option>').join('');
+}
+
+function serviciosDeTab() {
+  return todosLosServicios.filter(s => tabActual === 'examenes' ? esExamen(s) : !esExamen(s));
+}
 
 const catConfig = {
   consulta      : { icon:'🩺', label:'Consulta',     color:'#15803d', bg:'#f0fdf4', border:'#bbf7d0' },
@@ -136,6 +173,7 @@ const catConfig = {
   estetica      : { icon:'✂️', label:'Estética',     color:'#db2777', bg:'#fdf2f8', border:'#fbcfe8' },
   cirugia       : { icon:'🔬', label:'Cirugía',      color:'#be123c', bg:'#fff1f2', border:'#fecdd3' },
   laboratorio   : { icon:'🧪', label:'Laboratorio',  color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+  imagenologia  : { icon:'🩻', label:'Imagenología', color:'#0f766e', bg:'#f0fdfa', border:'#99f6e4' },
   medicamento   : { icon:'💊', label:'Medicamento',  color:'#0369a1', bg:'#f0f9ff', border:'#bae6fd' },
   eutanasia     : { icon:'🕊️', label:'Eutanasia',    color:'#64748b', bg:'#f1f5f9', border:'#cbd5e1' },
   internamiento : { icon:'🏨', label:'Internamiento', color:'#64748b', bg:'#f1f5f9', border:'#cbd5e1' },
@@ -162,19 +200,31 @@ async function cargar() {
   }
 }
 
+function statCard(icon, valor, label, color) {
+  return '<div class="vcard vcard-pad" style="text-align:center">' +
+    '<p style="font-size:1.5rem">' + icon + '</p>' +
+    '<p style="font-size:1.4rem;font-weight:800;color:' + color + ';margin:.2rem 0">' + valor + '</p>' +
+    '<p style="font-size:.68rem;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.08em">' + label + '</p>' +
+  '</div>';
+}
+
 function renderStats() {
-  const counts = {};
-  todosLosServicios.filter(s=>s.activo).forEach(s => {
-    counts[s.categoria] = (counts[s.categoria]||0) + 1;
-  });
-  const cats = Object.keys(catConfig);
-  document.getElementById('stats-cats').innerHTML = cats.slice(0,4).map(c => {
+  const activos = serviciosDeTab().filter(s => s.activo);
+  const counts  = {};
+  activos.forEach(s => { counts[s.categoria] = (counts[s.categoria]||0) + 1; });
+
+  if (tabActual === 'examenes') {
+    const sinPrecio = activos.filter(s => !parseFloat(s.precio)).length;
+    document.getElementById('stats-cats').innerHTML =
+      statCard('🧪', counts.laboratorio  || 0, 'Laboratorio',  catConfig.laboratorio.color) +
+      statCard('🩻', counts.imagenologia || 0, 'Imagenología', catConfig.imagenologia.color) +
+      statCard('📋', activos.length,           'Total activos', '#4b5f57') +
+      statCard(sinPrecio ? '⚠️' : '✅', sinPrecio, 'Sin precio', sinPrecio ? '#b45309' : '#15803d');
+    return;
+  }
+  document.getElementById('stats-cats').innerHTML = catsDeTab('servicios').slice(0,4).map(c => {
     const cfg = catConfig[c];
-    return `<div class="vcard vcard-pad" style="text-align:center">
-      <p style="font-size:1.5rem">${cfg.icon}</p>
-      <p style="font-size:1.4rem;font-weight:800;color:${cfg.color};margin:.2rem 0">${counts[c]||0}</p>
-      <p style="font-size:.68rem;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.08em">${cfg.label}</p>
-    </div>`;
+    return statCard(cfg.icon, counts[c]||0, cfg.label, cfg.color);
   }).join('');
 }
 
@@ -183,7 +233,7 @@ function filtrar() {
   const cat    = document.getElementById('f-cat').value;
   const grid   = document.getElementById('grid-servicios');
 
-  let items = todosLosServicios;
+  let items = serviciosDeTab();
   if (cat)    items = items.filter(s => s.categoria === cat);
   if (search) items = items.filter(s =>
     s.nombre.toLowerCase().includes(search) ||
@@ -192,7 +242,7 @@ function filtrar() {
 
   if (!items.length) {
     grid.innerHTML = `<div class="vempty" style="grid-column:1/-1">
-      <span class="icon">🔍</span><p>Sin servicios con esos filtros</p></div>`;
+      <span class="icon">🔍</span><p>${tabActual === 'examenes' ? 'Sin exámenes con esos filtros' : 'Sin servicios con esos filtros'}</p></div>`;
     return;
   }
 
@@ -226,6 +276,7 @@ function filtrar() {
         padding-top:.75rem;border-top:1px solid var(--line)">
         <p style="font-size:1.15rem;font-weight:800;color:${cfg.color}">
           S/. ${parseFloat(s.precio).toFixed(2)}
+          ${esExamen(s) && !parseFloat(s.precio) ? '<span style="font-size:.6rem;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:.1rem .4rem;vertical-align:middle">Sin precio</span>' : ''}
         </p>
         ${esAdmin ? `<div style="display:flex;gap:.4rem">
           <button class="vlink" onclick="abrirEditar(${s.id})"
@@ -241,11 +292,21 @@ function filtrar() {
   }).join('');
 }
 
+function prepararModal(esEdicion) {
+  const ex = tabActual === 'examenes';
+  document.getElementById('svc-cat').innerHTML = opcionesCategoria(tabActual);
+  document.getElementById('svc-titulo').textContent = esEdicion
+    ? (ex ? '✏️ Editar Examen' : '✏️ Editar Servicio')
+    : (ex ? '🧪 Nuevo Examen'  : '🛎️ Nuevo Servicio');
+  document.getElementById('svc-nombre-label').textContent = ex ? 'Nombre del examen *' : 'Nombre del servicio *';
+  document.getElementById('svc-nombre').placeholder = ex ? 'Hemograma completo, Ecografía abdominal…' : 'Consulta general, Baño básico…';
+}
+
 function abrirNuevo() {
-  document.getElementById('svc-titulo').textContent = '🛎️ Nuevo Servicio';
+  prepararModal(false);
   document.getElementById('svc-id').value     = '';
   document.getElementById('svc-nombre').value = '';
-  document.getElementById('svc-cat').value    = 'consulta';
+  document.getElementById('svc-cat').value    = tabActual === 'examenes' ? 'laboratorio' : 'consulta';
   document.getElementById('svc-precio').value = '';
   document.getElementById('svc-desc').value   = '';
   document.getElementById('svc-activo-wrap').style.display = 'none';
@@ -253,7 +314,7 @@ function abrirNuevo() {
 }
 
 async function abrirEditar(id) {
-  document.getElementById('svc-titulo').textContent = '✏️ Editar Servicio';
+  prepararModal(true);
   document.getElementById('svc-id').value = id;
   document.getElementById('svc-activo-wrap').style.display = 'block';
   openModal('modal-svc');
@@ -261,7 +322,7 @@ async function abrirEditar(id) {
   const svc = todosLosServicios.find(s => s.id === id);
   if (svc) {
     document.getElementById('svc-nombre').value   = svc.nombre      || '';
-    document.getElementById('svc-cat').value      = svc.categoria   || 'consulta';
+    document.getElementById('svc-cat').value      = svc.categoria   || (tabActual === 'examenes' ? 'laboratorio' : 'consulta');
     document.getElementById('svc-precio').value   = svc.precio      || '';
     document.getElementById('svc-desc').value     = svc.descripcion || '';
     document.getElementById('svc-activo').checked = !!svc.activo;
@@ -292,7 +353,8 @@ async function guardarServicio() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
-    toast(id ? '✅ Servicio actualizado.' : '✅ Servicio creado.', 'success');
+    const ex = tabActual === 'examenes';
+    toast(id ? (ex ? '✅ Examen actualizado.' : '✅ Servicio actualizado.') : (ex ? '✅ Examen creado.' : '✅ Servicio creado.'), 'success');
     closeModal('modal-svc');
     cargar();
   } catch { toast('Error de conexión.','danger'); }

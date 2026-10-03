@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { obtenerBlobsExamenes, borrarBlobsExamenes } = require('./examenes.routes'); // ← NUEVO: limpiar archivos de exámenes en Azure
 
 const router = Router();
 router.use(authenticate);
@@ -197,10 +198,13 @@ router.put('/:id/seguimientos/:segId', auditMiddleware('historia_clinica:actuali
 // DELETE /api/v1/historia/:id/seguimientos/:segId
 router.delete('/:id/seguimientos/:segId', authorize('admin', 'veterinario', 'veterinario_recepcionista'), async (req, res, next) => {
   try {
+    // ← NUEVO: guardar rutas de archivos de exámenes antes de borrar (los registros caen por CASCADE)
+    const blobsExamenes = await obtenerBlobsExamenes(req.db, { seguimientoId: req.params.segId });
     await req.db.query(
       'DELETE FROM historia_seguimientos WHERE id = ? AND historia_id = ?',
       [req.params.segId, req.params.id]
     );
+    borrarBlobsExamenes(blobsExamenes); // fire & forget
     return res.json({ success: true, message: 'Seguimiento eliminado.' });
   } catch (err) { next(err); }
 });
@@ -210,11 +214,14 @@ router.delete('/:id', authorize('admin', 'veterinario', 'veterinario_recepcionis
   try {
     const [h] = await req.db.query('SELECT id FROM historia_clinica WHERE id = ?', [req.params.id]);
     if (!h) return res.status(404).json({ success: false, message: 'Consulta no encontrada.' });
+    // ← NUEVO: guardar rutas de archivos de exámenes antes de borrar (los registros caen por CASCADE)
+    const blobsExamenes = await obtenerBlobsExamenes(req.db, { historiaId: req.params.id });
     await req.db.withTransaction(async (conn) => {
       await conn.execute('DELETE FROM historia_seguimientos WHERE historia_id = ?', [req.params.id]);
       await conn.execute('DELETE FROM recetas WHERE historia_clinica_id = ?', [req.params.id]);
       await conn.execute('DELETE FROM historia_clinica WHERE id = ?', [req.params.id]);
     });
+    borrarBlobsExamenes(blobsExamenes); // fire & forget
     return res.json({ success: true, message: 'Consulta eliminada correctamente.' });
   } catch (err) { next(err); }
 });

@@ -490,6 +490,10 @@ function renderTimeline(consultas) {
               style="font-size:.68rem;color:#8b5cf6;background:none;border:none;
               cursor:pointer;font-family:inherit;font-weight:600;padding:0"
               title="Agregar seguimiento">➕ Seguimiento</button>
+            <button onclick="event.stopPropagation();abrirModalExamenes(${c.id}, null)"
+              style="font-size:.68rem;color:#1d4ed8;background:none;border:none;
+              cursor:pointer;font-family:inherit;font-weight:600;padding:0"
+              title="Exámenes de la atención">🧪 Exámenes</button>
             <button onclick="event.stopPropagation();eliminarConsultaDirecto(${c.id})"
               style="font-size:.68rem;color:#e11d48;background:none;border:none;
               cursor:pointer;font-family:inherit;font-weight:600;padding:0"
@@ -497,10 +501,14 @@ function renderTimeline(consultas) {
           </div>
           ${c.tratamiento?'<span style="font-size:.68rem;background:#f5f3ff;color:#6d28d9;padding:.2rem .6rem;border-radius:999px;font-weight:600">💊 Con tratamiento</span>':''}
         </div>
+        <!-- Exámenes de la atención (los pinta examenes.js) -->
+        <div data-exa-h="${c.id}" style="display:none;flex-wrap:wrap;gap:.35rem;margin-top:.7rem"></div>
         <!-- Seguimientos -->
         ${c.seguimientos?.length ? renderSeguimientos(c.seguimientos) : ''}
       </div>
     </div>`).join('');
+  // Chips de exámenes (atención y seguimientos)
+  if (typeof examenesPintarTimeline === 'function') examenesPintarTimeline();
 }
 
 
@@ -572,6 +580,9 @@ async function verConsulta(id) {
       </div>
       ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Pruebas complementarias',c.pruebas_complementarias,'#1d4ed8')}${sec('Observaciones',c.observaciones)}
       ${c.recetas?.length?`<div style="margin-top:1.2rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:1.1rem;padding:1.15rem"><h4 style="font-family:'Playfair Display',serif;font-weight:700;color:#0c4a6e;margin-bottom:.85rem;font-size:.92rem">💊 Recetas (${c.recetas.length})</h4><div style="display:flex;flex-direction:column;gap:.55rem">${c.recetas.map(r=>`<div style="background:#fff;border-radius:.85rem;padding:.85rem 1rem;font-size:.8rem"><p style="font-weight:700">${esc(r.medicamento)}</p><p style="color:var(--ink-soft);margin-top:.2rem">${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias?' · '+r.duracion_dias+' días':''}</p>${r.instrucciones?'<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">📝 '+esc(r.instrucciones)+'</p>':''}</div>`).join('')}</div></div>`:''}`;
+      // Exámenes de la atención (incluye los de seguimientos)
+      document.getElementById('ver-body').insertAdjacentHTML('beforeend', '<div id="ver-examenes"></div>');
+      if (typeof examenesPintarDetalle === 'function') examenesPintarDetalle(id);
       // Mostrar botón imprimir solo si hay recetas
       var btnImp = document.getElementById('ver-btn-imprimir');
       if (btnImp) btnImp.style.display = c.recetas?.length ? '' : 'none';
@@ -591,6 +602,8 @@ async function guardarConsulta() {
     if (!med||!dosis||!frec) { toast('Completa todos los campos de la receta o elimínala.','warning'); return; }
     recetas.push({medicamento:med,dosis,frecuencia:frec,duracion_dias:parseInt(g('duracion_dias'))||null,instrucciones:g('instrucciones')});
   }
+  const exaLeido=examenesFormLeer('co');
+  if (exaLeido.error) { toast(exaLeido.error,'warning'); return; }
   const hayVacuna=document.getElementById('toggle-vacuna-rapida').checked;
   let vacunaData=null;
   if (hayVacuna) {
@@ -608,6 +621,11 @@ async function guardarConsulta() {
     if (!res) { btn.disabled=false; resetBtn(); return; }
     const data=await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); btn.disabled=false; resetBtn(); return; }
+    // Exámenes registrados en el formulario (se guardan con el id de la nueva atención)
+    if (examenesFormTienePendientes('co')) {
+      btn.textContent='Subiendo exámenes…';
+      await examenesGuardarPendientes('co', data.data.id, null);
+    }
     if (vacunaData) {
       const resV=await api('/vacunas',{method:'POST',body:vacunaData});
       toast(resV?.ok?'✅ Consulta y vacuna guardadas correctamente':'✅ Consulta guardada · ⚠️ Error al guardar la vacuna',resV?.ok?'success':'warning',5000);
@@ -789,6 +807,7 @@ function limpiarForm() {
   document.getElementById('vacuna-rapida-form').style.display='none';
   ['vr-nombre','vr-fabricante','vr-lote','vr-proxima','vr-notas'].forEach(id=>document.getElementById(id).value='');
   recetaN=0;
+  examenesFormReset('co');
 }
 
 function addReceta() {
@@ -833,6 +852,7 @@ async function abrirEditarConsulta(id) {
   document.getElementById('ec-id').value = id;
   document.getElementById('ec-recetas').innerHTML = '';
   ecRecetaN = 0;
+  examenesFormReset('ec');
   openModal('modal-editar-consulta');
   try {
     const res = await api(`/historia/${id}`);
@@ -890,6 +910,9 @@ async function guardarEditConsulta() {
     recetas.push({ medicamento:med, dosis, frecuencia:frec, duracion_dias:parseInt(g('duracion_dias'))||null, instrucciones:g('instrucciones') });
   }
 
+  const exaLeido = examenesFormLeer('ec');
+  if (exaLeido.error) { toast(exaLeido.error,'warning'); return; }
+
   const body = {
     motivo,
     peso_kg      : parseFloat(document.getElementById('ec-peso').value)||null,
@@ -908,6 +931,7 @@ async function guardarEditConsulta() {
     if (!res) return;
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error.','danger'); return; }
+    if (examenesFormTienePendientes('ec')) await examenesGuardarPendientes('ec', parseInt(id), null);
     toast('✅ Consulta actualizada','success');
     closeModal('modal-editar-consulta');
     cargarHistoria(mascotaId);
@@ -1263,6 +1287,8 @@ function renderSeguimientos(seguimientos) {
           '<div style="display:flex;gap:.5rem;align-items:center">' +
             (s.peso_kg ? '<span style="font-size:.65rem;background:#f0f9ff;color:#0369a1;padding:.15rem .45rem;border-radius:999px;font-weight:700">⚖️ ' + s.peso_kg + ' kg</span>' : '') +
             (s.temperatura_c ? '<span style="font-size:.65rem;background:#fffbeb;color:#b45309;padding:.15rem .45rem;border-radius:999px;font-weight:700">🌡️ ' + s.temperatura_c + '°C</span>' : '') +
+            '<button onclick="event.stopPropagation();abrirModalExamenes(' + s.historia_id + ',' + s.id + ')" title="Exámenes del seguimiento" ' +
+              'style="font-size:.65rem;color:#1d4ed8;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">🧪</button>' +
             '<button onclick="event.stopPropagation();editarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
               'style="font-size:.65rem;color:var(--sky);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0">✏️</button>' +
             '<button onclick="event.stopPropagation();eliminarSeguimiento(' + s.id + ',' + s.historia_id + ')" ' +
@@ -1273,6 +1299,7 @@ function renderSeguimientos(seguimientos) {
         (s.tratamiento ? '<p style="font-size:.75rem;color:var(--ink-soft);margin-top:.3rem;line-height:1.5"><strong>Tratamiento:</strong> ' + esc(s.tratamiento) + '</p>' : '') +
         (s.pruebas_complementarias ? '<p style="font-size:.75rem;color:#1d4ed8;margin-top:.3rem;line-height:1.5"><strong>Pruebas:</strong> ' + esc(s.pruebas_complementarias) + '</p>' : '') +
         (s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.3rem">📝 ' + esc(s.observaciones) + '</p>' : '') +
+        '<div data-exa-s="' + s.id + '" style="display:none;flex-wrap:wrap;gap:.35rem;margin-top:.5rem"></div>' +
       '</div>';
     }).join('') +
     '</div></div>';
@@ -1296,6 +1323,7 @@ async function editarSeguimiento(segId, historiaId) {
     document.getElementById('seg-observaciones').value = s.observaciones || '';
     document.getElementById('seg-peso').value          = s.peso_kg || '';
     document.getElementById('seg-temp').value          = s.temperatura_c || '';
+    examenesFormReset('seg');
 
     // Cambiar el botón guardar para que haga PUT en lugar de POST
     var btnGuardar = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
@@ -1312,6 +1340,8 @@ async function editarSeguimiento(segId, historiaId) {
 async function guardarEditSeguimiento(segId, historiaId) {
   var evolucion = document.getElementById('seg-evolucion').value.trim();
   if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+  var exaLeido = examenesFormLeer('seg');
+  if (exaLeido.error) { toast(exaLeido.error, 'warning'); return; }
 
   var body = {
     fecha                  : document.getElementById('seg-fecha').value,
@@ -1328,6 +1358,7 @@ async function guardarEditSeguimiento(segId, historiaId) {
     if (!res) return;
     var data = await res.json();
     if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+    if (examenesFormTienePendientes('seg')) await examenesGuardarPendientes('seg', parseInt(historiaId), parseInt(segId));
     toast('✅ Seguimiento actualizado.', 'success');
     closeModal('modal-seguimiento');
     // Restaurar botón a modo crear
@@ -1368,6 +1399,14 @@ function abrirModalSeguimiento(historiaId) {
   document.getElementById('seg-observaciones').value = '';
   document.getElementById('seg-peso').value          = '';
   document.getElementById('seg-temp').value          = '';
+  examenesFormReset('seg');
+  // Restaurar modo "crear" por si antes se abrió en modo edición y se canceló
+  var btnGuardarSeg = document.querySelector('#modal-seguimiento .vmodal-foot button:last-child');
+  if (btnGuardarSeg) {
+    btnGuardarSeg.textContent = '🔄 Guardar Seguimiento';
+    btnGuardarSeg.onclick = guardarSeguimiento;
+  }
+  document.getElementById('modal-seguimiento').querySelector('h3').textContent = '🔄 Agregar Seguimiento';
   openModal('modal-seguimiento');
   setTimeout(function() { document.getElementById('seg-evolucion').focus(); }, 150);
 }
@@ -1376,6 +1415,8 @@ async function guardarSeguimiento() {
   var historiaId = document.getElementById('seg-historia-id').value;
   var evolucion  = document.getElementById('seg-evolucion').value.trim();
   if (!evolucion) { toast('La evolución es obligatoria.', 'warning'); return; }
+  var exaLeido = examenesFormLeer('seg');
+  if (exaLeido.error) { toast(exaLeido.error, 'warning'); return; }
 
   var body = {
     fecha                  : document.getElementById('seg-fecha').value,
@@ -1392,6 +1433,7 @@ async function guardarSeguimiento() {
     if (!res) return;
     var data = await res.json();
     if (!res.ok) { toast(data.message || 'Error al guardar.', 'danger'); return; }
+    if (examenesFormTienePendientes('seg')) await examenesGuardarPendientes('seg', parseInt(historiaId), data.data.id);
     toast('🔄 Seguimiento registrado correctamente.', 'success');
     closeModal('modal-seguimiento');
     cargarHistoria(mascotaId);
