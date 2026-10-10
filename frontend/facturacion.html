@@ -187,7 +187,10 @@
 
   <div class="page-head">
     <div><h2>🧾 Facturación</h2><p>Boletas, facturas y dashboard de caja</p></div>
-    <button onclick="abrirNuevaFactura()" class="vbtn vbtn-primary">＋ Nueva Boleta / Factura</button>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button onclick="abrirNuevaProforma()" class="vbtn vbtn-ghost">📝 Nueva Proforma</button>
+      <button onclick="abrirNuevaFactura()" class="vbtn vbtn-primary">＋ Nueva Boleta / Factura</button>
+    </div>
   </div>
 
   <!-- Banner sede activa -->
@@ -201,6 +204,7 @@
   <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
     <button class="tab-btn active" id="tab-dashboard" onclick="mostrarTab('dashboard')">📊 Dashboard</button>
     <button class="tab-btn" id="tab-lista" onclick="mostrarTab('lista')">📋 Documentos</button>
+    <button class="tab-btn" id="tab-proformas" onclick="mostrarTab('proformas')">📝 Proformas</button>
   </div>
 
   <!-- ── TAB DASHBOARD ── -->
@@ -307,6 +311,9 @@
     <!-- Cards móvil -->
     <div id="cards-facturas"></div>
   </div>
+
+  <!-- ── TAB PROFORMAS (contenido generado por js/proformas.js) ── -->
+  <div id="contenido-proformas" class="tab-content-scroll" style="display:none"></div>
 
 </div><!-- /main-content -->
 
@@ -793,11 +800,12 @@ async function _buscarInventario(q) {
 
 // ── Tabs ──────────────────────────────────────────────────────────
 function mostrarTab(tab) {
-  ['dashboard','lista'].forEach(t => {
+  ['dashboard','lista','proformas'].forEach(t => {
     document.getElementById('tab-'+t).classList.toggle('active', t===tab);
     document.getElementById('contenido-'+t).style.display = t===tab?'block':'none';
   });
   if (tab==='lista') { _subTabActual='todos'; cargarFacturas(); }
+  if (tab==='proformas' && typeof abrirTabProformas === 'function') abrirTabProformas();
 }
 
 function mostrarSubTab(sub) {
@@ -1060,6 +1068,10 @@ function limpiarFormFac() {
   document.getElementById('nf-pagos').innerHTML = '';
   document.getElementById('nf-items').innerHTML = '';
   propFacSel = null; itemN = 0; pagoN = 0; _serviciosCache = null;
+  // Proforma de origen (se vuelve a fijar en convertirProforma)
+  window._proformaOrigenId = null;
+  var bannerPf = document.getElementById('nf-proforma-banner');
+  if (bannerPf) bannerPf.remove();
   calcularTotales();
 }
 
@@ -1483,6 +1495,7 @@ async function emitirFactura() {
     descuento_global_pct : descGlobalPct,
     comision_tarjeta_pct : comisionPct,
     cliente_ruc, cliente_razon_social, cliente_direccion_fiscal,
+    proforma_id    : window._proformaOrigenId || null,
   };
 
   try {
@@ -1492,6 +1505,10 @@ async function emitirFactura() {
     if (!res.ok) { toast(data.message||'Error al emitir.','danger'); return; }
     toast('✅ '+(body.tipo==='factura'?'Factura':'Boleta')+' '+data.data.numero+' emitida','success',5000);
     closeModal('modal-factura');
+    if (body.proforma_id) {
+      window._proformaOrigenId = null;
+      if (typeof pfRefrescar === 'function') pfRefrescar();
+    }
     await verFactura(data.data.id);
     cargarResumen();
     if (document.getElementById('contenido-lista').style.display!=='none') cargarFacturas();
@@ -2227,5 +2244,6 @@ function badgeEspecie(esp) {
   return m[(esp||'').toLowerCase()] || '🐾';
 }
 </script>
+<script src="js/proformas.js"></script>
 </body>
 </html>

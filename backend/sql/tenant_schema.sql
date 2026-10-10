@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v15
+-- VETNETCODIP SaaS — TENANT SCHEMA v16
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -16,6 +16,8 @@
 -- v14: + categoría 'imagenologia' en servicios_catalogo (maestra de exámenes = laboratorio + imagenologia)
 --       + historia_examenes / historia_examen_archivos (exámenes en atenciones y seguimientos)
 -- v15: + mascotas.foto_blob / foto_updated_at (foto de perfil, contenedor privado vet-mascotas)
+-- v16: + proformas / proforma_items (cotizaciones) + facturas.proforma_id
+--       + serie_proforma / correlativo_p / proforma_validez_dias / proforma_condiciones en empresa_config
 -- Ejecutar al crear nueva clínica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
@@ -357,6 +359,10 @@ CREATE TABLE IF NOT EXISTS empresa_config (
   fe_serie_nota_cred VARCHAR(4)    NOT NULL DEFAULT 'BC01',
   nubefact_ruta      VARCHAR(100)  NULL,
   nubefact_token     TEXT          NULL,
+  serie_proforma        VARCHAR(10)       NOT NULL DEFAULT 'P001' COMMENT 'Serie interna de proformas (no SUNAT)',
+  correlativo_p         INT UNSIGNED      NOT NULL DEFAULT 1      COMMENT 'Siguiente numero de proforma',
+  proforma_validez_dias SMALLINT UNSIGNED NOT NULL DEFAULT 30     COMMENT 'Validez por defecto (dias)',
+  proforma_condiciones  TEXT              NULL                    COMMENT 'Condiciones al pie (NULL = texto por defecto)',
   updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -409,7 +415,9 @@ CREATE TABLE IF NOT EXISTS facturas (
   INDEX idx_fecha        (fecha),
   INDEX idx_estado       (estado),
   INDEX idx_sunat_estado (sunat_estado),
-  INDEX idx_sede         (sede_id)
+  INDEX idx_sede         (sede_id),
+  proforma_id              INT UNSIGNED  NULL DEFAULT NULL COMMENT 'Proforma de la que se genero este comprobante',
+  INDEX idx_fact_proforma (proforma_id)
 ) ENGINE=InnoDB;
 
 -- ── Items de factura ─────────────────────────────────────────
@@ -442,6 +450,69 @@ CREATE TABLE IF NOT EXISTS factura_pagos (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
   INDEX idx_factura (factura_id)
+) ENGINE=InnoDB;
+
+-- ── Proformas (cotizaciones — no son comprobante SUNAT) ──────
+CREATE TABLE IF NOT EXISTS proformas (
+  id                    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  numero                VARCHAR(20)   NOT NULL UNIQUE                 COMMENT 'Ej: P001-00001',
+  propietario_id        INT UNSIGNED  NOT NULL,
+  mascota_id            INT UNSIGNED  NULL,
+  historia_clinica_id   INT UNSIGNED  NULL                            COMMENT 'Atencion desde la que se genero (opcional)',
+  creado_por_id         INT UNSIGNED  NOT NULL,
+  sede_id               INT UNSIGNED  NULL DEFAULT NULL,
+  fecha                 DATE          NOT NULL,
+  validez_dias          SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+  validez_hasta         DATE          NOT NULL,
+  estado                ENUM('borrador','enviada','aceptada','rechazada','vencida','facturada')
+                        NOT NULL DEFAULT 'borrador',
+  igv_incluido          TINYINT(1)    NOT NULL DEFAULT 1,
+  subtotal_bruto        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  descuento_items       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  descuento_global      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  descuento_global_pct  DECIMAL(5,2)  NOT NULL DEFAULT 0.00,
+  subtotal              DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  igv                   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  total                 DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  notas                 TEXT          NULL,
+  condiciones           TEXT          NULL,
+  motivo_rechazo        VARCHAR(255)  NULL,
+  factura_id            INT UNSIGNED  NULL,
+  enviada_at            DATETIME      NULL,
+  aceptada_at           DATETIME      NULL,
+  rechazada_at          DATETIME      NULL,
+  facturada_at          DATETIME      NULL,
+  created_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP     NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (propietario_id)      REFERENCES propietarios(id)     ON DELETE RESTRICT,
+  FOREIGN KEY (mascota_id)          REFERENCES mascotas(id)         ON DELETE SET NULL,
+  FOREIGN KEY (historia_clinica_id) REFERENCES historia_clinica(id) ON DELETE SET NULL,
+  FOREIGN KEY (creado_por_id)       REFERENCES usuarios(id)         ON DELETE RESTRICT,
+  FOREIGN KEY (factura_id)          REFERENCES facturas(id)         ON DELETE SET NULL,
+  INDEX idx_prof_fecha       (fecha),
+  INDEX idx_prof_estado      (estado),
+  INDEX idx_prof_validez     (validez_hasta),
+  INDEX idx_prof_propietario (propietario_id),
+  INDEX idx_prof_sede        (sede_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS proforma_items (
+  id               INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  proforma_id      INT UNSIGNED  NOT NULL,
+  orden            SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  tipo             ENUM('servicio','producto','libre') NOT NULL DEFAULT 'libre',
+  servicio_id      INT UNSIGNED  NULL,
+  inventario_id    INT UNSIGNED  NULL,
+  descripcion      VARCHAR(255)  NOT NULL,
+  cantidad         DECIMAL(8,2)  NOT NULL DEFAULT 1.00,
+  precio_unit      DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Precio congelado al cotizar',
+  descuento_pct    DECIMAL(5,2)  NOT NULL DEFAULT 0.00,
+  descuento_monto  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  subtotal         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  FOREIGN KEY (proforma_id)   REFERENCES proformas(id)          ON DELETE CASCADE,
+  FOREIGN KEY (servicio_id)   REFERENCES servicios_catalogo(id) ON DELETE SET NULL,
+  FOREIGN KEY (inventario_id) REFERENCES inventario(id)         ON DELETE SET NULL,
+  INDEX idx_pitem_proforma (proforma_id)
 ) ENGINE=InnoDB;
 
 -- ── Caja ─────────────────────────────────────────────────────
@@ -740,4 +811,4 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 --   ('Recordatorio de cita — Desparasitación','recordatorio_cita_desparasitacion','🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *desparasitación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Llámanos al [telefono].'),
 --   ('Recordatorio de cita — Estética','recordatorio_cita_estetica','✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de *estética* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos guapos! Llámanos al [telefono].');
 
-SELECT 'tenant_schema v15 ✅' AS resultado;
+SELECT 'tenant_schema v16 ✅' AS resultado;

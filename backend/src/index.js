@@ -40,6 +40,7 @@ const sedesRoutes             = require('./routes/sedes.routes');   // ← NUEVO
 const asistenciaRoutes        = require('./routes/asistencia.routes'); // ← NUEVO
 const integracionRoutes       = require('./routes/integracion.routes');
 const examenesRoutes          = require('./routes/examenes.routes');   // ← NUEVO: exámenes en atenciones/seguimientos
+const proformasRoutes         = require('./routes/proformas.routes');  // ← NUEVO: proformas / cotizaciones
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
@@ -182,6 +183,7 @@ app.use(`${API}/sedes`,            sedesRoutes);             // ← NUEVO
 app.use(`${API}/asistencia`,      asistenciaRoutes);         // ← NUEVO
 app.use(`${API}/integracion`,      integracionRoutes);
 app.use(`${API}/examenes`,         examenesRoutes);           // ← NUEVO
+app.use(`${API}/proformas`,        proformasRoutes);          // ← NUEVO: proformas
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>

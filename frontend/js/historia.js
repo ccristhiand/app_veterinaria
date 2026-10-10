@@ -606,7 +606,31 @@ async function verConsulta(id) {
       if (btnImp) btnImp.style.display = c.recetas?.length ? '' : 'none';
       // Guardar consulta actual para impresión
       window._consultaActual = c;
+      // Botón "Generar proforma" solo para roles que facturan
+      var btnPf = document.getElementById('ver-btn-proforma');
+      if (btnPf) btnPf.style.display = puedeGenerarProforma() ? '' : 'none';
   } catch { document.getElementById('ver-body').innerHTML='<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; }
+}
+
+// ── Proformas: desde una atención se arma el presupuesto en Facturación ──
+function puedeGenerarProforma() {
+  try {
+    var u = JSON.parse(localStorage.getItem('vet_user') || '{}');
+    return ['admin', 'recepcionista', 'veterinario_recepcionista'].indexOf(u.rol) >= 0;
+  } catch (e) { return false; }
+}
+
+function generarProformaDesdeConsulta() {
+  var c = window._consultaActual;
+  if (!c || !c.mascota_id) { toast('Abre una atención primero.', 'warning'); return; }
+  try {
+    sessionStorage.setItem('proforma_desde_historia', JSON.stringify({
+      mascota_id         : c.mascota_id,
+      historia_clinica_id: c.id,
+      motivo             : c.motivo || '',
+    }));
+  } catch (e) {}
+  window.location.href = 'facturacion.html';
 }
 
 async function guardarConsulta() {

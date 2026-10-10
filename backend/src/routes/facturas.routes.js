@@ -165,7 +165,9 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
       cliente_ruc, cliente_razon_social, cliente_direccion_fiscal,
       descuento_global_pct = 0,   // % de descuento global sobre subtotal bruto
       comision_tarjeta_pct = 0,   // % de comisión bancaria (solo tarjeta)
+      proforma_id = null,         // ← NUEVO: proforma de origen (si se convierte desde Proformas)
     } = req.body;
+    const proformaId = parseInt(proforma_id) || null;
 
     if (!propietario_id) return res.status(422).json({ success: false, message: 'propietario_id requerido.' });
     if (!fecha)          return res.status(422).json({ success: false, message: 'fecha requerida.' });
@@ -183,6 +185,21 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
                    (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
 
     const result = await req.db.withTransaction(async (conn) => {
+      // ── Proforma de origen: bloquear y validar ─────────────────
+      // FOR UPDATE evita que dos usuarios conviertan la misma proforma a la vez
+      if (proformaId) {
+        const [[pf]] = await conn.execute(
+          'SELECT id, numero, estado, propietario_id FROM proformas WHERE id = ? FOR UPDATE', [proformaId]
+        );
+        if (!pf) throw Object.assign(new Error('La proforma de origen no existe.'), { status: 404 });
+        if (pf.estado === 'facturada')
+          throw Object.assign(new Error(`La proforma ${pf.numero} ya fue facturada.`), { status: 422 });
+        if (pf.estado === 'rechazada')
+          throw Object.assign(new Error(`La proforma ${pf.numero} está rechazada. Reábrela antes de facturar.`), { status: 422 });
+        if (parseInt(pf.propietario_id) !== parseInt(propietario_id))
+          throw Object.assign(new Error('El propietario no coincide con el de la proforma.'), { status: 422 });
+      }
+
       // ── Validar stock ─────────────────────────────────────────
       for (const it of items) {
         if (it.inventario_id) {
@@ -198,7 +215,8 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
         }
       }
 
-      const [[cfg]] = await conn.execute('SELECT * FROM empresa_config LIMIT 1');
+      // FOR UPDATE: bloquea la fila mientras se toma el correlativo → evita números duplicados
+      const [[cfg]] = await conn.execute('SELECT * FROM empresa_config LIMIT 1 FOR UPDATE');
       if (!cfg) throw Object.assign(new Error('Configuración de empresa no encontrada.'), { status: 500 });
 
       const igvPct = parseFloat(cfg.igv_porcentaje) / 100;
@@ -300,6 +318,15 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
         ]
       );
       const facturaId = ins.insertId;
+
+      // ── Enlazar con la proforma de origen ────────────────────
+      if (proformaId) {
+        await conn.execute('UPDATE facturas SET proforma_id = ? WHERE id = ?', [proformaId, facturaId]);
+        await conn.execute(
+          "UPDATE proformas SET estado = 'facturada', factura_id = ?, facturada_at = NOW() WHERE id = ?",
+          [facturaId, proformaId]
+        );
+      }
 
       // ── INSERT ítems ─────────────────────────────────────────
       for (const it of itemsCalc) {
@@ -434,6 +461,17 @@ router.patch('/:id/anular', authorize('admin'), auditMiddleware('facturacion:anu
       "UPDATE facturas SET estado='anulado', observaciones=?, anulado_por=?, updated_at=NOW() WHERE id=?",
       [observaciones.trim(), req.user.nombre, req.params.id]
     );
+
+    // ── Si venía de una proforma, liberarla para poder facturarla de nuevo ──
+    try {
+      const [fp] = await req.db.query('SELECT proforma_id FROM facturas WHERE id = ?', [req.params.id]);
+      if (fp?.proforma_id) {
+        await req.db.query(
+          "UPDATE proformas SET estado='aceptada', factura_id=NULL, facturada_at=NULL WHERE id=? AND factura_id=?",
+          [fp.proforma_id, req.params.id]
+        );
+      }
+    } catch { /* tenant sin migración de proformas: no crítico */ }
 
     // Devolver stock
     const items = await req.db.query(
