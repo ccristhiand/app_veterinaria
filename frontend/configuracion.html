@@ -152,6 +152,34 @@
         </div>
       </div>
 
+      <!-- Configuración de proformas -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;margin-bottom:.35rem">
+          📝 Proformas
+        </h3>
+        <p style="font-size:.75rem;color:var(--ink-faint);margin-bottom:1.1rem">
+          Valores por defecto al crear una proforma. En cada proforma se pueden cambiar.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div>
+            <label class="vlabel">Serie de proforma</label>
+            <input id="c-serie-p" type="text" class="vinput" placeholder="P001" maxlength="10"
+              style="text-transform:uppercase"/>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">Serie interna, no es de SUNAT. Ej: P001-00025</p>
+          </div>
+          <div>
+            <label class="vlabel">Validez por defecto (días)</label>
+            <input id="c-pf-validez" type="number" min="1" max="365" step="1" class="vinput" placeholder="30"/>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">Entre 1 y 365 días</p>
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <label class="vlabel">Condiciones (se imprimen al pie de la proforma)</label>
+          <textarea id="c-pf-condiciones" rows="3" class="vinput"
+            placeholder="Precios referenciales. El monto final puede variar según la evolución del paciente…"></textarea>
+        </div>
+      </div>
+
     </div>
 
     <!-- Preview del documento -->
@@ -198,6 +226,10 @@ initPage({ activePage:'configuracion', title:'Configuración', subtitle:'Datos d
     document.getElementById('c-serie-b').value  = d.serie_boleta  || 'B001';
     document.getElementById('c-serie-f').value  = d.serie_factura || 'F001';
     document.getElementById('c-pie').value      = d.pie_documento || '';
+    // Proformas
+    document.getElementById('c-serie-p').value         = d.serie_proforma        || 'P001';
+    document.getElementById('c-pf-validez').value      = d.proforma_validez_dias || 30;
+    document.getElementById('c-pf-condiciones').value  = d.proforma_condiciones  || '';
     // Moneda
     const moneda = d.moneda || 'PEN';
     const selectMoneda = document.getElementById('c-moneda');
@@ -351,9 +383,19 @@ async function guardar() {
     serie_boleta  : document.getElementById('c-serie-b').value.trim()||'B001',
     serie_factura : document.getElementById('c-serie-f').value.trim()||'F001',
     pie_documento : document.getElementById('c-pie').value.trim(),
+    // Proformas
+    serie_proforma       : document.getElementById('c-serie-p').value.trim().toUpperCase() || 'P001',
+    proforma_validez_dias: parseInt(document.getElementById('c-pf-validez').value) || 30,
+    proforma_condiciones : document.getElementById('c-pf-condiciones').value.trim(),
   };
 
   if (!body.nombre) { toast('El nombre es obligatorio.','warning'); return; }
+  if (body.proforma_validez_dias < 1 || body.proforma_validez_dias > 365) {
+    toast('La validez de proformas debe estar entre 1 y 365 días.','warning'); return;
+  }
+  if (!/^[A-Z0-9]{1,10}$/.test(body.serie_proforma)) {
+    toast('La serie de proformas solo admite letras y números (máx. 10).','warning'); return;
+  }
 
   try {
     const res  = await api('/empresa', { method:'PUT', body });

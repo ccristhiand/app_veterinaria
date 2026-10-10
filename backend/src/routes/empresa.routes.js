@@ -24,7 +24,17 @@ router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado',
       telefono, email, web, logo_url,
       moneda, simbolo_moneda,
       igv_porcentaje, serie_boleta, serie_factura, pie_documento,
+      // ── Proformas (opcionales) ──
+      serie_proforma, proforma_validez_dias, proforma_condiciones,
     } = req.body;
+
+    if (proforma_validez_dias !== undefined && proforma_validez_dias !== null && proforma_validez_dias !== '') {
+      const v = parseInt(proforma_validez_dias);
+      if (!v || v < 1 || v > 365)
+        return res.status(422).json({ success: false, message: 'La validez de proformas debe estar entre 1 y 365 días.' });
+    }
+    if (serie_proforma !== undefined && !/^[A-Za-z0-9]{1,10}$/.test(String(serie_proforma).trim() || 'P001'))
+      return res.status(422).json({ success: false, message: 'La serie de proformas solo admite letras y números (máx. 10).' });
 
     if (!nombre?.trim())
       return res.status(422).json({ success: false, message: 'El nombre es obligatorio.' });
@@ -67,6 +77,26 @@ router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado',
           pie_documento?.trim()||null,
         ]
       );
+    }
+
+    // ── Configuración de proformas (solo si vino en el body) ──────
+    // Va aparte para que la configuración general siga funcionando
+    // aunque la clínica aún no tenga la migración de proformas.
+    if (serie_proforma !== undefined || proforma_validez_dias !== undefined || proforma_condiciones !== undefined) {
+      try {
+        const [fila] = await req.db.query('SELECT id FROM empresa_config LIMIT 1');
+        await req.db.query(
+          `UPDATE empresa_config SET serie_proforma=?, proforma_validez_dias=?, proforma_condiciones=? WHERE id=?`,
+          [
+            (String(serie_proforma || '').trim() || 'P001').toUpperCase(),
+            parseInt(proforma_validez_dias) || 30,
+            String(proforma_condiciones || '').trim() || null,
+            fila.id,
+          ]
+        );
+      } catch (e) {
+        if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;   // columnas aún no creadas → se ignora
+      }
     }
 
     const [updated] = await req.db.query('SELECT * FROM empresa_config LIMIT 1');
