@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v16
+-- VETNETCODIP SaaS — TENANT SCHEMA v17
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -18,6 +18,8 @@
 -- v15: + mascotas.foto_blob / foto_updated_at (foto de perfil, contenedor privado vet-mascotas)
 -- v16: + proformas / proforma_items (cotizaciones) + facturas.proforma_id
 --       + serie_proforma / correlativo_p / proforma_validez_dias / proforma_condiciones en empresa_config
+-- v17: + Punto de Venta: propietarios.es_generico (+ cliente Publico General), facturas.origen,
+--       inventario.codigo_barras / favorito, categorias alimento y accesorio
 -- Ejecutar al crear nueva clínica
 -- Compatible MySQL 5.7+ / MySQL 8+
 -- ============================================================
@@ -66,6 +68,7 @@ CREATE TABLE IF NOT EXISTS propietarios (
   ruc              VARCHAR(20)  NULL,
   razon_social     VARCHAR(200) NULL,
   direccion_fiscal VARCHAR(255) NULL,
+  es_generico      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '1 = cliente Publico General del Punto de Venta',
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -209,7 +212,9 @@ CREATE TABLE IF NOT EXISTS desparasitaciones (
 CREATE TABLE IF NOT EXISTS inventario (
   id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
   nombre            VARCHAR(200)  NOT NULL,
-  categoria         ENUM('medicamento','vacuna','insumo','otro') NOT NULL DEFAULT 'medicamento',
+  categoria         ENUM('medicamento','vacuna','insumo','alimento','accesorio','otro') NOT NULL DEFAULT 'medicamento',
+  codigo_barras     VARCHAR(50)   NULL DEFAULT NULL COMMENT 'Codigo de barras (lector)',
+  favorito          TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '1 = boton rapido en el Punto de Venta',
   descripcion       TEXT          NULL,
   cantidad          DECIMAL(10,2) NOT NULL DEFAULT 0,
   unidad            VARCHAR(30)   NOT NULL DEFAULT 'unidad',
@@ -224,7 +229,8 @@ CREATE TABLE IF NOT EXISTS inventario (
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_sede        (sede_id),
-  INDEX idx_vencimiento (fecha_vencimiento)
+  INDEX idx_vencimiento (fecha_vencimiento),
+  INDEX idx_inv_codigo_barras (codigo_barras)
 ) ENGINE=InnoDB;
 
 -- ── Estética ─────────────────────────────────────────────────
@@ -417,7 +423,9 @@ CREATE TABLE IF NOT EXISTS facturas (
   INDEX idx_sunat_estado (sunat_estado),
   INDEX idx_sede         (sede_id),
   proforma_id              INT UNSIGNED  NULL DEFAULT NULL COMMENT 'Proforma de la que se genero este comprobante',
-  INDEX idx_fact_proforma (proforma_id)
+  INDEX idx_fact_proforma (proforma_id),
+  origen                   ENUM('atencion','punto_venta') NOT NULL DEFAULT 'atencion' COMMENT 'Donde se genero el comprobante',
+  INDEX idx_fact_origen (origen)
 ) ENGINE=InnoDB;
 
 -- ── Items de factura ─────────────────────────────────────────
@@ -811,4 +819,9 @@ INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES
 --   ('Recordatorio de cita — Desparasitación','recordatorio_cita_desparasitacion','🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de *desparasitación* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos! Llámanos al [telefono].'),
 --   ('Recordatorio de cita — Estética','recordatorio_cita_estetica','✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de *estética* el *[fecha]* a las *[hora]* en *[clinica]*. ¡Te esperamos guapos! Llámanos al [telefono].');
 
-SELECT 'tenant_schema v16 ✅' AS resultado;
+-- ── Cliente generico para el Punto de Venta ─────────────────
+INSERT INTO propietarios (tipo_documento, nombre, apellido, es_generico)
+SELECT 'OTRO', 'Público', 'General', 1 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM propietarios WHERE es_generico = 1);
+
+SELECT 'tenant_schema v17 ✅' AS resultado;
