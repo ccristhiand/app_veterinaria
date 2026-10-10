@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VetClinic — Punto de Venta</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    .pv-grid { display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:1.2rem; align-items:start; }
+    @media (max-width:1100px) { .pv-grid { grid-template-columns:minmax(0,1fr) 360px; } }
+    @media (max-width:900px)  { .pv-grid { grid-template-columns:1fr; } }
+
+    .pv-search { position:relative; }
+    .pv-search input { font-size:1.05rem; padding:.9rem 1rem .9rem 2.9rem; border-radius:1rem; }
+    .pv-search .ico { position:absolute; left:1rem; top:50%; transform:translateY(-50%); font-size:1.1rem; opacity:.6; }
+    .pv-kbd { display:inline-block; font-size:.62rem; font-weight:700; padding:.05rem .35rem; border-radius:.3rem;
+              background:#f1f5f2; border:1px solid var(--line); color:var(--ink-soft); font-family:monospace; }
+
+    .pv-chips { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.55rem; }
+    .pv-chip { text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:.9rem; padding:.6rem .75rem;
+               cursor:pointer; font-family:inherit; transition:all .12s; display:flex; flex-direction:column; gap:.15rem; min-height:64px; }
+    .pv-chip:hover { border-color:#10b981; background:#f0fdf4; }
+    .pv-chip.sel   { border-color:#059669; box-shadow:0 0 0 3px rgba(16,185,129,.18); }
+    .pv-chip .n { font-size:.8rem; font-weight:700; line-height:1.25; }
+    .pv-chip .m { font-size:.7rem; color:var(--ink-faint); display:flex; justify-content:space-between; gap:.4rem; }
+    .pv-chip .p { font-weight:800; color:#15803d; }
+    .pv-chip.sin-stock { opacity:.55; }
+
+    .pv-cart { position:sticky; top:0; display:flex; flex-direction:column; max-height:calc(100vh - 11rem); overflow-y:auto; }
+    .pv-cart > * { flex-shrink:0; }
+    .pv-qty input, .pv-price { -moz-appearance:textfield; }
+    .pv-qty input::-webkit-inner-spin-button, .pv-qty input::-webkit-outer-spin-button,
+    .pv-price::-webkit-inner-spin-button, .pv-price::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+    .pv-cart-foot { position:sticky; bottom:-1.3rem; background:#fff; padding:.6rem 0 .2rem; margin-top:.2rem; z-index:2;
+                    box-shadow:0 -8px 12px -10px rgba(13,59,46,.25); display:flex; flex-direction:column; gap:.4rem; }
+    @media (max-width:900px) { .pv-cart { position:static; max-height:none; } }
+    .pv-cart-items { min-height:90px; }
+    .pv-row { display:grid; grid-template-columns:1fr auto; gap:.35rem .6rem; padding:.6rem .2rem; border-bottom:1px dashed var(--line); }
+    .pv-row .n { font-size:.82rem; font-weight:600; line-height:1.3; }
+    .pv-qty { display:flex; align-items:center; gap:.25rem; }
+    .pv-qty button { width:28px; height:28px; border-radius:.5rem; border:1px solid var(--line); background:#fff; cursor:pointer;
+                     font-weight:800; font-size:.95rem; line-height:1; }
+    .pv-qty input { width:52px; text-align:center; padding:.3rem; font-size:.82rem; }
+    .pv-price { width:96px; text-align:right; padding:.3rem .4rem; font-size:.8rem; }
+
+    .pv-metodos { display:grid; grid-template-columns:repeat(5,1fr); gap:.35rem; }
+    .pv-met { border:1.5px solid var(--line); background:#fff; border-radius:.7rem; padding:.45rem .2rem; cursor:pointer;
+              font-family:inherit; font-size:.7rem; font-weight:700; color:var(--ink-soft); display:flex; flex-direction:column;
+              align-items:center; gap:.1rem; }
+    .pv-met .e { font-size:1.05rem; }
+    .pv-met.on { border-color:#059669; background:#ecfdf5; color:#047857; }
+
+    .pv-total { display:flex; justify-content:space-between; align-items:baseline; font-weight:800; color:#15803d; }
+    .pv-total .v { font-size:1.9rem; letter-spacing:-.02em; }
+
+    .pv-cobrar { width:100%; padding:1rem; font-size:1.05rem; font-weight:800; border:none; border-radius:1rem; cursor:pointer;
+                 color:#fff; background:linear-gradient(135deg,#10b981,#047857); font-family:inherit;
+                 display:flex; justify-content:center; align-items:center; gap:.5rem; }
+    .pv-cobrar:disabled { background:#cbd5d1; cursor:not-allowed; }
+
+    .pv-aviso { font-size:.75rem; border-radius:.7rem; padding:.5rem .75rem; }
+    .pv-aviso.warn { background:#fffbeb; border:1px solid #fde68a; color:#b45309; }
+    .pv-aviso.err  { background:#fff1f2; border:1px solid #fecdd3; color:#be123c; }
+
+    .pv-vuelto { background:#ecfdf5; border:1px solid #a7f3d0; border-radius:.8rem; padding:.55rem .8rem;
+                 display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#047857; }
+    .pv-split-row { display:grid; grid-template-columns:1fr 110px 28px; gap:.4rem; align-items:center; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
+    <div>
+      <h2>🛒 Punto de Venta</h2>
+      <p>Ventas de mostrador · <span class="pv-kbd">F2</span> buscar · <span class="pv-kbd">F4</span> cobrar · <span class="pv-kbd">Esc</span> vaciar</p>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+      <div id="selector-sede-pv"></div>
+      <button onclick="pvToggleVentas()" class="vbtn vbtn-ghost">🧾 Ventas de hoy <span id="pv-hoy-total" style="font-weight:800;color:#15803d;margin-left:.3rem"></span></button>
+    </div>
+  </div>
+
+  <div id="pv-migracion" class="pv-aviso err" style="display:none;margin-bottom:1rem"></div>
+
+  <div class="pv-grid">
+
+    <!-- ══ Columna izquierda: búsqueda ══ -->
+    <div style="display:flex;flex-direction:column;gap:1rem;min-width:0">
+      <div class="vcard vcard-pad">
+        <div class="pv-search">
+          <span class="ico">🔍</span>
+          <input id="pv-q" type="text" class="vinput" autocomplete="off" spellcheck="false"
+            placeholder="Escanea el código de barras o escribe el producto / servicio…"/>
+        </div>
+        <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.45rem">
+          <span class="pv-kbd">Enter</span> agrega el resultado marcado · <span class="pv-kbd">↑</span><span class="pv-kbd">↓</span> para moverte entre resultados
+        </p>
+        <div id="pv-resultados" style="margin-top:.9rem;display:none"></div>
+      </div>
+
+      <div class="vcard vcard-pad">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">⭐ Favoritos</h3>
+          <a href="inventario" style="font-size:.72rem;color:var(--green-600);font-weight:600">Configurar en Inventario →</a>
+        </div>
+        <div id="pv-favoritos" class="pv-chips"></div>
+      </div>
+
+      <div id="pv-ventas-wrap" class="vcard vcard-pad" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">🧾 Ventas de mostrador de hoy</h3>
+          <button onclick="pvCargarVentasHoy()" class="vlink" style="font-size:.75rem">↻ Actualizar</button>
+        </div>
+        <div style="overflow-x:auto"><table class="vtable"><thead><tr>
+          <th>Hora</th><th>Número</th><th>Cliente</th><th>Pago</th><th>Total</th><th></th>
+        </tr></thead><tbody id="pv-ventas-tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ══ Columna derecha: carrito ══ -->
+    <div class="vcard vcard-pad pv-cart">
+      <!-- Cliente + tipo -->
+      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.6rem">
+        <div style="flex:1;min-width:0;background:#f8faf8;border:1px solid var(--line);border-radius:.8rem;padding:.45rem .7rem">
+          <p style="font-size:.6rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Cliente</p>
+          <p id="pv-cliente-nombre" style="font-size:.85rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</p>
+        </div>
+        <button onclick="pvAbrirCliente()" class="vbtn vbtn-ghost" style="padding:.5rem .7rem;font-size:.75rem">Cambiar</button>
+        <select id="pv-tipo" class="vinput" style="width:auto;min-width:104px;font-size:.8rem;padding:.5rem 1.8rem .5rem .6rem" onchange="pvOnTipo()">
+          <option value="boleta">Boleta</option>
+          <option value="factura">Factura</option>
+        </select>
+      </div>
+
+      <!-- Datos factura -->
+      <div id="pv-factura-box" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.8rem;padding:.6rem;margin-bottom:.6rem">
+        <div style="display:flex;gap:.4rem">
+          <input id="pv-ruc" class="vinput" maxlength="11" placeholder="RUC (11 dígitos)" style="font-size:.8rem"
+            oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter'){event.preventDefault();pvBuscarRUC();}"/>
+          <button onclick="pvBuscarRUC()" class="vbtn vbtn-ghost" style="padding:.4rem .6rem;font-size:.72rem" title="Consultar SUNAT">🔎</button>
+        </div>
+        <input id="pv-razon" class="vinput" placeholder="Razón social" style="font-size:.8rem;margin-top:.4rem"/>
+        <input id="pv-dirf" class="vinput" placeholder="Dirección fiscal (opcional)" style="font-size:.8rem;margin-top:.4rem"/>
+      </div>
+
+      <!-- Ítems -->
+      <div id="pv-items" class="pv-cart-items"></div>
+
+      <!-- Totales y pago -->
+      <div style="border-top:2px solid var(--line);padding-top:.7rem;margin-top:.4rem;display:flex;flex-direction:column;gap:.55rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:var(--ink-soft)">
+          <label style="display:flex;align-items:center;gap:.4rem">🏷️ Descuento
+            <input id="pv-desc" type="number" min="0" max="100" step="0.5" value="0" class="vinput"
+              style="width:64px;padding:.25rem .4rem;font-size:.78rem;text-align:center"/> %
+          </label>
+          <span id="pv-desc-monto" style="color:#be123c;font-weight:700"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--ink-faint)">
+          <span>Op. gravada <b id="pv-sub" style="color:var(--ink-soft)">S/. 0.00</b></span>
+          <span id="pv-igv-lbl">IGV <b id="pv-igv" style="color:var(--ink-soft)">S/. 0.00</b></span>
+        </div>
+        <div class="pv-total"><span>TOTAL</span><span class="v" id="pv-total">S/. 0.00</span></div>
+
+        <div id="pv-aviso" class="pv-aviso warn" style="display:none"></div>
+
+        <div class="pv-metodos" id="pv-metodos"></div>
+
+        <div id="pv-pago-simple">
+          <div id="pv-efectivo-box" style="display:flex;gap:.5rem;align-items:center">
+            <label style="font-size:.75rem;font-weight:600;color:var(--ink-soft);white-space:nowrap">💵 Recibe</label>
+            <input id="pv-recibe" type="number" min="0" step="0.1" class="vinput" placeholder="0.00"
+              style="font-size:.95rem;font-weight:700;text-align:right"/>
+          </div>
+          <div id="pv-rapidos" style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.4rem"></div>
+          <div id="pv-ref-box" style="display:none">
+            <input id="pv-ref" class="vinput" placeholder="N° de operación / voucher (opcional)" style="font-size:.8rem"/>
+          </div>
+        </div>
+
+        <div id="pv-pago-mixto" style="display:none;flex-direction:column;gap:.35rem"></div>
+        <button onclick="pvToggleMixto()" id="pv-btn-mixto" class="vlink" style="font-size:.72rem;align-self:flex-start">＋ Dividir pago (mixto)</button>
+
+      </div>
+      <!-- Pie fijo: el botón COBRAR siempre visible aunque el carrito sea largo -->
+      <div class="pv-cart-foot">
+        <div class="pv-vuelto" id="pv-vuelto-box" style="display:none"><span>Vuelto</span><span id="pv-vuelto" style="font-size:1.15rem">S/. 0.00</span></div>
+        <button id="pv-btn-cobrar" class="pv-cobrar" onclick="pvCobrar()" disabled>
+          💳 COBRAR <span class="pv-kbd" style="background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.35)">F4</span>
+        </button>
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--ink-soft);cursor:pointer;align-self:center">
+          <input type="checkbox" id="pv-autoprint" style="accent-color:var(--green-600)"/> Imprimir ticket automáticamente
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal cliente ══════════════════════════════════════════════ -->
+<div id="modal-pv-cliente" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head"><h3>👤 Cliente de la venta</h3>
+      <button onclick="closeModal('modal-pv-cliente')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <button onclick="pvUsarGenerico()" class="vbtn vbtn-ghost" style="justify-content:center">🧍 Usar "Público General"</button>
+
+      <div>
+        <label class="vlabel">Buscar cliente registrado</label>
+        <div style="display:flex;gap:.5rem">
+          <input id="pv-cli-q" class="vinput" placeholder="DNI, nombre o teléfono…"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();pvBuscarCliente();}"/>
+          <button onclick="pvBuscarCliente()" class="vbtn vbtn-primary">Buscar</button>
+        </div>
+        <div id="pv-cli-res" style="display:flex;flex-direction:column;gap:.35rem;margin-top:.5rem;max-height:180px;overflow-y:auto"></div>
+      </div>
+
+      <div style="border-top:1px dashed var(--line);padding-top:1rem">
+        <p style="font-size:.72rem;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">➕ Cliente nuevo rápido</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2" style="display:flex;gap:.4rem">
+            <input id="pv-new-dni" class="vinput" maxlength="8" placeholder="DNI (8 dígitos)"
+              oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter'){event.preventDefault();pvBuscarDNI();}"/>
+            <button onclick="pvBuscarDNI()" class="vbtn vbtn-ghost" title="Consultar RENIEC">🔎 RENIEC</button>
+          </div>
+          <input id="pv-new-nombre" class="vinput" placeholder="Nombres *"/>
+          <input id="pv-new-apellido" class="vinput" placeholder="Apellidos *"/>
+          <input id="pv-new-tel" class="vinput col-span-2" placeholder="Teléfono (opcional)"/>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-pv-cliente')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="pvCrearCliente()" class="vbtn vbtn-primary">Guardar y usar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal venta realizada ══════════════════════════════════════ -->
+<div id="modal-pv-ok" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:420px">
+    <div class="vmodal-body" style="text-align:center;display:flex;flex-direction:column;gap:.7rem;padding-top:1.8rem">
+      <div style="font-size:2.6rem">✅</div>
+      <p style="font-weight:800;font-size:1.1rem">Venta registrada</p>
+      <p id="pv-ok-numero" style="font-family:monospace;font-weight:700;color:var(--ink-soft)"></p>
+      <p id="pv-ok-total" style="font-size:1.6rem;font-weight:800;color:#15803d"></p>
+      <div id="pv-ok-vuelto" class="pv-vuelto" style="justify-content:center;gap:.6rem;font-size:1.05rem"></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="pvImprimirUltimo()" class="vbtn vbtn-ghost">🖨️ Ticket <span class="pv-kbd">P</span></button>
+      <button onclick="pvNuevaVenta()" class="vbtn vbtn-primary">Nueva venta <span class="pv-kbd" style="background:rgba(255,255,255,.2);color:#fff">Enter</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal confirmación ═════════════════════════════════════════ -->
+<div id="modal-pv-confirm" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:400px">
+    <div class="vmodal-head"><h3 id="pv-confirm-titulo">Confirmar</h3>
+      <button onclick="closeModal('modal-pv-confirm')" class="vmodal-close">✕</button></div>
+    <div class="vmodal-body"><p id="pv-confirm-msg" style="font-size:.85rem;color:var(--ink-soft)"></p></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-pv-confirm')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="pv-confirm-btn" class="vbtn" style="background:#be123c;color:#fff;border:none">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+initPage({ activePage:'punto_venta', title:'Punto de Venta', subtitle:'Ventas de mostrador' });
+
+// ══════════════════════════════════════════════════════════════════
+// Estado
+// ══════════════════════════════════════════════════════════════════
+var PV = {
+  cfg       : null,       // /punto-venta/config
+  cliente   : null,       // { id, nombre, generico, dni }
+  carrito   : [],         // { key, tipo, id, nombre, precio, cant, stock, unidad }
+  resultados: [],
+  selIdx    : 0,
+  metodo    : 'efectivo',
+  mixto     : false,
+  pagos     : [],         // modo mixto: { metodo, monto }
+  cobrando  : false,
+  ultimaVenta: null,      // datos para el ticket
+};
+
+var PV_METODOS = [
+  { v:'efectivo',      e:'💵', l:'Efectivo' },
+  { v:'yape',          e:'📱', l:'Yape' },
+  { v:'plin',          e:'📲', l:'Plin' },
+  { v:'tarjeta',       e:'💳', l:'Tarjeta' },
+  { v:'transferencia', e:'🏦', l:'Transf.' },
+];
+
+function S(n) { return 'S/. ' + (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2); }
+function r2(n) { return Math.round((parseFloat(n) || 0) * 100) / 100; }
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+// ══════════════════════════════════════════════════════════════════
+// Inicio
+// ══════════════════════════════════════════════════════════════════
+(async function init() {
+  document.getElementById('pv-autoprint').checked = lsGet('pv_autoprint') === '1';
+  document.getElementById('pv-autoprint').addEventListener('change', function () {
+    lsSet('pv_autoprint', this.checked ? '1' : '0');
+  });
+
+  pvRenderMetodos();
+  pvRender();
+
+  try {
+    var res = await api('/punto-venta/config');
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) {
+      var box = document.getElementById('pv-migracion');
+      box.style.display = 'block';
+      box.textContent = '⚠️ ' + (d.message || 'No se pudo cargar el Punto de Venta.');
+      return;
+    }
+    PV.cfg = d.data;
+    pvUsarGenerico(true);
+    var igv = PV.cfg.empresa.igv_porcentaje;
+    document.getElementById('pv-igv-lbl').firstChild.textContent = 'IGV (' + igv + '%) ';
+  } catch (e) { toast('Error de conexión.', 'danger'); }
+
+  try {
+    initSelectorSede('selector-sede-pv', function () { pvCargarFavoritos(); pvCargarVentasHoy(); },
+      { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
+  } catch (e) {}
+
+  pvCargarFavoritos();
+  pvCargarVentasHoy();
+  document.getElementById('pv-q').focus();
+})();
+
+// ══════════════════════════════════════════════════════════════════
+// Búsqueda
+// ══════════════════════════════════════════════════════════════════
+var _pvTimer = null, _pvSeq = 0;
+var qInput = document.getElementById('pv-q');
+
+qInput.addEventListener('input', function () {
+  clearTimeout(_pvTimer);
+  var q = qInput.value.trim();
+  if (q.length < 2) { pvMostrarResultados([]); return; }
+  _pvTimer = setTimeout(function () { pvBuscar(q, false); }, 250);
+});
+
+qInput.addEventListener('keydown', function (e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!PV.resultados.length) return;
+    e.preventDefault();
+    PV.selIdx = (PV.selIdx + (e.key === 'ArrowDown' ? 1 : -1) + PV.resultados.length) % PV.resultados.length;
+    pvMostrarResultados(PV.resultados);
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var q = qInput.value.trim();
+    if (!q) return;
+    clearTimeout(_pvTimer);
+    // Lector de código de barras: escribe rápido y presiona Enter → búsqueda inmediata
+    pvBuscar(q, true);
+  }
+});
+
+async function pvBuscar(q, agregarAlTerminar) {
+  var seq = ++_pvSeq;
+  try {
+    var res = await api('/punto-venta/buscar?q=' + encodeURIComponent(q));
+    if (seq !== _pvSeq) return;                       // llegó una búsqueda más nueva
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) { toast(d.message || 'Error al buscar.', 'danger'); return; }
+    var data = d.data || {};
+    if (agregarAlTerminar) {
+      var item = data.exacto || (data.resultados || [])[Math.min(PV.selIdx, (data.resultados || []).length - 1)];
+      if (!item) { toast('Sin resultados para "' + q + '".', 'warning'); return; }
+      pvAgregar(item);
+      qInput.value = '';
+      pvMostrarResultados([]);
+      return;
+    }
+    PV.selIdx = 0;
+    pvMostrarResultados(data.resultados || []);
+  } catch (e) { toast('Error de conexión.', 'danger'); }
+}
+
+function pvChip(it, idx, sel) {
+  var sinStock = it.tipo === 'producto' && it.stock <= 0;
+  var meta = it.tipo === 'producto'
+    ? (sinStock ? '<span style="color:#be123c">Sin stock</span>' : '📦 ' + it.stock + ' ' + esc(it.unidad || ''))
+    : '🛎️ servicio';
+  return '<button class="pv-chip' + (sel ? ' sel' : '') + (sinStock ? ' sin-stock' : '') + '" data-idx="' + idx + '">' +
+    '<span class="n">' + esc(it.nombre) + '</span>' +
+    '<span class="m"><span>' + meta + '</span><span class="p">' + S(it.precio) + '</span></span></button>';
+}
+
+function pvMostrarResultados(lista) {
+  PV.resultados = lista;
+  var box = document.getElementById('pv-resultados');
+  if (!lista.length) {
+    box.style.display = qInput.value.trim().length >= 2 ? 'block' : 'none';
+    box.innerHTML = '<p style="font-size:.78rem;color:var(--ink-faint)">Sin resultados.</p>';
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = '<div class="pv-chips">' + lista.map(function (it, i) { return pvChip(it, i, i === PV.selIdx); }).join('') + '</div>';
+  box.querySelectorAll('.pv-chip').forEach(function (b) {
+    b.onclick = function () {
+      pvAgregar(PV.resultados[+b.getAttribute('data-idx')]);
+      qInput.value = ''; pvMostrarResultados([]); qInput.focus();
+    };
+  });
+}
+
+async function pvCargarFavoritos() {
+  var box = document.getElementById('pv-favoritos');
+  try {
+    var res = await api('/punto-venta/favoritos');
+    var d = res ? await res.json() : {};
+    var lista = (res && res.ok) ? (d.data || []) : [];
+    window._pvFavs = lista;
+    box.innerHTML = lista.length
+      ? lista.map(function (it, i) { return pvChip(it, i, false); }).join('')
+      : '<p style="font-size:.78rem;color:var(--ink-faint);grid-column:1/-1">Aún no hay favoritos. En Inventario, edita un producto y marca "⭐ Botón rápido en Punto de Venta".</p>';
+    box.querySelectorAll('.pv-chip').forEach(function (b) {
+      b.onclick = function () { pvAgregar(window._pvFavs[+b.getAttribute('data-idx')]); qInput.focus(); };
+    });
+  } catch (e) { box.innerHTML = ''; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Carrito
+// ══════════════════════════════════════════════════════════════════
+function pvAgregar(it) {
+  if (!it) return;
+  var key = it.tipo + '-' + it.id;
+  var ex = PV.carrito.find(function (c) { return c.key === key; });
+  if (it.tipo === 'producto') {
+    var yaEnCarrito = ex ? ex.cant : 0;
+    if (it.stock <= 0) { toast('"' + it.nombre + '" no tiene stock.', 'warning'); return; }
+    if (yaEnCarrito + 1 > it.stock) { toast('Solo hay ' + it.stock + ' ' + (it.unidad || '') + ' de "' + it.nombre + '".', 'warning'); return; }
+  }
+  if (ex) ex.cant = r2(ex.cant + 1);
+  else PV.carrito.push({ key: key, tipo: it.tipo, id: it.id, nombre: it.nombre, precio: r2(it.precio),
+                         cant: 1, stock: it.stock, unidad: it.unidad });
+  pvRender();
+  var rows = document.querySelectorAll('#pv-items .pv-row');
+  if (rows.length) rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
+}
+
+function pvCambiarCant(i, delta, valor) {
+  var c = PV.carrito[i]; if (!c) return;
+  var n = valor !== undefined ? parseFloat(valor) : r2(c.cant + delta);
+  if (!n || n <= 0) { PV.carrito.splice(i, 1); pvRender(); return; }
+  if (c.tipo === 'producto' && n > c.stock) {
+    toast('Solo hay ' + c.stock + ' ' + (c.unidad || '') + ' de "' + c.nombre + '".', 'warning');
+    n = c.stock;
+  }
+  c.cant = r2(n);
+  pvRender();
+}
+
+function pvCambiarPrecio(i, valor) {
+  var c = PV.carrito[i]; if (!c) return;
+  c.precio = Math.max(r2(valor), 0);
+  pvRenderTotales();
+}
+
+function pvQuitar(i) { PV.carrito.splice(i, 1); pvRender(); }
+
+function pvRender() {
+  var cont = document.getElementById('pv-items');
+  if (!PV.carrito.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:2rem 1rem;color:var(--ink-faint)">' +
+      '<div style="font-size:2rem;margin-bottom:.4rem">🛒</div><p style="font-size:.8rem">Escanea o busca un producto para empezar</p></div>';
+  } else {
+    cont.innerHTML = PV.carrito.map(function (c, i) {
+      return '<div class="pv-row">' +
+        '<div class="n">' + esc(c.nombre) +
+          '<div style="font-size:.66rem;color:var(--ink-faint);font-weight:500">' +
+            (c.tipo === 'producto' ? '📦 stock ' + c.stock : '🛎️ servicio') + '</div></div>' +
+        '<div style="text-align:right;font-weight:800;font-size:.88rem">' + S(c.cant * c.precio) + '</div>' +
+        '<div class="pv-qty">' +
+          '<button onclick="pvCambiarCant(' + i + ',-1)">−</button>' +
+          '<input class="vinput" type="number" min="0" step="1" value="' + c.cant + '" onchange="pvCambiarCant(' + i + ',0,this.value)"/>' +
+          '<button onclick="pvCambiarCant(' + i + ',1)">＋</button>' +
+          '<span style="font-size:.7rem;color:var(--ink-faint);margin:0 .2rem">×</span>' +
+          '<input class="vinput pv-price" type="number" min="0" step="0.1" value="' + c.precio.toFixed(2) + '" ' +
+            'oninput="pvCambiarPrecio(' + i + ',this.value)" onchange="pvRender()" title="Precio unitario"/>' +
+        '</div>' +
+        '<div style="text-align:right"><button onclick="pvQuitar(' + i + ')" style="background:none;border:none;color:#e11d48;cursor:pointer;font-size:.75rem;font-weight:600">Quitar</button></div>' +
+      '</div>';
+    }).join('');
+  }
+  pvRenderTotales();
+}
+
+// Misma fórmula que Facturación (precios con IGV incluido)
+function pvCalcular() {
+  var igvPct = (PV.cfg ? PV.cfg.empresa.igv_porcentaje : 18) / 100;
+  var bruto = r2(PV.carrito.reduce(function (a, c) { return a + c.cant * c.precio; }, 0));
+  var dPct = Math.min(Math.max(parseFloat(document.getElementById('pv-desc').value) || 0, 0), 100);
+  var desc = r2(bruto * dPct / 100);
+  var total = r2(bruto - desc);
+  var sub = r2(total / (1 + igvPct));
+  return { bruto: bruto, descPct: dPct, desc: desc, total: total, sub: sub, igv: r2(total - sub) };
+}
+
+document.getElementById('pv-desc').addEventListener('input', pvRenderTotales);
+document.getElementById('pv-recibe').addEventListener('input', pvRenderTotales);
+
+function pvRenderTotales() {
+  var t = pvCalcular();
+  document.getElementById('pv-total').textContent = S(t.total);
+  document.getElementById('pv-sub').textContent = S(t.sub);
+  document.getElementById('pv-igv').textContent = S(t.igv);
+  document.getElementById('pv-desc-monto').textContent = t.desc > 0 ? '−' + S(t.desc) : '';
+
+  // Atajos de billetes según el total
+  var rap = document.getElementById('pv-rapidos');
+  if (PV.metodo === 'efectivo' && !PV.mixto && t.total > 0) {
+    var ops = [t.total];
+    [10, 20, 50, 100, 200].forEach(function (b) { var v = Math.ceil(t.total / b) * b; if (v > t.total && ops.indexOf(v) < 0) ops.push(v); });
+    rap.innerHTML = ops.slice(0, 5).map(function (v, i) {
+      return '<button class="vbtn vbtn-ghost" style="padding:.25rem .55rem;font-size:.72rem" onclick="pvSetRecibe(' + v + ')">' +
+        (i === 0 ? 'Exacto' : 'S/ ' + v) + '</button>';
+    }).join('');
+  } else rap.innerHTML = '';
+
+  // Vuelto
+  var vBox = document.getElementById('pv-vuelto-box');
+  var efectivo = pvMontoEfectivo(t.total);
+  var recibe = parseFloat(document.getElementById('pv-recibe').value) || 0;
+  if (efectivo > 0 && recibe > 0 && !PV.mixto) {
+    vBox.style.display = 'flex';
+    var vuelto = r2(recibe - efectivo);
+    document.getElementById('pv-vuelto').textContent = vuelto >= 0 ? S(vuelto) : 'Falta ' + S(-vuelto);
+    vBox.style.background = vuelto >= 0 ? '#ecfdf5' : '#fff1f2';
+    vBox.style.color = vuelto >= 0 ? '#047857' : '#be123c';
+  } else vBox.style.display = 'none';
+
+  if (PV.mixto) pvRenderMixto(t.total);
+  pvValidar(t);
+}
+
+function pvSetRecibe(v) { document.getElementById('pv-recibe').value = v; pvRenderTotales(); }
+
+function pvMontoEfectivo(total) {
+  if (!PV.mixto) return PV.metodo === 'efectivo' ? total : 0;
+  return PV.pagos.filter(function (p) { return p.metodo === 'efectivo'; }).reduce(function (a, p) { return a + (parseFloat(p.monto) || 0); }, 0);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Pagos
+// ══════════════════════════════════════════════════════════════════
+function pvRenderMetodos() {
+  document.getElementById('pv-metodos').innerHTML = PV_METODOS.map(function (m) {
+    return '<button class="pv-met' + (m.v === PV.metodo ? ' on' : '') + '" onclick="pvSetMetodo(\'' + m.v + '\')">' +
+      '<span class="e">' + m.e + '</span>' + m.l + '</button>';
+  }).join('');
+  var simple = !PV.mixto;
+  document.getElementById('pv-metodos').style.display = simple ? 'grid' : 'none';
+  document.getElementById('pv-pago-simple').style.display = simple ? 'block' : 'none';
+  document.getElementById('pv-efectivo-box').style.display = PV.metodo === 'efectivo' ? 'flex' : 'none';
+  document.getElementById('pv-ref-box').style.display = PV.metodo !== 'efectivo' ? 'block' : 'none';
+  document.getElementById('pv-pago-mixto').style.display = PV.mixto ? 'flex' : 'none';
+  document.getElementById('pv-btn-mixto').textContent = PV.mixto ? '← Volver a un solo método' : '＋ Dividir pago (mixto)';
+}
+
+function pvSetMetodo(m) { PV.metodo = m; pvRenderMetodos(); pvRenderTotales(); }
+
+function pvToggleMixto() {
+  PV.mixto = !PV.mixto;
+  if (PV.mixto) {
+    var total = pvCalcular().total;
+    PV.pagos = [{ metodo: 'efectivo', monto: '' }, { metodo: 'yape', monto: '' }];
+    if (total > 0) PV.pagos[0].monto = total;
+  }
+  pvRenderMetodos();
+  pvRenderTotales();
+}
+
+function pvRenderMixto(total) {
+  var cont = document.getElementById('pv-pago-mixto');
+  var asignado = r2(PV.pagos.reduce(function (a, p) { return a + (parseFloat(p.monto) || 0); }, 0));
+  var falta = r2(total - asignado);
+  // Solo re-dibujar si cambió la cantidad de filas (para no perder el foco al escribir)
+  if (cont.getAttribute('data-n') !== String(PV.pagos.length)) {
+    cont.setAttribute('data-n', PV.pagos.length);
+    cont.innerHTML = PV.pagos.map(function (p, i) {
+      return '<div class="pv-split-row">' +
+        '<select class="vinput" style="font-size:.8rem;padding:.4rem" onchange="PV.pagos[' + i + '].metodo=this.value;pvRenderTotales()">' +
+          PV_METODOS.map(function (m) { return '<option value="' + m.v + '"' + (m.v === p.metodo ? ' selected' : '') + '>' + m.e + ' ' + m.l + '</option>'; }).join('') +
+        '</select>' +
+        '<input class="vinput" type="number" min="0" step="0.1" value="' + p.monto + '" placeholder="0.00" ' +
+          'style="font-size:.85rem;text-align:right;padding:.4rem" oninput="PV.pagos[' + i + '].monto=this.value;pvRenderTotales()"/>' +
+        (PV.pagos.length > 1
+          ? '<button onclick="PV.pagos.splice(' + i + ',1);pvRenderTotales()" style="background:none;border:none;color:#e11d48;cursor:pointer">✕</button>'
+          : '<span></span>') +
+      '</div>';
+    }).join('') +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<button class="vlink" style="font-size:.72rem" onclick="PV.pagos.push({metodo:\'tarjeta\',monto:\'\'});pvRenderTotales()">＋ Otro método</button>' +
+      '<span id="pv-mixto-falta" style="font-size:.75rem;font-weight:700"></span></div>';
+  }
+  var lbl = document.getElementById('pv-mixto-falta');
+  if (lbl) {
+    lbl.textContent = Math.abs(falta) < 0.01 ? '✓ Completo' : falta > 0 ? 'Falta ' + S(falta) : 'Sobra ' + S(-falta);
+    lbl.style.color = Math.abs(falta) < 0.01 ? '#15803d' : '#be123c';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Validación (habilita / deshabilita COBRAR)
+// ══════════════════════════════════════════════════════════════════
+function pvValidar(t) {
+  var aviso = document.getElementById('pv-aviso');
+  var btn = document.getElementById('pv-btn-cobrar');
+  var msg = '', ok = true;
+
+  if (!PV.cfg)                 { ok = false; }
+  else if (!PV.carrito.length) { ok = false; }
+  else if (t.total <= 0)       { ok = false; msg = 'El total debe ser mayor a 0.'; }
+  else if (document.getElementById('pv-tipo').value === 'boleta' && PV.cliente && PV.cliente.generico && t.total >= PV.cfg.limite_sin_dni) {
+    ok = false;
+    msg = '🪪 Boletas de S/ ' + PV.cfg.limite_sin_dni + ' a más requieren identificar al cliente con DNI. Usa "Cambiar" para elegirlo.';
+  } else if (PV.mixto) {
+    var asig = r2(PV.pagos.reduce(function (a, p) { return a + (parseFloat(p.monto) || 0); }, 0));
+    if (Math.abs(asig - t.total) >= 0.01) { ok = false; msg = 'Los montos del pago mixto deben sumar ' + S(t.total) + '.'; }
+  } else if (PV.metodo === 'efectivo') {
+    var recibe = parseFloat(document.getElementById('pv-recibe').value) || 0;
+    if (recibe > 0 && recibe < t.total) { ok = false; msg = 'El monto recibido es menor al total.'; }
+  }
+
+  aviso.style.display = msg ? 'block' : 'none';
+  aviso.textContent = msg;
+  btn.disabled = !ok || PV.cobrando;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Cliente
+// ══════════════════════════════════════════════════════════════════
+function pvSetCliente(c) {
+  PV.cliente = c;
+  document.getElementById('pv-cliente-nombre').textContent =
+    (c.generico ? '🧍 ' : '👤 ') + c.nombre + (c.dni ? ' · ' + c.dni : '');
+  pvRenderTotales();
+}
+
+function pvUsarGenerico(silencioso) {
+  if (!PV.cfg) return;
+  pvSetCliente({ id: PV.cfg.cliente_generico.id, nombre: PV.cfg.cliente_generico.nombre, generico: true, dni: '' });
+  if (silencioso !== true) closeModal('modal-pv-cliente');
+}
+
+function pvAbrirCliente() {
+  ['pv-cli-q', 'pv-new-dni', 'pv-new-nombre', 'pv-new-apellido', 'pv-new-tel'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('pv-cli-res').innerHTML = '';
+  openModal('modal-pv-cliente');
+  setTimeout(function () { document.getElementById('pv-cli-q').focus(); }, 50);
+}
+
+async function pvBuscarCliente() {
+  var q = document.getElementById('pv-cli-q').value.trim();
+  var cont = document.getElementById('pv-cli-res');
+  if (!q) return;
+  cont.innerHTML = '<p style="font-size:.78rem;color:var(--ink-faint)">Buscando…</p>';
+  try {
+    var res = await api('/propietarios?search=' + encodeURIComponent(q) + '&limit=8');
+    var rows = (res && res.ok) ? ((await res.json()).data || []) : [];
+    window._pvCliRes = rows;
+    cont.innerHTML = rows.length ? rows.map(function (p, i) {
+      return '<button onclick="pvElegirCliente(' + i + ')" style="text-align:left;padding:.5rem .75rem;background:#fff;border:1px solid var(--line);' +
+        'border-radius:.7rem;cursor:pointer;font-family:inherit">' +
+        '<b style="font-size:.83rem">' + esc(p.nombre) + ' ' + esc(p.apellido) + '</b>' +
+        '<span style="display:block;font-size:.68rem;color:var(--ink-faint)">' + (p.dni ? '🪪 ' + esc(p.dni) + ' · ' : '') + '📞 ' + esc(p.telefono || '—') + '</span></button>';
+    }).join('') : '<p style="font-size:.78rem;color:var(--ink-faint)">Sin resultados. Regístralo abajo.</p>';
+  } catch (e) { cont.innerHTML = '<p style="font-size:.78rem;color:#be123c">Error al buscar.</p>'; }
+}
+
+function pvElegirCliente(i) {
+  var p = (window._pvCliRes || [])[i]; if (!p) return;
+  pvSetCliente({ id: p.id, nombre: p.nombre + ' ' + p.apellido, generico: false, dni: p.dni || '' });
+  if (p.ruc && document.getElementById('pv-tipo').value === 'factura') {
+    document.getElementById('pv-ruc').value = p.ruc;
+    document.getElementById('pv-razon').value = p.razon_social || '';
+    document.getElementById('pv-dirf').value = p.direccion_fiscal || '';
+  }
+  closeModal('modal-pv-cliente');
+}
+
+async function pvBuscarDNI() {
+  var dni = document.getElementById('pv-new-dni').value.trim();
+  if (!/^\d{8}$/.test(dni)) { toast('El DNI debe tener 8 dígitos.', 'warning'); return; }
+  try {
+    var res = await api('/integracion/dni/' + dni);
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) { toast(d.message || 'No se pudo consultar RENIEC. Completa los datos a mano.', 'warning'); return; }
+    var x = d.data || {};
+    document.getElementById('pv-new-nombre').value = x.nombres || '';
+    document.getElementById('pv-new-apellido').value = [x.apellido_paterno, x.apellido_materno].filter(Boolean).join(' ');
+  } catch (e) { toast('No se pudo consultar RENIEC.', 'warning'); }
+}
+
+async function pvCrearCliente() {
+  var body = {
+    tipo_documento: 'DNI',
+    dni     : document.getElementById('pv-new-dni').value.trim() || null,
+    nombre  : document.getElementById('pv-new-nombre').value.trim(),
+    apellido: document.getElementById('pv-new-apellido').value.trim(),
+    telefono: document.getElementById('pv-new-tel').value.trim() || null,
+  };
+  if (!body.nombre || !body.apellido) { toast('Nombres y apellidos son obligatorios.', 'warning'); return; }
+  if (body.dni && !/^\d{8}$/.test(body.dni)) { toast('El DNI debe tener 8 dígitos.', 'warning'); return; }
+  try {
+    var res = await api('/propietarios', { method: 'POST', body: body });
+    var d = res ? await res.json() : {};
+    var id = d.data && d.data.id;
+    if (res && res.status === 409 && id) {
+      toast('Ese cliente ya estaba registrado — se usará el existente.', 'info');
+    } else if (!res || !res.ok) {
+      toast(d.message || 'No se pudo registrar el cliente.', 'danger'); return;
+    }
+    pvSetCliente({ id: id, nombre: body.nombre + ' ' + body.apellido, generico: false, dni: body.dni || '' });
+    closeModal('modal-pv-cliente');
+  } catch (e) { toast('Error de conexión.', 'danger'); }
+}
+
+function pvOnTipo() {
+  var esFactura = document.getElementById('pv-tipo').value === 'factura';
+  document.getElementById('pv-factura-box').style.display = esFactura ? 'block' : 'none';
+  if (esFactura) setTimeout(function () { document.getElementById('pv-ruc').focus(); }, 30);
+  pvRenderTotales();
+}
+
+async function pvBuscarRUC() {
+  var ruc = document.getElementById('pv-ruc').value.trim();
+  if (!/^\d{11}$/.test(ruc)) { toast('El RUC debe tener 11 dígitos.', 'warning'); return; }
+  try {
+    var res = await api('/integracion/ruc/' + ruc);
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) { toast(d.message || 'No se pudo consultar SUNAT. Completa la razón social a mano.', 'warning'); return; }
+    var x = d.data || {};
+    document.getElementById('pv-razon').value = x.razon_social || '';
+    document.getElementById('pv-dirf').value = x.direccion || '';
+  } catch (e) { toast('No se pudo consultar SUNAT.', 'warning'); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Cobrar  →  POST /facturas  (origen = punto_venta)
+// ══════════════════════════════════════════════════════════════════
+async function pvCobrar() {
+  var btn = document.getElementById('pv-btn-cobrar');
+  if (btn.disabled || PV.cobrando) return;
+  var t = pvCalcular();
+  var tipo = document.getElementById('pv-tipo').value;
+
+  var body = {
+    tipo          : tipo,
+    propietario_id: PV.cliente.id,
+    fecha         : PV.cfg.hoy,
+    items         : PV.carrito.map(function (c) {
+      return { descripcion: c.nombre, cantidad: c.cant, precio_unit: c.precio, descuento_pct: 0,
+               inventario_id: c.tipo === 'producto' ? c.id : undefined };
+    }),
+    igv_incluido        : true,
+    descuento_global_pct: t.descPct,
+    comision_tarjeta_pct: 0,
+    notas               : 'Venta en mostrador',
+    origen              : 'punto_venta',
+  };
+
+  // Pagos
+  var recibe = parseFloat(document.getElementById('pv-recibe').value) || 0;
+  if (PV.mixto) {
+    body.pagos = PV.pagos.filter(function (p) { return (parseFloat(p.monto) || 0) > 0; })
+      .map(function (p) { return { metodo_pago: p.metodo, monto: r2(p.monto) }; });
+  } else {
+    body.pagos = [{ metodo_pago: PV.metodo, monto: t.total,
+                    referencia: PV.metodo !== 'efectivo' ? (document.getElementById('pv-ref').value.trim() || null) : null }];
+  }
+
+  if (tipo === 'factura') {
+    body.cliente_ruc              = document.getElementById('pv-ruc').value.trim();
+    body.cliente_razon_social     = document.getElementById('pv-razon').value.trim();
+    body.cliente_direccion_fiscal = document.getElementById('pv-dirf').value.trim() || null;
+    if (!/^\d{11}$/.test(body.cliente_ruc)) { toast('Para factura ingresa un RUC válido de 11 dígitos.', 'warning'); return; }
+    if (!body.cliente_razon_social)         { toast('Para factura ingresa la razón social.', 'warning'); return; }
+  }
+
+  PV.cobrando = true; btn.disabled = true;
+  btn.firstChild.textContent = '⏳ Procesando… ';
+  try {
+    var res = await api('/facturas', { method: 'POST', body: body });
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) { toast(d.message || 'No se pudo registrar la venta.', 'danger', 6000); return; }
+
+    var vuelto = (!PV.mixto && PV.metodo === 'efectivo' && recibe > 0) ? r2(recibe - t.total) : null;
+    PV.ultimaVenta = {
+      id: d.data.id, numero: d.data.numero, tipo: tipo, fecha: new Date(),
+      cliente: PV.cliente.generico ? null : PV.cliente, ruc: body.cliente_ruc, razon: body.cliente_razon_social,
+      items: PV.carrito.map(function (c) { return { descripcion: c.nombre, cantidad: c.cant, precio_unit: c.precio, subtotal: r2(c.cant * c.precio) }; }),
+      bruto: t.bruto, desc: t.desc, sub: d.data.subtotal, igv: d.data.igv, total: d.data.total,
+      pagos: body.pagos, recibe: recibe || null, vuelto: vuelto,
+    };
+
+    document.getElementById('pv-ok-numero').textContent = (tipo === 'factura' ? 'Factura ' : 'Boleta ') + d.data.numero;
+    document.getElementById('pv-ok-total').textContent = S(d.data.total);
+    var vbox = document.getElementById('pv-ok-vuelto');
+    vbox.style.display = vuelto !== null ? 'flex' : 'none';
+    vbox.innerHTML = vuelto !== null ? '<span>Vuelto</span><span>' + S(vuelto) + '</span>' : '';
+    openModal('modal-pv-ok');
+
+    if (document.getElementById('pv-autoprint').checked) pvImprimirUltimo();
+    pvCargarVentasHoy();
+    pvCargarFavoritos();            // refresca stock de los favoritos
+  } catch (e) {
+    toast('Error de conexión. Revisa en Facturación si la venta se registró antes de reintentar.', 'danger', 7000);
+  } finally {
+    PV.cobrando = false;
+    btn.firstChild.textContent = '💳 COBRAR ';
+    pvRenderTotales();
+  }
+}
+
+function pvNuevaVenta() {
+  closeModal('modal-pv-ok');
+  PV.carrito = []; PV.mixto = false; PV.metodo = 'efectivo'; PV.pagos = [];
+  document.getElementById('pv-desc').value = '0';
+  document.getElementById('pv-recibe').value = '';
+  document.getElementById('pv-ref').value = '';
+  document.getElementById('pv-tipo').value = 'boleta';
+  ['pv-ruc', 'pv-razon', 'pv-dirf'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('pv-pago-mixto').removeAttribute('data-n');
+  pvOnTipo();
+  pvUsarGenerico(true);
+  pvRenderMetodos();
+  pvRender();
+  qInput.focus();
+}
+
+function pvConfirmarVaciar() {
+  if (!PV.carrito.length) return;
+  document.getElementById('pv-confirm-titulo').textContent = '🗑️ Vaciar venta';
+  document.getElementById('pv-confirm-msg').textContent = '¿Quitar todos los productos de la venta actual?';
+  document.getElementById('pv-confirm-btn').onclick = function () { closeModal('modal-pv-confirm'); pvNuevaVenta(); };
+  openModal('modal-pv-confirm');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Ventas de hoy + reimpresión
+// ══════════════════════════════════════════════════════════════════
+function pvToggleVentas() {
+  var w = document.getElementById('pv-ventas-wrap');
+  w.style.display = w.style.display === 'none' ? 'block' : 'none';
+  if (w.style.display === 'block') { pvCargarVentasHoy(); w.scrollIntoView({ behavior: 'smooth' }); }
+}
+
+async function pvCargarVentasHoy() {
+  try {
+    var res = await api('/punto-venta/ventas-hoy');
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) return;
+    var rows = d.data || [];
+    document.getElementById('pv-hoy-total').textContent = S(d.meta ? d.meta.total_vendido : 0);
+    var met = {}; PV_METODOS.forEach(function (m) { met[m.v] = m.e + ' ' + m.l; });
+    document.getElementById('pv-ventas-tbody').innerHTML = rows.length ? rows.map(function (r) {
+      return '<tr' + (r.estado === 'anulado' ? ' style="opacity:.5;text-decoration:line-through"' : '') + '>' +
+        '<td style="font-size:.78rem">' + pvHora(r.ts) + '</td>' +
+        '<td style="font-family:monospace;font-size:.78rem;font-weight:700">' + esc(r.numero) + '</td>' +
+        '<td style="font-size:.78rem">' + esc(r.cliente) + '</td>' +
+        '<td style="font-size:.75rem">' + esc(met[r.metodo_pago] || r.metodo_pago || '—') + '</td>' +
+        '<td style="font-weight:700">' + S(r.total) + '</td>' +
+        '<td><button class="vlink" style="font-size:.72rem" onclick="pvReimprimir(' + r.id + ',' + (parseInt(r.ts) || 0) + ')">🖨️ Ticket</button></td></tr>';
+    }).join('') : '<tr><td colspan="6"><div class="vempty"><p>Aún no hay ventas de mostrador hoy</p></div></td></tr>';
+  } catch (e) {}
+}
+
+function pvHora(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+}
+
+async function pvReimprimir(id, ts) {
+  try {
+    var res = await api('/facturas/' + id);
+    var d = res ? await res.json() : {};
+    if (!res || !res.ok) { toast(d.message || 'No se pudo cargar la venta.', 'danger'); return; }
+    var f = d.data;
+    pvTicket({
+      numero: f.numero, tipo: f.tipo, fecha: ts ? new Date(ts * 1000) : new Date(f.created_at),
+      cliente: /^Público General$/.test((f.propietario_nombre || '').trim()) ? null : { nombre: f.propietario_nombre, dni: f.dni },
+      ruc: f.cliente_ruc, razon: f.cliente_razon_social,
+      items: (f.items || []).map(function (i) { return { descripcion: i.descripcion, cantidad: parseFloat(i.cantidad), precio_unit: parseFloat(i.precio_unit), subtotal: parseFloat(i.subtotal) }; }),
+      bruto: parseFloat(f.subtotal_bruto), desc: parseFloat(f.descuento_items || 0) + parseFloat(f.descuento_global || 0),
+      sub: f.subtotal, igv: f.igv, total: f.total,
+      pagos: (f.pagos || []).map(function (p) { return { metodo_pago: p.metodo_pago, monto: p.monto }; }),
+      anulado: f.estado === 'anulado', reimpresion: true,
+    });
+  } catch (e) { toast('Error de conexión.', 'danger'); }
+}
+
+function pvImprimirUltimo() { if (PV.ultimaVenta) pvTicket(PV.ultimaVenta); }
+
+// ── Ticket 80 mm ──────────────────────────────────────────────────
+function pvTicket(v) {
+  var emp = (PV.cfg && PV.cfg.empresa) || {};
+  var fecha = v.fecha instanceof Date && !isNaN(v.fecha) ? v.fecha : new Date();
+  var f = fecha.toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  var met = {}; PV_METODOS.forEach(function (m) { met[m.v] = m.l; });
+  var fila = function (a, b, cls) { return '<tr class="' + (cls || '') + '"><td>' + a + '</td><td class="r">' + b + '</td></tr>'; };
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>' + esc(v.numero) + '</title><style>' +
+    '@page{size:80mm auto;margin:3mm}*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{width:72mm;font-family:"Courier New",monospace;font-size:11.5px;color:#000;line-height:1.35}' +
+    '.c{text-align:center}.r{text-align:right;white-space:nowrap}.b{font-weight:bold}.big{font-size:15px}' +
+    'hr{border:none;border-top:1px dashed #000;margin:5px 0}table{width:100%;border-collapse:collapse}td{vertical-align:top;padding:1px 0}' +
+    '.it td{padding-top:3px}.tot td{font-weight:bold;font-size:14px;padding-top:3px}.muted{font-size:10px}' +
+    '@media print{.np{display:none}}</style></head><body>' +
+    '<div class="c b big">' + esc(emp.nombre || '') + '</div>' +
+    (emp.razon_social ? '<div class="c">' + esc(emp.razon_social) + '</div>' : '') +
+    (emp.ruc ? '<div class="c">RUC ' + esc(emp.ruc) + '</div>' : '') +
+    (emp.direccion ? '<div class="c muted">' + esc(emp.direccion) + (emp.distrito ? ', ' + esc(emp.distrito) : '') + '</div>' : '') +
+    (emp.telefono ? '<div class="c muted">Tel. ' + esc(emp.telefono) + '</div>' : '') +
+    '<hr/><div class="c b">' + (v.tipo === 'factura' ? 'FACTURA' : 'BOLETA DE VENTA') + '</div>' +
+    '<div class="c b">' + esc(v.numero) + '</div>' +
+    (v.anulado ? '<div class="c b">*** ANULADO ***</div>' : '') +
+    (v.reimpresion ? '<div class="c muted">(reimpresión)</div>' : '') +
+    '<div class="muted" style="margin-top:3px">Fecha: ' + esc(f) + '</div>' +
+    (v.tipo === 'factura'
+      ? '<div class="muted">RUC: ' + esc(v.ruc || '') + '</div><div class="muted">' + esc(v.razon || '') + '</div>'
+      : '<div class="muted">Cliente: ' + esc(v.cliente ? v.cliente.nombre : 'PÚBLICO GENERAL') + '</div>' +
+        (v.cliente && v.cliente.dni ? '<div class="muted">DNI: ' + esc(v.cliente.dni) + '</div>' : '')) +
+    '<hr/><table>' +
+    v.items.map(function (i) {
+      return '<tr class="it"><td colspan="2">' + esc(i.descripcion) + '</td></tr>' +
+        fila('&nbsp;' + i.cantidad + ' x ' + (+i.precio_unit).toFixed(2), (+i.subtotal).toFixed(2));
+    }).join('') +
+    '</table><hr/><table>' +
+    (v.desc > 0 ? fila('Subtotal', (+v.bruto).toFixed(2)) + fila('Descuento', '-' + (+v.desc).toFixed(2)) : '') +
+    fila('Op. gravada', (+v.sub).toFixed(2)) +
+    fila('IGV (' + (emp.igv_porcentaje || 18) + '%)', (+v.igv).toFixed(2)) +
+    fila('TOTAL ' + esc(emp.simbolo_moneda || 'S/.'), (+v.total).toFixed(2), 'tot') +
+    '</table><hr/><table>' +
+    (v.pagos || []).map(function (p) { return fila(esc(met[p.metodo_pago] || p.metodo_pago), (+p.monto).toFixed(2)); }).join('') +
+    (v.recibe ? fila('Recibido', (+v.recibe).toFixed(2)) + fila('Vuelto', (+v.vuelto).toFixed(2), 'b') : '') +
+    '</table><hr/>' +
+    (emp.pie_documento ? '<div class="c muted">' + esc(emp.pie_documento) + '</div>' : '<div class="c muted">¡Gracias por su compra!</div>') +
+    '<div class="np c" style="margin-top:10px"><button onclick="window.print()">Imprimir</button></div>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank', 'width=380,height=640');
+  if (!w) { toast('Permite las ventanas emergentes para imprimir el ticket.', 'warning'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 400);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Atajos de teclado
+// ══════════════════════════════════════════════════════════════════
+function pvModalAbierto(id) { var m = document.getElementById(id); return m && !m.classList.contains('hidden'); }
+
+document.addEventListener('keydown', function (e) {
+  if (pvModalAbierto('modal-pv-ok')) {
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); pvNuevaVenta(); }
+    else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); pvImprimirUltimo(); }
+    return;
+  }
+  if (pvModalAbierto('modal-pv-cliente') || pvModalAbierto('modal-pv-confirm')) {
+    if (e.key === 'Escape') { closeModal('modal-pv-cliente'); closeModal('modal-pv-confirm'); }
+    return;
+  }
+  if (e.key === 'F2') { e.preventDefault(); qInput.focus(); qInput.select(); }
+  else if (e.key === 'F4') { e.preventDefault(); pvCobrar(); }
+  else if (e.key === 'Escape') {
+    if (qInput.value) { qInput.value = ''; pvMostrarResultados([]); }
+    else pvConfirmarVaciar();
+  }
+});
+</script>
+</body>
+</html>

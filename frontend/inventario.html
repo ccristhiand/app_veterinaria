@@ -44,6 +44,8 @@
         <option value="medicamento">💊 Medicamento</option>
         <option value="vacuna">💉 Vacuna</option>
         <option value="insumo">📦 Insumo</option>
+        <option value="alimento">🥫 Alimento</option>
+        <option value="accesorio">🦴 Accesorio</option>
         <option value="otro">📎 Otro</option>
       </select>
     </div>
@@ -143,6 +145,8 @@
             <option value="medicamento">💊 Medicamento</option>
             <option value="vacuna">💉 Vacuna</option>
             <option value="insumo">📦 Insumo</option>
+            <option value="alimento">🥫 Alimento</option>
+            <option value="accesorio">🦴 Accesorio</option>
             <option value="otro">📎 Otro</option>
           </select>
         </div>
@@ -178,6 +182,20 @@
             <span style="font-size:.75rem;font-weight:700;color:#15803d;margin-left:.4rem"
               id="margen-pct">(0%)</span>
           </div>
+        </div>
+        <!-- Punto de Venta -->
+        <div>
+          <label class="vlabel">🏷️ Código de barras</label>
+          <input id="i-codigo" type="text" class="vinput" maxlength="50" autocomplete="off"
+            placeholder="Escanea o escribe el código…"
+            onkeydown="if(event.key==='Enter')event.preventDefault()"/>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;font-size:.82rem;font-weight:600;
+            background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.6rem .9rem;width:100%">
+            <input type="checkbox" id="i-favorito" style="accent-color:#d97706;width:16px;height:16px"/>
+            ⭐ Botón rápido en Punto de Venta
+          </label>
         </div>
         <div>
           <label class="vlabel">Proveedor</label>
@@ -457,6 +475,8 @@ function renderTabla(items) {
     medicamento : { icon:'💊', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
     vacuna      : { icon:'💉', color:'#6d28d9', bg:'#f5f3ff', border:'#ddd6fe' },
     insumo      : { icon:'📦', color:'#b45309', bg:'#fffbeb', border:'#fde68a' },
+    alimento    : { icon:'🥫', color:'#c2410c', bg:'#fff7ed', border:'#fed7aa' },
+    accesorio   : { icon:'🦴', color:'#0f766e', bg:'#f0fdfa', border:'#99f6e4' },
     otro        : { icon:'📎', color:'#4b5f57', bg:'#f8faf8', border:'#e8ede9' },
   };
 
@@ -534,6 +554,8 @@ function abrirNuevo() {
   document.getElementById('i-precio').value   = '';
   document.getElementById('i-proveedor').value= '';
   document.getElementById('i-venc').value     = '';
+  document.getElementById('i-codigo').value   = '';
+  document.getElementById('i-favorito').checked = false;
   // Preseleccionar sede del usuario si tiene una asignada
   var _u = getUser();
   if (_u.sede_id) document.getElementById('i-sede').value = _u.sede_id;
@@ -558,6 +580,8 @@ async function abrirEditar(id) {
     document.getElementById('i-precio-compra').value= item.precio_compra || '';
     calcularMargenInv();
     document.getElementById('i-proveedor').value = item.proveedor || '';
+    document.getElementById('i-codigo').value    = item.codigo_barras || '';
+    document.getElementById('i-favorito').checked = !!item.favorito;
     document.getElementById('i-venc').value      = item.fecha_vencimiento?.split('T')[0] || '';
     document.getElementById('i-sede').value      = item.sede_id || '';
   }
@@ -634,6 +658,8 @@ async function guardarItem() {
     proveedor       : document.getElementById('i-proveedor').value.trim() || null,
     fecha_vencimiento: document.getElementById('i-venc').value || null,
     sede_id         : sedeId,
+    codigo_barras   : document.getElementById('i-codigo').value.trim() || null,
+    favorito        : document.getElementById('i-favorito').checked,
   };
 
   const url    = id ? `/inventario/${id}` : '/inventario';
@@ -752,7 +778,7 @@ function descargarTemplate() {
     [''],
     ['COLUMNAS REQUERIDAS:'],
     ['nombre','Nombre del producto (obligatorio)'],
-    ['categoria','medicamento | vacuna | insumo | otro'],
+    ['categoria','medicamento | vacuna | insumo | alimento | accesorio | otro'],
     ['cantidad','Cantidad inicial en stock (número)'],
     ['unidad','caja, dosis, unidad, frasco, etc.'],
     ['stock_minimo','Cantidad mínima antes de alerta'],
@@ -789,7 +815,7 @@ function procesarExcel(input) {
 
       // Validar y limpiar
       const validos = [], errores = [];
-      const catValidas = ['medicamento','vacuna','insumo','otro'];
+      const catValidas = ['medicamento','vacuna','insumo','alimento','accesorio','otro'];
 
       rows.forEach((row, idx) => {
         const n = String(row.nombre||'').trim();

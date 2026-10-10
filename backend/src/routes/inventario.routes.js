@@ -142,7 +142,7 @@ router.post('/bulk', authorize('admin', 'veterinario', 'recepcionista'), async (
     if (items.length > 10000) return res.status(422).json({ success: false, message: 'Máximo 10,000 items.' });
 
     const sedeId    = req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-    const catValidas = ['medicamento','vacuna','insumo','otro'];
+    const catValidas = ['medicamento','vacuna','insumo','alimento','accesorio','otro'];
     const validos = []; const errores = [];
 
     items.forEach((item, idx) => {
@@ -186,6 +186,24 @@ router.post('/bulk', authorize('admin', 'veterinario', 'recepcionista'), async (
 });
 
 // ── POST /api/v1/inventario ───────────────────────────────────────
+// ── Campos del Punto de Venta (código de barras / favorito) ───────
+// Van en un UPDATE aparte: si la clínica aún no tiene la migración,
+// el inventario sigue funcionando y estos campos simplemente se ignoran.
+async function guardarCamposPV(db, id, codigo_barras, favorito) {
+  if (codigo_barras === undefined && favorito === undefined) return;
+  try {
+    const sets = [], vals = [];
+    if (codigo_barras !== undefined) {
+      sets.push('codigo_barras = ?');
+      vals.push(String(codigo_barras || '').trim().slice(0, 50) || null);
+    }
+    if (favorito !== undefined) { sets.push('favorito = ?'); vals.push(favorito ? 1 : 0); }
+    await db.query(`UPDATE inventario SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+  } catch (e) {
+    if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+  }
+}
+
 router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:creado','inventario'), async (req, res, next) => {
   try {
     const {
@@ -193,6 +211,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
       stock_minimo = 5, precio_unitario = null, precio_compra = 0,
       proveedor = null, fecha_vencimiento = null, descripcion = null,
       sede_id = null,
+      codigo_barras, favorito,          // ← NUEVO: Punto de Venta
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
@@ -211,6 +230,8 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
        fecha_vencimiento||null, descripcion||null, sedeId]
     );
 
+    await guardarCamposPV(req.db, result.insertId, codigo_barras, favorito);
+
     if (parseFloat(cantidad) < parseFloat(stock_minimo)) {
       const io = req.app.get('io');
       if (io) io.to('sala:admin').emit('notif:stock_minimo', { nombre, cantidad, stock_minimo, unidad });
@@ -227,6 +248,7 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
       nombre, categoria, cantidad, unidad,
       stock_minimo, precio_unitario, precio_compra = 0,
       proveedor, fecha_vencimiento, descripcion, sede_id = null,
+      codigo_barras, favorito,          // ← NUEVO: Punto de Venta
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
@@ -246,6 +268,8 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
        parseFloat(precio_compra)||0, proveedor||null,
        fecha_vencimiento||null, descripcion||null, sedeIdPut, req.params.id]
     );
+
+    await guardarCamposPV(req.db, req.params.id, codigo_barras, favorito);
 
     const cantF = parseFloat(cantidad)||0;
     const minF  = parseFloat(stock_minimo)||5;

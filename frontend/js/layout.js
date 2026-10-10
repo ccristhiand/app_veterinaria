@@ -16,7 +16,7 @@ const MODULOS_POR_PLAN = {
   ],
   enterprise: [
     'dashboard','citas','calendario','propietarios','mascotas','historia',
-    'inventario','facturacion','caja','reportes','servicios',
+    'inventario','facturacion','punto_venta','caja','reportes','servicios',
     'consentimientos','usuarios','configuracion','asistencia','whatsapp',
   ],
 };
@@ -32,6 +32,7 @@ const TODOS_LOS_LINKS = [
   { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia',       roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
   { id:'inventario',     icon:'📦', label:'Inventario',       href:'inventario',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
   { id:'facturacion',    icon:'🧾', label:'Facturación',      href:'facturacion',    roles:['admin','recepcionista','veterinario_recepcionista'] },
+  { id:'punto_venta',    icon:'🛒', label:'Punto de Venta',   href:'punto-venta',    roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja',           roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios',      roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
@@ -225,7 +226,7 @@ function aplicarModulosPlan(branding, activePage) {
 
   // Módulos desactivados manualmente por el admin SaaS
   if (!branding.modulo_facturacion) {
-    ['facturacion','caja'].forEach(m => {
+    ['facturacion','punto_venta','caja'].forEach(m => {
       const idx = modulosPlan.indexOf(m);
       if (idx > -1) modulosPlan.splice(idx, 1);
     });

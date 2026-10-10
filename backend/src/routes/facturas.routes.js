@@ -166,8 +166,10 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
       descuento_global_pct = 0,   // % de descuento global sobre subtotal bruto
       comision_tarjeta_pct = 0,   // % de comisión bancaria (solo tarjeta)
       proforma_id = null,         // ← NUEVO: proforma de origen (si se convierte desde Proformas)
+      origen = 'atencion',        // ← NUEVO: 'atencion' | 'punto_venta'
     } = req.body;
     const proformaId = parseInt(proforma_id) || null;
+    const origenVenta = origen === 'punto_venta' ? 'punto_venta' : 'atencion';
 
     if (!propietario_id) return res.status(422).json({ success: false, message: 'propietario_id requerido.' });
     if (!fecha)          return res.status(422).json({ success: false, message: 'fecha requerida.' });
@@ -289,6 +291,21 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
       const comisionMonto = hayTarjeta ? parseFloat((montoTarjeta * comisionPct / 100).toFixed(2)) : 0;
       const total         = totalBase; // total NO incluye comisión
 
+      // ── SUNAT: boleta de S/ 700 a más debe identificar al cliente ──
+      if (tipo === 'boleta' && total >= 700) {
+        let esGenerico = false;
+        try {
+          const [[pr]] = await conn.execute('SELECT es_generico FROM propietarios WHERE id = ?', [propietario_id]);
+          esGenerico = !!pr?.es_generico;
+        } catch { /* sin migración del Punto de Venta: no hay cliente genérico */ }
+        if (esGenerico) {
+          throw Object.assign(
+            new Error('Para boletas de S/ 700 a más se debe identificar al cliente con su DNI. Cambia "Público General" por el cliente.'),
+            { status: 422, code: 'REQUIERE_DNI' }
+          );
+        }
+      }
+
       // ── Estado de pago ────────────────────────────────────────
       const pagosValidos    = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);
       const totalPagado     = pagosValidos.reduce((a, p) => a + parseFloat(p.monto), 0);
@@ -318,6 +335,15 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
         ]
       );
       const facturaId = ins.insertId;
+
+      // ── Origen de la venta (Punto de Venta) ──────────────────
+      if (origenVenta !== 'atencion') {
+        try {
+          await conn.execute('UPDATE facturas SET origen = ? WHERE id = ?', [origenVenta, facturaId]);
+        } catch (e) {
+          if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;   // sin migración: se ignora
+        }
+      }
 
       // ── Enlazar con la proforma de origen ────────────────────
       if (proformaId) {
