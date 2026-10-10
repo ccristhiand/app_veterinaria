@@ -1973,7 +1973,7 @@ async function compartirWhatsApp() {
       var res = await api('/wa/enviar', {
         method: 'POST',
         body: {
-          telefono       : telPE,
+          telefono       : '+' + telPE,   // con '+' el gateway no duplica el 51
           mensaje,
           imagen_base64  : base64,
           imagen_mimetype: 'image/png',

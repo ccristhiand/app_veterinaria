@@ -914,7 +914,8 @@ async function pfEnviarWhatsApp() {
     var estD = est && est.ok ? await est.json() : null;
     if (estD && estD.data && estD.data.estado === 'conectado' && telPE && canvas) {
       var res = await api('/wa/enviar', { method: 'POST', body: {
-        telefono: telPE, mensaje: mensaje,
+        // Con '+' el gateway no vuelve a anteponer el código de país (evita 5151…)
+        telefono: '+' + telPE, mensaje: mensaje,
         imagen_base64: canvas.toDataURL('image/png').split(',')[1], imagen_mimetype: 'image/png',
         propietario_id: p.propietario_id,
       } });
