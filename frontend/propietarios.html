@@ -82,7 +82,7 @@
 
 <!-- ══ Modal Nuevo / Editar Propietario ══════════════════════════ -->
 <div id="modal-prop" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:600px">
+  <div class="vmodal" style="max-width:720px">
     <div class="vmodal-head">
       <h3 id="modal-prop-titulo">👤 Nuevo Propietario</h3>
       <button onclick="closeModal('modal-prop')" class="vmodal-close">✕</button>
@@ -186,6 +186,33 @@
               placeholder="Av. Empresarial 456, Lima"/>
           </div>
         </div>
+      </div>
+
+      <!-- Mascotas -->
+      <div style="border-top:1px solid var(--line);padding-top:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.85rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:1rem">🐾</span>
+            <div>
+              <p style="font-weight:700;font-size:.85rem">
+                Mascotas <span id="pm-contador" style="color:var(--ink-faint);font-weight:600"></span>
+              </p>
+              <p id="pm-ayuda" style="font-size:.68rem;color:var(--ink-faint)">
+                Opcional — puedes registrar sus mascotas ahora mismo
+              </p>
+            </div>
+          </div>
+          <button type="button" onclick="agregarFilaMascota()" class="vbtn"
+            style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;
+            padding:.4rem .85rem;font-size:.78rem">
+            ＋ Agregar mascota
+          </button>
+        </div>
+        <div id="pm-lista" style="display:flex;flex-direction:column;gap:.8rem"></div>
+        <p id="pm-vacio" style="display:none;font-size:.78rem;color:var(--ink-faint);text-align:center;
+          padding:.9rem;border:1px dashed var(--line);border-radius:.9rem">
+          Sin mascotas. Usa “＋ Agregar mascota” si quieres registrarlas ahora.
+        </p>
       </div>
     </div>
     <div class="vmodal-foot">
@@ -587,12 +614,151 @@ async function autocompletarDocumento(tipo, numero) {
   }
 }
 
+// ── Mascotas dentro del formulario del propietario ───────────────
+var _pmSeq = 0;
+var ESPECIES_PM = [
+  ['', 'Seleccionar…'], ['perro', '🐕 Canino'], ['gato', '🐈 Felino'], ['ave', '🦜 Ave'],
+  ['reptil', '🦎 Reptil'], ['roedor', '🐹 Roedor'], ['otro', '🐾 Otro'],
+];
+
+function limpiarMascotasForm() {
+  document.getElementById('pm-lista').innerHTML = '';
+  actualizarEstadoMascotas();
+}
+
+/**
+ * Agrega una tarjeta de mascota al formulario.
+ * m = mascota existente (modo edición) o vacío para una nueva.
+ */
+function agregarFilaMascota(m) {
+  m = m || {};
+  var esExistente = !!m.id;
+  var uid  = 'pm' + (++_pmSeq);
+  var card = document.createElement('div');
+  card.className = 'pm-card';
+  card.dataset.uid = uid;
+  if (esExistente) card.dataset.id = m.id;
+  card.style.cssText = 'border:1px solid ' + (esExistente ? 'var(--line)' : '#ddd6fe') +
+    ';background:' + (esExistente ? '#f8faf8' : '#faf5ff') + ';border-radius:1rem;padding:.9rem 1rem';
+
+  card.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem">' +
+      '<p class="pm-titulo" style="font-weight:700;font-size:.8rem;color:#6d28d9"></p>' +
+      (esExistente
+        ? '<span style="font-size:.62rem;font-weight:700;background:var(--green-50);color:var(--green-600);' +
+          'border:1px solid var(--green-100);padding:.15rem .5rem;border-radius:999px">Registrada</span>'
+        : '<button type="button" class="pm-quitar" style="font-size:.72rem;color:#e11d48;background:none;' +
+          'border:none;cursor:pointer;font-family:inherit;font-weight:600">✕ Quitar</button>') +
+    '</div>' +
+    '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">' +
+      '<div class="col-span-2"><label class="vlabel">Nombre *</label>' +
+        '<input data-f="nombre" type="text" class="vinput" placeholder="Max, Luna…"/></div>' +
+      '<div class="col-span-2"><label class="vlabel">Especie *</label>' +
+        '<select data-f="especie" class="vinput">' +
+          ESPECIES_PM.map(function(e) { return '<option value="' + e[0] + '">' + e[1] + '</option>'; }).join('') +
+        '</select></div>' +
+      '<div class="col-span-2"><label class="vlabel">Raza</label>' +
+        '<input data-f="raza" type="text" class="vinput" placeholder="Labrador…"/></div>' +
+      '<div><label class="vlabel">Sexo</label>' +
+        '<select data-f="sexo" class="vinput">' +
+          '<option value="desconocido">Desconocido</option>' +
+          '<option value="macho">Macho</option>' +
+          '<option value="hembra">Hembra</option>' +
+        '</select></div>' +
+      '<div><label class="vlabel">Peso (kg)</label>' +
+        '<input data-f="peso_kg" type="number" step="0.1" min="0" class="vinput" placeholder="3.5"/></div>' +
+      '<div class="col-span-2 sm:col-span-1"><label class="vlabel">F. nacimiento</label>' +
+        '<input data-f="fecha_nacimiento" type="date" class="vinput"/></div>' +
+      '<div><label class="vlabel">Color</label>' +
+        '<input data-f="color" type="text" class="vinput" placeholder="Negro…"/></div>' +
+      '<div class="col-span-2 sm:col-span-2"><label class="vlabel">Microchip</label>' +
+        '<input data-f="microchip" type="text" class="vinput"/></div>' +
+      '<div class="col-span-2 sm:col-span-4"><label class="vlabel" style="color:#be123c">⚠️ Alertas médicas</label>' +
+        '<textarea data-f="alertas_medicas" rows="2" class="vinput" style="border-color:#fecdd3" ' +
+        'placeholder="Condiciones que el veterinario debe conocer…"></textarea></div>' +
+    '</div>';
+
+  // Valores con .value (evita problemas con comillas en el HTML)
+  var set = function(f, v) { var el = card.querySelector('[data-f="' + f + '"]'); if (el) el.value = v == null ? '' : v; };
+  set('nombre', m.nombre);
+  set('especie', m.especie || '');
+  set('raza', m.raza);
+  set('sexo', m.sexo || 'desconocido');
+  set('peso_kg', m.peso_kg != null && m.peso_kg !== '' ? parseFloat(m.peso_kg) : '');
+  set('fecha_nacimiento', m.fecha_nacimiento ? String(m.fecha_nacimiento).slice(0, 10) : '');
+  set('color', m.color);
+  set('microchip', m.microchip);
+  set('alertas_medicas', m.alertas_medicas);
+
+  var quitar = card.querySelector('.pm-quitar');
+  if (quitar) quitar.onclick = function() { card.remove(); actualizarEstadoMascotas(); };
+  card.querySelector('[data-f="nombre"]').addEventListener('input', actualizarEstadoMascotas);
+
+  document.getElementById('pm-lista').appendChild(card);
+  actualizarEstadoMascotas();
+  if (!esExistente && arguments.length === 0) {
+    setTimeout(function() { card.querySelector('[data-f="nombre"]').focus(); }, 50);
+  }
+}
+
+function actualizarEstadoMascotas() {
+  var cards = document.querySelectorAll('#pm-lista .pm-card');
+  cards.forEach(function(c, i) {
+    var nom = c.querySelector('[data-f="nombre"]').value.trim();
+    c.querySelector('.pm-titulo').textContent = '🐾 ' + (nom || ('Mascota ' + (i + 1)));
+  });
+  document.getElementById('pm-contador').textContent = cards.length ? '(' + cards.length + ')' : '';
+  document.getElementById('pm-vacio').style.display  = cards.length ? 'none' : 'block';
+}
+
+/**
+ * Lee las tarjetas. Las nuevas completamente vacías se ignoran.
+ * Devuelve { error } o { lista }.
+ */
+function leerMascotasForm() {
+  var lista = [];
+  var cards = document.querySelectorAll('#pm-lista .pm-card');
+  for (var i = 0; i < cards.length; i++) {
+    var c   = cards[i];
+    var get = function(f) { var el = c.querySelector('[data-f="' + f + '"]'); return el ? el.value.trim() : ''; };
+    var m = {
+      nombre          : get('nombre'),
+      especie         : get('especie'),
+      raza            : get('raza') || null,
+      sexo            : get('sexo') || 'desconocido',
+      fecha_nacimiento: get('fecha_nacimiento') || null,
+      peso_kg         : parseFloat(get('peso_kg')) || null,
+      color           : get('color') || null,
+      microchip       : get('microchip') || null,
+      alertas_medicas : get('alertas_medicas') || null,
+    };
+    var id = c.dataset.id ? parseInt(c.dataset.id, 10) : null;
+
+    // Tarjeta nueva sin nada escrito → se ignora
+    var vacia = !m.nombre && !m.especie && !m.raza && !m.fecha_nacimiento && !m.peso_kg &&
+                !m.color && !m.microchip && !m.alertas_medicas;
+    if (!id && vacia) continue;
+
+    if (!m.nombre || !m.especie) {
+      var ref = m.nombre ? '"' + m.nombre + '"' : 'Mascota ' + (i + 1);
+      c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (m.nombre ? c.querySelector('[data-f="especie"]') : c.querySelector('[data-f="nombre"]')).focus();
+      return { error: ref + ': nombre y especie son obligatorios.' };
+    }
+    if (id) m.id = id;
+    lista.push(m);
+  }
+  return { lista: lista };
+}
+
 function abrirModalNuevo() {
   propEditandoId = null;
   document.getElementById('modal-prop-titulo').textContent = '👤 Nuevo Propietario';
   document.getElementById('btn-guardar-prop').textContent  = '💾 Guardar';
   document.getElementById('prop-id').value = '';
   limpiarForm();
+  document.getElementById('pm-ayuda').textContent = 'Opcional — puedes registrar sus mascotas ahora mismo';
+  agregarFilaMascota({}); // una tarjeta lista para llenar (si se deja vacía, se ignora)
   openModal('modal-prop');
   if (!_integraciones) cargarEstadoIntegraciones();
 }
@@ -602,6 +768,8 @@ async function abrirModalEditar(id) {
   document.getElementById('modal-prop-titulo').textContent = '✏️ Editar Propietario';
   document.getElementById('btn-guardar-prop').textContent  = '💾 Guardar Cambios';
   document.getElementById('prop-id').value = id;
+  limpiarMascotasForm();
+  document.getElementById('pm-ayuda').textContent = 'Edita sus mascotas o agrega nuevas';
   openModal('modal-prop');
 
   try {
@@ -620,8 +788,15 @@ async function abrirModalEditar(id) {
     document.getElementById('p-ruc').value        = p.ruc           || '';
     document.getElementById('p-razon').value      = p.razon_social  || '';
     document.getElementById('p-dir-fiscal').value = p.direccion_fiscal || '';
+    // onTipoDocChange() limpia el número: se vuelve a poner después
+    var numDocGuardado = document.getElementById('p-documento').value;
     onTipoDocChange();
+    document.getElementById('p-documento').value = numDocGuardado;
     ocultarBannersDoc();
+
+    // Mascotas ya registradas, editables
+    limpiarMascotasForm();
+    (p.mascotas || []).forEach(function(m) { agregarFilaMascota(m); });
   } catch { toast('Error de conexión.','danger'); }
 }
 
@@ -645,6 +820,9 @@ async function guardarProp() {
   var tipoDoc = document.getElementById('p-tipo-doc').value;
   var numDoc  = document.getElementById('p-documento').value.trim();
 
+  var pm = leerMascotasForm();
+  if (pm.error) { toast(pm.error, 'warning'); return; }
+
   const body = {
     nombre,
     apellido,
@@ -656,11 +834,17 @@ async function guardarProp() {
     ruc            : tipoDoc === 'RUC' ? numDoc || null : (ruc || null),
     razon_social   : document.getElementById('p-razon').value.trim()      || null,
     direccion_fiscal: document.getElementById('p-dir-fiscal').value.trim()|| null,
+    mascotas       : pm.lista,
   };
 
   const esEdicion = !!propEditandoId;
   const url       = esEdicion ? `/propietarios/${propEditandoId}` : '/propietarios';
   const method    = esEdicion ? 'PUT' : 'POST';
+
+  const btn = document.getElementById('btn-guardar-prop');
+  const txtBtn = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
 
   try {
     const res  = await api(url, { method, body });
@@ -668,11 +852,25 @@ async function guardarProp() {
     const data = await res.json();
     if (!res.ok) { toast(data.message||'Error al guardar.','danger'); return; }
 
-    toast(esEdicion ? '✅ Propietario actualizado' : '✅ Propietario registrado','success');
+    let msg;
+    if (esEdicion) {
+      const nuevas = data.data?.creadas || 0;
+      msg = '✅ Propietario actualizado' +
+            (nuevas ? ` · ${nuevas} mascota${nuevas > 1 ? 's' : ''} nueva${nuevas > 1 ? 's' : ''}` : '');
+    } else {
+      const n = data.data?.mascotas_ids?.length || 0;
+      msg = '✅ Propietario registrado' +
+            (n ? ` con ${n} mascota${n > 1 ? 's' : ''}` : '');
+    }
+    toast(msg, 'success');
     closeModal('modal-prop');
     limpiarForm();
     cargar();
   } catch { toast('Error de conexión.','danger'); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = txtBtn;
+  }
 }
 
 function limpiarForm() {
@@ -685,6 +883,7 @@ function limpiarForm() {
   document.getElementById('p-tipo-doc').value = 'DNI';
   onTipoDocChange();
   ocultarBannersDoc();
+  limpiarMascotasForm();
 }
 
 // ── Ver detalle ───────────────────────────────────────────────────

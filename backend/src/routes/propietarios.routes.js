@@ -7,6 +7,79 @@ const { auditMiddleware } = require('../middlewares/audit.middleware');
 const router = Router();
 router.use(authenticate);
 
+// ── Mascotas dentro del registro del propietario ──────────────────
+// Campos que se pueden enviar por mascota desde el formulario.
+const CAMPOS_MASCOTA = ['nombre', 'especie', 'raza', 'sexo', 'fecha_nacimiento',
+                        'peso_kg', 'color', 'microchip', 'alergias', 'alertas_medicas'];
+
+function limpiarMascota(m) {
+  const txt = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
+  const out = {};
+  for (const campo of CAMPOS_MASCOTA) {
+    if (!Object.prototype.hasOwnProperty.call(m, campo)) continue; // solo lo enviado
+    if (campo === 'peso_kg') {
+      const n = parseFloat(m.peso_kg);
+      out.peso_kg = Number.isFinite(n) && n > 0 ? n : null;
+    } else if (campo === 'sexo') {
+      out.sexo = ['macho', 'hembra', 'desconocido'].includes(m.sexo) ? m.sexo : 'desconocido';
+    } else if (campo === 'fecha_nacimiento') {
+      out.fecha_nacimiento = /^\d{4}-\d{2}-\d{2}$/.test(m.fecha_nacimiento || '') ? m.fecha_nacimiento : null;
+    } else {
+      out[campo] = txt(m[campo]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Valida el arreglo `mascotas` del body.
+ * Devuelve { error } o { lista } con cada mascota limpia (+ id si ya existe).
+ */
+function validarMascotas(mascotas) {
+  if (mascotas === undefined || mascotas === null) return { lista: [] };
+  if (!Array.isArray(mascotas)) return { error: 'El campo mascotas debe ser una lista.' };
+  if (mascotas.length > 20)     return { error: 'Máximo 20 mascotas por registro.' };
+
+  const lista = [];
+  for (let i = 0; i < mascotas.length; i++) {
+    const m = mascotas[i] || {};
+    const limpia = limpiarMascota(m);
+    const id = m.id ? parseInt(m.id, 10) : null;
+    const etiqueta = limpia.nombre ? `"${limpia.nombre}"` : `#${i + 1}`;
+
+    // Al crear se exigen nombre y especie; al actualizar, si se envían, no pueden quedar vacíos.
+    if (!id || 'nombre' in limpia)  { if (!limpia.nombre)  return { error: `La mascota ${etiqueta} necesita nombre.` }; }
+    if (!id || 'especie' in limpia) { if (!limpia.especie) return { error: `La mascota ${etiqueta} necesita especie.` }; }
+
+    lista.push({ id, ...limpia });
+  }
+  return { lista };
+}
+
+async function insertarMascota(conn, propietarioId, m) {
+  const [r] = await conn.execute(
+    `INSERT INTO mascotas (propietario_id, nombre, especie, raza, sexo, fecha_nacimiento,
+       peso_kg, color, microchip, alergias, alertas_medicas)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [propietarioId, m.nombre, m.especie, m.raza ?? null, m.sexo || 'desconocido',
+     m.fecha_nacimiento ?? null, m.peso_kg ?? null, m.color ?? null,
+     m.microchip ?? null, m.alergias ?? null, m.alertas_medicas ?? null]
+  );
+  return r.insertId;
+}
+
+async function actualizarMascota(conn, propietarioId, m) {
+  // Solo se actualizan los campos enviados (así no se pierden datos que el formulario no muestra)
+  const campos = CAMPOS_MASCOTA.filter(c => c in m);
+  if (!campos.length) return true;
+  const [r] = await conn.execute(
+    `UPDATE mascotas SET ${campos.map(c => `${c}=?`).join(', ')}
+     WHERE id = ? AND propietario_id = ?`,
+    [...campos.map(c => m[c]), m.id, propietarioId]
+  );
+  return r.affectedRows > 0;
+}
+
 // ── GET /api/v1/propietarios ──────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
@@ -80,7 +153,7 @@ router.get('/:id', async (req, res, next) => {
     if (!prop) return res.status(404).json({ success: false, message: 'Propietario no encontrado.' });
 
     const mascotas = await req.db.query(
-      'SELECT id, nombre, especie, raza, sexo, peso_kg, alertas_medicas, fecha_nacimiento, microchip, foto_updated_at FROM mascotas WHERE propietario_id = ? ORDER BY nombre',
+      'SELECT id, nombre, especie, raza, sexo, peso_kg, color, alertas_medicas, fecha_nacimiento, microchip, foto_updated_at FROM mascotas WHERE propietario_id = ? ORDER BY nombre',
       [req.params.id]
     );
     return res.json({ success: true, data: { ...prop, mascotas } });
@@ -122,16 +195,31 @@ router.post('/', auditMiddleware('propietarios:creado', 'propietarios'), async (
       });
     }
 
-    const result = await req.db.query(
-      `INSERT INTO propietarios
-         (tipo_documento, nombre, apellido, dni, telefono, email,
-          direccion, ruc, razon_social, direccion_fiscal)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [tipo_documento, nombre.trim(), apellido.trim(), dni?.trim()||null,
-       telefono?.trim()||null, email?.trim()||null, direccion?.trim()||null,
-       ruc?.trim()||null, razon_social?.trim()||null, direccion_fiscal?.trim()||null]
-    );
-    return res.status(201).json({ success: true, data: { id: result.insertId } });
+    // Mascotas opcionales que vienen en el mismo registro
+    const { error: errMasc, lista: mascotas } = validarMascotas(req.body.mascotas);
+    if (errMasc) return res.status(422).json({ success: false, message: errMasc });
+
+    // Propietario + mascotas en una sola transacción: o se guarda todo o nada
+    const resultado = await req.db.withTransaction(async (conn) => {
+      const [r] = await conn.execute(
+        `INSERT INTO propietarios
+           (tipo_documento, nombre, apellido, dni, telefono, email,
+            direccion, ruc, razon_social, direccion_fiscal)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [tipo_documento, nombre.trim(), apellido.trim(), dni?.trim()||null,
+         telefono?.trim()||null, email?.trim()||null, direccion?.trim()||null,
+         ruc?.trim()||null, razon_social?.trim()||null, direccion_fiscal?.trim()||null]
+      );
+      const propietarioId = r.insertId;
+
+      const mascotasIds = [];
+      for (const m of mascotas) {
+        mascotasIds.push(await insertarMascota(conn, propietarioId, m));
+      }
+      return { id: propietarioId, mascotas_ids: mascotasIds };
+    });
+
+    return res.status(201).json({ success: true, data: resultado });
   } catch (err) { next(err); }
 });
 
@@ -147,17 +235,50 @@ router.put('/:id', auditMiddleware('propietarios:actualizado', 'propietarios'), 
     if (ruc && !/^\d{11}$/.test(ruc.trim()))
       return res.status(422).json({ success: false, message: 'El RUC debe tener 11 dígitos.' });
 
-    await req.db.query(
-      `UPDATE propietarios SET tipo_documento=?, nombre=?, apellido=?, dni=?,
-       telefono=?, email=?, direccion=?, ruc=?, razon_social=?, direccion_fiscal=?
-       WHERE id=?`,
-      [tipo_documento, nombre.trim(), apellido.trim(), dni?.trim()||null,
-       telefono?.trim()||null, email?.trim()||null, direccion?.trim()||null,
-       ruc?.trim()||null, razon_social?.trim()||null, direccion_fiscal?.trim()||null,
-       req.params.id]
-    );
-    return res.json({ success: true, message: 'Propietario actualizado.' });
-  } catch (err) { next(err); }
+    const [existe] = await req.db.query('SELECT id FROM propietarios WHERE id = ?', [req.params.id]);
+    if (!existe) return res.status(404).json({ success: false, message: 'Propietario no encontrado.' });
+
+    // Mascotas: las que traen id se actualizan, las nuevas se crean.
+    // Las que no vengan en la lista NO se eliminan (eso se hace desde Mascotas).
+    const { error: errMasc, lista: mascotas } = validarMascotas(req.body.mascotas);
+    if (errMasc) return res.status(422).json({ success: false, message: errMasc });
+
+    const propietarioId = parseInt(req.params.id, 10);
+
+    const resultado = await req.db.withTransaction(async (conn) => {
+      await conn.execute(
+        `UPDATE propietarios SET tipo_documento=?, nombre=?, apellido=?, dni=?,
+         telefono=?, email=?, direccion=?, ruc=?, razon_social=?, direccion_fiscal=?
+         WHERE id=?`,
+        [tipo_documento, nombre.trim(), apellido.trim(), dni?.trim()||null,
+         telefono?.trim()||null, email?.trim()||null, direccion?.trim()||null,
+         ruc?.trim()||null, razon_social?.trim()||null, direccion_fiscal?.trim()||null,
+         propietarioId]
+      );
+
+      let creadas = 0, actualizadas = 0;
+      for (const m of mascotas) {
+        if (m.id) {
+          const ok = await actualizarMascota(conn, propietarioId, m);
+          if (!ok) {
+            const e = new Error(`La mascota "${m.nombre || m.id}" no pertenece a este propietario.`);
+            e.status = 422;
+            throw e;
+          }
+          actualizadas++;
+        } else {
+          await insertarMascota(conn, propietarioId, m);
+          creadas++;
+        }
+      }
+      return { creadas, actualizadas };
+    });
+
+    return res.json({ success: true, message: 'Propietario actualizado.', data: resultado });
+  } catch (err) {
+    if (err.status === 422) return res.status(422).json({ success: false, message: err.message });
+    next(err);
+  }
 });
 
 // ── DELETE /api/v1/propietarios/:id ──────────────────────────────
