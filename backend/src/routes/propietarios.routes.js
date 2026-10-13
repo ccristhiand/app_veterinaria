@@ -7,6 +7,37 @@ const { auditMiddleware } = require('../middlewares/audit.middleware');
 const router = Router();
 router.use(authenticate);
 
+// ── Búsqueda de propietarios ──────────────────────────────────────
+// Cada palabra se busca por separado y TODAS deben coincidir, en cualquier campo.
+// Así "juan perez" encuentra nombre=Juan + apellido=Pérez, y "987654321"
+// encuentra un teléfono guardado como "987 654 321".
+function construirBusqueda(search) {
+  const palabras = String(search || '').trim().split(/\s+/).filter(Boolean).slice(0, 6);
+  if (!palabras.length) return { where: '', params: [] };
+
+  const escLike = (s) => s.replace(/[\\%_]/g, '\\$&');
+  const conds = [], params = [];
+
+  for (const palabra of palabras) {
+    const like = `%${escLike(palabra)}%`;
+    const partes = [
+      `CONCAT_WS(' ', p.nombre, p.apellido, p.razon_social, p.email) LIKE ?`,
+      `p.dni LIKE ?`,
+      `p.ruc LIKE ?`,
+      `p.telefono LIKE ?`,
+    ];
+    params.push(like, like, like, like);
+
+    const digitos = palabra.replace(/\D/g, '');
+    if (digitos.length >= 3) {
+      partes.push(`REPLACE(REPLACE(REPLACE(p.telefono, ' ', ''), '-', ''), '+', '') LIKE ?`);
+      params.push(`%${digitos}%`);
+    }
+    conds.push(`(${partes.join(' OR ')})`);
+  }
+  return { where: `WHERE ${conds.join(' AND ')}`, params };
+}
+
 // ── Mascotas dentro del registro del propietario ──────────────────
 // Campos que se pueden enviar por mascota desde el formulario.
 const CAMPOS_MASCOTA = ['nombre', 'especie', 'raza', 'sexo', 'fecha_nacimiento',
@@ -86,27 +117,22 @@ router.get('/', async (req, res, next) => {
     const { search = '', page = 1, limit = 20 } = req.query;
     const limitN  = Math.min(parseInt(limit) || 20, 100);
     const offsetN = (Math.max(parseInt(page) || 1, 1) - 1) * limitN;
-    const q = `%${search}%`;
+    const { where, params } = construirBusqueda(search);
 
     const rows = await req.db.query(
       `SELECT p.*, COUNT(m.id) AS total_mascotas
        FROM propietarios p
        LEFT JOIN mascotas m ON m.propietario_id = p.id
-       WHERE p.nombre LIKE ? OR p.apellido LIKE ?
-          OR p.dni LIKE ? OR p.telefono LIKE ?
-          OR p.ruc LIKE ? OR p.razon_social LIKE ?
+       ${where}
        GROUP BY p.id
        ORDER BY p.apellido, p.nombre
        LIMIT ${limitN} OFFSET ${offsetN}`,
-      [q, q, q, q, q, q]
+      params
     );
 
     const [{ total }] = await req.db.query(
-      `SELECT COUNT(*) AS total FROM propietarios
-       WHERE nombre LIKE ? OR apellido LIKE ?
-          OR dni LIKE ? OR telefono LIKE ?
-          OR ruc LIKE ? OR razon_social LIKE ?`,
-      [q, q, q, q, q, q]
+      `SELECT COUNT(*) AS total FROM propietarios p ${where}`,
+      params
     );
 
     return res.json({ success: true, data: rows, total, page: parseInt(page), limit: limitN });

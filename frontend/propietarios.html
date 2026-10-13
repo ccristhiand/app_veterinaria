@@ -10,6 +10,43 @@
   <script src="js/layout.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <style>
+    /* Botón "Acciones" de cada fila */
+    .acc-btn {
+      display:inline-flex;align-items:center;gap:.35rem;
+      padding:.38rem .75rem;border-radius:.6rem;
+      border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+      font-family:inherit;font-size:.75rem;font-weight:600;cursor:pointer;
+      transition:background .15s,border-color .15s,color .15s;
+    }
+    .acc-btn:hover, .acc-btn.abierto {
+      background:var(--green-50);border-color:var(--green-100);color:var(--green-600);
+    }
+    /* Menú desplegable (fijo, para que no lo recorte el scroll de la tabla) */
+    #menu-acciones {
+      display:none;position:fixed;z-index:60;min-width:190px;
+      background:#fff;border:1px solid var(--line);border-radius:.85rem;
+      box-shadow:0 12px 32px rgba(15,40,30,.16);padding:.35rem;
+      animation:accIn .12s ease-out;
+    }
+    @keyframes accIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+    #menu-acciones button {
+      display:flex;align-items:center;gap:.6rem;width:100%;
+      padding:.55rem .7rem;border:none;background:none;border-radius:.55rem;
+      font-family:inherit;font-size:.8rem;font-weight:600;color:#334155;
+      cursor:pointer;text-align:left;
+    }
+    #menu-acciones button span { width:1.1rem;text-align:center; }
+    #menu-acciones button:hover, #menu-acciones button:focus-visible { background:#f1f5f9;outline:none; }
+    #menu-acciones button.acc-violeta { color:#6d28d9; }
+    #menu-acciones button.acc-violeta:hover { background:#f5f3ff; }
+    #menu-acciones button.acc-rojo { color:#e11d48; }
+    #menu-acciones button.acc-rojo:hover { background:#fff1f2; }
+    #menu-acciones .acc-sep { height:1px;background:var(--line);margin:.3rem .2rem; }
+    /* Fila recién guardada */
+    @keyframes filaNueva { 0%,60% { background:#ecfdf5; } 100% { background:transparent; } }
+    tr.fila-nueva td { animation:filaNueva 3s ease-out; }
+  </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
 <div id="main-content" class="page">
@@ -282,6 +319,9 @@
   </div>
 </div>
 
+<!-- Menú de acciones de la tabla (uno solo, se reposiciona en cada fila) -->
+<div id="menu-acciones" role="menu"></div>
+
 <script>
 let propEditandoId  = null;
 let propEliminandoId = null;
@@ -289,6 +329,67 @@ let _paginaActual   = 1;
 let _totalPaginas   = 1;
 let _searchActual   = '';
 const LIMIT         = 20;
+let _filas          = {};    // datos por id para el menú de acciones
+let _resaltarId     = null;  // propietario a resaltar tras guardar
+
+// ── Menú de acciones por fila ─────────────────────────────────────
+function abrirMenuAcciones(ev, id) {
+  ev.stopPropagation();
+  var menu = document.getElementById('menu-acciones');
+  var btn  = ev.currentTarget;
+
+  // Clic en el mismo botón con el menú abierto → cerrar
+  if (menu.style.display === 'block' && menu.dataset.id == id) { cerrarMenuAcciones(); return; }
+  cerrarMenuAcciones();
+
+  var f = _filas[id] || { nombre: '', total_mascotas: 0 };
+  menu.dataset.id = id;
+  menu.innerHTML =
+    '<button type="button" role="menuitem" data-acc="ver"><span>👁️</span> Ver detalle</button>' +
+    '<button type="button" role="menuitem" data-acc="editar"><span>✏️</span> Editar</button>' +
+    '<button type="button" role="menuitem" data-acc="mascota" class="acc-violeta"><span>🐾</span> Agregar mascota</button>' +
+    '<div class="acc-sep"></div>' +
+    '<button type="button" role="menuitem" data-acc="eliminar" class="acc-rojo"><span>🗑️</span> Eliminar</button>';
+
+  menu.querySelectorAll('button').forEach(function(b) {
+    b.onclick = function() {
+      cerrarMenuAcciones();
+      var acc = b.dataset.acc;
+      if (acc === 'ver')      verDetalle(id);
+      if (acc === 'editar')   abrirModalEditar(id);
+      if (acc === 'mascota')  abrirModalNuevaMascota(id, f.nombre);
+      if (acc === 'eliminar') abrirModalEliminarProp(id, f.nombre, f.total_mascotas);
+    };
+  });
+
+  // Posición: debajo del botón, alineado a la derecha; si no entra, hacia arriba
+  menu.style.display = 'block';
+  btn.classList.add('abierto');
+  var r  = btn.getBoundingClientRect();
+  var mw = menu.offsetWidth, mh = menu.offsetHeight;
+  var left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+  var top  = (r.bottom + mh + 8 > window.innerHeight) ? r.top - mh - 6 : r.bottom + 6;
+  menu.style.left = left + 'px';
+  menu.style.top  = Math.max(8, top) + 'px';
+  menu.querySelector('button').focus({ preventScroll: true });
+}
+
+function cerrarMenuAcciones() {
+  var menu = document.getElementById('menu-acciones');
+  if (!menu || menu.style.display !== 'block') return;
+  menu.style.display = 'none';
+  menu.dataset.id = '';
+  document.querySelectorAll('.acc-btn.abierto').forEach(function(b) { b.classList.remove('abierto'); });
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#menu-acciones')) cerrarMenuAcciones();
+});
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarMenuAcciones(); });
+window.addEventListener('resize', cerrarMenuAcciones);
+document.addEventListener('scroll', function(e) {
+  if (!e.target.closest || !e.target.closest('#menu-acciones')) cerrarMenuAcciones();
+}, true);
 
 document.addEventListener('DOMContentLoaded', function() {
   initPage({ activePage:'propietarios', title:'Propietarios', subtitle:'Registro de clientes' });
@@ -324,7 +425,7 @@ async function cargar() {
     }
 
     tbody.innerHTML = rows.map(p => `
-      <tr>
+      <tr data-id="${p.id}">
         <td>
           <div style="display:flex;align-items:center;gap:.7rem">
             <div style="width:36px;height:36px;border-radius:50%;
@@ -370,27 +471,29 @@ async function cargar() {
             🐾 ${p.total_mascotas||0}
           </span>
         </td>
-        <td>
-          <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-start">
-            <button class="vlink" onclick="verDetalle(${p.id})"
-              style="font-size:.75rem;color:var(--green-600);font-weight:600">
-              👁️ Ver
-            </button>
-            <button class="vlink" onclick="abrirModalEditar(${p.id})"
-              style="font-size:.75rem;color:var(--sky)">
-              ✏️ Editar
-            </button>
-            <button class="vlink" onclick="abrirModalNuevaMascota(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
-              style="font-size:.75rem;color:#8b5cf6;font-weight:600">
-              ＋🐾 Mascota
-            </button>
-            <button class="vlink" onclick="abrirModalEliminarProp(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}',${p.total_mascotas||0})"
-              style="font-size:.75rem;color:#e11d48">
-              🗑️ Eliminar
-            </button>
-          </div>
+        <td style="width:1%;white-space:nowrap">
+          <button type="button" class="acc-btn" onclick="abrirMenuAcciones(event, ${p.id})"
+            aria-haspopup="menu" title="Acciones">
+            Acciones <span style="font-size:.6rem;opacity:.7">▼</span>
+          </button>
         </td>
       </tr>`).join('');
+
+    // Guardar datos de cada fila para el menú (evita meter nombres en atributos onclick)
+    _filas = {};
+    rows.forEach(function(p) {
+      _filas[p.id] = { nombre: (p.nombre + ' ' + p.apellido).trim(), total_mascotas: p.total_mascotas || 0 };
+    });
+
+    // Resaltar el propietario recién guardado
+    if (_resaltarId) {
+      var fila = tbody.querySelector('tr[data-id="' + _resaltarId + '"]');
+      if (fila) {
+        fila.classList.add('fila-nueva');
+        fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      _resaltarId = null;
+    }
 
     // Renderizar paginación
     renderizarPaginacion(total);
