@@ -30,6 +30,139 @@ router.use((req, res, next) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════
+//  Configuración Meta de la PLATAFORMA (una sola para todas las clínicas)
+//  Se guarda en saas_config (clave/valor). El App Secret va cifrado.
+// ════════════════════════════════════════════════════════════════
+const crypto = require('crypto');
+const { encrypt, decrypt } = require('../services/crypto.service');
+
+const META_CLAVES = {
+  app_id      : 'meta_app_id',
+  app_secret  : 'meta_app_secret',     // cifrado
+  config_id   : 'meta_config_id',
+  verify_token: 'meta_verify_token',
+  graph_ver   : 'meta_graph_version',
+  public_url  : 'meta_public_url',
+};
+const META_DEF = { graph_ver: 'v25.0', public_url: 'https://wameta.netcodip.com' };
+
+async function leerMeta() {
+  const rows = await masterQuery(
+    `SELECT clave, valor FROM saas_config WHERE clave IN (${Object.values(META_CLAVES).map(() => '?').join(',')})`,
+    Object.values(META_CLAVES)
+  );
+  const map = Object.fromEntries(rows.map(r => [r.clave, r.valor]));
+  const out = {};
+  for (const [k, clave] of Object.entries(META_CLAVES)) out[k] = map[clave] || META_DEF[k] || '';
+  return out;
+}
+
+async function guardarMeta(k, valor, descripcion) {
+  await masterQuery(
+    `INSERT INTO saas_config (clave, valor, descripcion) VALUES (?,?,?)
+     ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
+    [META_CLAVES[k], valor ?? '', descripcion]
+  );
+}
+
+function vistaMeta(m) {
+  const base = (m.public_url || META_DEF.public_url).replace(/\/+$/, '');
+  return {
+    app_id      : m.app_id,
+    config_id   : m.config_id,
+    graph_ver   : m.graph_ver,
+    public_url  : base,
+    webhook_url : `${base}/webhook`,
+    verify_token: m.verify_token,
+    tiene_secret: !!m.app_secret,
+    completa    : !!(m.app_id && m.app_secret && m.config_id && m.verify_token),
+  };
+}
+
+// GET /admin/api/wa/plataforma-meta
+router.get('/plataforma-meta', async (req, res, next) => {
+  try {
+    const m = await leerMeta();
+    // Primera vez: generar el token de verificación del webhook
+    if (!m.verify_token) {
+      m.verify_token = crypto.randomBytes(24).toString('hex');
+      await guardarMeta('verify_token', m.verify_token, 'Token de verificación del webhook de Meta');
+    }
+    return res.json({ success: true, data: vistaMeta(m) });
+  } catch (err) { next(err); }
+});
+
+// PUT /admin/api/wa/plataforma-meta
+// El App Secret solo se cambia si se envía uno nuevo (vacío = conservar el actual).
+router.put('/plataforma-meta', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const appId    = String(b.app_id    || '').trim();
+    const configId = String(b.config_id || '').trim();
+    const secret   = String(b.app_secret || '').trim();
+    const graphVer = String(b.graph_ver || META_DEF.graph_ver).trim();
+    const pubUrl   = String(b.public_url || META_DEF.public_url).trim().replace(/\/+$/, '');
+
+    if (appId    && !/^\d{5,25}$/.test(appId))    return res.status(422).json({ success: false, message: 'El App ID debe ser solo números.' });
+    if (configId && !/^\d{5,25}$/.test(configId)) return res.status(422).json({ success: false, message: 'El Configuration ID debe ser solo números.' });
+    if (secret   && !/^[a-f0-9]{32}$/i.test(secret)) return res.status(422).json({ success: false, message: 'La clave secreta debe tener 32 caracteres (letras a-f y números).' });
+    if (!/^v\d{2}\.\d$/.test(graphVer))           return res.status(422).json({ success: false, message: 'Versión de Graph API inválida (ej. v25.0).' });
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(pubUrl)) return res.status(422).json({ success: false, message: 'La URL pública debe empezar con https:// y no llevar rutas.' });
+
+    await guardarMeta('app_id',     appId,    'App ID de Meta (VetNetcodip)');
+    await guardarMeta('config_id',  configId, 'Configuration ID de Embedded Signup');
+    await guardarMeta('graph_ver',  graphVer, 'Versión de Graph API');
+    await guardarMeta('public_url', pubUrl,   'URL pública del servicio wa-meta');
+    if (secret) await guardarMeta('app_secret', encrypt(secret), 'App Secret de Meta (cifrado)');
+
+    return res.json({ success: true, message: 'Configuración Meta guardada.', data: vistaMeta(await leerMeta()) });
+  } catch (err) { next(err); }
+});
+
+// POST /admin/api/wa/plataforma-meta/token — generar un token de verificación nuevo
+router.post('/plataforma-meta/token', async (req, res, next) => {
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    await guardarMeta('verify_token', token, 'Token de verificación del webhook de Meta');
+    return res.json({ success: true, data: vistaMeta(await leerMeta()) });
+  } catch (err) { next(err); }
+});
+
+// POST /admin/api/wa/plataforma-meta/probar — valida App ID + App Secret contra Meta
+router.post('/plataforma-meta/probar', async (req, res, next) => {
+  try {
+    const m = await leerMeta();
+    if (!m.app_id || !m.app_secret) {
+      return res.status(422).json({ success: false, message: 'Primero guarda el App ID y la clave secreta.' });
+    }
+    let secret;
+    try { secret = decrypt(m.app_secret); }
+    catch { return res.status(422).json({ success: false, message: 'No se pudo leer la clave secreta guardada. Vuelve a pegarla.' }); }
+
+    const url = `https://graph.facebook.com/${m.graph_ver}/${encodeURIComponent(m.app_id)}` +
+                `?fields=id,name&access_token=${encodeURIComponent(m.app_id + '|' + secret)}`;
+    let r, d;
+    try {
+      r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      d = await r.json();
+    } catch (e) {
+      return res.status(502).json({ success: false, message: 'No se pudo conectar con Meta: ' + e.message });
+    }
+    if (!r.ok || d.error) {
+      return res.status(422).json({
+        success: false,
+        message: 'Meta rechazó los datos: ' + (d.error?.message || 'App ID o clave secreta incorrectos.'),
+      });
+    }
+    return res.json({
+      success: true,
+      message: `Conexión correcta con la app "${d.name}".`,
+      data: { app_name: d.name, config_id_ok: !!m.config_id },
+    });
+  } catch (err) { next(err); }
+});
+
 const DEFAULTS = {
   activo: 0, ilimitado: 0, msgs_incluidos: 100, msgs_usados: 0,
   ver_qr: 1, ver_meta: 0, meta_alerta_mensual: 1000,

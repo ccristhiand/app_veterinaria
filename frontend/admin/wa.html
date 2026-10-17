@@ -42,6 +42,13 @@
     .pant-opt strong{display:block;font-size:.84rem;color:#e2e8f0;font-weight:600}
     .pant-opt small{display:block;font-size:.7rem;color:#64748b;font-weight:500;margin-top:.1rem}
     .badge-meta{background:#0c1f3f;color:#60a5fa;border:1px solid #1e3a8a}
+    .tabs{display:flex;gap:.4rem;border-bottom:1px solid #334155;margin-bottom:1.4rem;flex-wrap:wrap}
+    .tab{background:none;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:.65rem 1rem;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
+    .tab.activo{color:#4ade80;border-bottom-color:#25d366}
+    .ayuda{font-size:.68rem;color:#475569;margin-top:.3rem}
+    .copiable{display:flex;gap:.5rem;align-items:center}
+    .copiable code{flex:1;background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;font-size:.8rem;color:#e2e8f0;overflow-x:auto;white-space:nowrap}
+    .chip{background:#0f172a;border:1px solid #334155;border-radius:.4rem;padding:.1rem .4rem;font-size:.74rem;color:#93c5fd}
     .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#25d366;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
@@ -58,6 +65,94 @@
     <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
   </div>
 
+  <!-- Pestañas -->
+  <div class="tabs">
+    <button class="tab activo" data-tab="clinicas" onclick="cambiarTab('clinicas')">🏥 Clínicas</button>
+    <button class="tab" data-tab="meta" onclick="cambiarTab('meta')">⚙️ Configuración Meta (plataforma) <span id="tab-meta-badge"></span></button>
+  </div>
+
+  <!-- ══ Pestaña: Configuración Meta ══════════════════════════════ -->
+  <section id="tab-meta" class="hidden">
+    <div class="card" style="margin-bottom:1rem">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Datos de tu app de Meta</h2>
+      <p style="font-size:.78rem;color:#64748b;margin-top:.25rem">
+        Se configuran una sola vez para toda la plataforma. Las clínicas nunca ven esta pantalla.
+      </p>
+
+      <div class="grid2" style="margin-top:1.2rem">
+        <div>
+          <label>App ID (Identificador de la app)</label>
+          <input id="mp-app-id" inputmode="numeric" placeholder="1000434849737353"/>
+          <p class="ayuda">Meta → Configuración de la app → Básica → Identificador de la app</p>
+        </div>
+        <div>
+          <label>Clave secreta de la app (App Secret)</label>
+          <input id="mp-secret" type="password" autocomplete="new-password" placeholder="Pega la clave secreta"/>
+          <p class="ayuda" id="mp-secret-ayuda">Meta → Configuración de la app → Básica → Clave secreta → Mostrar</p>
+        </div>
+        <div>
+          <label>Configuration ID (Embedded Signup)</label>
+          <input id="mp-config-id" inputmode="numeric" placeholder="Ej. 1234567890123456"/>
+          <p class="ayuda">Meta → Inicio de sesión con Facebook (empresas) → Configuraciones</p>
+        </div>
+        <div>
+          <label>Versión de Graph API</label>
+          <input id="mp-graph" placeholder="v25.0"/>
+          <p class="ayuda">Déjalo así salvo que Meta indique otra.</p>
+        </div>
+        <div style="grid-column:span 2">
+          <label>URL pública del servicio WhatsApp Meta</label>
+          <input id="mp-public-url" placeholder="https://wameta.netcodip.com"/>
+          <p class="ayuda">El subdominio donde correrá el servicio wa-meta (con https, sin rutas).</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2rem;flex-wrap:wrap">
+        <button class="btn-ghost" onclick="probarMeta()" id="mp-btn-probar">🧪 Probar conexión</button>
+        <button class="btn-primary" onclick="guardarMeta()" id="mp-btn-guardar">💾 Guardar</button>
+      </div>
+      <div id="mp-resultado" class="hidden" style="margin-top:.9rem;font-size:.8rem;border-radius:.7rem;padding:.7rem .9rem"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Copia esto en Meta</h2>
+      <p style="font-size:.78rem;color:#64748b;margin-top:.25rem">
+        Meta → WhatsApp → Configuración → Webhook → Editar. Pega la URL y el token, y luego suscríbete a los campos de abajo.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:.9rem;margin-top:1.1rem">
+        <div>
+          <label>URL de devolución de llamada (Callback URL)</label>
+          <div class="copiable">
+            <code id="mp-webhook-url">—</code>
+            <button class="btn-ghost" onclick="copiar('mp-webhook-url')">📋 Copiar</button>
+          </div>
+        </div>
+        <div>
+          <label>Token de verificación (Verify token)</label>
+          <div class="copiable">
+            <code id="mp-verify-token">—</code>
+            <button class="btn-ghost" onclick="copiar('mp-verify-token')">📋 Copiar</button>
+            <button class="btn-ghost" onclick="regenerarToken()" title="Generar uno nuevo">🔄</button>
+          </div>
+        </div>
+        <div>
+          <label>Campos a los que debes suscribirte</label>
+          <p style="font-size:.8rem;color:#cbd5e1;line-height:1.8">
+            <code class="chip">messages</code> <code class="chip">account_update</code>
+            <code class="chip">message_template_status_update</code> <code class="chip">smb_message_echoes</code>
+            <code class="chip">history</code> <code class="chip">smb_app_state_sync</code>
+          </p>
+        </div>
+        <p style="font-size:.74rem;color:#fbbf24;background:#451a03;border:1px solid #9a3412;border-radius:.6rem;padding:.55rem .75rem">
+          ⚠️ Meta verifica la URL al guardar el webhook: hazlo cuando el servicio wa-meta ya esté instalado en el servidor (paso 2).
+          Y agrega <strong id="mp-dominio">wameta.netcodip.com</strong> en Meta → Inicio de sesión con Facebook (empresas) → Configuración → Dominios permitidos.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Pestaña: Clínicas ═════════════════════════════════════════ -->
+  <section id="tab-clinicas">
   <!-- Stats globales -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
     <div class="stat-box"><div class="stat-lbl">Clínicas con WA activo</div><div class="stat-val" id="stat-activas">—</div></div>
@@ -92,6 +187,7 @@
       </table>
     </div>
   </div>
+  </section>
 </main>
 
 <!-- Modal Config Cuota -->
@@ -387,7 +483,102 @@
     _tenantActual = null;
   }
 
+  // ══ Pestañas ══════════════════════════════════════════════════
+  function cambiarTab(tab) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
+    document.getElementById('tab-clinicas').classList.toggle('hidden', tab !== 'clinicas');
+    document.getElementById('tab-meta').classList.toggle('hidden', tab !== 'meta');
+    if (tab === 'meta') cargarMeta();
+  }
+
+  // ══ Configuración Meta (plataforma) ═══════════════════════════
+  function pintarMeta(d) {
+    document.getElementById('mp-app-id').value     = d.app_id    || '';
+    document.getElementById('mp-config-id').value  = d.config_id || '';
+    document.getElementById('mp-graph').value      = d.graph_ver || 'v25.0';
+    document.getElementById('mp-public-url').value = d.public_url || '';
+    document.getElementById('mp-secret').value     = '';
+    document.getElementById('mp-secret').placeholder = d.tiene_secret
+      ? '•••••••• guardada (déjalo vacío para conservarla)' : 'Pega la clave secreta';
+    document.getElementById('mp-webhook-url').textContent  = d.webhook_url  || '—';
+    document.getElementById('mp-verify-token').textContent = d.verify_token || '—';
+    try { document.getElementById('mp-dominio').textContent = new URL(d.public_url).host; } catch {}
+    document.getElementById('tab-meta-badge').innerHTML = d.completa
+      ? '<span class="badge-wa badge-conectado">Lista</span>'
+      : '<span class="badge-wa badge-conectando">Pendiente</span>';
+  }
+
+  function mostrarResultado(ok, texto) {
+    const el = document.getElementById('mp-resultado');
+    el.classList.remove('hidden');
+    el.style.cssText = 'margin-top:.9rem;font-size:.8rem;border-radius:.7rem;padding:.7rem .9rem;' + (ok
+      ? 'background:#052e16;color:#86efac;border:1px solid #166534'
+      : 'background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d');
+    el.textContent = (ok ? '✅ ' : '❌ ') + texto;
+  }
+
+  async function cargarMeta() {
+    try {
+      const res = await adminFetch('/wa/plataforma-meta');
+      const d = await res.json();
+      if (!res.ok) { mostrarResultado(false, d.message || 'No se pudo cargar.'); return; }
+      pintarMeta(d.data);
+    } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
+  }
+
+  async function guardarMeta() {
+    const btn = document.getElementById('mp-btn-guardar');
+    const body = {
+      app_id    : document.getElementById('mp-app-id').value.trim(),
+      app_secret: document.getElementById('mp-secret').value.trim(),
+      config_id : document.getElementById('mp-config-id').value.trim(),
+      graph_ver : document.getElementById('mp-graph').value.trim() || 'v25.0',
+      public_url: document.getElementById('mp-public-url').value.trim(),
+    };
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      const res = await adminFetch('/wa/plataforma-meta', { method: 'PUT', body });
+      const d = await res.json();
+      if (!res.ok) { mostrarResultado(false, d.message || 'No se pudo guardar.'); return; }
+      pintarMeta(d.data);
+      mostrarResultado(true, d.data.completa
+        ? 'Guardado. Ahora pulsa "Probar conexión".'
+        : 'Guardado. Aún faltan datos para activar el botón en las clínicas.');
+      toast('✅ Configuración Meta guardada', 'success');
+    } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+  }
+
+  async function probarMeta() {
+    const btn = document.getElementById('mp-btn-probar');
+    btn.disabled = true; btn.textContent = 'Probando…';
+    try {
+      const res = await adminFetch('/wa/plataforma-meta/probar', { method: 'POST' });
+      const d = await res.json();
+      mostrarResultado(res.ok, d.message + (res.ok && !d.data.config_id_ok ? ' Falta el Configuration ID.' : ''));
+    } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = '🧪 Probar conexión'; }
+  }
+
+  async function regenerarToken() {
+    try {
+      const res = await adminFetch('/wa/plataforma-meta/token', { method: 'POST' });
+      const d = await res.json();
+      if (res.ok) {
+        pintarMeta(d.data);
+        mostrarResultado(true, 'Token nuevo generado. Si ya lo habías pegado en Meta, actualízalo allá también.');
+      }
+    } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
+  }
+
+  async function copiar(id) {
+    const txt = document.getElementById(id).textContent;
+    try { await navigator.clipboard.writeText(txt); toast('📋 Copiado', 'success'); }
+    catch { toast('No se pudo copiar, selecciónalo manualmente', 'error'); }
+  }
+
   cargar();
+  cargarMeta();   // para mostrar el estado "Lista / Pendiente" en la pestaña
 </script>
 </body>
 </html>
