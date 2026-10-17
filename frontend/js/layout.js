@@ -42,6 +42,7 @@ const TODOS_LOS_LINKS = [
   { id:'sedes',          icon:'🏥', label:'Sedes',            href:'sedes',          roles:['admin'] },
   { id:'configuracion',  icon:'⚙️', label:'Configuración',    href:'configuracion',  roles:['admin'] },
   { id:'whatsapp',       icon:'💬', label:'WhatsApp',         href:'whatsapp',       roles:['admin'] },
+  { id:'whatsapp_meta',  icon:'✅', label:'WhatsApp Meta',    href:'whatsapp-meta',  roles:['admin'] },
 ];
 
 function renderShell({ activePage, title, subtitle }) {
@@ -60,7 +61,8 @@ function renderShell({ activePage, title, subtitle }) {
 
   const nav     = TODOS_LOS_LINKS.filter(n => n.roles.includes(rol));
   const navHTML = nav.map(n => `
-    <a href="${n.href}" class="sb-link ${n.id === activePage ? 'active' : ''}" data-modulo="${n.id}">
+    <a href="${n.href}" class="sb-link ${n.id === activePage ? 'active' : ''}" data-modulo="${n.id}"
+       ${n.id === 'whatsapp_meta' ? 'style="display:none"' : ''}>
       <span class="icon">${n.icon}</span>
       <span>${n.label}</span>
     </a>`).join('');
@@ -238,6 +240,19 @@ function aplicarModulosPlan(branding, activePage) {
   if (!branding.modulo_consentimientos) {
     const idx = modulosPlan.indexOf('consentimientos');
     if (idx > -1) modulosPlan.splice(idx, 1);
+  }
+
+  // ── WhatsApp: el admin SaaS decide qué pantallas ve la clínica ──
+  // wa_ver_qr   → pantalla "WhatsApp" (conexión por QR)
+  // wa_ver_meta → pantalla "WhatsApp Meta" (API oficial)
+  const verQr   = branding.wa_ver_qr   === undefined ? true  : !!Number(branding.wa_ver_qr);
+  const verMeta = branding.wa_ver_meta === undefined ? false : !!Number(branding.wa_ver_meta);
+  if (!verQr) {
+    const idx = modulosPlan.indexOf('whatsapp');
+    if (idx > -1) modulosPlan.splice(idx, 1);
+  }
+  if (verMeta && !modulosPlan.includes('whatsapp_meta')) {
+    modulosPlan.push('whatsapp_meta');
   }
 
   // Ocultar links que NO están en el plan final

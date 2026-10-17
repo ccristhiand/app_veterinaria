@@ -21,9 +21,12 @@ router.get('/', async (req, res, next) => {
          tc.modulo_inventario, tc.modulo_vacunas,
          tc.modulo_consentimientos, tc.modulo_carnet,
          tc.zona_horaria, tc.pais,
-         t.plan, t.activo
+         t.plan, t.activo,
+         COALESCE(wcg.ver_qr, 1)   AS wa_ver_qr,
+         COALESCE(wcg.ver_meta, 0) AS wa_ver_meta
        FROM tenants t
        JOIN tenant_config tc ON tc.tenant_id = t.id
+       LEFT JOIN wa_config_global wcg ON wcg.tenant_id = t.id
        WHERE t.subdominio = ? AND t.activo = 1
        LIMIT 1`, [host]
     );
@@ -100,6 +103,8 @@ function defaultBranding() {
     pais                 : 'Peru',
     plan                 : 'basic',
     activo               : 1,
+    wa_ver_qr            : 1,
+    wa_ver_meta          : 0,
   };
 }
 
