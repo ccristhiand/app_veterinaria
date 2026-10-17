@@ -37,6 +37,11 @@
     .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .hidden{display:none!important}
+    .pant-opt{display:flex!important;align-items:flex-start;gap:.65rem;cursor:pointer;background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.75rem .9rem;text-transform:none!important;letter-spacing:0!important;margin:0!important}
+    .pant-opt input{width:16px;height:16px;margin-top:.15rem;accent-color:#25d366;flex-shrink:0}
+    .pant-opt strong{display:block;font-size:.84rem;color:#e2e8f0;font-weight:600}
+    .pant-opt small{display:block;font-size:.7rem;color:#64748b;font-weight:500;margin-top:.1rem}
+    .badge-meta{background:#0c1f3f;color:#60a5fa;border:1px solid #1e3a8a}
     .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#25d366;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
@@ -72,6 +77,8 @@
           <tr>
             <th>Clínica</th>
             <th>WA activo</th>
+            <th>Pantallas</th>
+            <th>Envía por</th>
             <th>Conexión</th>
             <th>Número</th>
             <th>Mensajes mes</th>
@@ -80,7 +87,7 @@
           </tr>
         </thead>
         <tbody id="tbody-wa">
-          <tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -110,13 +117,46 @@
       </div>
       <div id="cuota-limite-box" class="grid2">
         <div>
-          <label>Mensajes incluidos / mes</label>
+          <label>Mensajes incluidos / mes (QR)</label>
           <input id="cuota-incluidos" type="number" min="1" placeholder="100"/>
         </div>
         <div>
           <label>Usados este mes</label>
           <input id="cuota-usados" type="number" readonly style="opacity:.6"/>
         </div>
+      </div>
+
+      <!-- Pantallas visibles para la clínica -->
+      <div style="border-top:1px solid #334155;padding-top:1rem">
+        <p style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">
+          Pantallas que ve la clínica
+        </p>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <label class="pant-opt">
+            <input type="checkbox" id="cfg-ver-qr" onchange="actualizarAvisoPantallas()"/>
+            <span>
+              <strong>💬 WhatsApp (QR)</strong>
+              <small>Conexión actual escaneando el código QR</small>
+            </span>
+          </label>
+          <label class="pant-opt">
+            <input type="checkbox" id="cfg-ver-meta" onchange="actualizarAvisoPantallas()"/>
+            <span>
+              <strong>✅ WhatsApp Meta</strong>
+              <small>API oficial de Meta (la clínica conecta su número)</small>
+            </span>
+          </label>
+        </div>
+        <p id="cfg-aviso-pantallas" style="display:none;margin-top:.6rem;font-size:.75rem;border-radius:.6rem;padding:.55rem .75rem"></p>
+      </div>
+
+      <div id="cfg-meta-box">
+        <label>Avisar a la clínica al llegar a (mensajes Meta / mes)</label>
+        <input id="cfg-meta-alerta" type="number" min="1" placeholder="1000"/>
+        <p style="font-size:.7rem;color:#64748b;margin-top:.35rem">
+          Meta cobra directamente a la clínica. Este número solo dispara un aviso en su pantalla.
+        </p>
+        <div id="cfg-meta-estado" style="margin-top:.6rem;font-size:.78rem;color:#94a3b8"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -138,7 +178,7 @@
 
   async function cargar() {
     const tbody = document.getElementById('tbody-wa');
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
 
     try {
       const [resTenants, resEstado] = await Promise.all([
@@ -147,7 +187,7 @@
       ]);
 
       if (!resTenants?.ok) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error al cargar tenants</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#f87171">Error al cargar tenants</td></tr>`;
         return;
       }
 
@@ -173,7 +213,7 @@
       document.getElementById('stat-cuota-total').textContent = cuotaTotal || '∞';
 
       if (!tenants.length) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>`;
         return;
       }
 
@@ -190,6 +230,8 @@
         const incl   = wa.msgs_incluidos || 0;
         const pct    = wa.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100, 100) : 0);
         const color  = pct > 80 ? '#f87171' : '#4ade80';
+        const verQr   = wa.ver_qr   === undefined ? true  : !!Number(wa.ver_qr);
+        const verMeta = wa.ver_meta === undefined ? false : !!Number(wa.ver_meta);
 
         return `<tr>
           <td>
@@ -199,6 +241,17 @@
           <td>${wa.activo
             ? '<span class="badge-wa badge-conectado">✅ Activo</span>'
             : '<span class="badge-wa badge-desconectado">⏸️ Inactivo</span>'}</td>
+          <td style="font-size:.72rem;line-height:1.6">
+            ${verQr   ? '<span class="badge-wa badge-desconectado" style="color:#cbd5e1">💬 QR</span> ' : ''}
+            ${verMeta ? '<span class="badge-wa badge-meta">✅ Meta</span>' : ''}
+            ${!verQr && !verMeta ? '<span style="color:#f87171">Ninguna</span>' : ''}
+          </td>
+          <td>${wa.proveedor_activo === 'meta'
+            ? `<span class="badge-wa badge-meta">✅ Meta</span>
+               <p style="font-size:.66rem;color:#64748b;margin-top:.2rem">${esc(wa.meta_numero || '')}${wa.meta_coexistencia ? ' · coexistencia' : ''}</p>`
+            : (verQr
+                ? '<span class="badge-wa badge-desconectado" style="color:#cbd5e1">💬 QR</span>'
+                : '<span style="font-size:.72rem;color:#64748b">—</span>')}</td>
           <td>${estadoBadge[wa.estado] || estadoBadge.desconectado}</td>
           <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">${esc(wa.numero_wa || '—')}</td>
           <td style="font-size:.78rem">
@@ -213,7 +266,7 @@
           </td>
           <td style="font-size:.75rem;color:#94a3b8">${wa.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
           <td>
-            <button onclick="abrirCuota(${t.id},'${esc(t.nombre_clinica||t.slug)}')"
+            <button onclick="abrirCuota(${t.id})" data-nombre="${esc(t.nombre_clinica||t.slug)}"
               class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
               ⚙️ Configurar
             </button>
@@ -223,18 +276,28 @@
 
     } catch(e) {
       console.error(e);
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
     }
   }
 
-  async function abrirCuota(tenantId, nombre) {
+  let _metaActual = null;
+
+  async function abrirCuota(tenantId) {
     _tenantActual = tenantId;
+    _metaActual   = null;
+    const btn    = document.querySelector(`button[onclick="abrirCuota(${tenantId})"]`);
+    const nombre = btn ? btn.dataset.nombre : '';
     document.getElementById('cuota-titulo').textContent  = `💬 WA — ${nombre}`;
     document.getElementById('cuota-tenant-id').value     = tenantId;
     document.getElementById('cuota-activo').checked      = false;
     document.getElementById('cuota-ilimitado').checked   = false;
     document.getElementById('cuota-incluidos').value     = 100;
     document.getElementById('cuota-usados').value        = 0;
+    document.getElementById('cfg-ver-qr').checked        = true;
+    document.getElementById('cfg-ver-meta').checked      = false;
+    document.getElementById('cfg-meta-alerta').value     = 1000;
+    document.getElementById('cfg-meta-estado').innerHTML = '';
+    actualizarAvisoPantallas();
     document.getElementById('modal-cuota').classList.remove('hidden');
 
     try {
@@ -245,9 +308,54 @@
         document.getElementById('cuota-ilimitado').checked = !!d.ilimitado;
         document.getElementById('cuota-incluidos').value   = d.msgs_incluidos || 100;
         document.getElementById('cuota-usados').value      = d.msgs_usados    || 0;
+        document.getElementById('cfg-ver-qr').checked      = !!Number(d.ver_qr);
+        document.getElementById('cfg-ver-meta').checked    = !!Number(d.ver_meta);
+        document.getElementById('cfg-meta-alerta').value   = d.meta_alerta_mensual || 1000;
+        _metaActual = d.meta || null;
+
+        const est = document.getElementById('cfg-meta-estado');
+        if (_metaActual && _metaActual.estado === 'conectado') {
+          est.innerHTML = `🟢 Conectada a Meta: <strong style="color:#e2e8f0">${esc(_metaActual.numero_display || '')}</strong>` +
+            (_metaActual.coexistencia ? ' · coexistencia con el celular' : '');
+        } else {
+          est.innerHTML = '⚪ La clínica aún no conecta su número con Meta.';
+        }
         toggleIlimitado();
+        actualizarAvisoPantallas();
       }
     } catch(e) { console.warn('Error cargando config WA:', e.message); }
+  }
+
+  // Explica qué pasará con la combinación de pantallas elegida
+  function actualizarAvisoPantallas() {
+    const qr   = document.getElementById('cfg-ver-qr').checked;
+    const meta = document.getElementById('cfg-ver-meta').checked;
+    const av   = document.getElementById('cfg-aviso-pantallas');
+    document.getElementById('cfg-meta-box').style.opacity = meta ? '1' : '.45';
+    document.getElementById('cfg-meta-alerta').disabled   = !meta;
+
+    const metaConectado = !!(_metaActual && _metaActual.estado === 'conectado');
+    let txt = '', estilo = 'background:#0c1f3f;color:#93c5fd;border:1px solid #1e3a8a';
+    if (!qr && !meta) {
+      txt = '⚠️ La clínica no verá ninguna pantalla de WhatsApp y no se enviarán mensajes.';
+      estilo = 'background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d';
+    } else if (!meta && metaConectado) {
+      txt = '⚠️ Esta clínica ya tiene Meta conectado. Al ocultar la pantalla, los mensajes volverán a salir por QR (si vuelve a escanear el código).';
+      estilo = 'background:#451a03;color:#fdba74;border:1px solid #9a3412';
+    } else if (qr && meta) {
+      txt = metaConectado
+        ? 'Verá las dos pantallas. Como ya conectó Meta, los mensajes salen por Meta y la conexión por QR queda deshabilitada.'
+        : 'Verá las dos pantallas. Si conecta su número con Meta, los mensajes saldrán por Meta y la conexión por QR quedará deshabilitada.';
+    } else if (meta && !qr) {
+      txt = metaConectado
+        ? 'Solo verá WhatsApp Meta. Los mensajes salen por Meta.'
+        : 'Solo verá WhatsApp Meta. Mientras no conecte su número, no se enviarán mensajes.';
+      if (!metaConectado) estilo = 'background:#451a03;color:#fdba74;border:1px solid #9a3412';
+    }
+    av.setAttribute('style',
+      'margin-top:.6rem;font-size:.75rem;border-radius:.6rem;padding:.55rem .75rem;' +
+      estilo + ';display:' + (txt ? 'block' : 'none'));
+    av.textContent = txt;
   }
 
   function toggleIlimitado() {
@@ -261,6 +369,9 @@
       activo        : document.getElementById('cuota-activo').checked,
       ilimitado     : document.getElementById('cuota-ilimitado').checked,
       msgs_incluidos: parseInt(document.getElementById('cuota-incluidos').value) || 100,
+      ver_qr        : document.getElementById('cfg-ver-qr').checked,
+      ver_meta      : document.getElementById('cfg-ver-meta').checked,
+      meta_alerta_mensual: parseInt(document.getElementById('cfg-meta-alerta').value) || 1000,
     };
     try {
       const res = await adminFetch(`/wa/${_tenantActual}/config`, { method: 'PUT', body });
