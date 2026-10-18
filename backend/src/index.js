@@ -42,6 +42,7 @@ const integracionRoutes       = require('./routes/integracion.routes');
 const examenesRoutes          = require('./routes/examenes.routes');   // ← NUEVO: exámenes en atenciones/seguimientos
 const proformasRoutes         = require('./routes/proformas.routes');  // ← NUEVO: proformas / cotizaciones
 const puntoVentaRoutes        = require('./routes/punto-venta.routes'); // ← NUEVO: punto de venta
+const waMetaRoutes            = require('./routes/wa-meta.routes');     // ← NUEVO: WhatsApp Meta (API oficial)
 // Panel admin SaaS
 const adminRoutes        = require('./routes/admin.routes');
 const adminLogsRoutes    = require('./routes/admin_logs.routes');
@@ -186,6 +187,7 @@ app.use(`${API}/integracion`,      integracionRoutes);
 app.use(`${API}/examenes`,         examenesRoutes);           // ← NUEVO
 app.use(`${API}/proformas`,        proformasRoutes);          // ← NUEVO: proformas
 app.use(`${API}/punto-venta`,      puntoVentaRoutes);         // ← NUEVO: punto de venta
+app.use(`${API}/wa-meta`,          waMetaRoutes);             // ← NUEVO: WhatsApp Meta (API oficial)
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((_req, res) =>
