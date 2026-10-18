@@ -1,0 +1,16 @@
+{
+  "name": "wa-meta",
+  "version": "1.0.0",
+  "description": "VetNetcodip — WhatsApp Cloud API (Meta): webhook y envío oficial",
+  "main": "src/wa-meta.js",
+  "scripts": {
+    "start": "node src/wa-meta.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mysql2": "^3.9.7"
+  }
+}
