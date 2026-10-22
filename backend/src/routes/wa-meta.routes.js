@@ -199,7 +199,7 @@ router.post('/conectar', async (req, res, next) => {
         await graph('POST', `${phoneId}/register`, { cfg, token, body: { messaging_product: 'whatsapp', pin } });
       } catch (e) {
         pin = null;
-        avisos.push('No se pudo registrar el número: ' + e.message);
+        avisos.push('No se pudo registrar el número (si es el número de prueba de Meta, puedes ignorar este aviso: ya viene registrado). Detalle: ' + e.message);
       }
     }
 
@@ -256,6 +256,222 @@ router.post('/desconectar', async (req, res, next) => {
     );
     return res.json({ success: true, message: 'WhatsApp Meta desconectado.' });
   } catch (err) { next(err); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  PLANTILLAS Y ENVÍO (requieren la clínica conectada)
+// ════════════════════════════════════════════════════════════════════
+
+// Datos para llamar a Meta en nombre de la clínica
+async function cuentaConectada(req) {
+  const tenantId = await tenantIdDe(req);
+  const [c] = await masterQuery('SELECT * FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
+  if (!c || c.estado !== 'conectado' || !c.access_token || !c.waba_id || !c.phone_number_id) {
+    const e = new Error('Primero conecta tu número con Meta.'); e.status = 409; throw e;
+  }
+  const cfg = await configPlataforma();
+  let token;
+  try { token = decrypt(c.access_token); }
+  catch { const e = new Error('No se pudo leer el token guardado. Vuelve a conectar tu número.'); e.status = 409; throw e; }
+  return { tenantId, cfg, token, wabaId: c.waba_id, phoneId: c.phone_number_id };
+}
+
+function responderError(res, next, err) {
+  if (err.status && err.status < 500) return res.status(err.status).json({ success: false, message: err.message });
+  if (err.status === 502) return res.status(502).json({ success: false, message: err.message });
+  return next(err);
+}
+
+// Variables {{1}}, {{2}}… usadas en un texto
+function variablesDe(texto) {
+  return [...String(texto).matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => parseInt(m[1], 10));
+}
+
+/**
+ * Revisa la plantilla con las reglas que más rechaza Meta.
+ * Devuelve la lista de problemas (vacía = OK).
+ */
+function validarPlantilla({ nombre, categoria, cuerpo, ejemplos, pie, encabezado }) {
+  const p = [];
+  if (!/^[a-z0-9_]{1,512}$/.test(nombre || '')) p.push('El nombre solo puede tener minúsculas, números y guion bajo (ej. recordatorio_vacuna).');
+  if (!['UTILITY', 'MARKETING'].includes(categoria)) p.push('Elige la categoría: Utilidad o Marketing.');
+  const txt = String(cuerpo || '').trim();
+  if (!txt) p.push('Escribe el texto del mensaje.');
+  if (txt.length > 1024) p.push('El mensaje no puede pasar de 1024 caracteres.');
+
+  const vars = variablesDe(txt);
+  const unicas = [...new Set(vars)].sort((a, b) => a - b);
+  unicas.forEach((n, i) => { if (n !== i + 1) p.push('Las variables deben ir en orden: {{1}}, {{2}}, {{3}}…'); });
+  if (/^\{\{\s*\d+\s*\}\}/.test(txt)) p.push('El mensaje no puede empezar con una variable.');
+  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿]*$/.test(txt)) p.push('El mensaje no puede terminar con una variable (agrega texto después).');
+  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(txt)) p.push('No pongas dos variables seguidas: escribe texto entre ellas.');
+  const palabras = txt.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
+  if (unicas.length && palabras < unicas.length * 2 + 1) p.push('Hay demasiadas variables para tan poco texto.');
+  if ((ejemplos || []).length < unicas.length || (ejemplos || []).slice(0, unicas.length).some(e => !String(e || '').trim())) {
+    p.push('Escribe un ejemplo para cada variable (Meta lo exige).');
+  }
+  if (pie && String(pie).length > 60) p.push('El pie de mensaje no puede pasar de 60 caracteres.');
+  if (encabezado && String(encabezado).length > 60) p.push('El encabezado no puede pasar de 60 caracteres.');
+  if (encabezado && variablesDe(encabezado).length) p.push('El encabezado no puede tener variables.');
+  return [...new Set(p)];
+}
+
+// ── GET /plantillas — lista las plantillas de la clínica en Meta ─────
+router.get('/plantillas', async (req, res, next) => {
+  try {
+    const { cfg, token, wabaId } = await cuentaConectada(req);
+    const d = await graph('GET', `${wabaId}/message_templates`, {
+      cfg, token, query: { fields: 'id,name,language,status,category,components,rejected_reason', limit: '200' },
+    });
+    const data = (d.data || []).map(t => {
+      const body   = (t.components || []).find(c => c.type === 'BODY');
+      const header = (t.components || []).find(c => c.type === 'HEADER' && c.format === 'TEXT');
+      const footer = (t.components || []).find(c => c.type === 'FOOTER');
+      return {
+        id: t.id, nombre: t.name, idioma: t.language, estado: t.status, categoria: t.category,
+        cuerpo: body?.text || '', encabezado: header?.text || '', pie: footer?.text || '',
+        variables: [...new Set(variablesDe(body?.text || ''))].length,
+        motivo_rechazo: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
+      };
+    });
+    return res.json({ success: true, data });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── POST /plantillas — crea una plantilla y la envía a revisión ──────
+router.post('/plantillas', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const datos = {
+      nombre    : String(b.nombre || '').trim().toLowerCase(),
+      categoria : String(b.categoria || '').toUpperCase(),
+      idioma    : String(b.idioma || 'es').trim(),
+      encabezado: String(b.encabezado || '').trim(),
+      cuerpo    : String(b.cuerpo || '').trim(),
+      pie       : String(b.pie || '').trim(),
+      ejemplos  : Array.isArray(b.ejemplos) ? b.ejemplos.map(e => String(e || '').trim()) : [],
+    };
+    const problemas = validarPlantilla(datos);
+    if (problemas.length) return res.status(422).json({ success: false, message: problemas[0], problemas });
+
+    const { cfg, token, wabaId } = await cuentaConectada(req);
+    const nVars = [...new Set(variablesDe(datos.cuerpo))].length;
+    const components = [];
+    if (datos.encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: datos.encabezado });
+    const body = { type: 'BODY', text: datos.cuerpo };
+    if (nVars) body.example = { body_text: [datos.ejemplos.slice(0, nVars)] };
+    components.push(body);
+    if (datos.pie) components.push({ type: 'FOOTER', text: datos.pie });
+
+    const d = await graph('POST', `${wabaId}/message_templates`, {
+      cfg, token, body: { name: datos.nombre, language: datos.idioma, category: datos.categoria, components },
+    });
+    return res.status(201).json({
+      success: true,
+      message: 'Plantilla enviada a revisión de Meta.',
+      data: { id: d.id, estado: d.status || 'PENDING', categoria: d.category || datos.categoria },
+    });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── DELETE /plantillas/:nombre ───────────────────────────────────────
+router.delete('/plantillas/:nombre', async (req, res, next) => {
+  try {
+    const nombre = String(req.params.nombre || '');
+    if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Nombre inválido.' });
+    const { cfg, token, wabaId } = await cuentaConectada(req);
+    await graph('DELETE', `${wabaId}/message_templates`, { cfg, token, query: { name: nombre } });
+    return res.json({ success: true, message: 'Plantilla eliminada.' });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// Número en formato internacional sin "+" (ej. 51987654321)
+async function normalizarTelefono(req, tel) {
+  let t = String(tel || '').replace(/\D/g, '');
+  if (!t) return null;
+  if (t.length === 9) {   // número local peruano → agregar código de país de la clínica
+    let cod = '51';
+    try {
+      const [cfg] = await req.db.query('SELECT codigo_pais FROM wa_config LIMIT 1');
+      if (cfg?.codigo_pais) cod = String(cfg.codigo_pais).replace(/\D/g, '') || '51';
+    } catch { /* sin wa_config: Perú */ }
+    t = cod + t;
+  }
+  return t.length >= 10 && t.length <= 15 ? t : null;
+}
+
+// Registro en el historial de mensajes de la clínica (si falta la migración v18, sin columnas nuevas)
+async function registrarEnvio(req, { telefono, mensaje, estado, error, wamid, propietarioId }) {
+  try {
+    await req.db.query(
+      `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at, proveedor, wamid)
+       VALUES ('manual', ?, ?, ?, ?, ?, ${estado === 'enviado' ? 'NOW()' : 'NULL'}, 'meta', ?)`,
+      [propietarioId || null, telefono, mensaje, estado, error || null, wamid || null]
+    );
+  } catch {
+    try {
+      await req.db.query(
+        `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at)
+         VALUES ('manual', ?, ?, ?, ?, ?, ${estado === 'enviado' ? 'NOW()' : 'NULL'})`,
+        [propietarioId || null, telefono, mensaje, estado, error || null]
+      );
+    } catch (e) { logger.warn('[wa-meta] No se pudo registrar el envío: ' + e.message); }
+  }
+}
+
+// ── POST /enviar — envía una plantilla (o texto, si el cliente escribió en las últimas 24 h) ──
+router.post('/enviar', async (req, res, next) => {
+  let telefono = null, resumen = '';
+  try {
+    const b = req.body || {};
+    telefono = await normalizarTelefono(req, b.telefono);
+    if (!telefono) return res.status(422).json({ success: false, message: 'Número de teléfono inválido.' });
+
+    const tipo = b.tipo === 'texto' ? 'texto' : 'plantilla';
+    const { cfg, token, phoneId } = await cuentaConectada(req);
+    let payload;
+
+    if (tipo === 'texto') {
+      const texto = String(b.texto || '').trim();
+      if (!texto) return res.status(422).json({ success: false, message: 'Escribe el mensaje.' });
+      if (texto.length > 4096) return res.status(422).json({ success: false, message: 'El mensaje es demasiado largo.' });
+      payload = { messaging_product: 'whatsapp', to: telefono, type: 'text', text: { body: texto } };
+      resumen = texto;
+    } else {
+      const nombre = String(b.plantilla || '').trim();
+      if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Elige una plantilla aprobada.' });
+      const vars = Array.isArray(b.variables) ? b.variables.map(v => String(v ?? '').trim()) : [];
+      if (vars.some(v => !v)) return res.status(422).json({ success: false, message: 'Completa todas las variables de la plantilla.' });
+      payload = {
+        messaging_product: 'whatsapp', to: telefono, type: 'template',
+        template: { name: nombre, language: { code: String(b.idioma || 'es') } },
+      };
+      if (vars.length) payload.template.components = [{ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v })) }];
+      resumen = String(b.vista_previa || `[plantilla ${nombre}] ${vars.join(' | ')}`).slice(0, 2000);
+    }
+
+    const d = await graph('POST', `${phoneId}/messages`, { cfg, token, body: payload });
+    const wamid = d.messages?.[0]?.id || null;
+    await registrarEnvio(req, { telefono, mensaje: resumen, estado: 'enviado', wamid, propietarioId: b.propietario_id });
+    return res.json({ success: true, message: 'Mensaje enviado.', data: { wamid, telefono } });
+  } catch (err) {
+    if (telefono && err.status && err.status !== 409) {
+      await registrarEnvio(req, { telefono, mensaje: resumen || '[meta]', estado: 'fallido', error: err.message });
+    }
+    // 131047: fuera de la ventana de 24 h → solo plantillas
+    if (err.meta?.code === 131047) {
+      return res.status(422).json({ success: false, message: 'Este cliente no te escribió en las últimas 24 horas: solo puedes enviarle una plantilla aprobada.' });
+    }
+    // 131030: número de prueba de Meta → solo a destinatarios autorizados
+    if (err.meta?.code === 131030) {
+      return res.status(422).json({ success: false, message: 'Con el número de prueba de Meta solo puedes enviar a los números que agregaste como destinatarios en Meta (WhatsApp → Configuración de la API → "Para").' });
+    }
+    // 132001: la plantilla no existe en ese idioma o aún no está aprobada
+    if (err.meta?.code === 132001) {
+      return res.status(422).json({ success: false, message: 'La plantilla no existe o todavía no está aprobada por Meta.' });
+    }
+    responderError(res, next, err);
+  }
 });
 
 module.exports = router;

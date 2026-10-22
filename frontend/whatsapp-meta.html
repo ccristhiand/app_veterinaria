@@ -39,6 +39,30 @@
     .wm-dato p:last-child  { font-size:.84rem; font-weight:700; margin-top:.15rem; }
     .wm-spin { width:16px; height:16px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    .hidden { display:none !important; }
+    .wm-grid-pl { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+    .wm-pl { background:#fff; border:1px solid var(--line); border-radius:1rem; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.6rem; }
+    .wm-pl-top { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; }
+    .wm-pl-nombre { font-family:monospace; font-size:.82rem; font-weight:700; word-break:break-all; }
+    .wm-badge { font-size:.62rem; font-weight:700; padding:.18rem .55rem; border-radius:999px; white-space:nowrap; display:inline-block; }
+    .wm-b-ok   { background:#dcfce7; color:#15803d; } .wm-b-pend { background:#fef9c3; color:#a16207; }
+    .wm-b-mal  { background:#fee2e2; color:#b91c1c; } .wm-b-gris { background:#f1f5f9; color:#64748b; }
+    .wm-b-util { background:#e0f2fe; color:#0369a1; } .wm-b-mkt  { background:#f3e8ff; color:#7e22ce; }
+    .wm-chat { background:#e7ddd3; border-radius:.9rem; padding:1rem; min-height:120px; }
+    .wm-burbuja { background:#fff; border-radius:.2rem .9rem .9rem .9rem; padding:.6rem .8rem; font-size:.82rem; line-height:1.45; max-width:95%; box-shadow:0 1px 1px rgba(0,0,0,.08); white-space:pre-wrap; word-break:break-word; }
+    .wm-burbuja .enc { font-weight:700; display:block; margin-bottom:.25rem; }
+    .wm-burbuja .pie { color:#8696a0; font-size:.72rem; display:block; margin-top:.35rem; }
+    .wm-var { background:#dcfce7; color:#166534; border-radius:.3rem; padding:0 .25rem; font-weight:600; }
+    .wm-chip { font-size:.72rem; font-weight:600; background:#f1f5f9; border:1px solid var(--line); border-radius:999px; padding:.25rem .65rem; cursor:pointer; font-family:inherit; color:var(--ink-soft); }
+    .wm-chip:hover { background:#e2e8f0; }
+    .wm-pl-form { display:grid; grid-template-columns:1.3fr 1fr; gap:1.3rem; }
+    @media (max-width:760px) { .wm-pl-form { grid-template-columns:1fr; } }
+    .wm-envio { display:grid; grid-template-columns:1.2fr 1fr; gap:1.1rem; align-items:start; }
+    @media (max-width:900px) { .wm-envio { grid-template-columns:1fr; } }
+    .wm-radio { display:inline-flex; align-items:center; gap:.4rem; font-size:.82rem; border:1px solid var(--line); border-radius:.7rem; padding:.45rem .75rem; cursor:pointer; }
+    .wm-resultados { position:absolute; left:0; right:0; top:100%; margin-top:.25rem; background:#fff; border:1px solid var(--line); border-radius:.8rem; box-shadow:0 10px 25px rgba(0,0,0,.08); z-index:20; max-height:240px; overflow-y:auto; }
+    .wm-resultados button { display:block; width:100%; text-align:left; padding:.55rem .8rem; border:none; background:none; font-family:inherit; font-size:.8rem; cursor:pointer; }
+    .wm-resultados button:hover { background:#f8faf8; }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -53,9 +77,9 @@
 
   <!-- Pestañas: se activan en los siguientes pasos -->
   <div class="wm-tabs" id="wm-tabs">
-    <button class="wm-tab activo" data-tab="conexion">🔗 Conexión</button>
-    <button class="wm-tab" data-tab="plantillas" disabled>📝 Plantillas <span class="pronto">Pronto</span></button>
-    <button class="wm-tab" data-tab="envio" disabled>✉️ Envío manual <span class="pronto">Pronto</span></button>
+    <button class="wm-tab activo" data-tab="conexion" onclick="cambiarTab('conexion')">🔗 Conexión</button>
+    <button class="wm-tab" data-tab="plantillas" disabled onclick="cambiarTab('plantillas')">📝 Plantillas <span class="pronto" data-req>Conecta primero</span></button>
+    <button class="wm-tab" data-tab="envio" disabled onclick="cambiarTab('envio')">✉️ Envío manual <span class="pronto" data-req>Conecta primero</span></button>
     <button class="wm-tab" data-tab="campanas" disabled>📣 Campañas <span class="pronto">Pronto</span></button>
     <button class="wm-tab" data-tab="bandeja" disabled>💬 Bandeja <span class="pronto">Pronto</span></button>
     <button class="wm-tab" data-tab="consumo" disabled>📊 Consumo <span class="pronto">Pronto</span></button>
@@ -126,6 +150,164 @@
       </div>
     </div>
   </section>
+
+  <!-- ── Pestaña Plantillas ───────────────────────────────────── -->
+  <section id="tab-plantillas" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+    <div class="vcard vcard-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+        <div>
+          <p style="font-weight:800;font-size:1rem">Tus plantillas</p>
+          <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.15rem">
+            Meta revisa cada plantilla antes de que puedas usarla. Suele tardar minutos (máximo 24 horas).
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="vbtn vbtn-ghost" onclick="cargarPlantillas()">🔄 Actualizar</button>
+          <button class="vbtn vbtn-primary" onclick="abrirNuevaPlantilla()">＋ Nueva plantilla</button>
+        </div>
+      </div>
+    </div>
+    <div id="pl-lista" class="wm-grid-pl"></div>
+  </section>
+
+  <!-- ── Pestaña Envío manual ─────────────────────────────────── -->
+  <section id="tab-envio" class="hidden">
+    <div class="wm-envio">
+      <div class="vcard vcard-pad" style="display:flex;flex-direction:column;gap:1rem">
+        <p style="font-weight:800;font-size:1rem">Enviar mensaje</p>
+
+        <div>
+          <label class="vlabel">Buscar propietario (opcional)</label>
+          <div style="position:relative">
+            <input id="ev-buscar" class="vinput" placeholder="Nombre, DNI o teléfono…" oninput="buscarPropietarioEnvio()" autocomplete="off"/>
+            <div id="ev-resultados" class="wm-resultados hidden"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="vlabel">Número de WhatsApp *</label>
+          <input id="ev-telefono" class="vinput" placeholder="987654321 o 51987654321" inputmode="tel"/>
+          <p id="ev-prueba" style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">
+            Si usas el número de prueba de Meta, solo puedes enviar a los números que agregaste como destinatarios en Meta.
+          </p>
+        </div>
+
+        <div>
+          <label class="vlabel">Tipo de mensaje</label>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <label class="wm-radio"><input type="radio" name="ev-tipo" value="plantilla" checked onchange="cambiarTipoEnvio()"/> Plantilla aprobada</label>
+            <label class="wm-radio"><input type="radio" name="ev-tipo" value="texto" onchange="cambiarTipoEnvio()"/> Texto libre</label>
+          </div>
+        </div>
+
+        <div id="ev-bloque-plantilla" style="display:flex;flex-direction:column;gap:.8rem">
+          <div>
+            <label class="vlabel">Plantilla *</label>
+            <select id="ev-plantilla" class="vinput" onchange="elegirPlantillaEnvio()"></select>
+          </div>
+          <div id="ev-variables" style="display:flex;flex-direction:column;gap:.6rem"></div>
+        </div>
+
+        <div id="ev-bloque-texto" class="hidden">
+          <label class="vlabel">Mensaje *</label>
+          <textarea id="ev-texto" rows="4" class="vinput" placeholder="Escribe tu mensaje…" oninput="previaEnvio()"></textarea>
+          <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">
+            Solo funciona si el cliente te escribió en las últimas 24 horas. Si no, usa una plantilla.
+          </p>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end">
+          <button class="vbtn vbtn-primary" id="ev-btn" onclick="enviarMensaje()">📤 Enviar</button>
+        </div>
+        <div id="ev-msg" class="wm-aviso hidden"></div>
+      </div>
+
+      <div class="vcard vcard-pad">
+        <p style="font-weight:700;font-size:.82rem;margin-bottom:.7rem;color:var(--ink-soft)">Vista previa</p>
+        <div class="wm-chat"><div class="wm-burbuja" id="ev-previa">Elige una plantilla…</div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ Modal nueva plantilla ═════════════════════════════════════ -->
+<div id="modal-plantilla" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:820px">
+    <div class="vmodal-head">
+      <h3>📝 Nueva plantilla</h3>
+      <button onclick="closeModal('modal-plantilla')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div class="wm-pl-form">
+        <div style="display:flex;flex-direction:column;gap:.9rem">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+            <span style="font-size:.72rem;color:var(--ink-faint);align-self:center">Usar ejemplo:</span>
+            <button type="button" class="wm-chip" onclick="usarEjemplo('vacuna')">💉 Vacuna</button>
+            <button type="button" class="wm-chip" onclick="usarEjemplo('cita')">📅 Cita</button>
+            <button type="button" class="wm-chip" onclick="usarEjemplo('desparasitacion')">🐛 Desparasitación</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="vlabel">Nombre interno *</label>
+              <input id="pl-nombre" class="vinput" placeholder="recordatorio_vacuna" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'_');validarForm()"/>
+            </div>
+            <div>
+              <label class="vlabel">Categoría *</label>
+              <select id="pl-categoria" class="vinput" onchange="validarForm()">
+                <option value="UTILITY">Utilidad (recordatorios, avisos)</option>
+                <option value="MARKETING">Marketing (promociones, campañas)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="vlabel">Encabezado (opcional)</label>
+            <input id="pl-encabezado" class="vinput" maxlength="60" placeholder="Ej. Recordatorio de vacuna" oninput="validarForm()"/>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <label class="vlabel">Mensaje *</label>
+              <button type="button" class="wm-chip" onclick="insertarVariable()">＋ Insertar variable</button>
+            </div>
+            <textarea id="pl-cuerpo" rows="5" class="vinput" maxlength="1024"
+              placeholder="Hola {{1}}, te recordamos que {{2}} tiene su vacuna el {{3}}. ¡Te esperamos!"
+              oninput="validarForm()"></textarea>
+          </div>
+          <div id="pl-ejemplos" style="display:flex;flex-direction:column;gap:.5rem"></div>
+          <div>
+            <label class="vlabel">Pie de mensaje (opcional)</label>
+            <input id="pl-pie" class="vinput" maxlength="60" placeholder="Ej. Veterinaria VetPet" oninput="validarForm()"/>
+          </div>
+          <div id="pl-problemas" class="wm-aviso hidden" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e"></div>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:.78rem;margin-bottom:.6rem;color:var(--ink-soft)">Así lo verá tu cliente</p>
+          <div class="wm-chat"><div class="wm-burbuja" id="pl-previa"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-plantilla')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="crearPlantilla()" id="pl-btn-crear" class="vbtn vbtn-primary">📨 Enviar a revisión</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal eliminar plantilla ══════════════════════════════════ -->
+<div id="modal-eliminar-pl" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:440px">
+    <div class="vmodal-head">
+      <h3>🗑️ Eliminar plantilla</h3>
+      <button onclick="closeModal('modal-eliminar-pl')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <p style="font-size:.86rem">¿Eliminar la plantilla <strong id="elim-pl-nombre"></strong>?</p>
+      <p style="font-size:.76rem;color:#b45309;margin-top:.6rem">Meta no permite volver a crear una plantilla con el mismo nombre durante 30 días.</p>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-eliminar-pl')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="confirmarEliminarPlantilla()" id="btn-elim-pl" class="vbtn" style="background:#e11d48;color:#fff;border:none">Sí, eliminar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══ Modal confirmar desconexión ═══════════════════════════════ -->
@@ -200,7 +382,7 @@ async function cargarEstadoMeta() {
     if (!res || !res.ok) return pintarEstado(null);
     _estado = (await res.json()).data;
     pintarEstado(_estado);
-    if (_estado.plataforma_lista && _estado.ver_meta && _estado.estado !== 'conectado') cargarSdk();
+    if (_estado.plataforma_lista && _estado.ver_meta && _estado.estado !== 'conectado') cargarSdk().catch(function() {});
   } catch (e) { pintarEstado(null); }
 }
 
@@ -232,6 +414,7 @@ function pintarEstado(d) {
   var datos   = document.getElementById('wm-datos');
   var req     = document.getElementById('wm-requisitos');
   if (!icono) return; // la pantalla fue bloqueada por el plan / admin
+  habilitarPestanas(!!(d && d.estado === 'conectado'));
 
   btn.classList.remove('hidden'); btnDesc.classList.add('hidden'); datos.classList.add('hidden');
   req.classList.remove('hidden');
@@ -408,6 +591,440 @@ async function desconectarMeta() {
     mostrarMsg('error', 'Error de conexión: ' + esc(e.message));
   } finally {
     btn.disabled = false; btn.textContent = 'Sí, desconectar';
+  }
+}
+
+// ══ Pestañas ══════════════════════════════════════════════════════
+var _tabActual = 'conexion';
+
+function habilitarPestanas(conectado) {
+  ['plantillas', 'envio'].forEach(function(t) {
+    var b = document.querySelector('.wm-tab[data-tab="' + t + '"]');
+    if (!b) return;
+    b.disabled = !conectado;
+    var badge = b.querySelector('[data-req]');
+    if (badge) badge.style.display = conectado ? 'none' : '';
+  });
+  if (!conectado && _tabActual !== 'conexion') cambiarTab('conexion');
+}
+
+function cambiarTab(tab) {
+  var b = document.querySelector('.wm-tab[data-tab="' + tab + '"]');
+  if (!b || b.disabled) return;
+  _tabActual = tab;
+  document.querySelectorAll('.wm-tab').forEach(function(x) { x.classList.toggle('activo', x.dataset.tab === tab); });
+  ['conexion', 'plantillas', 'envio'].forEach(function(t) {
+    var s = document.getElementById('tab-' + t);
+    if (s) s.classList.toggle('hidden', t !== tab);
+  });
+  if (tab === 'plantillas') cargarPlantillas();
+  if (tab === 'envio') prepararEnvio();
+}
+
+// ══ Utilidades de plantillas ══════════════════════════════════════
+var _plantillas = [];
+var ESTADOS_PL = {
+  APPROVED: ['Aprobada', 'wm-b-ok'], PENDING: ['En revisión', 'wm-b-pend'], IN_APPEAL: ['En apelación', 'wm-b-pend'],
+  REJECTED: ['Rechazada', 'wm-b-mal'], PAUSED: ['Pausada', 'wm-b-gris'], DISABLED: ['Deshabilitada', 'wm-b-gris'],
+  FLAGGED: ['Marcada', 'wm-b-mal'], PENDING_DELETION: ['Eliminándose', 'wm-b-gris'],
+};
+var MOTIVOS_RECHAZO = {
+  INVALID_FORMAT: 'El formato no es válido (revisa las variables).',
+  TAG_CONTENT_MISMATCH: 'El texto no corresponde a la categoría elegida.',
+  PROMOTIONAL: 'Parece promoción: créala como Marketing.',
+  ABUSIVE_CONTENT: 'Meta considera el contenido inapropiado.',
+  INCORRECT_CATEGORY: 'La categoría no es la correcta.',
+  SCAM: 'Meta lo consideró posible fraude.',
+};
+
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+function varsDe(txt) {
+  var out = [], re = /\{\{\s*(\d+)\s*\}\}/g, m;
+  while ((m = re.exec(String(txt || '')))) out.push(parseInt(m[1], 10));
+  return out;
+}
+function numVars(txt) { return new Set(varsDe(txt)).size; }
+
+// Texto con las variables reemplazadas (resaltadas) para la burbuja de WhatsApp
+function textoConVars(txt, valores) {
+  return esc(txt).replace(/\{\{\s*(\d+)\s*\}\}/g, function(_, n) {
+    var v = valores && valores[n - 1];
+    return '<span class="wm-var">' + esc(v && String(v).trim() ? v : '{{' + n + '}}') + '</span>';
+  }).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>');
+}
+
+function burbuja(enc, cuerpo, pie, valores) {
+  if (!String(cuerpo || '').trim() && !enc) return '<span style="color:#8696a0">Escribe el mensaje para ver la vista previa…</span>';
+  return (enc ? '<span class="enc">' + esc(enc) + '</span>' : '') +
+    textoConVars(cuerpo, valores) +
+    (pie ? '<span class="pie">' + esc(pie) + '</span>' : '');
+}
+
+// ══ Pestaña Plantillas ════════════════════════════════════════════
+async function cargarPlantillas() {
+  var cont = document.getElementById('pl-lista');
+  cont.innerHTML = '<div class="vcard vcard-pad" style="grid-column:1/-1;text-align:center;color:var(--ink-faint)"><span class="wm-spin" style="border-color:#cbd5e1;border-top-color:#25d366"></span> Cargando plantillas…</div>';
+  try {
+    var res = await api('/wa-meta/plantillas');
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) {
+      cont.innerHTML = '<div class="vcard vcard-pad" style="grid-column:1/-1;color:#be123c">❌ ' + esc(data.message || 'No se pudieron cargar las plantillas.') + '</div>';
+      return;
+    }
+    _plantillas = data.data || [];
+    pintarPlantillas();
+  } catch (e) {
+    cont.innerHTML = '<div class="vcard vcard-pad" style="grid-column:1/-1;color:#be123c">Error de conexión: ' + esc(e.message) + '</div>';
+  }
+}
+
+function pintarPlantillas() {
+  var cont = document.getElementById('pl-lista');
+  if (!_plantillas.length) {
+    cont.innerHTML = '<div class="vcard vcard-pad" style="grid-column:1/-1;text-align:center;padding:2.5rem 1rem">' +
+      '<p style="font-size:2rem">📝</p><p style="font-weight:700;margin-top:.4rem">Aún no tienes plantillas</p>' +
+      '<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.3rem">Crea tu primera plantilla para enviar recordatorios a tus clientes.</p>' +
+      '<button class="vbtn vbtn-primary" style="margin-top:1rem" onclick="abrirNuevaPlantilla()">＋ Nueva plantilla</button></div>';
+    return;
+  }
+  cont.innerHTML = _plantillas.map(function(p, i) {
+    var est = ESTADOS_PL[p.estado] || [p.estado, 'wm-b-gris'];
+    var cat = p.categoria === 'MARKETING' ? ['Marketing', 'wm-b-mkt'] : p.categoria === 'UTILITY' ? ['Utilidad', 'wm-b-util'] : [p.categoria, 'wm-b-gris'];
+    var motivo = p.motivo_rechazo ? (MOTIVOS_RECHAZO[p.motivo_rechazo] || p.motivo_rechazo) : '';
+    return '<div class="wm-pl">' +
+      '<div class="wm-pl-top"><div><p class="wm-pl-nombre">' + esc(p.nombre) + '</p>' +
+      '<p style="font-size:.66rem;color:var(--ink-faint);margin-top:.15rem">Idioma: ' + esc(p.idioma) + ' · ' + p.variables + ' variable(s)</p></div>' +
+      '<div style="display:flex;flex-direction:column;gap:.25rem;align-items:flex-end">' +
+      '<span class="wm-badge ' + est[1] + '">' + esc(est[0]) + '</span><span class="wm-badge ' + cat[1] + '">' + esc(cat[0]) + '</span></div></div>' +
+      '<div class="wm-chat" style="min-height:0;padding:.7rem"><div class="wm-burbuja">' + burbuja(p.encabezado, p.cuerpo, p.pie) + '</div></div>' +
+      (motivo ? '<p style="font-size:.74rem;color:#b91c1c;background:#fff1f2;border-radius:.6rem;padding:.45rem .65rem">Motivo del rechazo: ' + esc(motivo) + '</p>' : '') +
+      (p.estado === 'PENDING' ? '<p style="font-size:.72rem;color:#a16207">Meta la está revisando. Pulsa «Actualizar» en unos minutos.</p>' : '') +
+      '<div style="display:flex;justify-content:flex-end;gap:.4rem;margin-top:auto">' +
+      (p.estado === 'APPROVED' ? '<button class="vbtn vbtn-ghost" style="font-size:.74rem" onclick="usarEnEnvio(' + i + ')">✉️ Enviar</button>' : '') +
+      '<button class="vbtn vbtn-ghost" style="font-size:.74rem;color:#e11d48" onclick="pedirEliminarPlantilla(' + i + ')">🗑️ Eliminar</button></div>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Nueva plantilla ──────────────────────────────────────────────
+var EJEMPLOS_PL = {
+  vacuna: {
+    nombre: 'recordatorio_vacuna', categoria: 'UTILITY', encabezado: 'Recordatorio de vacuna',
+    cuerpo: 'Hola {{1}}, te recordamos que a {{2}} le toca su vacuna el {{3}}. Responde a este mensaje si necesitas cambiar la fecha. ¡Te esperamos!',
+    ejemplos: ['María', 'Firulais', '25/10/2026'], pie: '',
+  },
+  cita: {
+    nombre: 'recordatorio_cita', categoria: 'UTILITY', encabezado: 'Recordatorio de cita',
+    cuerpo: 'Hola {{1}}, te recordamos la cita de {{2}} el {{3}} a las {{4}} horas. Si no puedes asistir, avísanos respondiendo este mensaje.',
+    ejemplos: ['Carlos', 'Luna', '25/10/2026', '10:30'], pie: '',
+  },
+  desparasitacion: {
+    nombre: 'recordatorio_desparasitacion', categoria: 'UTILITY', encabezado: 'Recordatorio de desparasitación',
+    cuerpo: 'Hola {{1}}, a {{2}} le toca su desparasitación el {{3}}. Escríbenos para separar su turno. ¡Gracias por confiar en nosotros!',
+    ejemplos: ['Ana', 'Rocky', '25/10/2026'], pie: '',
+  },
+};
+
+function abrirNuevaPlantilla() {
+  ['pl-nombre', 'pl-encabezado', 'pl-cuerpo', 'pl-pie'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('pl-categoria').value = 'UTILITY';
+  cargarBranding().then(function(b) {
+    var n = b && (b.nombre_clinica || b.nombre || b.razon_social);
+    if (n && !document.getElementById('pl-pie').value) document.getElementById('pl-pie').value = String(n).slice(0, 60);
+    validarForm();
+  }).catch(function() {});
+  pintarEjemplos([]);
+  validarForm();
+  openModal('modal-plantilla');
+}
+
+function usarEjemplo(clave) {
+  var e = EJEMPLOS_PL[clave]; if (!e) return;
+  document.getElementById('pl-nombre').value = e.nombre;
+  document.getElementById('pl-categoria').value = e.categoria;
+  document.getElementById('pl-encabezado').value = e.encabezado;
+  document.getElementById('pl-cuerpo').value = e.cuerpo;
+  if (e.pie) document.getElementById('pl-pie').value = e.pie;
+  pintarEjemplos(e.ejemplos);
+  validarForm();
+}
+
+function insertarVariable() {
+  var ta = document.getElementById('pl-cuerpo');
+  var n = (varsDe(ta.value).reduce(function(a, b) { return Math.max(a, b); }, 0)) + 1;
+  var ini = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+  var fin = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
+  var antes = ta.value.slice(0, ini), despues = ta.value.slice(fin);
+  var ins = (antes && !/\s$/.test(antes) ? ' ' : '') + '{{' + n + '}}' + (despues && !/^\s/.test(despues) ? ' ' : '');
+  ta.value = antes + ins + despues;
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = (antes + ins).length;
+  validarForm();
+}
+
+function leerEjemplos() {
+  return Array.prototype.map.call(document.querySelectorAll('#pl-ejemplos input'), function(i) { return i.value; });
+}
+
+function pintarEjemplos(valores) {
+  var n = numVars(document.getElementById('pl-cuerpo').value);
+  var cont = document.getElementById('pl-ejemplos');
+  if (cont.children.length === n && !valores) return;
+  var previos = valores || leerEjemplos();
+  if (!n) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<p class="vlabel" style="margin:0">Ejemplos para Meta <span style="font-weight:400;color:var(--ink-faint)">(Meta los usa para revisar; tus clientes no los ven)</span></p>' +
+    Array.from({ length: n }, function(_, i) {
+      return '<div style="display:flex;align-items:center;gap:.5rem"><span class="wm-var" style="min-width:2.6rem;text-align:center">{{' + (i + 1) + '}}</span>' +
+        '<input class="vinput" placeholder="Ej. ' + ['María', 'Firulais', '25/10/2026', '10:30'][i % 4] + '" value="' + escAttr(previos[i] || '') + '" oninput="validarForm(true)"/></div>';
+    }).join('');
+}
+
+function datosForm() {
+  return {
+    nombre    : document.getElementById('pl-nombre').value.trim(),
+    categoria : document.getElementById('pl-categoria').value,
+    encabezado: document.getElementById('pl-encabezado').value.trim(),
+    cuerpo    : document.getElementById('pl-cuerpo').value.trim(),
+    pie       : document.getElementById('pl-pie').value.trim(),
+    ejemplos  : leerEjemplos(),
+  };
+}
+
+// Mismas reglas que el servidor (las que más rechaza Meta)
+function problemasPlantilla(d) {
+  var p = [];
+  if (!/^[a-z0-9_]{1,512}$/.test(d.nombre)) p.push('El nombre solo puede tener minúsculas, números y guion bajo (ej. recordatorio_vacuna).');
+  if (!d.cuerpo) p.push('Escribe el texto del mensaje.');
+  if (d.cuerpo.length > 1024) p.push('El mensaje no puede pasar de 1024 caracteres.');
+  var unicas = Array.from(new Set(varsDe(d.cuerpo))).sort(function(a, b) { return a - b; });
+  if (unicas.some(function(n, i) { return n !== i + 1; })) p.push('Las variables deben ir en orden: {{1}}, {{2}}, {{3}}…');
+  if (/^\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('El mensaje no puede empezar con una variable.');
+  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿]*$/.test(d.cuerpo)) p.push('El mensaje no puede terminar con una variable (agrega texto después).');
+  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('No pongas dos variables seguidas: escribe texto entre ellas.');
+  var palabras = d.cuerpo.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
+  if (unicas.length && palabras < unicas.length * 2 + 1) p.push('Hay demasiadas variables para tan poco texto.');
+  if (d.ejemplos.slice(0, unicas.length).some(function(e) { return !String(e).trim(); }) || d.ejemplos.length < unicas.length)
+    p.push('Escribe un ejemplo para cada variable (Meta lo exige).');
+  if (varsDe(d.encabezado).length) p.push('El encabezado no puede tener variables.');
+  if (_plantillas.some(function(x) { return x.nombre === d.nombre; })) p.push('Ya tienes una plantilla con ese nombre.');
+  return p;
+}
+
+function validarForm(soloEjemplos) {
+  if (!soloEjemplos) pintarEjemplos();
+  var d = datosForm();
+  document.getElementById('pl-previa').innerHTML = burbuja(d.encabezado, d.cuerpo, d.pie, d.ejemplos);
+  var p = problemasPlantilla(d);
+  var box = document.getElementById('pl-problemas');
+  var tocado = d.nombre || d.cuerpo;
+  if (p.length && tocado) {
+    box.classList.remove('hidden');
+    box.innerHTML = p.map(function(x) { return '• ' + esc(x); }).join('<br>');
+  } else box.classList.add('hidden');
+  document.getElementById('pl-btn-crear').disabled = p.length > 0;
+  return p;
+}
+
+async function crearPlantilla() {
+  if (validarForm().length) return;
+  var btn = document.getElementById('pl-btn-crear');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    var d = datosForm();
+    d.ejemplos = d.ejemplos.slice(0, numVars(d.cuerpo));
+    var res = await api('/wa-meta/plantillas', { method: 'POST', body: d });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) {
+      var box = document.getElementById('pl-problemas');
+      box.classList.remove('hidden');
+      box.innerHTML = '❌ ' + esc(data.message || 'Meta no aceptó la plantilla.');
+      return;
+    }
+    closeModal('modal-plantilla');
+    toast(data.data && data.data.estado === 'APPROVED' ? '✅ Plantilla aprobada' : '📨 Plantilla enviada a revisión de Meta', 'success');
+    cargarPlantillas();
+  } catch (e) {
+    toast('Error de conexión: ' + e.message, 'error');
+  } finally {
+    btn.textContent = '📨 Enviar a revisión';
+    btn.disabled = false;
+  }
+}
+
+// ── Eliminar plantilla ───────────────────────────────────────────
+var _plEliminar = null;
+function pedirEliminarPlantilla(i) {
+  _plEliminar = _plantillas[i]; if (!_plEliminar) return;
+  document.getElementById('elim-pl-nombre').textContent = _plEliminar.nombre;
+  openModal('modal-eliminar-pl');
+}
+async function confirmarEliminarPlantilla() {
+  if (!_plEliminar) return;
+  var btn = document.getElementById('btn-elim-pl');
+  btn.disabled = true; btn.textContent = 'Eliminando…';
+  try {
+    var res = await api('/wa-meta/plantillas/' + encodeURIComponent(_plEliminar.nombre), { method: 'DELETE' });
+    if (!res) return;
+    var data = await res.json();
+    closeModal('modal-eliminar-pl');
+    if (res.ok) { toast('Plantilla eliminada', 'success'); cargarPlantillas(); }
+    else toast(data.message || 'No se pudo eliminar.', 'error');
+  } catch (e) { toast('Error de conexión: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Sí, eliminar'; }
+}
+
+// ══ Pestaña Envío manual ══════════════════════════════════════════
+var _envioPlantilla = null;
+var _envioPropietarioId = null;
+var _plantillaPreferida = null;
+
+function usarEnEnvio(i) {
+  _plantillaPreferida = _plantillas[i] ? _plantillas[i].nombre + '|' + _plantillas[i].idioma : null;
+  cambiarTab('envio');
+}
+
+async function prepararEnvio() {
+  var sel = document.getElementById('ev-plantilla');
+  if (!_plantillas.length) {
+    sel.innerHTML = '<option value="">Cargando…</option>';
+    try {
+      var res = await api('/wa-meta/plantillas');
+      if (res && res.ok) _plantillas = (await res.json()).data || [];
+    } catch (e) {}
+  }
+  var aprobadas = _plantillas.filter(function(p) { return p.estado === 'APPROVED'; });
+  var actual = _plantillaPreferida || sel.value;
+  sel.innerHTML = aprobadas.length
+    ? '<option value="">— Elige una plantilla —</option>' + aprobadas.map(function(p) {
+        var v = p.nombre + '|' + p.idioma;
+        return '<option value="' + escAttr(v) + '"' + (v === actual ? ' selected' : '') + '>' + esc(p.nombre) + ' (' + esc(p.idioma) + ')</option>';
+      }).join('')
+    : '<option value="">No tienes plantillas aprobadas todavía</option>';
+  _plantillaPreferida = null;
+  elegirPlantillaEnvio();
+}
+
+function cambiarTipoEnvio() {
+  var tipo = document.querySelector('input[name="ev-tipo"]:checked').value;
+  document.getElementById('ev-bloque-plantilla').classList.toggle('hidden', tipo !== 'plantilla');
+  document.getElementById('ev-bloque-texto').classList.toggle('hidden', tipo !== 'texto');
+  previaEnvio();
+}
+
+function elegirPlantillaEnvio() {
+  var v = document.getElementById('ev-plantilla').value;
+  _envioPlantilla = _plantillas.find(function(p) { return p.nombre + '|' + p.idioma === v; }) || null;
+  var cont = document.getElementById('ev-variables');
+  if (!_envioPlantilla || !_envioPlantilla.variables) { cont.innerHTML = ''; previaEnvio(); return; }
+  cont.innerHTML = Array.from({ length: _envioPlantilla.variables }, function(_, i) {
+    return '<div><label class="vlabel">Variable {{' + (i + 1) + '}} *</label>' +
+      '<input class="vinput ev-var" oninput="previaEnvio()" placeholder="Valor para {{' + (i + 1) + '}}"/></div>';
+  }).join('');
+  previaEnvio();
+}
+
+function previaEnvio() {
+  document.getElementById('ev-msg').classList.add('hidden');
+  var tipo = document.querySelector('input[name="ev-tipo"]:checked').value;
+  var el = document.getElementById('ev-previa');
+  if (tipo === 'texto') {
+    var t = document.getElementById('ev-texto').value;
+    el.innerHTML = t.trim() ? textoConVars(t) : '<span style="color:#8696a0">Escribe tu mensaje…</span>';
+    return;
+  }
+  if (!_envioPlantilla) { el.innerHTML = '<span style="color:#8696a0">Elige una plantilla…</span>'; return; }
+  var vals = Array.prototype.map.call(document.querySelectorAll('.ev-var'), function(i) { return i.value; });
+  el.innerHTML = burbuja(_envioPlantilla.encabezado, _envioPlantilla.cuerpo, _envioPlantilla.pie, vals);
+}
+
+// Buscador de propietarios
+var _evTimer = null;
+function buscarPropietarioEnvio() {
+  clearTimeout(_evTimer);
+  var q = document.getElementById('ev-buscar').value.trim();
+  var box = document.getElementById('ev-resultados');
+  if (q.length < 2) { box.classList.add('hidden'); return; }
+  _evTimer = setTimeout(async function() {
+    try {
+      var res = await api('/propietarios?search=' + encodeURIComponent(q) + '&page=1&limit=8');
+      if (!res || !res.ok) return;
+      var rows = (await res.json()).data || [];
+      window._evResultados = rows;
+      box.innerHTML = rows.length ? rows.map(function(p, i) {
+        var nombre = p.razon_social || [p.nombre, p.apellido].filter(Boolean).join(' ');
+        return '<button type="button" onclick="elegirPropietarioEnvio(' + i + ')"><b>' + esc(nombre) + '</b>' +
+          '<span style="color:var(--ink-faint);margin-left:.4rem">' + esc(p.telefono || 'sin teléfono') + '</span></button>';
+      }).join('') : '<p style="padding:.6rem .8rem;font-size:.78rem;color:var(--ink-faint)">Sin resultados</p>';
+      box.classList.remove('hidden');
+    } catch (e) {}
+  }, 300);
+}
+
+function elegirPropietarioEnvio(i) {
+  var p = (window._evResultados || [])[i]; if (!p) return;
+  var nombre = p.razon_social || [p.nombre, p.apellido].filter(Boolean).join(' ');
+  _envioPropietarioId = p.id;
+  document.getElementById('ev-buscar').value = nombre;
+  document.getElementById('ev-telefono').value = p.telefono || '';
+  document.getElementById('ev-resultados').classList.add('hidden');
+  var primera = document.querySelector('.ev-var');
+  if (primera && !primera.value) { primera.value = p.razon_social || p.nombre || ''; previaEnvio(); }
+  if (!p.telefono) toast('Este propietario no tiene teléfono registrado.', 'warning');
+}
+
+document.addEventListener('click', function(e) {
+  var box = document.getElementById('ev-resultados');
+  if (box && !e.target.closest('#ev-resultados') && e.target.id !== 'ev-buscar') box.classList.add('hidden');
+});
+
+function msgEnvio(tipo, html) {
+  var el = document.getElementById('ev-msg');
+  var estilos = {
+    ok   : 'background:#f0fdf4;border:1px solid #bbf7d0;color:#166534',
+    error: 'background:#fff1f2;border:1px solid #fecdd3;color:#be123c',
+  };
+  el.classList.remove('hidden');
+  el.setAttribute('style', estilos[tipo] || estilos.error);
+  el.innerHTML = html;
+}
+
+async function enviarMensaje() {
+  var tel = document.getElementById('ev-telefono').value.trim();
+  var tipo = document.querySelector('input[name="ev-tipo"]:checked').value;
+  document.getElementById('ev-msg').classList.add('hidden');
+  if (!tel.replace(/\D/g, '')) return msgEnvio('error', 'Escribe el número de WhatsApp.');
+
+  var body = { telefono: tel, tipo: tipo, propietario_id: _envioPropietarioId || null };
+  if (tipo === 'plantilla') {
+    if (!_envioPlantilla) return msgEnvio('error', 'Elige una plantilla aprobada.');
+    var vals = Array.prototype.map.call(document.querySelectorAll('.ev-var'), function(i) { return i.value.trim(); });
+    if (vals.some(function(v) { return !v; })) return msgEnvio('error', 'Completa todas las variables.');
+    body.plantilla = _envioPlantilla.nombre;
+    body.idioma = _envioPlantilla.idioma;
+    body.variables = vals;
+    body.vista_previa = _envioPlantilla.cuerpo.replace(/\{\{\s*(\d+)\s*\}\}/g, function(_, n) { return vals[n - 1] || ''; });
+  } else {
+    var texto = document.getElementById('ev-texto').value.trim();
+    if (!texto) return msgEnvio('error', 'Escribe el mensaje.');
+    body.texto = texto;
+  }
+
+  var btn = document.getElementById('ev-btn');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    var res = await api('/wa-meta/enviar', { method: 'POST', body: body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) return msgEnvio('error', '❌ ' + esc(data.message || 'No se pudo enviar.'));
+    msgEnvio('ok', '✅ Mensaje enviado a +' + esc(data.data && data.data.telefono || tel) + '.');
+    toast('✅ Mensaje enviado', 'success');
+  } catch (e) {
+    msgEnvio('error', 'Error de conexión: ' + esc(e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '📤 Enviar';
   }
 }
 </script>
