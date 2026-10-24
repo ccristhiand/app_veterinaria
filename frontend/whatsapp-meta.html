@@ -101,6 +101,9 @@
           </svg>
           <span id="wm-btn-texto">Conectar con Facebook</span>
         </button>
+        <button class="vbtn vbtn-ghost hidden" id="wm-btn-diagnostico" onclick="diagnosticarNumero()">
+          🔎 Revisar número con Meta
+        </button>
         <button class="vbtn vbtn-ghost hidden" id="wm-btn-registrar" onclick="abrirRegistro()" title="Úsalo si al enviar te sale «Account not registered»">
           📲 Registrar número
         </button>
@@ -445,6 +448,7 @@ function pintarEstado(d) {
 
   btn.classList.remove('hidden'); btnDesc.classList.add('hidden'); datos.classList.add('hidden');
   document.getElementById('wm-btn-registrar').classList.add('hidden');
+  document.getElementById('wm-btn-diagnostico').classList.add('hidden');
   req.classList.remove('hidden');
 
   if (d && d.estado === 'conectado') {
@@ -455,6 +459,7 @@ function pintarEstado(d) {
       : 'Tu número funciona desde el sistema.';
     btn.classList.add('hidden'); btnDesc.classList.remove('hidden');
     document.getElementById('wm-btn-registrar').classList.toggle('hidden', !!d.coexistencia);
+    document.getElementById('wm-btn-diagnostico').classList.remove('hidden');
     req.classList.add('hidden'); avisoQr.style.display = 'none';
     var hist = { en_proceso:'Sincronizando…', completo:'Completo', pendiente:'Pendiente', rechazado:'No compartido', no_aplica:'No aplica' };
     var cal  = { GREEN:'Alta', YELLOW:'Media', RED:'Baja' };
@@ -620,6 +625,48 @@ async function desconectarMeta() {
     mostrarMsg('error', 'Error de conexión: ' + esc(e.message));
   } finally {
     btn.disabled = false; btn.textContent = 'Sí, desconectar';
+  }
+}
+
+// ── Revisar número con Meta (diagnóstico) ─────────────────────────
+async function diagnosticarNumero() {
+  var btn = document.getElementById('wm-btn-diagnostico');
+  btn.disabled = true; btn.textContent = 'Revisando…';
+  try {
+    var res = await api('/wa-meta/diagnostico', { method: 'POST' });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { mostrarMsg('error', '❌ ' + esc(data.message || 'No se pudo revisar el número.')); return; }
+    var d = data.data;
+    await cargarEstadoMeta();
+
+    var si = function(v) { return v === true ? 'Sí' : v === false ? 'No' : '—'; };
+    var filas = [
+      ['Número', d.numero],
+      ['Tipo', d.coexistencia ? 'Coexistencia (app WhatsApp Business + sistema)' : 'Solo API'],
+      ['Plataforma en Meta', d.plataforma],
+      ['Estado del número', d.estado_numero],
+      ['Nombre visible', (d.nombre || '—') + (d.estado_nombre ? ' (' + d.estado_nombre + ')' : '')],
+      ['Avisos de Meta (webhooks)', d.suscrito ? 'Activos' : 'Inactivos'],
+      ['En la app del celular', si(d.en_app_business)],
+    ];
+    var html = '🔎 <b>Resultado de la revisión</b><br>' +
+      filas.map(function(f) { return esc(f[0]) + ': <b>' + esc(f[1] || '—') + '</b>'; }).join('<br>');
+    var tipo = 'info';
+    if (d.coexistencia) {
+      html += '<br><br>✅ Tu número es de coexistencia: <b>no necesita registrarse</b>. Prueba enviar desde «Envío manual».';
+      tipo = 'ok';
+    }
+    if (d.plataforma && d.plataforma !== 'CLOUD_API') {
+      html += '<br><br>⚠️ Meta indica que el número no está activo en la API (' + esc(d.plataforma) + '). Por eso aparece «Account not registered».';
+      tipo = 'warn';
+    }
+    if (d.avisos && d.avisos.length) html += '<br><br>' + d.avisos.map(function(a) { return '• ' + esc(a); }).join('<br>');
+    mostrarMsg(tipo, html);
+  } catch (e) {
+    mostrarMsg('error', 'Error de conexión: ' + esc(e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '🔎 Revisar número con Meta';
   }
 }
 
@@ -1092,7 +1139,7 @@ async function enviarMensaje() {
     var data = await res.json();
     if (!res.ok) {
       var extra = data.codigo === 133010
-        ? ' <button type="button" class="vbtn vbtn-ghost" style="font-size:.74rem;margin-left:.4rem" onclick="cambiarTab(\'conexion\');abrirRegistro()">📲 Registrar ahora</button>'
+        ? ' <button type="button" class="vbtn vbtn-ghost" style="font-size:.74rem;margin-left:.4rem" onclick="cambiarTab(\'conexion\');diagnosticarNumero()">🔎 Revisar número</button>'
         : '';
       return msgEnvio('error', '❌ ' + esc(data.message || 'No se pudo enviar.') + extra);
     }
@@ -1103,7 +1150,6 @@ async function enviarMensaje() {
   } finally {
     btn.disabled = false; btn.textContent = '📤 Enviar';
   }
-  
 }
 </script>
 </body>
