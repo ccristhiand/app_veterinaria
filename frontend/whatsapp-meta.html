@@ -101,6 +101,9 @@
           </svg>
           <span id="wm-btn-texto">Conectar con Facebook</span>
         </button>
+        <button class="vbtn vbtn-ghost hidden" id="wm-btn-registrar" onclick="abrirRegistro()" title="Úsalo si al enviar te sale «Account not registered»">
+          📲 Registrar número
+        </button>
         <button class="wm-btn-desc hidden" id="wm-btn-desconectar" onclick="openModal('modal-desconectar')">
           ✕ Desconectar
         </button>
@@ -228,6 +231,30 @@
       </div>
     </div>
   </section>
+</div>
+
+<!-- ══ Modal registrar número ════════════════════════════════════ -->
+<div id="modal-registrar" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:480px">
+    <div class="vmodal-head">
+      <h3>📲 Registrar número en Meta</h3>
+      <button onclick="closeModal('modal-registrar')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:.8rem">
+      <p style="font-size:.84rem">Tu número ya está conectado, pero Meta pide registrarlo para poder enviar mensajes desde el sistema.</p>
+      <div>
+        <label class="vlabel">PIN de verificación en dos pasos (opcional)</label>
+        <input id="reg-pin" class="vinput" maxlength="6" inputmode="numeric" placeholder="Déjalo vacío si nunca pusiste uno"
+          oninput="this.value=this.value.replace(/\D/g,'')"/>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">Si lo dejas vacío, el sistema crea un PIN nuevo y te lo muestra para que lo guardes.</p>
+      </div>
+      <div id="reg-msg" class="wm-aviso hidden"></div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-registrar')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="registrarNumero()" id="btn-registrar" class="vbtn vbtn-primary">Registrar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══ Modal nueva plantilla ═════════════════════════════════════ -->
@@ -417,6 +444,7 @@ function pintarEstado(d) {
   habilitarPestanas(!!(d && d.estado === 'conectado'));
 
   btn.classList.remove('hidden'); btnDesc.classList.add('hidden'); datos.classList.add('hidden');
+  document.getElementById('wm-btn-registrar').classList.add('hidden');
   req.classList.remove('hidden');
 
   if (d && d.estado === 'conectado') {
@@ -426,6 +454,7 @@ function pintarEstado(d) {
       ? 'Tu número funciona en el sistema y también en la app WhatsApp Business del celular.'
       : 'Tu número funciona desde el sistema.';
     btn.classList.add('hidden'); btnDesc.classList.remove('hidden');
+    document.getElementById('wm-btn-registrar').classList.toggle('hidden', !!d.coexistencia);
     req.classList.add('hidden'); avisoQr.style.display = 'none';
     var hist = { en_proceso:'Sincronizando…', completo:'Completo', pendiente:'Pendiente', rechazado:'No compartido', no_aplica:'No aplica' };
     var cal  = { GREEN:'Alta', YELLOW:'Media', RED:'Baja' };
@@ -591,6 +620,49 @@ async function desconectarMeta() {
     mostrarMsg('error', 'Error de conexión: ' + esc(e.message));
   } finally {
     btn.disabled = false; btn.textContent = 'Sí, desconectar';
+  }
+}
+
+// ── Registrar número (error 133010) ───────────────────────────────
+function abrirRegistro() {
+  document.getElementById('reg-pin').value = '';
+  document.getElementById('reg-msg').classList.add('hidden');
+  openModal('modal-registrar');
+}
+
+async function registrarNumero() {
+  var btn = document.getElementById('btn-registrar');
+  var msg = document.getElementById('reg-msg');
+  var pin = document.getElementById('reg-pin').value.trim();
+  if (pin && pin.length !== 6) {
+    msg.classList.remove('hidden');
+    msg.setAttribute('style', 'background:#fff1f2;border:1px solid #fecdd3;color:#be123c');
+    msg.textContent = 'El PIN debe tener 6 dígitos.';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Registrando…';
+  try {
+    var res = await api('/wa-meta/registrar', { method: 'POST', body: { pin: pin || null } });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) {
+      msg.classList.remove('hidden');
+      msg.setAttribute('style', 'background:#fff1f2;border:1px solid #fecdd3;color:#be123c');
+      msg.textContent = '❌ ' + (data.message || 'No se pudo registrar.');
+      return;
+    }
+    closeModal('modal-registrar');
+    toast('✅ Número registrado en Meta', 'success');
+    mostrarMsg('ok', '✅ Número registrado. Ya puedes enviar mensajes desde «Envío manual».');
+    if (data.data && data.data.pin) {
+      document.getElementById('pin-valor').textContent = data.data.pin;
+      openModal('modal-pin');
+    }
+  } catch (e) {
+    msg.classList.remove('hidden');
+    msg.textContent = 'Error de conexión: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Registrar';
   }
 }
 
@@ -1018,7 +1090,12 @@ async function enviarMensaje() {
     var res = await api('/wa-meta/enviar', { method: 'POST', body: body });
     if (!res) return;
     var data = await res.json();
-    if (!res.ok) return msgEnvio('error', '❌ ' + esc(data.message || 'No se pudo enviar.'));
+    if (!res.ok) {
+      var extra = data.codigo === 133010
+        ? ' <button type="button" class="vbtn vbtn-ghost" style="font-size:.74rem;margin-left:.4rem" onclick="cambiarTab(\'conexion\');abrirRegistro()">📲 Registrar ahora</button>'
+        : '';
+      return msgEnvio('error', '❌ ' + esc(data.message || 'No se pudo enviar.') + extra);
+    }
     msgEnvio('ok', '✅ Mensaje enviado a +' + esc(data.data && data.data.telefono || tel) + '.');
     toast('✅ Mensaje enviado', 'success');
   } catch (e) {
@@ -1026,6 +1103,7 @@ async function enviarMensaje() {
   } finally {
     btn.disabled = false; btn.textContent = '📤 Enviar';
   }
+  
 }
 </script>
 </body>

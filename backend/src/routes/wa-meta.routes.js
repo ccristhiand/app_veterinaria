@@ -258,6 +258,36 @@ router.post('/desconectar', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── POST /registrar — registra el número en la API de Meta (error 133010 "Account not registered") ──
+//    body: { pin? }  → si el número ya tenía PIN de verificación en dos pasos, se usa ese;
+//                     si no, se crea uno nuevo y se devuelve para que la clínica lo guarde.
+router.post('/registrar', async (req, res, next) => {
+  try {
+    const { tenantId, cfg, token, phoneId } = await cuentaConectada(req);
+    const pinDado = String(req.body?.pin || '').trim();
+    if (pinDado && !/^\d{6}$/.test(pinDado)) {
+      return res.status(422).json({ success: false, message: 'El PIN debe tener 6 dígitos.' });
+    }
+    const pin = pinDado || String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    try {
+      await graph('POST', `${phoneId}/register`, { cfg, token, body: { messaging_product: 'whatsapp', pin } });
+    } catch (e) {
+      logger.warn(`[wa-meta] Registro del número falló (clínica ${tenantId}): ${e.message} ${JSON.stringify(e.meta || {})}`);
+      const det = e.meta ? ` (código ${e.meta.code}${e.meta.error_subcode ? '/' + e.meta.error_subcode : ''})` : '';
+      let ayuda = '';
+      if (/policy|polic/i.test(e.message)) {
+        ayuda = ' Revisa en el Administrador de WhatsApp (business.facebook.com → WhatsApp Manager) que la cuenta tenga un método de pago, que el nombre visible esté aprobado y que la cuenta no tenga restricciones.';
+      } else if (/pin|two.?step|verificaci/i.test(e.message)) {
+        ayuda = ' Ese número ya tiene un PIN de verificación en dos pasos: escríbelo en el campo PIN y vuelve a intentar.';
+      }
+      return res.status(422).json({ success: false, message: 'Meta no registró el número: ' + e.message + det + '.' + ayuda });
+    }
+    await masterQuery('UPDATE wa_meta_cuentas SET ultimo_error = NULL WHERE tenant_id = ?', [tenantId]);
+    logger.info(`[wa-meta] Número registrado en Meta (clínica ${tenantId})`);
+    return res.json({ success: true, message: 'Número registrado en Meta.', data: { pin: pinDado ? null : pin } });
+  } catch (err) { responderError(res, next, err); }
+});
+
 // ════════════════════════════════════════════════════════════════════
 //  PLANTILLAS Y ENVÍO (requieren la clínica conectada)
 // ════════════════════════════════════════════════════════════════════
@@ -465,6 +495,10 @@ router.post('/enviar', async (req, res, next) => {
     // 131030: número de prueba de Meta → solo a destinatarios autorizados
     if (err.meta?.code === 131030) {
       return res.status(422).json({ success: false, message: 'Con el número de prueba de Meta solo puedes enviar a los números que agregaste como destinatarios en Meta (WhatsApp → Configuración de la API → "Para").' });
+    }
+    // 133010: el número está conectado pero no registrado en la API
+    if (err.meta?.code === 133010) {
+      return res.status(422).json({ success: false, codigo: 133010, message: 'Tu número está conectado pero todavía no está registrado en Meta. Ve a la pestaña «Conexión» y pulsa «Registrar número».' });
     }
     // 132001: la plantilla no existe en ese idioma o aún no está aprobada
     if (err.meta?.code === 132001) {
