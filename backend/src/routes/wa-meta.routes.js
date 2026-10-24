@@ -258,6 +258,85 @@ router.post('/desconectar', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── POST /diagnostico — vuelve a leer el número desde Meta y corrige lo guardado ──
+//    · detecta si es coexistencia (número también en la app WhatsApp Business del celular)
+//    · revisa que nuestra app siga suscrita a la cuenta (webhooks) y si no, la suscribe
+router.post('/diagnostico', async (req, res, next) => {
+  try {
+    const { tenantId, cfg, token, wabaId, phoneId } = await cuentaConectada(req);
+    const avisos = [];
+
+    // Datos del número (si Meta no acepta algún campo, se piden los básicos)
+    let info;
+    try {
+      info = await graph('GET', phoneId, {
+        cfg, token,
+        query: { fields: 'display_phone_number,verified_name,quality_rating,is_on_biz_app,platform_type,status,name_status,code_verification_status' },
+      });
+    } catch {
+      info = await graph('GET', phoneId, {
+        cfg, token, query: { fields: 'display_phone_number,verified_name,quality_rating,is_on_biz_app,platform_type' },
+      });
+    }
+
+    // Suscripción de la app a la cuenta de WhatsApp
+    let suscrito = false;
+    try {
+      const subs = await graph('GET', `${wabaId}/subscribed_apps`, { cfg, token });
+      suscrito = (subs.data || []).some(s => String(s.whatsapp_business_api_data?.id || s.id || '') === String(cfg.appId));
+      if (!suscrito) {
+        await graph('POST', `${wabaId}/subscribed_apps`, { cfg, token });
+        suscrito = true;
+        avisos.push('La app no estaba suscrita a tu cuenta de WhatsApp; se volvió a suscribir.');
+      }
+    } catch (e) { avisos.push('No se pudo revisar la suscripción de avisos: ' + e.message); }
+
+    const [c] = await masterQuery('SELECT coexistencia, historial_sync FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
+    const coexistencia = info.is_on_biz_app === true || !!Number(c?.coexistencia);
+    let historial = c?.historial_sync || 'no_aplica';
+
+    // Recién detectada como coexistencia: pedir contactos e historial (Meta solo lo permite en las primeras 24 h)
+    if (coexistencia && !Number(c?.coexistencia)) {
+      historial = 'en_proceso';
+      for (const tipo of ['smb_app_state_sync', 'history']) {
+        try {
+          await graph('POST', `${phoneId}/smb_app_data`, { cfg, token, body: { messaging_product: 'whatsapp', sync_type: tipo } });
+        } catch (e) {
+          if (tipo === 'history') historial = 'pendiente';
+          avisos.push(`No se pudo pedir ${tipo === 'history' ? 'el historial' : 'los contactos'} (Meta solo lo permite en las primeras 24 h): ${e.message}`);
+        }
+      }
+    }
+
+    await masterQuery(
+      `UPDATE wa_meta_cuentas SET numero_display = COALESCE(?, numero_display), nombre_verificado = COALESCE(?, nombre_verificado),
+         calidad = ?, coexistencia = ?, historial_sync = ?, webhook_ok = ?,
+         ultimo_error = IF(? = 1, NULL, ultimo_error)
+       WHERE tenant_id = ?`,
+      [info.display_phone_number || null, info.verified_name || null, info.quality_rating || null,
+       coexistencia ? 1 : 0, historial, suscrito ? 1 : 0, coexistencia ? 1 : 0, tenantId]
+    );
+    logger.info(`[wa-meta] Diagnóstico clínica ${tenantId}: ${JSON.stringify(info)} suscrito=${suscrito}`);
+
+    return res.json({
+      success: true,
+      data: {
+        numero        : info.display_phone_number || null,
+        nombre        : info.verified_name || null,
+        coexistencia,
+        en_app_business: info.is_on_biz_app ?? null,
+        plataforma    : info.platform_type || null,
+        estado_numero : info.status || null,
+        estado_nombre : info.name_status || null,
+        verificacion  : info.code_verification_status || null,
+        calidad       : info.quality_rating || null,
+        suscrito,
+        avisos,
+      },
+    });
+  } catch (err) { responderError(res, next, err); }
+});
+
 // ── POST /registrar — registra el número en la API de Meta (error 133010 "Account not registered") ──
 //    body: { pin? }  → si el número ya tenía PIN de verificación en dos pasos, se usa ese;
 //                     si no, se crea uno nuevo y se devuelve para que la clínica lo guarde.
@@ -346,27 +425,93 @@ function validarPlantilla({ nombre, categoria, cuerpo, ejemplos, pie, encabezado
   return [...new Set(p)];
 }
 
+// ── Plantillas guardadas en la base de la clínica (wa_meta_plantillas, migración v18) ──
+const ESTADO_DESDE_META = {
+  APPROVED: 'aprobada', PENDING: 'pendiente', IN_APPEAL: 'pendiente', REJECTED: 'rechazada',
+  PAUSED: 'pausada', DISABLED: 'deshabilitada', FLAGGED: 'pausada', LIMIT_EXCEEDED: 'deshabilitada',
+  PENDING_DELETION: 'deshabilitada', DELETED: 'deshabilitada',
+};
+
+function errorSinMigracion(e) {
+  return e && (e.code === 'ER_NO_SUCH_TABLE' || e.code === 'ER_BAD_FIELD_ERROR' || /doesn't exist|Unknown column/i.test(e.message || ''));
+}
+function faltaMigracion() {
+  const e = new Error('Falta actualizar la base de datos de la clínica (migración v18). Avisa a soporte.');
+  e.status = 409; return e;
+}
+
+async function plantillasMeta(cfg, token, wabaId, nombre) {
+  const query = { fields: 'id,name,language,status,category,components,rejected_reason', limit: '200' };
+  if (nombre) query.name = nombre;
+  const d = await graph('GET', `${wabaId}/message_templates`, { cfg, token, query });
+  return d.data || [];
+}
+
+function vistaPlantillaMeta(t) {
+  const body   = (t.components || []).find(c => c.type === 'BODY');
+  const header = (t.components || []).find(c => c.type === 'HEADER' && c.format === 'TEXT');
+  const footer = (t.components || []).find(c => c.type === 'FOOTER');
+  return {
+    id: t.id, nombre: t.name, idioma: t.language, estado: t.status, categoria: t.category,
+    cuerpo: body?.text || '', encabezado: header?.text || '', pie: footer?.text || '',
+    variables: [...new Set(variablesDe(body?.text || ''))].length,
+    motivo_rechazo: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
+  };
+}
+
+// Copia el estado que tiene Meta en wa_meta_plantillas (aprobada, rechazada…)
+async function sincronizarPlantillas(req, lista) {
+  try {
+    const filas = await req.db.query('SELECT id, nombre_meta, idioma, meta_template_id FROM wa_meta_plantillas');
+    for (const f of filas) {
+      const t = lista.find(x => x.name === f.nombre_meta && x.language === f.idioma);
+      if (t) {
+        await req.db.query(
+          `UPDATE wa_meta_plantillas SET estado=?, categoria=?, motivo_rechazo=?, meta_template_id=?, activo=1 WHERE id=?`,
+          [ESTADO_DESDE_META[t.status] || 'pendiente',
+           ['UTILITY', 'MARKETING', 'AUTHENTICATION'].includes(t.category) ? t.category : 'UTILITY',
+           t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null, t.id, f.id]
+        );
+      } else if (f.meta_template_id) {
+        // Ya no existe en Meta (la borraron desde Meta o desde aquí)
+        await req.db.query(`UPDATE wa_meta_plantillas SET estado='deshabilitada', activo=0 WHERE id=?`, [f.id]);
+      }
+    }
+    return true;
+  } catch (e) {
+    if (!errorSinMigracion(e)) logger.warn('[wa-meta] No se pudo sincronizar plantillas: ' + e.message);
+    return false;
+  }
+}
+
 // ── GET /plantillas — lista las plantillas de la clínica en Meta ─────
 router.get('/plantillas', async (req, res, next) => {
   try {
     const { cfg, token, wabaId } = await cuentaConectada(req);
-    const d = await graph('GET', `${wabaId}/message_templates`, {
-      cfg, token, query: { fields: 'id,name,language,status,category,components,rejected_reason', limit: '200' },
-    });
-    const data = (d.data || []).map(t => {
-      const body   = (t.components || []).find(c => c.type === 'BODY');
-      const header = (t.components || []).find(c => c.type === 'HEADER' && c.format === 'TEXT');
-      const footer = (t.components || []).find(c => c.type === 'FOOTER');
-      return {
-        id: t.id, nombre: t.name, idioma: t.language, estado: t.status, categoria: t.category,
-        cuerpo: body?.text || '', encabezado: header?.text || '', pie: footer?.text || '',
-        variables: [...new Set(variablesDe(body?.text || ''))].length,
-        motivo_rechazo: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
-      };
+    const lista = await plantillasMeta(cfg, token, wabaId);
+    await sincronizarPlantillas(req, lista);
+    let usos = [];
+    try { usos = await req.db.query('SELECT nombre_meta, idioma, uso, es_estandar FROM wa_meta_plantillas WHERE activo=1'); }
+    catch { /* sin migración v18 */ }
+    const data = lista.map(t => {
+      const u = usos.find(x => x.nombre_meta === t.name && x.idioma === t.language);
+      return { ...vistaPlantillaMeta(t), uso: u?.uso || null, es_estandar: !!(u && Number(u.es_estandar)) };
     });
     return res.json({ success: true, data });
   } catch (err) { responderError(res, next, err); }
 });
+
+// Arma los componentes de Meta (encabezado, cuerpo con ejemplos, pie)
+function componentesPlantilla({ encabezado, cuerpo, pie, ejemplos }) {
+  const nVars = [...new Set(variablesDe(cuerpo))].length;
+  const components = [];
+  if (encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: encabezado });
+  const body = { type: 'BODY', text: cuerpo };
+  if (nVars) body.example = { body_text: [ejemplos.slice(0, nVars)] };
+  components.push(body);
+  if (pie) components.push({ type: 'FOOTER', text: pie });
+  return components;
+}
 
 // ── POST /plantillas — crea una plantilla y la envía a revisión ──────
 router.post('/plantillas', async (req, res, next) => {
@@ -385,17 +530,26 @@ router.post('/plantillas', async (req, res, next) => {
     if (problemas.length) return res.status(422).json({ success: false, message: problemas[0], problemas });
 
     const { cfg, token, wabaId } = await cuentaConectada(req);
-    const nVars = [...new Set(variablesDe(datos.cuerpo))].length;
-    const components = [];
-    if (datos.encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: datos.encabezado });
-    const body = { type: 'BODY', text: datos.cuerpo };
-    if (nVars) body.example = { body_text: [datos.ejemplos.slice(0, nVars)] };
-    components.push(body);
-    if (datos.pie) components.push({ type: 'FOOTER', text: datos.pie });
-
     const d = await graph('POST', `${wabaId}/message_templates`, {
-      cfg, token, body: { name: datos.nombre, language: datos.idioma, category: datos.categoria, components },
+      cfg, token,
+      body: { name: datos.nombre, language: datos.idioma, category: datos.categoria, components: componentesPlantilla(datos) },
     });
+
+    // Se guarda también en la base de la clínica (para campañas y estados)
+    try {
+      await req.db.query(
+        `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, encabezado_tipo, encabezado_texto, cuerpo, pie,
+           meta_template_id, estado, es_estandar, activo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,0,1)
+         ON DUPLICATE KEY UPDATE categoria=VALUES(categoria), cuerpo=VALUES(cuerpo), encabezado_tipo=VALUES(encabezado_tipo),
+           encabezado_texto=VALUES(encabezado_texto), pie=VALUES(pie), meta_template_id=VALUES(meta_template_id),
+           estado=VALUES(estado), activo=1`,
+        [datos.nombre, datos.idioma, datos.categoria, datos.categoria === 'MARKETING' ? 'campana' : 'manual',
+         datos.encabezado ? 'texto' : 'ninguno', datos.encabezado || null, datos.cuerpo, datos.pie || null,
+         d.id || null, ESTADO_DESDE_META[d.status] || 'pendiente']
+      );
+    } catch (e) { if (!errorSinMigracion(e)) logger.warn('[wa-meta] No se guardó la plantilla en la clínica: ' + e.message); }
+
     return res.status(201).json({
       success: true,
       message: 'Plantilla enviada a revisión de Meta.',
@@ -411,6 +565,8 @@ router.delete('/plantillas/:nombre', async (req, res, next) => {
     if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Nombre inválido.' });
     const { cfg, token, wabaId } = await cuentaConectada(req);
     await graph('DELETE', `${wabaId}/message_templates`, { cfg, token, query: { name: nombre } });
+    try { await req.db.query(`UPDATE wa_meta_plantillas SET estado='deshabilitada', activo=0 WHERE nombre_meta=?`, [nombre]); }
+    catch { /* sin migración v18 */ }
     return res.json({ success: true, message: 'Plantilla eliminada.' });
   } catch (err) { responderError(res, next, err); }
 });
@@ -470,7 +626,8 @@ router.post('/enviar', async (req, res, next) => {
     } else {
       const nombre = String(b.plantilla || '').trim();
       if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Elige una plantilla aprobada.' });
-      const vars = Array.isArray(b.variables) ? b.variables.map(v => String(v ?? '').trim()) : [];
+      // Meta no acepta saltos de línea, tabulaciones ni más de 4 espacios seguidos en las variables
+      const vars = Array.isArray(b.variables) ? b.variables.map(v => String(v ?? '').replace(/[\n\t]+/g, ' ').replace(/ {4,}/g, '   ').trim()) : [];
       if (vars.some(v => !v)) return res.status(422).json({ success: false, message: 'Completa todas las variables de la plantilla.' });
       payload = {
         messaging_product: 'whatsapp', to: telefono, type: 'template',
@@ -498,7 +655,7 @@ router.post('/enviar', async (req, res, next) => {
     }
     // 133010: el número está conectado pero no registrado en la API
     if (err.meta?.code === 133010) {
-      return res.status(422).json({ success: false, codigo: 133010, message: 'Tu número está conectado pero todavía no está registrado en Meta. Ve a la pestaña «Conexión» y pulsa «Registrar número».' });
+      return res.status(422).json({ success: false, codigo: 133010, message: 'Meta dice que tu número no está activo en la API («Account not registered»). Ve a la pestaña «Conexión» y pulsa «Revisar número con Meta».' });
     }
     // 132001: la plantilla no existe en ese idioma o aún no está aprobada
     if (err.meta?.code === 132001) {
@@ -506,6 +663,450 @@ router.post('/enviar', async (req, res, next) => {
     }
     responderError(res, next, err);
   }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  PLANTILLAS DE RECORDATORIOS (las mismas que usa la clínica con QR)
+//  Cada recordatorio del sistema tiene su plantilla en Meta, creada a partir
+//  del texto que la clínica ya tiene en wa_plantillas ([nombre], [mascota]…).
+// ════════════════════════════════════════════════════════════════════
+
+const USOS_SISTEMA = [
+  { uso: 'recordatorio_cita', titulo: 'Recordatorio de cita médica', datos: ['nombre', 'mascota', 'fecha', 'hora'],
+    estandar: '🐾 Hola [nombre], te recordamos que tienes una cita médica para *[mascota]* el *[fecha]* a las *[hora]* en *[clinica]*. Si no puedes asistir, responde este mensaje para reprogramarla.' },
+  { uso: 'recordatorio_cita_vacuna', titulo: 'Recordatorio de cita de vacunación', datos: ['nombre', 'mascota', 'fecha', 'hora'],
+    estandar: '💉 Hola [nombre], te recordamos que *[mascota]* tiene su cita de vacunación el *[fecha]* a las *[hora]* en *[clinica]*. Si no puedes asistir, responde este mensaje para reprogramarla.' },
+  { uso: 'recordatorio_cita_desparasitacion', titulo: 'Recordatorio de cita de desparasitación', datos: ['nombre', 'mascota', 'fecha', 'hora'],
+    estandar: '🐛 Hola [nombre], te recordamos que *[mascota]* tiene su cita de desparasitación el *[fecha]* a las *[hora]* en *[clinica]*. Si no puedes asistir, responde este mensaje para reprogramarla.' },
+  { uso: 'recordatorio_cita_estetica', titulo: 'Recordatorio de cita de estética', datos: ['nombre', 'mascota', 'fecha', 'hora'],
+    estandar: '✂️ Hola [nombre], te recordamos que *[mascota]* tiene su cita de estética el *[fecha]* a las *[hora]* en *[clinica]*. Si no puedes asistir, responde este mensaje para reprogramarla.' },
+  { uso: 'recordatorio_vacuna', titulo: 'Aviso de vacuna pendiente', datos: ['nombre', 'mascota', 'vacuna', 'fecha'],
+    estandar: '💉 Hola [nombre], te recordamos que *[mascota]* tiene pendiente su vacuna *[vacuna]* para el *[fecha]*. Responde este mensaje para coordinar su cita en *[clinica]*.' },
+  { uso: 'recordatorio_desparasitacion', titulo: 'Aviso de desparasitación pendiente', datos: ['nombre', 'mascota', 'producto', 'fecha'],
+    estandar: '🐛 Hola [nombre], te recordamos que *[mascota]* tiene pendiente su desparasitación con *[producto]* para el *[fecha]*. Responde este mensaje para coordinar en *[clinica]*.' },
+];
+const ETIQUETA_DATO = { nombre: 'Nombre del cliente', mascota: 'Mascota', fecha: 'Fecha', hora: 'Hora', vacuna: 'Vacuna', producto: 'Producto' };
+const EJEMPLO_DATO  = { nombre: 'María López', mascota: 'Firulais', fecha: '25 de octubre de 2026', hora: '10:30 a. m.', vacuna: 'Rabia', producto: 'Bravecto' };
+const NOMBRE_META_DE = uso => `vet_${uso}`;
+
+async function datosClinica(tenantId) {
+  const [c] = await masterQuery('SELECT nombre_clinica, telefono FROM tenant_config WHERE tenant_id = ? LIMIT 1', [tenantId]);
+  return { clinica: (c?.nombre_clinica || 'nuestra veterinaria').trim(), telefono: (c?.telefono || '').trim() };
+}
+
+/**
+ * Convierte un texto con etiquetas [nombre], [mascota]… al formato de Meta.
+ *  · [clinica] y [telefono] se escriben fijos (son siempre los mismos)
+ *  · el resto pasa a {{1}}, {{2}}… en el orden en que aparecen
+ * Devuelve { cuerpo, variables, ejemplos }.
+ */
+function convertirTexto(texto, datosPermitidos, clinica, telefono) {
+  let t = String(texto || '').replace(/\r/g, '');
+  t = t.replace(/\[clinica\]/gi, clinica);
+  if (telefono) t = t.replace(/\[telefono\]/gi, telefono);
+  else t = t.replace(/[^.!?¡\n]*\[telefono\][^.!?\n]*[.!?]?/gi, '');   // sin teléfono: se quita la frase
+  const variables = [];
+  t = t.replace(/\[([a-z_]+)\]/gi, (_, k) => {
+    k = k.toLowerCase();
+    if (!datosPermitidos.includes(k)) return '';
+    let i = variables.indexOf(k);
+    if (i === -1) { variables.push(k); i = variables.length - 1; }
+    return `{{${i + 1}}}`;
+  });
+  t = t.replace(/[ \t]{2,}/g, ' ').replace(/ +([.,!?])/g, '$1').replace(/\n{3,}/g, '\n\n').trim();
+  return { cuerpo: t, variables, ejemplos: variables.map(v => EJEMPLO_DATO[v] || 'Ejemplo') };
+}
+
+// Propuesta para un uso: el texto de la clínica, o el estándar si el suyo no pasaría la revisión
+function propuestaPara(def, textoClinica, clinica, telefono) {
+  if (textoClinica) {
+    const c = convertirTexto(textoClinica, def.datos, clinica, telefono);
+    const prob = validarPlantilla({ nombre: NOMBRE_META_DE(def.uso), categoria: 'UTILITY', cuerpo: c.cuerpo, ejemplos: c.ejemplos });
+    if (!prob.length) return { ...c, origen: 'clinica' };
+  }
+  return { ...convertirTexto(def.estandar, def.datos, clinica, telefono), origen: 'estandar' };
+}
+
+// ── GET /plantillas-sistema — estado de las plantillas de recordatorios ──
+router.get('/plantillas-sistema', async (req, res, next) => {
+  try {
+    const tenantId = await tenantIdDe(req);
+    const { clinica, telefono } = await datosClinica(tenantId);
+
+    let guardadas;
+    try {
+      guardadas = await req.db.query(
+        `SELECT id, nombre_meta, idioma, uso, cuerpo, variables, estado, categoria, motivo_rechazo, meta_template_id, updated_at
+         FROM wa_meta_plantillas WHERE es_estandar = 1 AND activo = 1 ORDER BY id DESC`
+      );
+    } catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
+
+    let textos = [];
+    try { textos = await req.db.query('SELECT tipo, contenido FROM wa_plantillas WHERE activo = 1 ORDER BY id DESC'); }
+    catch { /* sin plantillas QR */ }
+
+    const data = USOS_SISTEMA.map(def => {
+      const propia = textos.find(x => x.tipo === def.uso);
+      const prop   = propuestaPara(def, propia?.contenido, clinica, telefono);
+      const g      = guardadas.find(x => x.uso === def.uso);
+      let vars = [];
+      try { vars = g?.variables ? JSON.parse(g.variables) : []; } catch { vars = []; }
+      return {
+        uso: def.uso, titulo: def.titulo,
+        datos: def.datos.map(k => ({ clave: k, etiqueta: ETIQUETA_DATO[k] })),
+        propuesta: { cuerpo: prop.cuerpo, variables: prop.variables, origen: prop.origen },
+        meta: g ? {
+          id: g.id, nombre: g.nombre_meta, cuerpo: g.cuerpo, variables: vars, estado: g.estado,
+          categoria: g.categoria, motivo_rechazo: g.motivo_rechazo, actualizado: g.updated_at,
+        } : null,
+      };
+    });
+    return res.json({ success: true, data, clinica: { nombre: clinica, telefono } });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// Crea (o corrige y reenvía) la plantilla de un uso en Meta y la guarda en la clínica
+async function enviarPlantillaSistema(req, ctx, def, textoEditado) {
+  const { cfg, token, wabaId, clinica, telefono } = ctx;
+  let prop;
+  if (textoEditado) {
+    prop = { ...convertirTexto(textoEditado, def.datos, clinica, telefono), origen: 'editado' };
+  } else {
+    let propia = null;
+    try { [propia] = await req.db.query('SELECT contenido FROM wa_plantillas WHERE tipo = ? AND activo = 1 ORDER BY id DESC LIMIT 1', [def.uso]); }
+    catch { /* sin plantillas QR */ }
+    prop = propuestaPara(def, propia?.contenido, clinica, telefono);
+  }
+  const nombre = NOMBRE_META_DE(def.uso);
+  const problemas = validarPlantilla({ nombre, categoria: 'UTILITY', cuerpo: prop.cuerpo, ejemplos: prop.ejemplos });
+  if (problemas.length) return { uso: def.uso, ok: false, message: problemas[0] };
+
+  const [g] = await req.db.query(
+    'SELECT * FROM wa_meta_plantillas WHERE nombre_meta = ? AND idioma = ? LIMIT 1', [nombre, 'es']
+  );
+  if (g && g.activo && g.estado === 'aprobada' && g.cuerpo === prop.cuerpo) {
+    return { uso: def.uso, ok: true, estado: 'aprobada', message: 'Ya estaba aprobada.' };
+  }
+  if (g && g.activo && g.estado === 'pendiente' && g.cuerpo === prop.cuerpo) {
+    return { uso: def.uso, ok: true, estado: 'pendiente', message: 'Ya está en revisión.' };
+  }
+
+  const components = componentesPlantilla({ cuerpo: prop.cuerpo, ejemplos: prop.ejemplos });
+  const editar = async (id) => {
+    // Plantilla que ya existe en Meta → se corrige y Meta la vuelve a revisar
+    await graph('POST', `${id}`, { cfg, token, body: { category: 'UTILITY', components } });
+  };
+  let templateId = g && g.activo && g.meta_template_id ? g.meta_template_id : null;
+  let estadoMeta = 'PENDING';
+  let categoria  = 'UTILITY';
+
+  try {
+    if (templateId) {
+      await editar(templateId);
+    } else {
+      try {
+        const d = await graph('POST', `${wabaId}/message_templates`, {
+          cfg, token, body: { name: nombre, language: 'es', category: 'UTILITY', components },
+        });
+        templateId = d.id; estadoMeta = d.status || 'PENDING'; categoria = d.category || 'UTILITY';
+      } catch (e) {
+        // Ya existía en Meta con ese nombre (creada antes): se toma esa y se corrige si hace falta
+        const existe = (await plantillasMeta(cfg, token, wabaId, nombre).catch(() => []))
+          .find(x => x.name === nombre && x.language === 'es');
+        if (!existe) throw e;
+        templateId = existe.id;
+        categoria  = existe.category || 'UTILITY';
+        if (vistaPlantillaMeta(existe).cuerpo === prop.cuerpo) estadoMeta = existe.status || 'PENDING';
+        else await editar(templateId);
+      }
+    }
+  } catch (e) {
+    return { uso: def.uso, ok: false, message: 'Meta no aceptó la plantilla: ' + e.message };
+  }
+
+  await req.db.query(
+    `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, encabezado_tipo, cuerpo, variables,
+       meta_template_id, estado, motivo_rechazo, es_estandar, activo)
+     VALUES (?,?,?,?, 'ninguno', ?,?,?,?, NULL, 1, 1)
+     ON DUPLICATE KEY UPDATE categoria=VALUES(categoria), uso=VALUES(uso), cuerpo=VALUES(cuerpo), variables=VALUES(variables),
+       meta_template_id=VALUES(meta_template_id), estado=VALUES(estado), motivo_rechazo=NULL, es_estandar=1, activo=1`,
+    [nombre, 'es', ['UTILITY', 'MARKETING'].includes(categoria) ? categoria : 'UTILITY', def.uso, prop.cuerpo,
+     JSON.stringify(prop.variables), templateId, ESTADO_DESDE_META[estadoMeta] || 'pendiente']
+  );
+  return { uso: def.uso, ok: true, estado: ESTADO_DESDE_META[estadoMeta] || 'pendiente', message: 'Enviada a revisión de Meta.' };
+}
+
+// ── POST /plantillas-sistema — envía a revisión una o todas ───────────
+//    body: { uso?: 'recordatorio_cita', texto?: 'texto editado con [nombre]…' }   (sin uso = todas)
+router.post('/plantillas-sistema', async (req, res, next) => {
+  try {
+    const { tenantId, cfg, token, wabaId } = await cuentaConectada(req);
+    const { clinica, telefono } = await datosClinica(tenantId);
+    try { await req.db.query('SELECT 1 FROM wa_meta_plantillas LIMIT 1'); }
+    catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
+
+    const uso   = req.body?.uso ? String(req.body.uso) : null;
+    const texto = req.body?.texto ? String(req.body.texto).trim() : null;
+    const defs  = uso ? USOS_SISTEMA.filter(d => d.uso === uso) : USOS_SISTEMA;
+    if (!defs.length) return res.status(422).json({ success: false, message: 'Tipo de recordatorio desconocido.' });
+    if (texto && texto.length > 1024) return res.status(422).json({ success: false, message: 'El mensaje no puede pasar de 1024 caracteres.' });
+
+    const ctx = { cfg, token, wabaId, clinica, telefono };
+    const resultados = [];
+    for (const def of defs) {
+      try { resultados.push(await enviarPlantillaSistema(req, ctx, def, uso ? texto : null)); }
+      catch (e) { resultados.push({ uso: def.uso, ok: false, message: e.message }); }
+    }
+    const fallidas = resultados.filter(r => !r.ok);
+    logger.info(`[wa-meta] Plantillas del sistema clínica ${tenantId}: ${resultados.map(r => r.uso + '=' + (r.ok ? r.estado : 'error')).join(', ')}`);
+    return res.status(fallidas.length === resultados.length ? 422 : 200).json({
+      success: fallidas.length < resultados.length,
+      message: fallidas.length
+        ? (fallidas.length === resultados.length ? fallidas[0].message : `${resultados.length - fallidas.length} enviadas, ${fallidas.length} con error.`)
+        : (defs.length > 1 ? 'Plantillas enviadas a revisión de Meta.' : resultados[0].message),
+      data: resultados,
+    });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── GET/PUT /recordatorios — misma configuración que la pantalla QR (wa_config) ──
+const CAMPOS_RECORDATORIO = {
+  activo: 'bool', recordatorio_citas_activo: 'bool', recordatorio_citas_horas: 'horas', recordatorio_citas_horas2: 'horas?',
+  recordatorio_vacunas_activo: 'bool', recordatorio_vacunas_dias: 'dias', recordatorio_vacunas_dias2: 'dias?',
+  recordatorio_desparasitaciones_activo: 'bool',
+};
+
+router.get('/recordatorios', async (req, res, next) => {
+  try {
+    const [cfg] = await req.db.query('SELECT * FROM wa_config LIMIT 1');
+    const data = {};
+    for (const k of Object.keys(CAMPOS_RECORDATORIO)) data[k] = cfg ? cfg[k] : null;
+    data.codigo_pais = cfg?.codigo_pais || '+51';
+    return res.json({ success: true, data });
+  } catch (err) { responderError(res, next, err); }
+});
+
+router.put('/recordatorios', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const val = {};
+    for (const [k, tipo] of Object.entries(CAMPOS_RECORDATORIO)) {
+      const v = b[k];
+      if (tipo === 'bool') { val[k] = v ? 1 : 0; continue; }
+      const opcional = tipo.endsWith('?');
+      if ((v === null || v === '' || v === undefined) && opcional) { val[k] = null; continue; }
+      const n = parseInt(v, 10);
+      const max = tipo.startsWith('horas') ? 168 : 60;
+      if (!Number.isInteger(n) || n < 1 || n > max) {
+        return res.status(422).json({ success: false, message: `Valor inválido en ${k.replace(/_/g, ' ')} (1 a ${max}).` });
+      }
+      val[k] = n;
+    }
+    const cols = Object.keys(val);
+    const [cfg] = await req.db.query('SELECT id FROM wa_config LIMIT 1');
+    if (cfg) {
+      await req.db.query(`UPDATE wa_config SET ${cols.map(c => `${c}=?`).join(', ')} WHERE id=?`, [...cols.map(c => val[c]), cfg.id]);
+    } else {
+      await req.db.query(`INSERT INTO wa_config (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map(c => val[c]));
+    }
+    return res.json({ success: true, message: 'Recordatorios guardados.' });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  CAMPAÑAS POR META (las envía el procesador wa-campanas)
+// ════════════════════════════════════════════════════════════════════
+
+const SEGMENTOS = ['todos', 'por_especie', 'vacunas_vencidas', 'citas_semana', 'sin_citas_60d'];
+const DATOS_CAMPANA = { nombre: 'Nombre del cliente', mascota: 'Mascota(s)', clinica: 'Nombre de la clínica' };
+
+// Misma consulta que usa el procesador wa-campanas (mantener iguales)
+function sqlSegmento(segmento, valor) {
+  const nombre = `COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.nombre,''),' ',COALESCE(p.apellido,''))),''), p.razon_social)`;
+  const base = (joins, where, params = []) => ({
+    sql: `SELECT p.id, ${nombre} AS nombre, p.telefono,
+                 GROUP_CONCAT(DISTINCT m.nombre ORDER BY m.id SEPARATOR ', ') AS mascotas
+          FROM propietarios p ${joins}
+          WHERE p.telefono IS NOT NULL AND TRIM(p.telefono) <> '' ${where}
+          GROUP BY p.id`,
+    params,
+  });
+  switch (segmento) {
+    case 'todos':            return base('LEFT JOIN mascotas m ON m.propietario_id = p.id', '');
+    case 'por_especie':      return base('JOIN mascotas m ON m.propietario_id = p.id', 'AND m.especie = ?', [String(valor || '')]);
+    case 'vacunas_vencidas': return base('JOIN mascotas m ON m.propietario_id = p.id JOIN vacunas v ON v.mascota_id = m.id',
+                                         'AND v.proxima_dosis < CURDATE() AND v.notificado = 0');
+    case 'citas_semana':     return base('JOIN mascotas m ON m.propietario_id = p.id JOIN citas c ON c.mascota_id = m.id',
+                                         "AND c.fecha_hora BETWEEN NOW() AND NOW() + INTERVAL 7 DAY AND c.estado IN ('pendiente','confirmada')");
+    case 'sin_citas_60d':    return base('LEFT JOIN mascotas m ON m.propietario_id = p.id',
+                                         `AND NOT EXISTS (SELECT 1 FROM citas c2 JOIN mascotas m2 ON m2.id = c2.mascota_id
+                                                          WHERE m2.propietario_id = p.id AND c2.fecha_hora >= NOW() - INTERVAL 60 DAY)`);
+    default: return null;
+  }
+}
+
+// ── GET /campanas/contar?segmento=&valor= — cuántos clientes recibirían ──
+router.get('/campanas/contar', async (req, res, next) => {
+  try {
+    const q = sqlSegmento(String(req.query.segmento || ''), req.query.valor);
+    if (!q) return res.status(422).json({ success: false, message: 'Segmento inválido.' });
+    const [r] = await req.db.query(`SELECT COUNT(*) AS n FROM (${q.sql}) x`, q.params);
+    return res.json({ success: true, data: { total: Number(r?.n || 0) } });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── GET /campanas/especies — especies registradas (para el segmento "por especie") ──
+router.get('/campanas/especies', async (req, res, next) => {
+  try {
+    const rows = await req.db.query(
+      `SELECT m.especie, COUNT(DISTINCT p.id) AS clientes
+       FROM mascotas m JOIN propietarios p ON p.id = m.propietario_id
+       WHERE m.especie IS NOT NULL AND TRIM(m.especie) <> '' AND p.telefono IS NOT NULL AND TRIM(p.telefono) <> ''
+       GROUP BY m.especie ORDER BY clientes DESC LIMIT 30`
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── GET /campanas — campañas por Meta ────────────────────────────────
+router.get('/campanas', async (req, res, next) => {
+  try {
+    let rows;
+    try {
+      rows = await req.db.query(
+        `SELECT c.id, c.nombre, c.mensaje, c.segmento, c.segmento_valor, c.estado, c.total, c.enviados, c.fallidos,
+                c.programada_at, c.iniciada_at, c.completada_at, c.created_at, p.nombre_meta AS plantilla
+         FROM wa_campanas c LEFT JOIN wa_meta_plantillas p ON p.id = c.meta_plantilla_id
+         WHERE c.proveedor = 'meta' ORDER BY c.id DESC LIMIT 100`
+      );
+    } catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
+    return res.json({ success: true, data: rows });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── POST /campanas — crea una campaña con una plantilla aprobada ─────
+//    body: { nombre, plantilla:'nombre|idioma', variables:[{tipo:'dato'|'fijo', valor}], segmento, segmento_valor, programada_at }
+router.post('/campanas', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const nombre = String(b.nombre || '').trim().slice(0, 150);
+    if (!nombre) return res.status(422).json({ success: false, message: 'Ponle un nombre a la campaña.' });
+    const segmento = String(b.segmento || 'todos');
+    if (!SEGMENTOS.includes(segmento)) return res.status(422).json({ success: false, message: 'Elige a quién enviar.' });
+    const segValor = segmento === 'por_especie' ? String(b.segmento_valor || '').trim() : null;
+    if (segmento === 'por_especie' && !segValor) return res.status(422).json({ success: false, message: 'Elige la especie.' });
+
+    let programada = null;
+    if (b.programada_at) {
+      programada = new Date(b.programada_at);
+      if (isNaN(programada)) return res.status(422).json({ success: false, message: 'Fecha de programación inválida.' });
+      if (programada < new Date(Date.now() - 5 * 60000)) return res.status(422).json({ success: false, message: 'La fecha programada ya pasó.' });
+    }
+
+    const [pNombre, pIdioma] = String(b.plantilla || '').split('|');
+    if (!/^[a-z0-9_]{1,512}$/.test(pNombre || '')) return res.status(422).json({ success: false, message: 'Elige una plantilla aprobada.' });
+
+    const { cfg, token, wabaId } = await cuentaConectada(req);
+    const t = (await plantillasMeta(cfg, token, wabaId, pNombre)).find(x => x.name === pNombre && (!pIdioma || x.language === pIdioma));
+    if (!t) return res.status(422).json({ success: false, message: 'La plantilla ya no existe en Meta.' });
+    if (t.status !== 'APPROVED') return res.status(422).json({ success: false, message: 'La plantilla todavía no está aprobada por Meta.' });
+    const vt = vistaPlantillaMeta(t);
+    if ((t.components || []).some(c => c.type === 'HEADER' && c.format && c.format !== 'TEXT')) {
+      return res.status(422).json({ success: false, message: 'Por ahora las campañas solo usan plantillas de texto (sin imagen).' });
+    }
+
+    const vars = Array.isArray(b.variables) ? b.variables : [];
+    if (vars.length < vt.variables) return res.status(422).json({ success: false, message: 'Indica qué va en cada variable de la plantilla.' });
+    const mapeo = [];
+    for (let i = 0; i < vt.variables; i++) {
+      const v = vars[i] || {};
+      if (v.tipo === 'dato' && DATOS_CAMPANA[v.valor]) mapeo.push({ tipo: 'dato', valor: v.valor });
+      else if (v.tipo === 'fijo' && String(v.valor || '').trim()) mapeo.push({ tipo: 'fijo', valor: String(v.valor).trim().replace(/\s+/g, ' ').slice(0, 200) });
+      else return res.status(422).json({ success: false, message: `Completa la variable {{${i + 1}}}.` });
+    }
+    const vista = vt.cuerpo.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => {
+      const m = mapeo[n - 1]; return !m ? '' : m.tipo === 'dato' ? `[${m.valor}]` : m.valor;
+    });
+
+    // Asegura la plantilla en la base de la clínica
+    let plantillaId;
+    try {
+      await req.db.query(
+        `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, cuerpo, meta_template_id, estado, es_estandar, activo)
+         VALUES (?,?,?, 'campana', ?,?, 'aprobada', 0, 1)
+         ON DUPLICATE KEY UPDATE categoria=VALUES(categoria), cuerpo=VALUES(cuerpo), meta_template_id=VALUES(meta_template_id),
+           estado='aprobada', activo=1`,
+        [t.name, t.language, ['UTILITY', 'MARKETING', 'AUTHENTICATION'].includes(t.category) ? t.category : 'MARKETING', vt.cuerpo, t.id]
+      );
+      const [fila] = await req.db.query('SELECT id FROM wa_meta_plantillas WHERE nombre_meta=? AND idioma=?', [t.name, t.language]);
+      plantillaId = fila.id;
+      const r = await req.db.query(
+        `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, estado, programada_at, proveedor, meta_plantilla_id, meta_variables)
+         VALUES (?,?,?,?,?,?, 'meta', ?, ?)`,
+        [nombre, vista, segmento, segValor, programada ? 'programada' : 'borrador', programada, plantillaId, JSON.stringify(mapeo)]
+      );
+      return res.status(201).json({ success: true, message: programada ? 'Campaña programada.' : 'Campaña creada.', data: { id: r.insertId } });
+    } catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── POST /campanas/:id/:accion — iniciar | pausar | reanudar | cancelar ──
+router.post('/campanas/:id/:accion', async (req, res, next) => {
+  try {
+    const acciones = {
+      iniciar : { desde: ['borrador'],                         sql: "estado='enviando', iniciada_at=IFNULL(iniciada_at, NOW())" },
+      pausar  : { desde: ['enviando', 'programada'],           sql: "estado='pausada', pausada_at=NOW()" },
+      reanudar: { desde: ['pausada'],                          sql: "estado='enviando', iniciada_at=IFNULL(iniciada_at, NOW())" },
+      cancelar: { desde: ['borrador', 'programada', 'enviando', 'pausada'], sql: "estado='cancelada'" },
+    };
+    const a = acciones[req.params.accion];
+    if (!a) return res.status(404).json({ success: false, message: 'Acción no válida.' });
+    const [c] = await req.db.query("SELECT id, estado FROM wa_campanas WHERE id=? AND proveedor='meta'", [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
+    if (!a.desde.includes(c.estado)) return res.status(422).json({ success: false, message: `No se puede ${req.params.accion} una campaña ${c.estado}.` });
+    if (req.params.accion !== 'pausar' && req.params.accion !== 'cancelar') await cuentaConectada(req);
+    await req.db.query(`UPDATE wa_campanas SET ${a.sql} WHERE id=?`, [c.id]);
+    const textos = { iniciar: 'Campaña iniciada.', pausar: 'Campaña pausada.', reanudar: 'Campaña reanudada.', cancelar: 'Campaña cancelada.' };
+    return res.json({ success: true, message: textos[req.params.accion] });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── DELETE /campanas/:id — solo borradores, canceladas o completadas ──
+router.delete('/campanas/:id', async (req, res, next) => {
+  try {
+    const [c] = await req.db.query("SELECT id, estado FROM wa_campanas WHERE id=? AND proveedor='meta'", [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
+    if (!['borrador', 'cancelada', 'completada'].includes(c.estado)) {
+      return res.status(422).json({ success: false, message: 'Pausa o cancela la campaña antes de eliminarla.' });
+    }
+    await req.db.query('DELETE FROM wa_campanas WHERE id=?', [c.id]);
+    return res.json({ success: true, message: 'Campaña eliminada.' });
+  } catch (err) { responderError(res, next, err); }
+});
+
+// ── GET /consumo — mensajes enviados por Meta en el mes ──────────────
+router.get('/consumo', async (req, res, next) => {
+  try {
+    const tenantId = await tenantIdDe(req);
+    const [g] = await masterQuery('SELECT meta_alerta_mensual FROM wa_config_global WHERE tenant_id=?', [tenantId]);
+    let porTipo = [];
+    try {
+      porTipo = await req.db.query(
+        `SELECT tipo, estado, COUNT(*) AS n FROM wa_mensajes_log
+         WHERE proveedor='meta' AND created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+         GROUP BY tipo, estado`
+      );
+    } catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
+    const ok = porTipo.filter(r => r.estado !== 'fallido');
+    const total = ok.reduce((a, r) => a + Number(r.n), 0);
+    const resumen = {};
+    for (const r of porTipo) {
+      resumen[r.tipo] = resumen[r.tipo] || { enviados: 0, fallidos: 0 };
+      if (r.estado === 'fallido') resumen[r.tipo].fallidos += Number(r.n); else resumen[r.tipo].enviados += Number(r.n);
+    }
+    const alerta = Number(g?.meta_alerta_mensual || 1000);
+    return res.json({ success: true, data: { mes: new Date().toISOString().slice(0, 7), total, alerta, supera: total >= alerta, por_tipo: resumen } });
+  } catch (err) { responderError(res, next, err); }
 });
 
 module.exports = router;

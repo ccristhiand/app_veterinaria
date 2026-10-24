@@ -63,6 +63,27 @@
     .wm-resultados { position:absolute; left:0; right:0; top:100%; margin-top:.25rem; background:#fff; border:1px solid var(--line); border-radius:.8rem; box-shadow:0 10px 25px rgba(0,0,0,.08); z-index:20; max-height:240px; overflow-y:auto; }
     .wm-resultados button { display:block; width:100%; text-align:left; padding:.55rem .8rem; border:none; background:none; font-family:inherit; font-size:.8rem; cursor:pointer; }
     .wm-resultados button:hover { background:#f8faf8; }
+    .wm-switch { display:inline-flex; align-items:center; gap:.55rem; cursor:pointer; font-size:.84rem; user-select:none; }
+    .wm-switch input { display:none; }
+    .wm-switch span { width:2.6rem; height:1.45rem; background:#cbd5e1; border-radius:999px; position:relative; transition:background .2s; }
+    .wm-switch span::after { content:''; position:absolute; top:.17rem; left:.17rem; width:1.1rem; height:1.1rem; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+    .wm-switch input:checked + span { background:#25d366; }
+    .wm-switch input:checked + span::after { transform:translateX(1.15rem); }
+    .wm-rc-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:.8rem; margin-top:1rem; }
+    .wm-rc-grid.apagado { opacity:.45; pointer-events:none; }
+    .wm-rc { border:1px solid var(--line); border-radius:.9rem; padding:.8rem .9rem; display:flex; flex-direction:column; gap:.55rem; }
+    .wm-rc-tit { font-weight:700; font-size:.86rem; display:flex; align-items:center; gap:.45rem; cursor:pointer; }
+    .wm-rc-campos { display:flex; flex-direction:column; gap:.4rem; font-size:.78rem; color:var(--ink-soft); }
+    .wm-rc-campos label { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+    .wm-num { width:4.6rem !important; padding:.35rem .5rem !important; text-align:center; }
+    .wm-opc { font-size:.7rem; color:var(--ink-faint); }
+    .wm-cp { background:#fff; border:1px solid var(--line); border-radius:1rem; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.6rem; }
+    .wm-barra { height:.5rem; background:#f1f5f9; border-radius:999px; overflow:hidden; }
+    .wm-barra > div { height:100%; background:linear-gradient(90deg,#25d366,#128c7e); border-radius:999px; transition:width .4s; }
+    .wm-b-azul { background:#dbeafe; color:#1d4ed8; }
+    .wm-tabla { width:100%; border-collapse:collapse; font-size:.8rem; }
+    .wm-tabla th { text-align:left; font-size:.7rem; color:var(--ink-faint); font-weight:600; padding:.45rem .5rem; border-bottom:1px solid var(--line); }
+    .wm-tabla td { padding:.5rem; border-bottom:1px solid #f1f5f9; }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -80,9 +101,10 @@
     <button class="wm-tab activo" data-tab="conexion" onclick="cambiarTab('conexion')">🔗 Conexión</button>
     <button class="wm-tab" data-tab="plantillas" disabled onclick="cambiarTab('plantillas')">📝 Plantillas <span class="pronto" data-req>Conecta primero</span></button>
     <button class="wm-tab" data-tab="envio" disabled onclick="cambiarTab('envio')">✉️ Envío manual <span class="pronto" data-req>Conecta primero</span></button>
-    <button class="wm-tab" data-tab="campanas" disabled>📣 Campañas <span class="pronto">Pronto</span></button>
+    <button class="wm-tab" data-tab="recordatorios" disabled onclick="cambiarTab('recordatorios')">⏰ Recordatorios <span class="pronto" data-req>Conecta primero</span></button>
+    <button class="wm-tab" data-tab="campanas" disabled onclick="cambiarTab('campanas')">📣 Campañas <span class="pronto" data-req>Conecta primero</span></button>
+    <button class="wm-tab" data-tab="consumo" disabled onclick="cambiarTab('consumo')">📊 Consumo <span class="pronto" data-req>Conecta primero</span></button>
     <button class="wm-tab" data-tab="bandeja" disabled>💬 Bandeja <span class="pronto">Pronto</span></button>
-    <button class="wm-tab" data-tab="consumo" disabled>📊 Consumo <span class="pronto">Pronto</span></button>
   </div>
 
   <!-- ── Pestaña Conexión ─────────────────────────────────────── -->
@@ -234,6 +256,196 @@
       </div>
     </div>
   </section>
+
+  <!-- ── Pestaña Recordatorios ────────────────────────────────── -->
+  <section id="tab-recordatorios" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+    <div class="vcard vcard-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+        <div>
+          <p style="font-weight:800;font-size:1rem">Envío automático</p>
+          <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.15rem">El sistema revisa cada 30 minutos y envía los recordatorios por Meta con su plantilla aprobada.</p>
+        </div>
+        <label class="wm-switch"><input type="checkbox" id="rc-activo" onchange="pintarFormRecordatorios()"/><span></span> <b id="rc-activo-txt">Apagado</b></label>
+      </div>
+      <div id="rc-form" class="wm-rc-grid">
+        <div class="wm-rc">
+          <label class="wm-rc-tit"><input type="checkbox" id="rc-citas"/> 📅 Citas</label>
+          <div class="wm-rc-campos">
+            <label>Primer aviso <input type="number" min="1" max="168" id="rc-citas-h" class="vinput wm-num"/> horas antes</label>
+            <label>Segundo aviso <input type="number" min="1" max="168" id="rc-citas-h2" class="vinput wm-num" placeholder="—"/> horas antes <span class="wm-opc">(opcional)</span></label>
+          </div>
+        </div>
+        <div class="wm-rc">
+          <label class="wm-rc-tit"><input type="checkbox" id="rc-vacunas"/> 💉 Vacunas</label>
+          <div class="wm-rc-campos">
+            <label>Primer aviso <input type="number" min="1" max="60" id="rc-vac-d" class="vinput wm-num"/> días antes</label>
+            <label>Segundo aviso <input type="number" min="1" max="60" id="rc-vac-d2" class="vinput wm-num" placeholder="—"/> días antes <span class="wm-opc">(opcional)</span></label>
+          </div>
+        </div>
+        <div class="wm-rc">
+          <label class="wm-rc-tit"><input type="checkbox" id="rc-desp"/> 🐛 Desparasitaciones</label>
+          <div class="wm-rc-campos"><p class="wm-opc" style="margin:0">Usa los mismos días de aviso que las vacunas.</p></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="vbtn vbtn-primary" id="rc-btn" onclick="guardarRecordatorios()">💾 Guardar</button>
+      </div>
+    </div>
+
+    <div class="vcard vcard-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+        <div>
+          <p style="font-weight:800;font-size:1rem">Plantillas de los recordatorios</p>
+          <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.15rem">
+            Se arman con los mismos textos que ya usas en WhatsApp. Meta debe aprobar cada una (de minutos a 24 horas).
+            Un recordatorio sin plantilla aprobada <b>no se envía</b>.
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="vbtn vbtn-ghost" onclick="cargarPlantillasSistema(true)">🔄 Actualizar</button>
+          <button class="vbtn vbtn-primary" id="ps-btn-todas" onclick="enviarPlantillasSistema()">📨 Enviar todas a revisión</button>
+        </div>
+      </div>
+      <div id="ps-resumen" style="margin-top:.8rem"></div>
+      <div id="ps-lista" class="wm-grid-pl" style="margin-top:1rem"></div>
+    </div>
+  </section>
+
+  <!-- ── Pestaña Campañas ─────────────────────────────────────── -->
+  <section id="tab-campanas" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+    <div class="vcard vcard-pad">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap">
+        <div>
+          <p style="font-weight:800;font-size:1rem">Campañas</p>
+          <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.15rem">
+            Envía una plantilla aprobada a un grupo de clientes. Meta cobra cada mensaje de marketing a la cuenta de tu negocio.
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="vbtn vbtn-ghost" onclick="cargarCampanas()">🔄 Actualizar</button>
+          <button class="vbtn vbtn-primary" onclick="abrirNuevaCampana()">＋ Nueva campaña</button>
+        </div>
+      </div>
+    </div>
+    <div id="cp-lista" style="display:flex;flex-direction:column;gap:.8rem"></div>
+  </section>
+
+  <!-- ── Pestaña Consumo ──────────────────────────────────────── -->
+  <section id="tab-consumo" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+    <div class="vcard vcard-pad" id="cs-panel"></div>
+  </section>
+</div>
+
+<!-- ══ Modal editar texto de recordatorio ═══════════════════════ -->
+<div id="modal-texto-rc" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:820px">
+    <div class="vmodal-head">
+      <h3 id="trc-titulo">✏️ Editar texto</h3>
+      <button onclick="closeModal('modal-texto-rc')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div class="wm-pl-form">
+        <div style="display:flex;flex-direction:column;gap:.8rem">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <label class="vlabel" style="margin:0">Mensaje</label>
+              <div id="trc-chips" style="display:flex;gap:.3rem;flex-wrap:wrap"></div>
+            </div>
+            <textarea id="trc-texto" rows="6" class="vinput" maxlength="1024" style="margin-top:.4rem" oninput="previaTextoRc()"></textarea>
+            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">
+              Usa las etiquetas entre corchetes: el sistema las cambia por los datos de cada cliente. [clinica] y [telefono] se escriben con los datos de tu clínica.
+            </p>
+          </div>
+          <div id="trc-problemas" class="wm-aviso hidden" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e"></div>
+          <p style="font-size:.72rem;color:#92400e;background:#fffbeb;border-radius:.6rem;padding:.5rem .7rem">
+            Para que Meta la apruebe como <b>Utilidad</b> (más barata): solo información del recordatorio, sin promociones ni descuentos.
+          </p>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:.78rem;margin-bottom:.6rem;color:var(--ink-soft)">Así lo verá tu cliente</p>
+          <div class="wm-chat"><div class="wm-burbuja" id="trc-previa"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="restaurarTextoRc()" class="vbtn vbtn-ghost" style="margin-right:auto">↺ Texto sugerido</button>
+      <button onclick="closeModal('modal-texto-rc')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarTextoRc()" id="trc-btn" class="vbtn vbtn-primary">📨 Enviar a revisión</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal nueva campaña ═══════════════════════════════════════ -->
+<div id="modal-campana" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:860px">
+    <div class="vmodal-head">
+      <h3>📣 Nueva campaña</h3>
+      <button onclick="closeModal('modal-campana')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <div class="wm-pl-form">
+        <div style="display:flex;flex-direction:column;gap:.85rem">
+          <div>
+            <label class="vlabel">Nombre de la campaña *</label>
+            <input id="cp-nombre" class="vinput" maxlength="150" placeholder="Ej. Campaña de vacunación de noviembre"/>
+          </div>
+          <div>
+            <label class="vlabel">Plantilla aprobada *</label>
+            <select id="cp-plantilla" class="vinput" onchange="elegirPlantillaCampana()"></select>
+            <p id="cp-pl-aviso" class="hidden" style="font-size:.7rem;color:#b45309;margin-top:.3rem"></p>
+          </div>
+          <div id="cp-variables" style="display:flex;flex-direction:column;gap:.55rem"></div>
+          <div>
+            <label class="vlabel">¿A quién enviar? *</label>
+            <select id="cp-segmento" class="vinput" onchange="cambiarSegmento()">
+              <option value="todos">Todos los clientes con teléfono</option>
+              <option value="por_especie">Clientes con mascotas de una especie</option>
+              <option value="vacunas_vencidas">Clientes con vacunas vencidas</option>
+              <option value="citas_semana">Clientes con cita en los próximos 7 días</option>
+              <option value="sin_citas_60d">Clientes sin citas en los últimos 60 días</option>
+            </select>
+            <select id="cp-especie" class="vinput hidden" style="margin-top:.5rem" onchange="contarDestinatarios()"></select>
+            <p id="cp-total" style="font-size:.76rem;color:var(--ink-soft);margin-top:.35rem"></p>
+          </div>
+          <div>
+            <label style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;cursor:pointer">
+              <input type="checkbox" id="cp-programar" onchange="document.getElementById('cp-fecha').classList.toggle('hidden', !this.checked)"/> Programar para más tarde
+            </label>
+            <input type="datetime-local" id="cp-fecha" class="vinput hidden" style="margin-top:.4rem"/>
+          </div>
+          <div id="cp-msg" class="wm-aviso hidden"></div>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:.78rem;margin-bottom:.6rem;color:var(--ink-soft)">Vista previa (con un cliente de ejemplo)</p>
+          <div class="wm-chat"><div class="wm-burbuja" id="cp-previa">Elige una plantilla…</div></div>
+          <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.6rem">
+            Se envía entre la hora de inicio y fin de campañas configurada en tu clínica, con un máximo de 250 clientes por día
+            (el límite de Meta para números nuevos).
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-campana')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="crearCampana(false)" id="cp-btn-borrador" class="vbtn vbtn-ghost">Guardar borrador</button>
+      <button onclick="crearCampana(true)" id="cp-btn-crear" class="vbtn vbtn-primary">📤 Crear y enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal confirmar acción de campaña ════════════════════════ -->
+<div id="modal-cp-accion" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:440px">
+    <div class="vmodal-head">
+      <h3 id="cpa-titulo">Confirmar</h3>
+      <button onclick="closeModal('modal-cp-accion')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body"><p style="font-size:.86rem" id="cpa-texto"></p></div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-cp-accion')" class="vbtn vbtn-ghost">No</button>
+      <button onclick="confirmarAccionCampana()" id="cpa-btn" class="vbtn vbtn-primary">Sí</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══ Modal registrar número ════════════════════════════════════ -->
@@ -715,9 +927,10 @@ async function registrarNumero() {
 
 // ══ Pestañas ══════════════════════════════════════════════════════
 var _tabActual = 'conexion';
+var TABS_CONECTADO = ['plantillas', 'envio', 'recordatorios', 'campanas', 'consumo'];
 
 function habilitarPestanas(conectado) {
-  ['plantillas', 'envio'].forEach(function(t) {
+  TABS_CONECTADO.forEach(function(t) {
     var b = document.querySelector('.wm-tab[data-tab="' + t + '"]');
     if (!b) return;
     b.disabled = !conectado;
@@ -732,12 +945,15 @@ function cambiarTab(tab) {
   if (!b || b.disabled) return;
   _tabActual = tab;
   document.querySelectorAll('.wm-tab').forEach(function(x) { x.classList.toggle('activo', x.dataset.tab === tab); });
-  ['conexion', 'plantillas', 'envio'].forEach(function(t) {
+  ['conexion'].concat(TABS_CONECTADO).forEach(function(t) {
     var s = document.getElementById('tab-' + t);
     if (s) s.classList.toggle('hidden', t !== tab);
   });
   if (tab === 'plantillas') cargarPlantillas();
   if (tab === 'envio') prepararEnvio();
+  if (tab === 'recordatorios') cargarRecordatorios();
+  if (tab === 'campanas') cargarCampanas();
+  if (tab === 'consumo') cargarConsumo();
 }
 
 // ══ Utilidades de plantillas ══════════════════════════════════════
@@ -801,14 +1017,21 @@ async function cargarPlantillas() {
 
 function pintarPlantillas() {
   var cont = document.getElementById('pl-lista');
-  if (!_plantillas.length) {
-    cont.innerHTML = '<div class="vcard vcard-pad" style="grid-column:1/-1;text-align:center;padding:2.5rem 1rem">' +
-      '<p style="font-size:2rem">📝</p><p style="font-weight:700;margin-top:.4rem">Aún no tienes plantillas</p>' +
-      '<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.3rem">Crea tu primera plantilla para enviar recordatorios a tus clientes.</p>' +
+  var nSistema = _plantillas.filter(function(p) { return p.es_estandar; }).length;
+  var aviso = '<div class="vcard vcard-pad" style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;background:#f0fdf4;border-color:#bbf7d0">' +
+    '<p style="font-size:.8rem;color:#166534">⏰ Las plantillas de los <b>recordatorios automáticos</b> (citas, vacunas, desparasitaciones)' +
+    (nSistema ? ' (' + nSistema + ')' : '') + ' se manejan en la pestaña Recordatorios.</p>' +
+    '<button class="vbtn vbtn-ghost" style="font-size:.76rem" onclick="cambiarTab(\'recordatorios\')">Ir a Recordatorios</button></div>';
+  var propias = _plantillas.filter(function(p) { return !p.es_estandar; });
+  if (!propias.length) {
+    cont.innerHTML = aviso + '<div class="vcard vcard-pad" style="grid-column:1/-1;text-align:center;padding:2.5rem 1rem">' +
+      '<p style="font-size:2rem">📝</p><p style="font-weight:700;margin-top:.4rem">Aún no tienes plantillas propias</p>' +
+      '<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.3rem">Crea plantillas para campañas (Marketing) o avisos puntuales (Utilidad).</p>' +
       '<button class="vbtn vbtn-primary" style="margin-top:1rem" onclick="abrirNuevaPlantilla()">＋ Nueva plantilla</button></div>';
     return;
   }
-  cont.innerHTML = _plantillas.map(function(p, i) {
+  cont.innerHTML = aviso + _plantillas.map(function(p, i) {
+    if (p.es_estandar) return '';
     var est = ESTADOS_PL[p.estado] || [p.estado, 'wm-b-gris'];
     var cat = p.categoria === 'MARKETING' ? ['Marketing', 'wm-b-mkt'] : p.categoria === 'UTILITY' ? ['Utilidad', 'wm-b-util'] : [p.categoria, 'wm-b-gris'];
     var motivo = p.motivo_rechazo ? (MOTIVOS_RECHAZO[p.motivo_rechazo] || p.motivo_rechazo) : '';
@@ -1150,6 +1373,550 @@ async function enviarMensaje() {
   } finally {
     btn.disabled = false; btn.textContent = '📤 Enviar';
   }
+}
+
+// ══ Pestaña Recordatorios ═════════════════════════════════════════
+var _ps = [];                 // plantillas de recordatorios (del sistema)
+var _psClinica = { nombre: '', telefono: '' };
+var EJEMPLO_DATO = { nombre: 'María López', mascota: 'Firulais', fecha: '25 de octubre de 2026', hora: '10:30 a. m.', vacuna: 'Rabia', producto: 'Bravecto' };
+var ESTADO_SISTEMA = {
+  sin_crear: ['No creada', 'wm-b-gris'], borrador: ['No creada', 'wm-b-gris'], pendiente: ['En revisión', 'wm-b-pend'],
+  aprobada: ['Aprobada', 'wm-b-ok'], rechazada: ['Rechazada', 'wm-b-mal'], pausada: ['Pausada por Meta', 'wm-b-mal'],
+  deshabilitada: ['Deshabilitada', 'wm-b-gris'],
+};
+
+async function cargarRecordatorios() {
+  cargarPlantillasSistema(true);
+  try {
+    var res = await api('/wa-meta/recordatorios');
+    if (!res || !res.ok) return;
+    var d = (await res.json()).data;
+    document.getElementById('rc-activo').checked = !!Number(d.activo);
+    document.getElementById('rc-citas').checked = !!Number(d.recordatorio_citas_activo);
+    document.getElementById('rc-citas-h').value = d.recordatorio_citas_horas || 24;
+    document.getElementById('rc-citas-h2').value = d.recordatorio_citas_horas2 || '';
+    document.getElementById('rc-vacunas').checked = !!Number(d.recordatorio_vacunas_activo);
+    document.getElementById('rc-vac-d').value = d.recordatorio_vacunas_dias || 7;
+    document.getElementById('rc-vac-d2').value = d.recordatorio_vacunas_dias2 || '';
+    document.getElementById('rc-desp').checked = !!Number(d.recordatorio_desparasitaciones_activo);
+    pintarFormRecordatorios();
+  } catch (e) {}
+}
+
+function pintarFormRecordatorios() {
+  var on = document.getElementById('rc-activo').checked;
+  document.getElementById('rc-activo-txt').textContent = on ? 'Encendido' : 'Apagado';
+  document.getElementById('rc-form').classList.toggle('apagado', !on);
+}
+
+async function guardarRecordatorios() {
+  var btn = document.getElementById('rc-btn');
+  var v = function(id) { return document.getElementById(id).value.trim(); };
+  var body = {
+    activo: document.getElementById('rc-activo').checked,
+    recordatorio_citas_activo: document.getElementById('rc-citas').checked,
+    recordatorio_citas_horas: v('rc-citas-h'), recordatorio_citas_horas2: v('rc-citas-h2') || null,
+    recordatorio_vacunas_activo: document.getElementById('rc-vacunas').checked,
+    recordatorio_vacunas_dias: v('rc-vac-d'), recordatorio_vacunas_dias2: v('rc-vac-d2') || null,
+    recordatorio_desparasitaciones_activo: document.getElementById('rc-desp').checked,
+  };
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    var res = await api('/wa-meta/recordatorios', { method: 'PUT', body: body });
+    if (!res) return;
+    var data = await res.json();
+    toast(res.ok ? '✅ Recordatorios guardados' : (data.message || 'No se pudo guardar.'), res.ok ? 'success' : 'error');
+  } catch (e) { toast('Error de conexión: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+}
+
+// {{n}} → [dato] (para editar con etiquetas)
+function cuerpoAEtiquetas(cuerpo, variables) {
+  var t = String(cuerpo || '').replace(/\{\{\s*(\d+)\s*\}\}/g, function(_, n) { return '[' + (variables[n - 1] || 'dato') + ']'; });
+  if (_psClinica.nombre) t = t.split(_psClinica.nombre).join('[clinica]');
+  if (_psClinica.telefono) t = t.split(_psClinica.telefono).join('[telefono]');
+  return t;
+}
+
+async function cargarPlantillasSistema(sincronizar) {
+  var cont = document.getElementById('ps-lista');
+  cont.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--ink-faint);font-size:.8rem;padding:1rem"><span class="wm-spin" style="border-color:#cbd5e1;border-top-color:#25d366"></span> Consultando a Meta…</p>';
+  try {
+    if (sincronizar) {   // trae el estado actual desde Meta (aprobada, rechazada…)
+      var r1 = await api('/wa-meta/plantillas');
+      if (r1 && r1.ok) _plantillas = (await r1.json()).data || [];
+    }
+    var res = await api('/wa-meta/plantillas-sistema');
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) {
+      cont.innerHTML = '<p style="grid-column:1/-1;color:#be123c;font-size:.84rem">❌ ' + esc(data.message || 'No se pudieron cargar.') + '</p>';
+      document.getElementById('ps-resumen').innerHTML = '';
+      return;
+    }
+    _ps = data.data || [];
+    _psClinica = data.clinica || _psClinica;
+    pintarPlantillasSistema();
+  } catch (e) {
+    cont.innerHTML = '<p style="grid-column:1/-1;color:#be123c">Error de conexión: ' + esc(e.message) + '</p>';
+  }
+}
+
+function pintarPlantillasSistema() {
+  var aprobadas = _ps.filter(function(x) { return x.meta && x.meta.estado === 'aprobada'; }).length;
+  var res = document.getElementById('ps-resumen');
+  if (aprobadas === _ps.length && _ps.length) {
+    res.innerHTML = '<div class="wm-aviso" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534">✅ Las ' + _ps.length + ' plantillas están aprobadas: todos los recordatorios se pueden enviar.</div>';
+  } else {
+    var sinCrear = _ps.filter(function(x) { return !x.meta; }).length;
+    res.innerHTML = '<div class="wm-aviso" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e">⚠️ ' + aprobadas + ' de ' + _ps.length +
+      ' plantillas aprobadas. Los recordatorios sin plantilla aprobada no se envían.' +
+      (sinCrear ? ' Pulsa <b>«Enviar todas a revisión»</b> para crearlas.' : '') + '</div>';
+  }
+  document.getElementById('ps-btn-todas').disabled = aprobadas === _ps.length;
+
+  document.getElementById('ps-lista').innerHTML = _ps.map(function(x, i) {
+    var estado = x.meta ? x.meta.estado : 'sin_crear';
+    var est = ESTADO_SISTEMA[estado] || [estado, 'wm-b-gris'];
+    var cuerpo = x.meta ? x.meta.cuerpo : x.propuesta.cuerpo;
+    var vars = x.meta ? x.meta.variables : x.propuesta.variables;
+    var ejemplos = (vars || []).map(function(k) { return EJEMPLO_DATO[k] || k; });
+    var nota = '';
+    if (!x.meta) {
+      nota = x.propuesta.origen === 'clinica'
+        ? '<p style="font-size:.7rem;color:var(--ink-faint)">Basada en tu texto de WhatsApp.</p>'
+        : '<p style="font-size:.7rem;color:#b45309">Texto sugerido: el tuyo no cumple las reglas de Meta (o no existe). Puedes editarlo.</p>';
+    }
+    var motivo = x.meta && x.meta.motivo_rechazo ? (MOTIVOS_RECHAZO[x.meta.motivo_rechazo] || x.meta.motivo_rechazo) : '';
+    var reenviar = !x.meta || ['rechazada', 'pausada', 'deshabilitada', 'borrador'].indexOf(estado) >= 0;
+    var botones = estado === 'pendiente'
+      ? '<span style="font-size:.72rem;color:#a16207">⏳ Esperando la revisión de Meta…</span>'
+      : '<button class="vbtn vbtn-ghost" style="font-size:.74rem" onclick="abrirTextoRc(' + i + ')">✏️ Editar texto</button>' +
+        (reenviar ? '<button class="vbtn vbtn-primary" style="font-size:.74rem" onclick="enviarPlantillasSistema(\'' + x.uso + '\')">📨 Enviar a revisión</button>' : '');
+    return '<div class="wm-pl">' +
+      '<div class="wm-pl-top"><p style="font-weight:700;font-size:.86rem">' + esc(x.titulo) + '</p>' +
+      '<span class="wm-badge ' + est[1] + '">' + esc(est[0]) + '</span></div>' +
+      '<div class="wm-chat" style="min-height:0;padding:.7rem"><div class="wm-burbuja">' + burbuja('', cuerpo, '', ejemplos) + '</div></div>' +
+      nota +
+      (motivo ? '<p style="font-size:.74rem;color:#b91c1c;background:#fff1f2;border-radius:.6rem;padding:.45rem .65rem">Motivo: ' + esc(motivo) + '. Corrige el texto y vuelve a enviarla.</p>' : '') +
+      (x.meta && x.meta.categoria === 'MARKETING' ? '<p style="font-size:.7rem;color:#7e22ce">Meta la clasificó como Marketing (se cobra a tarifa de marketing).</p>' : '') +
+      '<div style="display:flex;justify-content:flex-end;align-items:center;gap:.4rem;margin-top:auto;flex-wrap:wrap">' + botones + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+async function enviarPlantillasSistema(uso, texto) {
+  var btn = uso ? null : document.getElementById('ps-btn-todas');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    var body = {};
+    if (uso) body.uso = uso;
+    if (texto) body.texto = texto;
+    var res = await api('/wa-meta/plantillas-sistema', { method: 'POST', body: body });
+    if (!res) return false;
+    var data = await res.json();
+    var errores = (data.data || []).filter(function(r) { return !r.ok; });
+    if (errores.length) {
+      var titulos = {};
+      _ps.forEach(function(x) { titulos[x.uso] = x.titulo; });
+      toast(data.message || 'Algunas plantillas no se enviaron.', 'error');
+      if (!texto) {
+        document.getElementById('ps-resumen').innerHTML = '<div class="wm-aviso" style="background:#fff1f2;border:1px solid #fecdd3;color:#be123c">' +
+          errores.map(function(r) { return '❌ <b>' + esc(titulos[r.uso] || r.uso) + ':</b> ' + esc(r.message); }).join('<br>') + '</div>';
+      }
+    } else {
+      toast('📨 ' + (data.message || 'Enviado a revisión de Meta'), 'success');
+    }
+    if (!texto || !errores.length) await cargarPlantillasSistema(false);
+    return errores.length ? (errores[0].message || 'Error') : true;
+  } catch (e) {
+    toast('Error de conexión: ' + e.message, 'error');
+    return e.message;
+  } finally {
+    if (btn) { btn.textContent = '📨 Enviar todas a revisión'; }
+  }
+}
+
+// ── Editar el texto de un recordatorio ───────────────────────────
+var _trc = null;
+function abrirTextoRc(i) {
+  _trc = _ps[i]; if (!_trc) return;
+  document.getElementById('trc-titulo').textContent = '✏️ ' + _trc.titulo;
+  var base = _trc.meta ? cuerpoAEtiquetas(_trc.meta.cuerpo, _trc.meta.variables) : cuerpoAEtiquetas(_trc.propuesta.cuerpo, _trc.propuesta.variables);
+  document.getElementById('trc-texto').value = base;
+  var chips = _trc.datos.map(function(d) { return { clave: d.clave, etiqueta: d.etiqueta }; });
+  chips.push({ clave: 'clinica', etiqueta: 'Clínica' });
+  if (_psClinica.telefono) chips.push({ clave: 'telefono', etiqueta: 'Teléfono' });
+  document.getElementById('trc-chips').innerHTML = chips.map(function(c) {
+    return '<button type="button" class="wm-chip" onclick="insertarEtiquetaRc(\'' + c.clave + '\')">＋ ' + esc(c.etiqueta) + '</button>';
+  }).join('');
+  previaTextoRc();
+  openModal('modal-texto-rc');
+}
+
+function insertarEtiquetaRc(clave) {
+  var ta = document.getElementById('trc-texto');
+  var ini = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+  var fin = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
+  var antes = ta.value.slice(0, ini), despues = ta.value.slice(fin);
+  var ins = (antes && !/\s$/.test(antes) ? ' ' : '') + '[' + clave + ']' + (despues && !/^[\s.,!?]/.test(despues) ? ' ' : '');
+  ta.value = antes + ins + despues;
+  ta.focus(); ta.selectionStart = ta.selectionEnd = (antes + ins).length;
+  previaTextoRc();
+}
+
+function restaurarTextoRc() {
+  if (!_trc) return;
+  document.getElementById('trc-texto').value = cuerpoAEtiquetas(_trc.propuesta.cuerpo, _trc.propuesta.variables);
+  previaTextoRc();
+}
+
+// Convierte las etiquetas como lo hará el servidor y revisa las reglas de Meta
+function convertirTextoRc(texto) {
+  var permitidos = _trc.datos.map(function(d) { return d.clave; });
+  var desconocidas = [];
+  var vars = [];
+  var t = String(texto || '').replace(/\[clinica\]/gi, _psClinica.nombre || 'tu clínica');
+  if (_psClinica.telefono) t = t.replace(/\[telefono\]/gi, _psClinica.telefono);
+  t = t.replace(/\[([a-z_]+)\]/gi, function(m, k) {
+    k = k.toLowerCase();
+    if (permitidos.indexOf(k) < 0) { desconocidas.push(m); return ''; }
+    var i = vars.indexOf(k); if (i < 0) { vars.push(k); i = vars.length - 1; }
+    return '{{' + (i + 1) + '}}';
+  }).replace(/[ \t]{2,}/g, ' ').replace(/ +([.,!?])/g, '$1').trim();
+  var p = [];
+  if (!t) p.push('Escribe el mensaje.');
+  if (desconocidas.length) p.push('Este recordatorio no tiene el dato ' + desconocidas.join(', ') + '. Usa los botones de arriba.');
+  if (/^\{\{\s*\d+\s*\}\}/.test(t)) p.push('El mensaje no puede empezar con un dato del cliente (ej. «Hola [nombre]…»).');
+  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿*_]*$/.test(t)) p.push('El mensaje no puede terminar con un dato del cliente: agrega texto al final.');
+  if (/\{\{\s*\d+\s*\}\}[\s*_]*\{\{\s*\d+\s*\}\}/.test(t)) p.push('No pongas dos datos seguidos: escribe texto entre ellos.');
+  var palabras = t.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
+  if (vars.length && palabras < vars.length * 2 + 1) p.push('Hay demasiados datos para tan poco texto.');
+  return { cuerpo: t, vars: vars, problemas: p };
+}
+
+function previaTextoRc() {
+  var c = convertirTextoRc(document.getElementById('trc-texto').value);
+  document.getElementById('trc-previa').innerHTML = burbuja('', c.cuerpo, '', c.vars.map(function(k) { return EJEMPLO_DATO[k] || k; }));
+  var box = document.getElementById('trc-problemas');
+  if (c.problemas.length) { box.classList.remove('hidden'); box.innerHTML = c.problemas.map(function(x) { return '• ' + esc(x); }).join('<br>'); }
+  else box.classList.add('hidden');
+  document.getElementById('trc-btn').disabled = c.problemas.length > 0;
+}
+
+async function guardarTextoRc() {
+  if (!_trc) return;
+  var texto = document.getElementById('trc-texto').value.trim();
+  if (convertirTextoRc(texto).problemas.length) return;
+  var btn = document.getElementById('trc-btn');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  var r = await enviarPlantillasSistema(_trc.uso, texto);
+  btn.disabled = false; btn.textContent = '📨 Enviar a revisión';
+  if (r === true) { closeModal('modal-texto-rc'); }
+  else {
+    var box = document.getElementById('trc-problemas');
+    box.classList.remove('hidden'); box.innerHTML = '❌ ' + esc(r);
+  }
+}
+
+// ══ Pestaña Campañas ══════════════════════════════════════════════
+var _campanas = [];
+var _cpTimer = null;
+var SEGMENTO_TXT = {
+  todos: 'Todos los clientes', por_especie: 'Mascotas de especie', vacunas_vencidas: 'Con vacunas vencidas',
+  citas_semana: 'Con cita en 7 días', sin_citas_60d: 'Sin citas en 60 días', personalizado: 'Selección manual',
+};
+var ESTADO_CAMPANA = {
+  borrador: ['Borrador', 'wm-b-gris'], programada: ['Programada', 'wm-b-azul'], enviando: ['Enviando', 'wm-b-pend'],
+  pausada: ['Pausada', 'wm-b-gris'], completada: ['Completada', 'wm-b-ok'], cancelada: ['Cancelada', 'wm-b-mal'],
+};
+var DATO_CAMPANA_TXT = { nombre: 'Nombre del cliente', mascota: 'Mascota(s)', clinica: 'Nombre de la clínica' };
+
+function fechaCorta(v) {
+  if (!v) return '';
+  var d = new Date(v);
+  return isNaN(d) ? '' : d.toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+async function cargarCampanas() {
+  clearTimeout(_cpTimer);
+  var cont = document.getElementById('cp-lista');
+  try {
+    var res = await api('/wa-meta/campanas');
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { cont.innerHTML = '<div class="vcard vcard-pad" style="color:#be123c">❌ ' + esc(data.message || 'No se pudieron cargar.') + '</div>'; return; }
+    _campanas = data.data || [];
+    pintarCampanas();
+    // Mientras haya campañas enviándose, se actualiza sola
+    if (_tabActual === 'campanas' && _campanas.some(function(c) { return c.estado === 'enviando'; })) {
+      _cpTimer = setTimeout(cargarCampanas, 10000);
+    }
+  } catch (e) { cont.innerHTML = '<div class="vcard vcard-pad" style="color:#be123c">Error de conexión: ' + esc(e.message) + '</div>'; }
+}
+
+function pintarCampanas() {
+  var cont = document.getElementById('cp-lista');
+  if (!_campanas.length) {
+    cont.innerHTML = '<div class="vcard vcard-pad" style="text-align:center;padding:2.5rem 1rem"><p style="font-size:2rem">📣</p>' +
+      '<p style="font-weight:700;margin-top:.4rem">Aún no tienes campañas por Meta</p>' +
+      '<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.3rem">Primero crea y aprueba una plantilla de Marketing en la pestaña Plantillas.</p>' +
+      '<button class="vbtn vbtn-primary" style="margin-top:1rem" onclick="abrirNuevaCampana()">＋ Nueva campaña</button></div>';
+    return;
+  }
+  cont.innerHTML = _campanas.map(function(c) {
+    var est = ESTADO_CAMPANA[c.estado] || [c.estado, 'wm-b-gris'];
+    var pct = c.total > 0 ? Math.round((c.enviados + c.fallidos) / c.total * 100) : 0;
+    var seg = (SEGMENTO_TXT[c.segmento] || c.segmento) + (c.segmento === 'por_especie' && c.segmento_valor ? ': ' + c.segmento_valor : '');
+    var b = function(txt, acc, prim) { return '<button class="vbtn ' + (prim ? 'vbtn-primary' : 'vbtn-ghost') + '" style="font-size:.74rem" onclick="accionCampana(' + c.id + ',\'' + acc + '\')">' + txt + '</button>'; };
+    var botones = {
+      borrador  : b('📤 Enviar ahora', 'iniciar', true) + b('🗑️ Eliminar', 'eliminar'),
+      programada: b('⏸ Pausar', 'pausar') + b('✕ Cancelar', 'cancelar'),
+      enviando  : b('⏸ Pausar', 'pausar'),
+      pausada   : b('▶ Reanudar', 'reanudar', true) + b('✕ Cancelar', 'cancelar'),
+      completada: b('🗑️ Eliminar', 'eliminar'),
+      cancelada : b('🗑️ Eliminar', 'eliminar'),
+    }[c.estado] || '';
+    return '<div class="wm-cp">' +
+      '<div style="display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap">' +
+      '<div><p style="font-weight:800;font-size:.92rem">' + esc(c.nombre) + '</p>' +
+      '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.15rem">Plantilla: <span style="font-family:monospace">' + esc(c.plantilla || '—') + '</span> · ' + esc(seg) +
+      (c.estado === 'programada' && c.programada_at ? ' · 🗓 ' + esc(fechaCorta(c.programada_at)) : '') + '</p></div>' +
+      '<span class="wm-badge ' + est[1] + '">' + esc(est[0]) + '</span></div>' +
+      '<p style="font-size:.78rem;color:var(--ink-soft);background:#f8faf8;border-radius:.6rem;padding:.5rem .7rem;white-space:pre-wrap">' + esc(c.mensaje) + '</p>' +
+      (c.total > 0
+        ? '<div><div class="wm-barra"><div style="width:' + pct + '%"></div></div>' +
+          '<p style="font-size:.72rem;color:var(--ink-soft);margin-top:.3rem">✅ ' + c.enviados + ' enviados · ❌ ' + c.fallidos + ' fallidos · de ' + c.total + ' clientes</p></div>'
+        : (c.estado === 'enviando' ? '<p style="font-size:.72rem;color:#a16207">Preparando la lista de clientes…</p>' : '')) +
+      '<div style="display:flex;justify-content:flex-end;gap:.4rem;flex-wrap:wrap">' + botones + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+// Acciones con confirmación (sin ventanas del navegador)
+var _cpAccion = null;
+function accionCampana(id, accion) {
+  var c = _campanas.find(function(x) { return x.id === id; }); if (!c) return;
+  if (accion === 'pausar' || accion === 'reanudar') { _cpAccion = { id: id, accion: accion }; return confirmarAccionCampana(); }
+  _cpAccion = { id: id, accion: accion };
+  var textos = {
+    iniciar : ['📤 Enviar campaña', 'Se enviará «' + c.nombre + '» a los clientes del segmento elegido. Meta cobra cada mensaje de marketing. ¿Enviar ahora?', 'Sí, enviar'],
+    cancelar: ['✕ Cancelar campaña', 'La campaña «' + c.nombre + '» dejará de enviarse. Los mensajes ya enviados no se pueden deshacer.', 'Sí, cancelar'],
+    eliminar: ['🗑️ Eliminar campaña', '¿Eliminar «' + c.nombre + '» y su historial de envíos?', 'Sí, eliminar'],
+  }[accion];
+  document.getElementById('cpa-titulo').textContent = textos[0];
+  document.getElementById('cpa-texto').textContent = textos[1];
+  var btn = document.getElementById('cpa-btn');
+  btn.textContent = textos[2];
+  btn.style.cssText = accion === 'iniciar' ? '' : 'background:#e11d48;color:#fff;border:none';
+  openModal('modal-cp-accion');
+}
+
+async function confirmarAccionCampana() {
+  if (!_cpAccion) return;
+  var a = _cpAccion; _cpAccion = null;
+  var btn = document.getElementById('cpa-btn'); btn.disabled = true;
+  try {
+    var res = a.accion === 'eliminar'
+      ? await api('/wa-meta/campanas/' + a.id, { method: 'DELETE' })
+      : await api('/wa-meta/campanas/' + a.id + '/' + a.accion, { method: 'POST' });
+    if (!res) return;
+    var data = await res.json();
+    closeModal('modal-cp-accion');
+    toast(data.message || (res.ok ? 'Listo' : 'No se pudo.'), res.ok ? 'success' : 'error');
+    await cargarCampanas();
+  } catch (e) { toast('Error de conexión: ' + e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+
+// ── Nueva campaña ────────────────────────────────────────────────
+var _cpPlantilla = null;
+async function abrirNuevaCampana() {
+  document.getElementById('cp-nombre').value = '';
+  document.getElementById('cp-segmento').value = 'todos';
+  document.getElementById('cp-programar').checked = false;
+  document.getElementById('cp-fecha').classList.add('hidden');
+  document.getElementById('cp-fecha').value = '';
+  document.getElementById('cp-msg').classList.add('hidden');
+  document.getElementById('cp-especie').classList.add('hidden');
+  var sel = document.getElementById('cp-plantilla');
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  openModal('modal-campana');
+
+  if (!_psClinica.nombre) {
+    try { var b = await cargarBranding(); _psClinica.nombre = (b && (b.nombre_clinica || b.nombre)) || 'tu clínica'; } catch (e) {}
+  }
+  try {
+    var res = await api('/wa-meta/plantillas');
+    if (res && res.ok) _plantillas = (await res.json()).data || [];
+  } catch (e) {}
+  var aprobadas = _plantillas.filter(function(p) { return p.estado === 'APPROVED' && !p.es_estandar; })
+    .sort(function(a, b) { return (a.categoria === 'MARKETING' ? 0 : 1) - (b.categoria === 'MARKETING' ? 0 : 1); });
+  sel.innerHTML = aprobadas.length
+    ? '<option value="">— Elige una plantilla —</option>' + aprobadas.map(function(p) {
+        return '<option value="' + escAttr(p.nombre + '|' + p.idioma) + '">' + esc(p.nombre) + ' · ' + (p.categoria === 'MARKETING' ? 'Marketing' : 'Utilidad') + '</option>';
+      }).join('')
+    : '<option value="">No tienes plantillas aprobadas: crea una de Marketing en «Plantillas»</option>';
+  elegirPlantillaCampana();
+  cambiarSegmento();
+}
+
+function elegirPlantillaCampana() {
+  var v = document.getElementById('cp-plantilla').value;
+  _cpPlantilla = _plantillas.find(function(p) { return p.nombre + '|' + p.idioma === v; }) || null;
+  var aviso = document.getElementById('cp-pl-aviso');
+  aviso.classList.toggle('hidden', !(_cpPlantilla && _cpPlantilla.categoria !== 'MARKETING'));
+  aviso.textContent = 'Es una plantilla de Utilidad: úsala solo para avisos informativos. Para promociones usa una de Marketing, o Meta puede bloquear los envíos.';
+  var cont = document.getElementById('cp-variables');
+  if (!_cpPlantilla || !_cpPlantilla.variables) { cont.innerHTML = ''; previaCampana(); return; }
+  var defecto = ['nombre', 'mascota', 'clinica'];
+  cont.innerHTML = '<p class="vlabel" style="margin:0">¿Qué va en cada variable?</p>' + Array.from({ length: _cpPlantilla.variables }, function(_, i) {
+    var d = defecto[i] || 'fijo';
+    return '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">' +
+      '<span class="wm-var" style="min-width:2.6rem;text-align:center">{{' + (i + 1) + '}}</span>' +
+      '<select class="vinput cp-var-tipo" style="flex:1;min-width:170px" onchange="cambiarVarCampana(this)">' +
+        Object.keys(DATO_CAMPANA_TXT).map(function(k) { return '<option value="' + k + '"' + (k === d ? ' selected' : '') + '>' + DATO_CAMPANA_TXT[k] + '</option>'; }).join('') +
+        '<option value="fijo"' + (d === 'fijo' ? ' selected' : '') + '>Texto fijo…</option>' +
+      '</select>' +
+      '<input class="vinput cp-var-fijo' + (d === 'fijo' ? '' : ' hidden') + '" style="flex:1;min-width:170px" maxlength="200" placeholder="Escribe el texto" oninput="previaCampana()"/>' +
+      '</div>';
+  }).join('');
+  previaCampana();
+}
+
+function cambiarVarCampana(sel) {
+  sel.parentNode.querySelector('.cp-var-fijo').classList.toggle('hidden', sel.value !== 'fijo');
+  previaCampana();
+}
+
+function leerVarsCampana() {
+  return Array.prototype.map.call(document.querySelectorAll('#cp-variables .cp-var-tipo'), function(sel) {
+    var fijo = sel.parentNode.querySelector('.cp-var-fijo').value.trim();
+    return sel.value === 'fijo' ? { tipo: 'fijo', valor: fijo } : { tipo: 'dato', valor: sel.value };
+  });
+}
+
+function previaCampana() {
+  var el = document.getElementById('cp-previa');
+  if (!_cpPlantilla) { el.innerHTML = '<span style="color:#8696a0">Elige una plantilla…</span>'; return; }
+  var ej = { nombre: 'María López', mascota: 'Firulais, Mishi', clinica: _psClinica.nombre || 'tu clínica' };
+  var vals = leerVarsCampana().map(function(v) { return v.tipo === 'dato' ? ej[v.valor] : v.valor; });
+  el.innerHTML = burbuja(_cpPlantilla.encabezado, _cpPlantilla.cuerpo, _cpPlantilla.pie, vals);
+}
+
+async function cambiarSegmento() {
+  var seg = document.getElementById('cp-segmento').value;
+  var esp = document.getElementById('cp-especie');
+  esp.classList.toggle('hidden', seg !== 'por_especie');
+  if (seg === 'por_especie' && !esp.options.length) {
+    try {
+      var res = await api('/wa-meta/campanas/especies');
+      var rows = res && res.ok ? (await res.json()).data || [] : [];
+      esp.innerHTML = rows.length
+        ? rows.map(function(r) { return '<option value="' + escAttr(r.especie) + '">' + esc(r.especie) + ' (' + r.clientes + ' clientes)</option>'; }).join('')
+        : '<option value="">No hay mascotas registradas</option>';
+    } catch (e) {}
+  }
+  contarDestinatarios();
+}
+
+var _cpTotal = 0;
+async function contarDestinatarios() {
+  var seg = document.getElementById('cp-segmento').value;
+  var val = document.getElementById('cp-especie').value;
+  var el = document.getElementById('cp-total');
+  el.textContent = 'Contando clientes…';
+  try {
+    var res = await api('/wa-meta/campanas/contar?segmento=' + encodeURIComponent(seg) + '&valor=' + encodeURIComponent(val || ''));
+    var data = res ? await res.json() : {};
+    _cpTotal = (data.data && data.data.total) || 0;
+    el.innerHTML = _cpTotal
+      ? '👥 Llegará a <b>' + _cpTotal + '</b> cliente(s) con teléfono.' + (_cpTotal > 250 ? ' Se enviará en varios días (máx. 250 por día).' : '')
+      : '<span style="color:#b45309">Ningún cliente con teléfono cumple esta condición.</span>';
+  } catch (e) { el.textContent = ''; }
+}
+
+function msgCampana(html) {
+  var el = document.getElementById('cp-msg');
+  el.classList.remove('hidden');
+  el.setAttribute('style', 'background:#fff1f2;border:1px solid #fecdd3;color:#be123c');
+  el.innerHTML = html;
+}
+
+async function crearCampana(enviar) {
+  document.getElementById('cp-msg').classList.add('hidden');
+  var nombre = document.getElementById('cp-nombre').value.trim();
+  if (!nombre) return msgCampana('Ponle un nombre a la campaña.');
+  if (!_cpPlantilla) return msgCampana('Elige una plantilla aprobada.');
+  var vars = leerVarsCampana();
+  var vacia = vars.findIndex(function(v) { return v.tipo === 'fijo' && !v.valor; });
+  if (vacia >= 0) return msgCampana('Escribe el texto de la variable {{' + (vacia + 1) + '}}.');
+  var seg = document.getElementById('cp-segmento').value;
+  var body = {
+    nombre: nombre, plantilla: _cpPlantilla.nombre + '|' + _cpPlantilla.idioma, variables: vars,
+    segmento: seg, segmento_valor: seg === 'por_especie' ? document.getElementById('cp-especie').value : null,
+  };
+  if (seg === 'por_especie' && !body.segmento_valor) return msgCampana('Elige la especie.');
+  if (!_cpTotal) return msgCampana('Ningún cliente recibiría esta campaña.');
+  var programar = document.getElementById('cp-programar').checked;
+  if (programar) {
+    var f = document.getElementById('cp-fecha').value;
+    if (!f) return msgCampana('Elige la fecha y hora de envío.');
+    body.programada_at = new Date(f).toISOString();
+  }
+
+  var b1 = document.getElementById('cp-btn-crear'), b2 = document.getElementById('cp-btn-borrador');
+  b1.disabled = b2.disabled = true;
+  try {
+    var res = await api('/wa-meta/campanas', { method: 'POST', body: body });
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) return msgCampana('❌ ' + esc(data.message || 'No se pudo crear la campaña.'));
+    if (enviar && !programar) {
+      var r2 = await api('/wa-meta/campanas/' + data.data.id + '/iniciar', { method: 'POST' });
+      var d2 = r2 ? await r2.json() : {};
+      toast(r2 && r2.ok ? '📤 Campaña en envío' : (d2.message || 'Campaña creada, pero no se pudo iniciar.'), r2 && r2.ok ? 'success' : 'error');
+    } else {
+      toast(programar ? '🗓 Campaña programada' : '💾 Borrador guardado', 'success');
+    }
+    closeModal('modal-campana');
+    cargarCampanas();
+  } catch (e) { msgCampana('Error de conexión: ' + esc(e.message)); }
+  finally { b1.disabled = b2.disabled = false; }
+}
+
+// ══ Pestaña Consumo ═══════════════════════════════════════════════
+var TIPO_CONSUMO = {
+  recordatorio_cita: 'Recordatorios de citas', recordatorio_vacuna: 'Recordatorios de vacunas y desparasitación',
+  manual: 'Envíos manuales', campana: 'Campañas',
+};
+async function cargarConsumo() {
+  var el = document.getElementById('cs-panel');
+  el.innerHTML = '<p style="color:var(--ink-faint);font-size:.82rem">Cargando…</p>';
+  try {
+    var res = await api('/wa-meta/consumo');
+    if (!res) return;
+    var data = await res.json();
+    if (!res.ok) { el.innerHTML = '<p style="color:#be123c">❌ ' + esc(data.message || 'No se pudo cargar.') + '</p>'; return; }
+    var d = data.data;
+    var pct = Math.min(100, Math.round(d.total / Math.max(1, d.alerta) * 100));
+    var mes = new Date(d.mes + '-15').toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+    var filas = Object.keys(TIPO_CONSUMO).map(function(k) {
+      var r = d.por_tipo[k] || { enviados: 0, fallidos: 0 };
+      return '<tr><td>' + TIPO_CONSUMO[k] + '</td><td style="text-align:right;font-weight:700">' + r.enviados + '</td><td style="text-align:right;color:#be123c">' + (r.fallidos || '—') + '</td></tr>';
+    }).join('');
+    el.innerHTML =
+      '<p style="font-weight:800;font-size:1rem">Mensajes por Meta en ' + esc(mes) + '</p>' +
+      '<div style="display:flex;align-items:baseline;gap:.5rem;margin-top:.6rem"><span style="font-size:2.2rem;font-weight:800;color:#128c7e">' + d.total + '</span>' +
+      '<span style="font-size:.82rem;color:var(--ink-soft)">de ' + d.alerta + ' (aviso)</span></div>' +
+      '<div class="wm-barra" style="margin-top:.4rem"><div style="width:' + pct + '%;' + (d.supera ? 'background:#f59e0b' : '') + '"></div></div>' +
+      (d.supera
+        ? '<div class="wm-aviso" style="margin-top:.9rem;background:#fffbeb;border:1px solid #fde68a;color:#92400e">⚠️ Este mes pasaste los ' + d.alerta + ' mensajes. Meta cobra los mensajes adicionales a la cuenta de tu negocio (método de pago en el Administrador de WhatsApp).</div>'
+        : '<p style="font-size:.74rem;color:var(--ink-faint);margin-top:.5rem">Te avisaremos aquí si llegas a ' + d.alerta + ' mensajes en el mes.</p>') +
+      '<table class="wm-tabla" style="margin-top:1.1rem"><thead><tr><th>Tipo</th><th style="text-align:right">Enviados</th><th style="text-align:right">Fallidos</th></tr></thead><tbody>' + filas + '</tbody></table>' +
+      '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.9rem">Responder a un cliente dentro de las 24 horas desde su último mensaje es gratis. ' +
+      'Las plantillas fuera de esa ventana se cobran según la tarifa de Meta (Utilidad es más barata que Marketing).</p>';
+  } catch (e) { el.innerHTML = '<p style="color:#be123c">Error de conexión: ' + esc(e.message) + '</p>'; }
 }
 </script>
 </body>

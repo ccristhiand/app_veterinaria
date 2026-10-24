@@ -691,6 +691,8 @@ CREATE TABLE IF NOT EXISTS wa_campanas (
                     COMMENT 'Canal de la campania (v18)',
   meta_plantilla_id INT UNSIGNED   NULL DEFAULT NULL
                     COMMENT 'Plantilla aprobada por Meta que usa la campania (v18)',
+  meta_variables    TEXT           NULL
+                    COMMENT 'Lista JSON: que va en cada variable de la plantilla (v18)',
   INDEX idx_estado (estado),
   INDEX idx_fecha  (created_at)
 ) ENGINE=InnoDB;
