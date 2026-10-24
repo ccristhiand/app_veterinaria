@@ -38,6 +38,49 @@ async function verificarPassword(req, res, password_confirm) {
   return true;
 }
 
+// Texto seguro dentro de HTML (nombres, DNI…)
+const escHtml = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Coloca el logo en el documento según cómo lo use la plantilla:
+ *  · <img src="{{logo_clinica}}">  o  src="{{logo_url}}"  → se pone solo la URL
+ *    (antes se metía una etiqueta <img> dentro de otra y se veía el código)
+ *  · url({{logo_clinica}}) en estilos                     → se pone solo la URL
+ *  · {{logo_clinica}} suelto                              → etiqueta <img> completa
+ * Sin logo: la imagen se reemplaza por un ícono.
+ */
+function ponerLogo(html, logoUrl, nombreClinica) {
+  const url  = logoUrl ? escHtml(logoUrl) : '';
+  const icono = '<span style="font-size:1.6rem">🏥</span>';
+  const etiqueta = url
+    ? `<img src="${url}" alt="${escHtml(nombreClinica)}" style="max-height:52px;max-width:52px;object-fit:contain;border-radius:.5rem"/>`
+    : icono;
+  const VAR = '\\{\\{\\s*logo_(?:clinica|url)\\s*\\}\\}';
+
+  let out = String(html || '');
+  // <img ... src="{{logo_...}}" ...>
+  out = out.replace(new RegExp(`<img\\b[^>]*?\\bsrc\\s*=\\s*(["']?)\\s*${VAR}\\s*\\1[^>]*>`, 'gi'), tag => {
+    if (!url) return icono;
+    return tag.replace(new RegExp(`(\\bsrc\\s*=\\s*)(["']?)\\s*${VAR}\\s*\\2`, 'i'), `$1"${url}"`);
+  });
+  // url({{logo_...}}) en estilos
+  out = out.replace(new RegExp(`url\\(\\s*(["']|&quot;)?\\s*${VAR}\\s*(["']|&quot;)?\\s*\\)`, 'gi'), url ? `url('${url}')` : 'none');
+  // Cualquier otro atributo: ="{{logo_...}}"
+  out = out.replace(new RegExp(`=\\s*(["'])\\s*${VAR}\\s*\\1`, 'gi'), `="${url}"`);
+  // Sueltos
+  out = out.replace(/\{\{\s*logo_clinica\s*\}\}/gi, etiqueta);
+  out = out.replace(/\{\{\s*logo_url\s*\}\}/gi, url);
+  return out;
+}
+
+// Repara documentos ya generados con el error anterior: src="<img src="URL" …/>"
+function repararLogo(html) {
+  return String(html || '').replace(
+    /(\bsrc\s*=\s*)(["'])\s*<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\3[^>]*?\/?>\s*\2/gi,
+    (_, pre, _q, _q2, u) => `${pre}"${u}"`
+  );
+}
+
 const router = Router();
 router.use(authenticate);
 
@@ -134,25 +177,18 @@ router.post('/generar', auditMiddleware('consentimientos:creado', 'consentimient
     const nombreClinica = tenantConfig?.nombre_clinica || empresa?.nombre || 'VetClinic';
     const logoUrl       = tenantConfig?.logo_url || empresa?.logo_url || null;
 
-    // HTML del logo para insertar en el documento
-    const logoHtml = logoUrl
-      ? `<img src="${logoUrl}" alt="${nombreClinica}" style="max-height:52px;max-width:52px;object-fit:contain;border-radius:.5rem"/>`
-      : `<span style="font-size:1.6rem">🏥</span>`;
-
-    // Reemplazar variables
-    const hoy = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' });
-    let contenido = plantilla.contenido
-      .replace(/{{nombre_mascota}}/g,    mascota.nombre || '')
-      .replace(/{{especie}}/g,           mascota.especie || '')
-      .replace(/{{raza}}/g,              mascota.raza || '')
-      .replace(/{{peso_kg}}/g,           mascota.peso_kg || '')
-      .replace(/{{nombre_propietario}}/g,mascota.nombre_propietario || '')
-      .replace(/{{dni_propietario}}/g,   mascota.dni_propietario || '')
-      .replace(/{{telefono}}/g,          mascota.telefono || '')
-      .replace(/{{nombre_veterinario}}/g,vet?.nombre || req.user.nombre || '')
-      .replace(/{{nombre_clinica}}/g,    nombreClinica)
-      .replace(/{{logo_clinica}}/g,      logoHtml)
-      .replace(/{{logo_url}}/g,          logoUrl || '')
+    // Reemplazar variables (los datos van escapados para no romper el HTML)
+    const hoy = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric', timeZone:'America/Lima' });
+    let contenido = ponerLogo(plantilla.contenido, logoUrl, nombreClinica)
+      .replace(/{{nombre_mascota}}/g,    escHtml(mascota.nombre))
+      .replace(/{{especie}}/g,           escHtml(mascota.especie))
+      .replace(/{{raza}}/g,              escHtml(mascota.raza))
+      .replace(/{{peso_kg}}/g,           escHtml(mascota.peso_kg))
+      .replace(/{{nombre_propietario}}/g,escHtml(mascota.nombre_propietario))
+      .replace(/{{dni_propietario}}/g,   escHtml(mascota.dni_propietario))
+      .replace(/{{telefono}}/g,          escHtml(mascota.telefono))
+      .replace(/{{nombre_veterinario}}/g,escHtml(vet?.nombre || req.user.nombre))
+      .replace(/{{nombre_clinica}}/g,    escHtml(nombreClinica))
       .replace(/{{fecha}}/g,             hoy);
 
     // Guardar en BD
@@ -207,6 +243,7 @@ router.get('/:id', async (req, res, next) => {
        WHERE cg.id=?`, [req.params.id]
     );
     if (!row) return res.status(404).json({ success:false, message:'No encontrado.' });
+    row.contenido_final = repararLogo(row.contenido_final);
     return res.json({ success:true, data:row });
   } catch(err) { next(err); }
 });
