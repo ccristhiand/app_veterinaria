@@ -485,12 +485,51 @@ async function sincronizarPlantillas(req, lista) {
   }
 }
 
+/**
+ * Plantillas de recordatorios que ya existen en Meta (creadas desde otro servidor o
+ * antes de la migración) pero no están en la base de la clínica: se registran tal cual,
+ * sin volver a enviarlas a revisión. Los datos de cada variable se toman del texto de la clínica.
+ */
+async function adoptarPlantillasSistema(req, lista) {
+  try {
+    const sistema = lista.filter(t => /^vet_recordatorio_/.test(t.name) && t.language === 'es');
+    if (!sistema.length) return;
+    const filas = await req.db.query('SELECT nombre_meta FROM wa_meta_plantillas WHERE idioma = ?', ['es']);
+    const faltan = sistema.filter(t => !filas.some(f => f.nombre_meta === t.name));
+    if (!faltan.length) return;
+    const tenantId = await tenantIdDe(req);
+    const { clinica, telefono } = await datosClinica(tenantId);
+    let textos = [];
+    try { textos = await req.db.query('SELECT tipo, contenido FROM wa_plantillas WHERE activo = 1 ORDER BY id DESC'); } catch { /* sin plantillas QR */ }
+    for (const t of faltan) {
+      const def = USOS_SISTEMA.find(d => NOMBRE_META_DE(d.uso) === t.name);
+      if (!def) continue;
+      const v = vistaPlantillaMeta(t);
+      const prop = propuestaPara(def, textos.find(x => x.tipo === def.uso)?.contenido, clinica, telefono);
+      // Si el texto coincide con la propuesta se usan sus datos; si no, el orden estándar del recordatorio
+      const vars = prop.cuerpo === v.cuerpo ? prop.variables : def.datos.slice(0, v.variables);
+      await req.db.query(
+        `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, encabezado_tipo, cuerpo, variables,
+           meta_template_id, estado, motivo_rechazo, es_estandar, activo)
+         VALUES (?, 'es', ?, ?, 'ninguno', ?, ?, ?, ?, ?, 1, 1)
+         ON DUPLICATE KEY UPDATE es_estandar = 1`,
+        [t.name, ['UTILITY', 'MARKETING'].includes(t.category) ? t.category : 'UTILITY', def.uso, v.cuerpo,
+         JSON.stringify(vars), t.id, ESTADO_DESDE_META[t.status] || 'pendiente', v.motivo_rechazo]
+      );
+      logger.info(`[wa-meta] Plantilla ${t.name} registrada en la clínica ${tenantId} (ya existía en Meta)`);
+    }
+  } catch (e) {
+    if (!errorSinMigracion(e)) logger.warn('[wa-meta] No se pudieron registrar plantillas existentes: ' + e.message);
+  }
+}
+
 // ── GET /plantillas — lista las plantillas de la clínica en Meta ─────
 router.get('/plantillas', async (req, res, next) => {
   try {
     const { cfg, token, wabaId } = await cuentaConectada(req);
     const lista = await plantillasMeta(cfg, token, wabaId);
     await sincronizarPlantillas(req, lista);
+    await adoptarPlantillasSistema(req, lista);
     let usos = [];
     try { usos = await req.db.query('SELECT nombre_meta, idioma, uso, es_estandar, variables FROM wa_meta_plantillas WHERE activo=1'); }
     catch { /* sin migración v18 */ }
@@ -501,7 +540,8 @@ router.get('/plantillas', async (req, res, next) => {
       let nombres = null;
       try { nombres = u?.variables ? JSON.parse(u.variables) : null; } catch { nombres = null; }
       if (!Array.isArray(nombres) || nombres.length !== v.variables) nombres = null;
-      return { ...v, uso: u?.uso || null, es_estandar: !!(u && Number(u.es_estandar)), variables_nombres: nombres };
+      const esSistema = !!(u && Number(u.es_estandar)) || /^vet_recordatorio_/.test(t.name);
+      return { ...v, uso: u?.uso || null, es_estandar: esSistema, variables_nombres: nombres };
     });
     return res.json({ success: true, data });
   } catch (err) { responderError(res, next, err); }
