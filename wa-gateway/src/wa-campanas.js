@@ -402,6 +402,7 @@ async function procesarCampana(campana, conn, cfg, tenant) {
         r = await callMeta({
           tenantId: campana.tenant_id, telefono: contacto.telefono, plantilla: campana.nombre_meta,
           idioma: campana.meta_idioma || 'es', variables, tipo: 'campana', campanaId: campana.id,
+          imagenMediaId: String(campana.imagen_url || '').startsWith('meta-media:') ? campana.imagen_url.slice(11) : null,
           propietarioId: contacto.propietario_id, resumen, codigoPais: '+51',
         });
       } catch (e) { r = { success: false, reintentar: true, message: e.message }; }

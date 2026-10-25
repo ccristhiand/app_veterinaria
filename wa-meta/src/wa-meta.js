@@ -255,7 +255,13 @@ async function enviarPlantilla(b) {
     messaging_product: 'whatsapp', to: telefono, type: 'template',
     template: { name: b.plantilla, language: { code: String(b.idioma || 'es') } },
   };
-  if (vars.length) payload.template.components = [{ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v || '-' })) }];
+  const comps = [];
+  // Plantilla con imagen en el encabezado (id de la imagen subida a Meta)
+  if (b.imagenMediaId && /^\d{5,30}$/.test(String(b.imagenMediaId))) {
+    comps.push({ type: 'header', parameters: [{ type: 'image', image: { id: String(b.imagenMediaId) } }] });
+  }
+  if (vars.length) comps.push({ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v || '-' })) });
+  if (comps.length) payload.template.components = comps;
 
   let r, d;
   try {

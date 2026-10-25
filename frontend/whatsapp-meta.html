@@ -52,6 +52,7 @@
     .wm-burbuja { background:#fff; border-radius:.2rem .9rem .9rem .9rem; padding:.6rem .8rem; font-size:.82rem; line-height:1.45; max-width:95%; box-shadow:0 1px 1px rgba(0,0,0,.08); white-space:pre-wrap; word-break:break-word; }
     .wm-burbuja .enc { font-weight:700; display:block; margin-bottom:.25rem; }
     .wm-burbuja .pie { color:#8696a0; font-size:.72rem; display:block; margin-top:.35rem; }
+    .wm-etq { min-width:8.5rem; text-align:center; font-size:.72rem !important; padding:.4rem .5rem !important; border-radius:.5rem; line-height:1.2; flex-shrink:0; }
     .wm-var { background:#dcfce7; color:#166534; border-radius:.3rem; padding:0 .25rem; font-weight:600; }
     .wm-chip { font-size:.72rem; font-weight:600; background:#f1f5f9; border:1px solid var(--line); border-radius:999px; padding:.25rem .65rem; cursor:pointer; font-family:inherit; color:var(--ink-soft); }
     .wm-chip:hover { background:#e2e8f0; }
@@ -233,6 +234,11 @@
             <label class="vlabel">Plantilla *</label>
             <select id="ev-plantilla" class="vinput" onchange="elegirPlantillaEnvio()"></select>
           </div>
+          <div id="ev-imagen-box" class="hidden">
+            <label class="vlabel">Imagen *</label>
+            <input type="file" id="ev-imagen" accept="image/jpeg,image/png" class="vinput" onchange="leerImagenEnvio(this)"/>
+            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">JPG o PNG, máximo 5 MB.</p>
+          </div>
           <div id="ev-variables" style="display:flex;flex-direction:column;gap:.6rem"></div>
         </div>
 
@@ -394,6 +400,11 @@
             <select id="cp-plantilla" class="vinput" onchange="elegirPlantillaCampana()"></select>
             <p id="cp-pl-aviso" class="hidden" style="font-size:.7rem;color:#b45309;margin-top:.3rem"></p>
           </div>
+          <div id="cp-imagen-box" class="hidden">
+            <label class="vlabel">Imagen de la campaña *</label>
+            <input type="file" id="cp-imagen" accept="image/jpeg,image/png" class="vinput" onchange="leerImagenCampana(this)"/>
+            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">JPG o PNG, máximo 5 MB. Meta guarda la imagen 30 días: la campaña debe terminar de enviarse en ese plazo.</p>
+          </div>
           <div id="cp-variables" style="display:flex;flex-direction:column;gap:.55rem"></div>
           <div>
             <label class="vlabel">¿A quién enviar? *</label>
@@ -486,7 +497,7 @@
             <span style="font-size:.72rem;color:var(--ink-faint);align-self:center">Usar ejemplo:</span>
             <button type="button" class="wm-chip" onclick="usarEjemplo('vacuna')">💉 Vacuna</button>
             <button type="button" class="wm-chip" onclick="usarEjemplo('cita')">📅 Cita</button>
-            <button type="button" class="wm-chip" onclick="usarEjemplo('desparasitacion')">🐛 Desparasitación</button>
+            <button type="button" class="wm-chip" onclick="usarEjemplo('promo')">🛁 Promoción con imagen</button>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -503,16 +514,43 @@
           </div>
           <div>
             <label class="vlabel">Encabezado (opcional)</label>
-            <input id="pl-encabezado" class="vinput" maxlength="60" placeholder="Ej. Recordatorio de vacuna" oninput="validarForm()"/>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.45rem">
+              <label class="wm-radio"><input type="radio" name="pl-enc-tipo" value="ninguno" checked onchange="cambiarTipoEncabezado()"/> Sin encabezado</label>
+              <label class="wm-radio"><input type="radio" name="pl-enc-tipo" value="texto" onchange="cambiarTipoEncabezado()"/> Texto</label>
+              <label class="wm-radio"><input type="radio" name="pl-enc-tipo" value="imagen" onchange="cambiarTipoEncabezado()"/> 🖼️ Imagen</label>
+            </div>
+            <input id="pl-encabezado" class="vinput hidden" maxlength="60" placeholder="Ej. Recordatorio de vacuna" oninput="validarForm()"/>
+            <div id="pl-imagen-box" class="hidden">
+              <input type="file" id="pl-imagen" accept="image/jpeg,image/png" class="vinput" onchange="leerImagenPlantilla(this)"/>
+              <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">
+                JPG o PNG, máximo 5 MB. Es solo el <b>ejemplo</b> para que Meta revise: en cada campaña o envío eliges la imagen que quieras.
+              </p>
+            </div>
           </div>
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <label class="vlabel">Mensaje *</label>
-              <button type="button" class="wm-chip" onclick="insertarVariable()">＋ Insertar variable</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <label class="vlabel" style="margin:0">Mensaje *</label>
+            </div>
+            <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin:.4rem 0">
+              <span style="font-size:.7rem;color:var(--ink-faint);align-self:center">Insertar dato:</span>
+              <button type="button" class="wm-chip" onclick="insertarDato('nombre')">＋ Nombre del cliente</button>
+              <button type="button" class="wm-chip" onclick="insertarDato('mascota')">＋ Mascota</button>
+              <button type="button" class="wm-chip" onclick="insertarDato('clinica')">＋ Clínica</button>
+              <button type="button" class="wm-chip" onclick="insertarDato('fecha')">＋ Fecha</button>
+              <button type="button" class="wm-chip" onclick="insertarDato('hora')">＋ Hora</button>
+              <button type="button" class="wm-chip" onclick="mostrarOtroDato()">＋ Otro dato…</button>
+            </div>
+            <div id="pl-otro-box" class="hidden" style="display:flex;gap:.4rem;margin-bottom:.45rem">
+              <input id="pl-otro" class="vinput" maxlength="30" placeholder="Nombre del dato, ej. descuento" style="flex:1"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();agregarOtroDato();}"/>
+              <button type="button" class="vbtn vbtn-ghost" onclick="agregarOtroDato()">Agregar</button>
             </div>
             <textarea id="pl-cuerpo" rows="5" class="vinput" maxlength="1024"
-              placeholder="Hola {{1}}, te recordamos que {{2}} tiene su vacuna el {{3}}. ¡Te esperamos!"
+              placeholder="Hola [nombre], te recordamos que [mascota] tiene su vacuna el [fecha]. ¡Te esperamos!"
               oninput="validarForm()"></textarea>
+            <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">
+              Los datos entre corchetes, como [nombre], se reemplazan por la información de cada cliente al enviar.
+            </p>
           </div>
           <div id="pl-ejemplos" style="display:flex;flex-direction:column;gap:.5rem"></div>
           <div>
@@ -1037,10 +1075,13 @@ function pintarPlantillas() {
     var motivo = p.motivo_rechazo ? (MOTIVOS_RECHAZO[p.motivo_rechazo] || p.motivo_rechazo) : '';
     return '<div class="wm-pl">' +
       '<div class="wm-pl-top"><div><p class="wm-pl-nombre">' + esc(p.nombre) + '</p>' +
-      '<p style="font-size:.66rem;color:var(--ink-faint);margin-top:.15rem">Idioma: ' + esc(p.idioma) + ' · ' + p.variables + ' variable(s)</p></div>' +
+      '<p style="font-size:.66rem;color:var(--ink-faint);margin-top:.15rem">Idioma: ' + esc(p.idioma) +
+        (p.encabezado_formato === 'IMAGE' ? ' · 🖼️ con imagen' : '') +
+        (p.variables ? ' · Datos: ' + esc(etiquetasVariables(p).join(', ')) : ' · sin datos') + '</p></div>' +
       '<div style="display:flex;flex-direction:column;gap:.25rem;align-items:flex-end">' +
       '<span class="wm-badge ' + est[1] + '">' + esc(est[0]) + '</span><span class="wm-badge ' + cat[1] + '">' + esc(cat[0]) + '</span></div></div>' +
-      '<div class="wm-chat" style="min-height:0;padding:.7rem"><div class="wm-burbuja">' + burbuja(p.encabezado, p.cuerpo, p.pie) + '</div></div>' +
+      '<div class="wm-chat" style="min-height:0;padding:.7rem"><div class="wm-burbuja">' + (p.encabezado_formato === 'IMAGE' ? IMG_VACIA : '') +
+        burbuja(p.encabezado, p.cuerpo, p.pie, etiquetasVariables(p).map(function(l) { return '[' + l + ']'; })) + '</div></div>' +
       (motivo ? '<p style="font-size:.74rem;color:#b91c1c;background:#fff1f2;border-radius:.6rem;padding:.45rem .65rem">Motivo del rechazo: ' + esc(motivo) + '</p>' : '') +
       (p.estado === 'PENDING' ? '<p style="font-size:.72rem;color:#a16207">Meta la está revisando. Pulsa «Actualizar» en unos minutos.</p>' : '') +
       '<div style="display:flex;justify-content:flex-end;gap:.4rem;margin-top:auto">' +
@@ -1050,34 +1091,65 @@ function pintarPlantillas() {
   }).join('');
 }
 
+// ── Datos con nombre ([nombre], [mascota]…) ──────────────────────
+var ETIQUETA_DATO_PL = {
+  nombre: 'Nombre del cliente', mascota: 'Mascota', clinica: 'Clínica', fecha: 'Fecha', hora: 'Hora',
+  vacuna: 'Vacuna', producto: 'Producto',
+};
+function etiquetaDato(k) {
+  if (!k) return 'Dato';
+  return ETIQUETA_DATO_PL[k] || (k.charAt(0).toUpperCase() + k.slice(1)).replace(/_/g, ' ');
+}
+// {{1}} → [Nombre del cliente] para mostrar plantillas con nombres guardados
+function cuerpoConNombres(cuerpo, nombres) {
+  if (!nombres || !nombres.length) return cuerpo;
+  return String(cuerpo || '').replace(/\{\{\s*(\d+)\s*\}\}/g, function(m, n) { return nombres[n - 1] ? '[' + etiquetaDato(nombres[n - 1]) + ']' : m; });
+}
+function etiquetasVariables(p) {   // nombre visible de cada variable de una plantilla
+  return Array.from({ length: p.variables || 0 }, function(_, i) {
+    return p.variables_nombres && p.variables_nombres[i] ? etiquetaDato(p.variables_nombres[i]) : 'Variable {{' + (i + 1) + '}}';
+  });
+}
+var IMG_VACIA = '<div style="height:110px;margin:-.2rem -.35rem .45rem;border-radius:.6rem;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:.78rem">🖼️ Imagen</div>';
+function imagenBurbuja(src) {
+  return src ? '<img src="' + escAttr(src) + '" alt="" style="display:block;width:calc(100% + .7rem);max-height:180px;object-fit:cover;margin:-.2rem -.35rem .45rem;border-radius:.6rem"/>' : IMG_VACIA;
+}
+
 // ── Nueva plantilla ──────────────────────────────────────────────
+var EJEMPLO_DATO_PL = { nombre: 'María López', mascota: 'Firulais', fecha: '25 de octubre', hora: '10:30 a. m.', vacuna: 'Rabia', producto: 'Bravecto' };
+var _ejPl = {};          // ejemplos escritos por dato
+var _imgPl = null;       // { base64, mime, nombre, url } imagen de ejemplo del encabezado
+var _clinicaNombre = '';
+
 var EJEMPLOS_PL = {
   vacuna: {
-    nombre: 'recordatorio_vacuna', categoria: 'UTILITY', encabezado: 'Recordatorio de vacuna',
-    cuerpo: 'Hola {{1}}, te recordamos que a {{2}} le toca su vacuna el {{3}}. Responde a este mensaje si necesitas cambiar la fecha. ¡Te esperamos!',
-    ejemplos: ['María', 'Firulais', '25/10/2026'], pie: '',
+    nombre: 'aviso_vacuna', categoria: 'UTILITY', encabezado: 'Recordatorio de vacuna',
+    cuerpo: 'Hola [nombre], te recordamos que a [mascota] le toca su vacuna el [fecha]. Responde a este mensaje si necesitas cambiar la fecha. ¡Te esperamos!',
   },
   cita: {
-    nombre: 'recordatorio_cita', categoria: 'UTILITY', encabezado: 'Recordatorio de cita',
-    cuerpo: 'Hola {{1}}, te recordamos la cita de {{2}} el {{3}} a las {{4}} horas. Si no puedes asistir, avísanos respondiendo este mensaje.',
-    ejemplos: ['Carlos', 'Luna', '25/10/2026', '10:30'], pie: '',
+    nombre: 'aviso_cita', categoria: 'UTILITY', encabezado: 'Recordatorio de cita',
+    cuerpo: 'Hola [nombre], te recordamos la cita de [mascota] el [fecha] a las [hora]. Si no puedes asistir, avísanos respondiendo este mensaje.',
   },
-  desparasitacion: {
-    nombre: 'recordatorio_desparasitacion', categoria: 'UTILITY', encabezado: 'Recordatorio de desparasitación',
-    cuerpo: 'Hola {{1}}, a {{2}} le toca su desparasitación el {{3}}. Escríbenos para separar su turno. ¡Gracias por confiar en nosotros!',
-    ejemplos: ['Ana', 'Rocky', '25/10/2026'], pie: '',
+  promo: {
+    nombre: 'promo_bano', categoria: 'MARKETING', encabezado: '', imagen: true,
+    cuerpo: 'Hola [nombre], este mes en [clinica] tenemos [descuento] de descuento en baño y corte para [mascota]. Responde a este mensaje para reservar tu turno.',
   },
 };
 
 function abrirNuevaPlantilla() {
-  ['pl-nombre', 'pl-encabezado', 'pl-cuerpo', 'pl-pie'].forEach(function(id) { document.getElementById(id).value = ''; });
+  ['pl-nombre', 'pl-encabezado', 'pl-cuerpo', 'pl-pie', 'pl-otro'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('pl-categoria').value = 'UTILITY';
+  document.querySelector('input[name="pl-enc-tipo"][value="ninguno"]').checked = true;
+  document.getElementById('pl-imagen').value = '';
+  document.getElementById('pl-otro-box').classList.add('hidden');
+  _ejPl = {}; _imgPl = null;
+  cambiarTipoEncabezado();
   cargarBranding().then(function(b) {
     var n = b && (b.nombre_clinica || b.nombre || b.razon_social);
+    if (n) _clinicaNombre = String(n);
     if (n && !document.getElementById('pl-pie').value) document.getElementById('pl-pie').value = String(n).slice(0, 60);
     validarForm();
   }).catch(function() {});
-  pintarEjemplos([]);
   validarForm();
   openModal('modal-plantilla');
 }
@@ -1086,70 +1158,135 @@ function usarEjemplo(clave) {
   var e = EJEMPLOS_PL[clave]; if (!e) return;
   document.getElementById('pl-nombre').value = e.nombre;
   document.getElementById('pl-categoria').value = e.categoria;
-  document.getElementById('pl-encabezado').value = e.encabezado;
+  document.querySelector('input[name="pl-enc-tipo"][value="' + (e.imagen ? 'imagen' : e.encabezado ? 'texto' : 'ninguno') + '"]').checked = true;
+  document.getElementById('pl-encabezado').value = e.encabezado || '';
   document.getElementById('pl-cuerpo').value = e.cuerpo;
-  if (e.pie) document.getElementById('pl-pie').value = e.pie;
-  pintarEjemplos(e.ejemplos);
+  if (clave === 'promo') _ejPl.descuento = _ejPl.descuento || '20%';
+  cambiarTipoEncabezado();
+}
+
+function tipoEncabezado() { return document.querySelector('input[name="pl-enc-tipo"]:checked').value; }
+
+function cambiarTipoEncabezado() {
+  var t = tipoEncabezado();
+  document.getElementById('pl-encabezado').classList.toggle('hidden', t !== 'texto');
+  document.getElementById('pl-imagen-box').classList.toggle('hidden', t !== 'imagen');
   validarForm();
 }
 
-function insertarVariable() {
-  var ta = document.getElementById('pl-cuerpo');
-  var n = (varsDe(ta.value).reduce(function(a, b) { return Math.max(a, b); }, 0)) + 1;
+function leerImagenPlantilla(input) {
+  leerArchivoImagen(input, function(img) { _imgPl = img; validarForm(); });
+}
+
+// Lee un JPG/PNG (máx. 5 MB) y devuelve { base64, mime, nombre, url }
+function leerArchivoImagen(input, listo) {
+  var f = input.files && input.files[0];
+  if (!f) { listo(null); return; }
+  if (['image/jpeg', 'image/png'].indexOf(f.type) < 0) { toast('La imagen debe ser JPG o PNG.', 'error'); input.value = ''; listo(null); return; }
+  if (f.size > 5 * 1024 * 1024) { toast('La imagen no puede pasar de 5 MB.', 'error'); input.value = ''; listo(null); return; }
+  var r = new FileReader();
+  r.onload = function() { listo({ base64: String(r.result).split(',')[1], mime: f.type, nombre: f.name, url: r.result }); };
+  r.onerror = function() { toast('No se pudo leer la imagen.', 'error'); listo(null); };
+  r.readAsDataURL(f);
+}
+
+function insertarEnCursor(id, texto) {
+  var ta = document.getElementById(id);
   var ini = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
   var fin = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
   var antes = ta.value.slice(0, ini), despues = ta.value.slice(fin);
-  var ins = (antes && !/\s$/.test(antes) ? ' ' : '') + '{{' + n + '}}' + (despues && !/^\s/.test(despues) ? ' ' : '');
+  var ins = (antes && !/\s$/.test(antes) ? ' ' : '') + texto + (despues && !/^[\s.,!?;:]/.test(despues) ? ' ' : '');
   ta.value = antes + ins + despues;
   ta.focus();
   ta.selectionStart = ta.selectionEnd = (antes + ins).length;
-  validarForm();
 }
 
-function leerEjemplos() {
-  return Array.prototype.map.call(document.querySelectorAll('#pl-ejemplos input'), function(i) { return i.value; });
+function insertarDato(clave) { insertarEnCursor('pl-cuerpo', '[' + clave + ']'); validarForm(); }
+
+function mostrarOtroDato() {
+  var box = document.getElementById('pl-otro-box');
+  box.classList.remove('hidden');
+  document.getElementById('pl-otro').focus();
+}
+function agregarOtroDato() {
+  var inp = document.getElementById('pl-otro');
+  var k = inp.value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+  if (!k) { inp.focus(); return; }
+  inp.value = '';
+  document.getElementById('pl-otro-box').classList.add('hidden');
+  insertarDato(k);
 }
 
-function pintarEjemplos(valores) {
-  var n = numVars(document.getElementById('pl-cuerpo').value);
+// Convierte [dato] → {{n}} igual que el servidor
+function convertirDatosPl(texto) {
+  var nombres = [];
+  var tieneEtiquetas = /\[[a-z0-9_]{1,30}\]/i.test(texto);
+  var cuerpo = !tieneEtiquetas ? texto : texto.replace(/\[([a-z0-9_]{1,30})\]/gi, function(_, k) {
+    k = k.toLowerCase();
+    var i = nombres.indexOf(k); if (i < 0) { nombres.push(k); i = nombres.length - 1; }
+    return '{{' + (i + 1) + '}}';
+  });
+  return { cuerpo: cuerpo, nombres: tieneEtiquetas ? nombres : null, mezcla: tieneEtiquetas && /\{\{\s*\d+\s*\}\}/.test(texto) };
+}
+
+function ejemploDe(k) {
+  if (_ejPl[k] != null) return _ejPl[k];
+  if (k === 'clinica') return _clinicaNombre || 'VetPet';
+  return EJEMPLO_DATO_PL[k] || '';
+}
+
+function pintarEjemplos() {
+  var conv = convertirDatosPl(document.getElementById('pl-cuerpo').value);
+  var claves = conv.nombres || Array.from({ length: numVars(conv.cuerpo) }, function(_, i) { return '_' + (i + 1); });
   var cont = document.getElementById('pl-ejemplos');
-  if (cont.children.length === n && !valores) return;
-  var previos = valores || leerEjemplos();
-  if (!n) { cont.innerHTML = ''; return; }
-  cont.innerHTML = '<p class="vlabel" style="margin:0">Ejemplos para Meta <span style="font-weight:400;color:var(--ink-faint)">(Meta los usa para revisar; tus clientes no los ven)</span></p>' +
-    Array.from({ length: n }, function(_, i) {
-      return '<div style="display:flex;align-items:center;gap:.5rem"><span class="wm-var" style="min-width:2.6rem;text-align:center">{{' + (i + 1) + '}}</span>' +
-        '<input class="vinput" placeholder="Ej. ' + ['María', 'Firulais', '25/10/2026', '10:30'][i % 4] + '" value="' + escAttr(previos[i] || '') + '" oninput="validarForm(true)"/></div>';
+  if (cont.dataset.claves === claves.join(',')) return;
+  cont.dataset.claves = claves.join(',');
+  if (!claves.length) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<p class="vlabel" style="margin:0">Ejemplo de cada dato <span style="font-weight:400;color:var(--ink-faint)">(Meta lo usa para revisar; tus clientes no lo ven)</span></p>' +
+    claves.map(function(k) {
+      var etiqueta = k.charAt(0) === '_' ? '{{' + k.slice(1) + '}}' : etiquetaDato(k);
+      return '<div style="display:flex;align-items:center;gap:.5rem"><span class="wm-var wm-etq">' + esc(etiqueta) + '</span>' +
+        '<input class="vinput" data-clave="' + escAttr(k) + '" placeholder="Ej. ' + escAttr(EJEMPLO_DATO_PL[k] || 'valor de ejemplo') + '" value="' + escAttr(ejemploDe(k)) +
+        '" oninput="_ejPl[this.dataset.clave]=this.value;validarForm(true)"/></div>';
     }).join('');
 }
 
 function datosForm() {
+  var texto = document.getElementById('pl-cuerpo').value.trim();
+  var conv = convertirDatosPl(texto);
+  var claves = conv.nombres || Array.from({ length: numVars(conv.cuerpo) }, function(_, i) { return '_' + (i + 1); });
   return {
     nombre    : document.getElementById('pl-nombre').value.trim(),
     categoria : document.getElementById('pl-categoria').value,
-    encabezado: document.getElementById('pl-encabezado').value.trim(),
-    cuerpo    : document.getElementById('pl-cuerpo').value.trim(),
+    tipoEnc   : tipoEncabezado(),
+    encabezado: tipoEncabezado() === 'texto' ? document.getElementById('pl-encabezado').value.trim() : '',
+    texto     : texto,
+    cuerpo    : conv.cuerpo,
+    nombres   : conv.nombres,
+    mezcla    : conv.mezcla,
     pie       : document.getElementById('pl-pie').value.trim(),
-    ejemplos  : leerEjemplos(),
+    ejemplos  : claves.map(function(k) { return String(ejemploDe(k) || '').trim(); }),
   };
 }
 
 // Mismas reglas que el servidor (las que más rechaza Meta)
 function problemasPlantilla(d) {
   var p = [];
-  if (!/^[a-z0-9_]{1,512}$/.test(d.nombre)) p.push('El nombre solo puede tener minúsculas, números y guion bajo (ej. recordatorio_vacuna).');
+  if (!/^[a-z0-9_]{1,512}$/.test(d.nombre)) p.push('El nombre interno solo puede tener minúsculas, números y guion bajo (ej. promo_bano).');
   if (!d.cuerpo) p.push('Escribe el texto del mensaje.');
   if (d.cuerpo.length > 1024) p.push('El mensaje no puede pasar de 1024 caracteres.');
+  if (d.mezcla) p.push('Usa solo los botones de datos ([nombre], [mascota]…), sin {{1}}.');
   var unicas = Array.from(new Set(varsDe(d.cuerpo))).sort(function(a, b) { return a - b; });
-  if (unicas.some(function(n, i) { return n !== i + 1; })) p.push('Las variables deben ir en orden: {{1}}, {{2}}, {{3}}…');
-  if (/^\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('El mensaje no puede empezar con una variable.');
-  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿]*$/.test(d.cuerpo)) p.push('El mensaje no puede terminar con una variable (agrega texto después).');
-  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('No pongas dos variables seguidas: escribe texto entre ellas.');
+  if (!d.nombres && unicas.some(function(n, i) { return n !== i + 1; })) p.push('Las variables deben ir en orden: {{1}}, {{2}}, {{3}}…');
+  if (/^\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('El mensaje no puede empezar con un dato: escribe algo antes (ej. «Hola [nombre]…»).');
+  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿]*$/.test(d.cuerpo)) p.push('El mensaje no puede terminar con un dato: agrega texto al final.');
+  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(d.cuerpo)) p.push('No pongas dos datos seguidos: escribe texto entre ellos.');
   var palabras = d.cuerpo.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
-  if (unicas.length && palabras < unicas.length * 2 + 1) p.push('Hay demasiadas variables para tan poco texto.');
-  if (d.ejemplos.slice(0, unicas.length).some(function(e) { return !String(e).trim(); }) || d.ejemplos.length < unicas.length)
-    p.push('Escribe un ejemplo para cada variable (Meta lo exige).');
-  if (varsDe(d.encabezado).length) p.push('El encabezado no puede tener variables.');
+  if (unicas.length && palabras < unicas.length * 2 + 1) p.push('Hay demasiados datos para tan poco texto.');
+  if (d.ejemplos.some(function(e) { return !e; })) p.push('Escribe un ejemplo para cada dato (Meta lo exige).');
+  if (/\[[a-z0-9_]+\]|\{\{/.test(d.encabezado)) p.push('El encabezado no puede tener datos del cliente.');
+  if (d.tipoEnc === 'texto' && !d.encabezado) p.push('Escribe el texto del encabezado o elige «Sin encabezado».');
+  if (d.tipoEnc === 'imagen' && !_imgPl) p.push('Elige la imagen de ejemplo del encabezado.');
   if (_plantillas.some(function(x) { return x.nombre === d.nombre; })) p.push('Ya tienes una plantilla con ese nombre.');
   return p;
 }
@@ -1157,10 +1294,11 @@ function problemasPlantilla(d) {
 function validarForm(soloEjemplos) {
   if (!soloEjemplos) pintarEjemplos();
   var d = datosForm();
-  document.getElementById('pl-previa').innerHTML = burbuja(d.encabezado, d.cuerpo, d.pie, d.ejemplos);
+  var previa = d.texto || d.encabezado ? burbuja(d.encabezado, d.cuerpo, d.pie, d.ejemplos) : '<span style="color:#8696a0">Escribe el mensaje para ver la vista previa…</span>';
+  document.getElementById('pl-previa').innerHTML = (d.tipoEnc === 'imagen' ? imagenBurbuja(_imgPl && _imgPl.url) : '') + previa;
   var p = problemasPlantilla(d);
   var box = document.getElementById('pl-problemas');
-  var tocado = d.nombre || d.cuerpo;
+  var tocado = d.nombre || d.texto;
   if (p.length && tocado) {
     box.classList.remove('hidden');
     box.innerHTML = p.map(function(x) { return '• ' + esc(x); }).join('<br>');
@@ -1172,11 +1310,15 @@ function validarForm(soloEjemplos) {
 async function crearPlantilla() {
   if (validarForm().length) return;
   var btn = document.getElementById('pl-btn-crear');
-  btn.disabled = true; btn.textContent = 'Enviando…';
+  btn.disabled = true; btn.textContent = tipoEncabezado() === 'imagen' ? 'Subiendo imagen…' : 'Enviando…';
   try {
     var d = datosForm();
-    d.ejemplos = d.ejemplos.slice(0, numVars(d.cuerpo));
-    var res = await api('/wa-meta/plantillas', { method: 'POST', body: d });
+    var body = {
+      nombre: d.nombre, categoria: d.categoria, encabezado_tipo: d.tipoEnc, encabezado: d.encabezado,
+      cuerpo: d.texto, pie: d.pie, ejemplos: d.ejemplos,
+    };
+    if (d.tipoEnc === 'imagen' && _imgPl) body.imagen = { base64: _imgPl.base64, mime: _imgPl.mime, nombre: _imgPl.nombre };
+    var res = await api('/wa-meta/plantillas', { method: 'POST', body: body });
     if (!res) return;
     var data = await res.json();
     if (!res.ok) {
@@ -1221,6 +1363,19 @@ async function confirmarEliminarPlantilla() {
 // ══ Pestaña Envío manual ══════════════════════════════════════════
 var _envioPlantilla = null;
 var _envioPropietarioId = null;
+var _envioPropietarioNombre = '';
+var _evImg = null;
+
+// Sube una imagen a Meta para enviarla → { ok, id } o { ok:false, message }
+async function subirImagenMeta(img, guardar) {
+  try {
+    var res = await api('/wa-meta/media', { method: 'POST', body: { imagen: { base64: img.base64, mime: img.mime, nombre: img.nombre }, guardar: !!guardar } });
+    if (!res) return { ok: false, message: 'Sin respuesta.' };
+    var data = await res.json();
+    return res.ok ? { ok: true, id: data.data.id, blob: data.data.blob } : { ok: false, message: data.message || 'No se pudo subir la imagen.' };
+  } catch (e) { return { ok: false, message: 'Error de conexión: ' + e.message }; }
+}
+function leerImagenEnvio(input) { leerArchivoImagen(input, function(img) { _evImg = img; previaEnvio(); }); }
 var _plantillaPreferida = null;
 
 function usarEnEnvio(i) {
@@ -1230,13 +1385,11 @@ function usarEnEnvio(i) {
 
 async function prepararEnvio() {
   var sel = document.getElementById('ev-plantilla');
-  if (!_plantillas.length) {
-    sel.innerHTML = '<option value="">Cargando…</option>';
-    try {
-      var res = await api('/wa-meta/plantillas');
-      if (res && res.ok) _plantillas = (await res.json()).data || [];
-    } catch (e) {}
-  }
+  if (!_plantillas.length) sel.innerHTML = '<option value="">Cargando…</option>';
+  try {   // siempre trae el estado actual (una plantilla recién aprobada aparece sin recargar la página)
+    var res = await api('/wa-meta/plantillas');
+    if (res && res.ok) _plantillas = (await res.json()).data || [];
+  } catch (e) {}
   var aprobadas = _plantillas.filter(function(p) { return p.estado === 'APPROVED'; });
   var actual = _plantillaPreferida || sel.value;
   sel.innerHTML = aprobadas.length
@@ -1260,10 +1413,17 @@ function elegirPlantillaEnvio() {
   var v = document.getElementById('ev-plantilla').value;
   _envioPlantilla = _plantillas.find(function(p) { return p.nombre + '|' + p.idioma === v; }) || null;
   var cont = document.getElementById('ev-variables');
+  _evImg = null;
+  document.getElementById('ev-imagen').value = '';
+  document.getElementById('ev-imagen-box').classList.toggle('hidden', !(_envioPlantilla && _envioPlantilla.encabezado_formato === 'IMAGE'));
   if (!_envioPlantilla || !_envioPlantilla.variables) { cont.innerHTML = ''; previaEnvio(); return; }
-  cont.innerHTML = Array.from({ length: _envioPlantilla.variables }, function(_, i) {
-    return '<div><label class="vlabel">Variable {{' + (i + 1) + '}} *</label>' +
-      '<input class="vinput ev-var" oninput="previaEnvio()" placeholder="Valor para {{' + (i + 1) + '}}"/></div>';
+  var etiquetas = etiquetasVariables(_envioPlantilla);
+  var nombres = _envioPlantilla.variables_nombres || [];
+  cont.innerHTML = etiquetas.map(function(et, i) {
+    var k = nombres[i] || '';
+    var valor = k === 'clinica' ? (_clinicaNombre || _psClinica.nombre || '') : k === 'nombre' && _envioPropietarioNombre ? _envioPropietarioNombre : '';
+    return '<div><label class="vlabel">' + esc(et) + ' *</label>' +
+      '<input class="vinput ev-var" data-clave="' + escAttr(k) + '" value="' + escAttr(valor) + '" oninput="previaEnvio()" placeholder="' + escAttr(EJEMPLO_DATO_PL[k] ? 'Ej. ' + EJEMPLO_DATO_PL[k] : 'Escribe ' + et.toLowerCase()) + '"/></div>';
   }).join('');
   previaEnvio();
 }
@@ -1279,7 +1439,8 @@ function previaEnvio() {
   }
   if (!_envioPlantilla) { el.innerHTML = '<span style="color:#8696a0">Elige una plantilla…</span>'; return; }
   var vals = Array.prototype.map.call(document.querySelectorAll('.ev-var'), function(i) { return i.value; });
-  el.innerHTML = burbuja(_envioPlantilla.encabezado, _envioPlantilla.cuerpo, _envioPlantilla.pie, vals);
+  el.innerHTML = (_envioPlantilla.encabezado_formato === 'IMAGE' ? imagenBurbuja(_evImg && _evImg.url) : '') +
+    burbuja(_envioPlantilla.encabezado, _envioPlantilla.cuerpo, _envioPlantilla.pie, vals);
 }
 
 // Buscador de propietarios
@@ -1309,11 +1470,14 @@ function elegirPropietarioEnvio(i) {
   var p = (window._evResultados || [])[i]; if (!p) return;
   var nombre = p.razon_social || [p.nombre, p.apellido].filter(Boolean).join(' ');
   _envioPropietarioId = p.id;
+  _envioPropietarioNombre = nombre;
   document.getElementById('ev-buscar').value = nombre;
   document.getElementById('ev-telefono').value = p.telefono || '';
   document.getElementById('ev-resultados').classList.add('hidden');
-  var primera = document.querySelector('.ev-var');
-  if (primera && !primera.value) { primera.value = p.razon_social || p.nombre || ''; previaEnvio(); }
+  // Completa el dato "Nombre del cliente" (o la primera variable si la plantilla no tiene nombres)
+  var campo = document.querySelector('.ev-var[data-clave="nombre"]') ||
+              (!(_envioPlantilla && _envioPlantilla.variables_nombres) ? document.querySelector('.ev-var') : null);
+  if (campo) { campo.value = nombre; previaEnvio(); }
   if (!p.telefono) toast('Este propietario no tiene teléfono registrado.', 'warning');
 }
 
@@ -1343,7 +1507,8 @@ async function enviarMensaje() {
   if (tipo === 'plantilla') {
     if (!_envioPlantilla) return msgEnvio('error', 'Elige una plantilla aprobada.');
     var vals = Array.prototype.map.call(document.querySelectorAll('.ev-var'), function(i) { return i.value.trim(); });
-    if (vals.some(function(v) { return !v; })) return msgEnvio('error', 'Completa todas las variables.');
+    if (vals.some(function(v) { return !v; })) return msgEnvio('error', 'Completa todos los datos de la plantilla.');
+    if (_envioPlantilla.encabezado_formato === 'IMAGE' && !_evImg) return msgEnvio('error', 'Esta plantilla lleva imagen: elígela.');
     body.plantilla = _envioPlantilla.nombre;
     body.idioma = _envioPlantilla.idioma;
     body.variables = vals;
@@ -1357,6 +1522,13 @@ async function enviarMensaje() {
   var btn = document.getElementById('ev-btn');
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
+    if (tipo === 'plantilla' && _envioPlantilla.encabezado_formato === 'IMAGE') {
+      btn.textContent = 'Subiendo imagen…';
+      var mid = await subirImagenMeta(_evImg);
+      if (!mid.ok) return msgEnvio('error', '❌ ' + esc(mid.message));
+      body.imagen_media_id = mid.id;
+      btn.textContent = 'Enviando…';
+    }
     var res = await api('/wa-meta/enviar', { method: 'POST', body: body });
     if (!res) return;
     var data = await res.json();
@@ -1680,7 +1852,8 @@ function pintarCampanas() {
     return '<div class="wm-cp">' +
       '<div style="display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap">' +
       '<div><p style="font-weight:800;font-size:.92rem">' + esc(c.nombre) + '</p>' +
-      '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.15rem">Plantilla: <span style="font-family:monospace">' + esc(c.plantilla || '—') + '</span> · ' + esc(seg) +
+      '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.15rem">Plantilla: <span style="font-family:monospace">' + esc(c.plantilla || '—') + '</span>' +
+        (Number(c.con_imagen) ? ' · 🖼️ con imagen' : '') + ' · ' + esc(seg) +
       (c.estado === 'programada' && c.programada_at ? ' · 🗓 ' + esc(fechaCorta(c.programada_at)) : '') + '</p></div>' +
       '<span class="wm-badge ' + est[1] + '">' + esc(est[0]) + '</span></div>' +
       '<p style="font-size:.78rem;color:var(--ink-soft);background:#f8faf8;border-radius:.6rem;padding:.5rem .7rem;white-space:pre-wrap">' + esc(c.mensaje) + '</p>' +
@@ -1731,6 +1904,8 @@ async function confirmarAccionCampana() {
 
 // ── Nueva campaña ────────────────────────────────────────────────
 var _cpPlantilla = null;
+var _cpImg = null;
+function leerImagenCampana(input) { leerArchivoImagen(input, function(img) { _cpImg = img; previaCampana(); }); }
 async function abrirNuevaCampana() {
   document.getElementById('cp-nombre').value = '';
   document.getElementById('cp-segmento').value = 'todos';
@@ -1750,11 +1925,12 @@ async function abrirNuevaCampana() {
     var res = await api('/wa-meta/plantillas');
     if (res && res.ok) _plantillas = (await res.json()).data || [];
   } catch (e) {}
-  var aprobadas = _plantillas.filter(function(p) { return p.estado === 'APPROVED' && !p.es_estandar; })
+  var aprobadas = _plantillas.filter(function(p) { return p.estado === 'APPROVED' && !p.es_estandar && (!p.encabezado_formato || p.encabezado_formato === 'TEXT' || p.encabezado_formato === 'IMAGE'); })
     .sort(function(a, b) { return (a.categoria === 'MARKETING' ? 0 : 1) - (b.categoria === 'MARKETING' ? 0 : 1); });
   sel.innerHTML = aprobadas.length
     ? '<option value="">— Elige una plantilla —</option>' + aprobadas.map(function(p) {
-        return '<option value="' + escAttr(p.nombre + '|' + p.idioma) + '">' + esc(p.nombre) + ' · ' + (p.categoria === 'MARKETING' ? 'Marketing' : 'Utilidad') + '</option>';
+        return '<option value="' + escAttr(p.nombre + '|' + p.idioma) + '">' + esc(p.nombre) + ' · ' + (p.categoria === 'MARKETING' ? 'Marketing' : 'Utilidad') +
+          (p.encabezado_formato === 'IMAGE' ? ' · 🖼️ con imagen' : '') + '</option>';
       }).join('')
     : '<option value="">No tienes plantillas aprobadas: crea una de Marketing en «Plantillas»</option>';
   elegirPlantillaCampana();
@@ -1768,17 +1944,23 @@ function elegirPlantillaCampana() {
   aviso.classList.toggle('hidden', !(_cpPlantilla && _cpPlantilla.categoria !== 'MARKETING'));
   aviso.textContent = 'Es una plantilla de Utilidad: úsala solo para avisos informativos. Para promociones usa una de Marketing, o Meta puede bloquear los envíos.';
   var cont = document.getElementById('cp-variables');
+  _cpImg = null;
+  document.getElementById('cp-imagen').value = '';
+  document.getElementById('cp-imagen-box').classList.toggle('hidden', !(_cpPlantilla && _cpPlantilla.encabezado_formato === 'IMAGE'));
   if (!_cpPlantilla || !_cpPlantilla.variables) { cont.innerHTML = ''; previaCampana(); return; }
+  var nombres = _cpPlantilla.variables_nombres;
+  var etiquetas = etiquetasVariables(_cpPlantilla);
   var defecto = ['nombre', 'mascota', 'clinica'];
-  cont.innerHTML = '<p class="vlabel" style="margin:0">¿Qué va en cada variable?</p>' + Array.from({ length: _cpPlantilla.variables }, function(_, i) {
-    var d = defecto[i] || 'fijo';
+  cont.innerHTML = '<p class="vlabel" style="margin:0">¿Qué va en cada dato?</p>' + Array.from({ length: _cpPlantilla.variables }, function(_, i) {
+    // Con nombres guardados: nombre/mascota/clínica se llenan solos; el resto es texto fijo
+    var d = nombres ? (DATO_CAMPANA_TXT[nombres[i]] ? nombres[i] : 'fijo') : (defecto[i] || 'fijo');
     return '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">' +
-      '<span class="wm-var" style="min-width:2.6rem;text-align:center">{{' + (i + 1) + '}}</span>' +
+      '<span class="wm-var wm-etq">' + esc(etiquetas[i]) + '</span>' +
       '<select class="vinput cp-var-tipo" style="flex:1;min-width:170px" onchange="cambiarVarCampana(this)">' +
         Object.keys(DATO_CAMPANA_TXT).map(function(k) { return '<option value="' + k + '"' + (k === d ? ' selected' : '') + '>' + DATO_CAMPANA_TXT[k] + '</option>'; }).join('') +
         '<option value="fijo"' + (d === 'fijo' ? ' selected' : '') + '>Texto fijo…</option>' +
       '</select>' +
-      '<input class="vinput cp-var-fijo' + (d === 'fijo' ? '' : ' hidden') + '" style="flex:1;min-width:170px" maxlength="200" placeholder="Escribe el texto" oninput="previaCampana()"/>' +
+      '<input class="vinput cp-var-fijo' + (d === 'fijo' ? '' : ' hidden') + '" style="flex:1;min-width:170px" maxlength="200" placeholder="' + escAttr(nombres ? 'Escribe ' + etiquetas[i].toLowerCase() + ' (igual para todos)' : 'Escribe el texto') + '" oninput="previaCampana()"/>' +
       '</div>';
   }).join('');
   previaCampana();
@@ -1801,7 +1983,8 @@ function previaCampana() {
   if (!_cpPlantilla) { el.innerHTML = '<span style="color:#8696a0">Elige una plantilla…</span>'; return; }
   var ej = { nombre: 'María López', mascota: 'Firulais, Mishi', clinica: _psClinica.nombre || 'tu clínica' };
   var vals = leerVarsCampana().map(function(v) { return v.tipo === 'dato' ? ej[v.valor] : v.valor; });
-  el.innerHTML = burbuja(_cpPlantilla.encabezado, _cpPlantilla.cuerpo, _cpPlantilla.pie, vals);
+  el.innerHTML = (_cpPlantilla.encabezado_formato === 'IMAGE' ? imagenBurbuja(_cpImg && _cpImg.url) : '') +
+    burbuja(_cpPlantilla.encabezado, _cpPlantilla.cuerpo, _cpPlantilla.pie, vals);
 }
 
 async function cambiarSegmento() {
@@ -1850,7 +2033,9 @@ async function crearCampana(enviar) {
   if (!_cpPlantilla) return msgCampana('Elige una plantilla aprobada.');
   var vars = leerVarsCampana();
   var vacia = vars.findIndex(function(v) { return v.tipo === 'fijo' && !v.valor; });
-  if (vacia >= 0) return msgCampana('Escribe el texto de la variable {{' + (vacia + 1) + '}}.');
+  if (vacia >= 0) return msgCampana('Escribe el texto de «' + esc(etiquetasVariables(_cpPlantilla)[vacia]) + '».');
+  var conImagen = _cpPlantilla.encabezado_formato === 'IMAGE';
+  if (conImagen && !_cpImg) return msgCampana('Esta plantilla lleva imagen: elige la imagen de la campaña.');
   var seg = document.getElementById('cp-segmento').value;
   var body = {
     nombre: nombre, plantilla: _cpPlantilla.nombre + '|' + _cpPlantilla.idioma, variables: vars,
@@ -1868,6 +2053,12 @@ async function crearCampana(enviar) {
   var b1 = document.getElementById('cp-btn-crear'), b2 = document.getElementById('cp-btn-borrador');
   b1.disabled = b2.disabled = true;
   try {
+    if (conImagen) {
+      var mid = await subirImagenMeta(_cpImg, true);
+      if (!mid.ok) return msgCampana('❌ ' + esc(mid.message));
+      body.imagen_media_id = mid.id;
+      body.imagen_blob = mid.blob;
+    }
     var res = await api('/wa-meta/campanas', { method: 'POST', body: body });
     if (!res) return;
     var data = await res.json();

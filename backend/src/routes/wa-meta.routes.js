@@ -454,6 +454,7 @@ function vistaPlantillaMeta(t) {
   return {
     id: t.id, nombre: t.name, idioma: t.language, estado: t.status, categoria: t.category,
     cuerpo: body?.text || '', encabezado: header?.text || '', pie: footer?.text || '',
+    encabezado_formato: (t.components || []).find(c => c.type === 'HEADER')?.format || null,   // TEXT | IMAGE | VIDEO | DOCUMENT
     variables: [...new Set(variablesDe(body?.text || ''))].length,
     motivo_rechazo: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
   };
@@ -491,21 +492,27 @@ router.get('/plantillas', async (req, res, next) => {
     const lista = await plantillasMeta(cfg, token, wabaId);
     await sincronizarPlantillas(req, lista);
     let usos = [];
-    try { usos = await req.db.query('SELECT nombre_meta, idioma, uso, es_estandar FROM wa_meta_plantillas WHERE activo=1'); }
+    try { usos = await req.db.query('SELECT nombre_meta, idioma, uso, es_estandar, variables FROM wa_meta_plantillas WHERE activo=1'); }
     catch { /* sin migración v18 */ }
     const data = lista.map(t => {
       const u = usos.find(x => x.nombre_meta === t.name && x.idioma === t.language);
-      return { ...vistaPlantillaMeta(t), uso: u?.uso || null, es_estandar: !!(u && Number(u.es_estandar)) };
+      const v = vistaPlantillaMeta(t);
+      // Nombre de cada variable ({{1}} = nombre, {{2}} = mascota…) si la plantilla se creó desde el sistema
+      let nombres = null;
+      try { nombres = u?.variables ? JSON.parse(u.variables) : null; } catch { nombres = null; }
+      if (!Array.isArray(nombres) || nombres.length !== v.variables) nombres = null;
+      return { ...v, uso: u?.uso || null, es_estandar: !!(u && Number(u.es_estandar)), variables_nombres: nombres };
     });
     return res.json({ success: true, data });
   } catch (err) { responderError(res, next, err); }
 });
 
 // Arma los componentes de Meta (encabezado, cuerpo con ejemplos, pie)
-function componentesPlantilla({ encabezado, cuerpo, pie, ejemplos }) {
+function componentesPlantilla({ encabezado, cuerpo, pie, ejemplos, imagenHandle }) {
   const nVars = [...new Set(variablesDe(cuerpo))].length;
   const components = [];
-  if (encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: encabezado });
+  if (imagenHandle) components.push({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [imagenHandle] } });
+  else if (encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: encabezado });
   const body = { type: 'BODY', text: cuerpo };
   if (nVars) body.example = { body_text: [ejemplos.slice(0, nVars)] };
   components.push(body);
@@ -513,23 +520,144 @@ function componentesPlantilla({ encabezado, cuerpo, pie, ejemplos }) {
   return components;
 }
 
+// ── Datos con nombre: [nombre], [mascota]… → {{1}}, {{2}}… ──────────────
+// Devuelve { cuerpo, nombres } — nombres = null si el texto ya venía con {{1}}
+function convertirEtiquetas(texto) {
+  const t = String(texto || '');
+  if (!/\[[a-z0-9_]{1,30}\]/i.test(t)) return { cuerpo: t, nombres: null };
+  if (/\{\{\s*\d+\s*\}\}/.test(t)) {
+    const e = new Error('Usa los botones de datos ([nombre], [mascota]…) en lugar de {{1}}, {{2}}.'); e.status = 422; throw e;
+  }
+  const nombres = [];
+  const cuerpo = t.replace(/\[([a-z0-9_]{1,30})\]/gi, (_, k) => {
+    k = k.toLowerCase();
+    let i = nombres.indexOf(k);
+    if (i === -1) { nombres.push(k); i = nombres.length - 1; }
+    return `{{${i + 1}}}`;
+  });
+  return { cuerpo, nombres };
+}
+
+// ── Imágenes ─────────────────────────────────────────────────────────
+const MIME_IMAGEN = ['image/jpeg', 'image/png'];
+const MAX_IMAGEN  = 5 * 1024 * 1024;   // límite de Meta para imágenes
+
+function leerImagen(img) {
+  if (!img || !img.base64) return null;
+  const mime = String(img.mime || '').toLowerCase().replace('image/jpg', 'image/jpeg');
+  if (!MIME_IMAGEN.includes(mime)) { const e = new Error('La imagen debe ser JPG o PNG.'); e.status = 422; throw e; }
+  const buf = Buffer.from(String(img.base64).replace(/^data:[^;]+;base64,/, ''), 'base64');
+  if (!buf.length) { const e = new Error('La imagen está vacía.'); e.status = 422; throw e; }
+  if (buf.length > MAX_IMAGEN) { const e = new Error('La imagen no puede pasar de 5 MB.'); e.status = 422; throw e; }
+  const ext  = mime === 'image/png' ? 'png' : 'jpg';
+  const nombre = (String(img.nombre || 'imagen').replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 40) || 'imagen') + '.' + ext;
+  return { buf, mime, nombre };
+}
+
+async function respuestaMeta(r, quePaso) {
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) {
+    const e = new Error(`${quePaso}: ${d.error?.error_user_msg || d.error?.message || 'Meta respondió ' + r.status}`);
+    e.status = 422; e.meta = d.error; throw e;
+  }
+  return d;
+}
+
+// Imagen de ejemplo para crear la plantilla (Resumable Upload → "header_handle")
+async function subirImagenEjemplo(cfg, token, img) {
+  const base = `${GRAPH_BASE}/${cfg.graphVer}`;
+  const q = new URLSearchParams({ file_name: img.nombre, file_length: String(img.buf.length), file_type: img.mime, access_token: token });
+  let r = await fetch(`${base}/${cfg.appId}/uploads?${q}`, { method: 'POST', signal: AbortSignal.timeout(20000) });
+  const sesion = await respuestaMeta(r, 'No se pudo preparar la subida de la imagen');
+  r = await fetch(`${base}/${sesion.id}`, {
+    method: 'POST', signal: AbortSignal.timeout(60000),
+    headers: { Authorization: `OAuth ${token}`, file_offset: '0', 'Content-Type': img.mime },
+    body: img.buf,
+  });
+  const d = await respuestaMeta(r, 'No se pudo subir la imagen a Meta');
+  if (!d.h) { const e = new Error('Meta no devolvió el identificador de la imagen.'); e.status = 422; throw e; }
+  return d.h;
+}
+
+// Imagen para enviar en un mensaje (queda en Meta 30 días) → media id
+async function subirImagenEnvio(cfg, token, phoneId, img) {
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', img.mime);
+  form.append('file', new Blob([img.buf], { type: img.mime }), img.nombre);
+  const r = await fetch(`${GRAPH_BASE}/${cfg.graphVer}/${phoneId}/media`, {
+    method: 'POST', signal: AbortSignal.timeout(60000), headers: { Authorization: `Bearer ${token}` }, body: form,
+  });
+  const d = await respuestaMeta(r, 'No se pudo subir la imagen a Meta');
+  return d.id;
+}
+
+// ── Copia en Azure Blob Storage (mismo contenedor que las campañas por QR) ──
+let _azureWa = null;
+function contenedorWA() {
+  const conn = process.env.AZURE_WA_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING || process.env.AZURE_STORAGE_CONNECTION;
+  if (!conn) return null;
+  if (!_azureWa) {
+    const { BlobServiceClient } = require('@azure/storage-blob');
+    _azureWa = BlobServiceClient.fromConnectionString(conn);
+  }
+  return _azureWa.getContainerClient(process.env.AZURE_WA_CONTAINER || 'wa-media');
+}
+
+async function guardarEnBlob(tenantId, img) {
+  const cont = contenedorWA();
+  if (!cont) { logger.warn('[wa-meta] Azure Blob no configurado: la imagen solo queda en Meta'); return null; }
+  const nombre = `meta/${tenantId}/${Date.now()}-${img.nombre}`;
+  await cont.getBlockBlobClient(nombre).upload(img.buf, img.buf.length, { blobHTTPHeaders: { blobContentType: img.mime } });
+  return nombre;
+}
+
+async function borrarDeBlob(nombre) {
+  const cont = contenedorWA();
+  if (!cont || !nombre) return;
+  try { await cont.deleteBlob(nombre); } catch (e) { logger.warn('[wa-meta] No se pudo borrar el blob ' + nombre + ': ' + e.message); }
+}
+
+// ── POST /media — sube una imagen para enviarla (envío manual o campaña) ──
+//    body: { imagen: { base64, mime, nombre }, guardar?: true }  →  { id, blob }
+//    guardar = true (campañas): además queda una copia en Azure Blob Storage
+router.post('/media', async (req, res, next) => {
+  try {
+    const img = leerImagen(req.body?.imagen);
+    if (!img) return res.status(422).json({ success: false, message: 'Elige una imagen.' });
+    const { tenantId, cfg, token, phoneId } = await cuentaConectada(req);
+    const id = await subirImagenEnvio(cfg, token, phoneId, img);
+    let blob = null;
+    if (req.body?.guardar) {
+      try { blob = await guardarEnBlob(tenantId, img); }
+      catch (e) { logger.warn('[wa-meta] No se pudo guardar la imagen en Azure: ' + e.message); }
+    }
+    return res.json({ success: true, data: { id, blob } });
+  } catch (err) { responderError(res, next, err); }
+});
+
 // ── POST /plantillas — crea una plantilla y la envía a revisión ──────
 router.post('/plantillas', async (req, res, next) => {
   try {
     const b = req.body || {};
+    const conv = convertirEtiquetas(String(b.cuerpo || '').trim());
+    const tipoEnc = ['texto', 'imagen'].includes(b.encabezado_tipo) ? b.encabezado_tipo : (b.encabezado ? 'texto' : 'ninguno');
     const datos = {
       nombre    : String(b.nombre || '').trim().toLowerCase(),
       categoria : String(b.categoria || '').toUpperCase(),
       idioma    : String(b.idioma || 'es').trim(),
-      encabezado: String(b.encabezado || '').trim(),
-      cuerpo    : String(b.cuerpo || '').trim(),
+      encabezado: tipoEnc === 'texto' ? String(b.encabezado || '').trim() : '',
+      cuerpo    : conv.cuerpo.trim(),
       pie       : String(b.pie || '').trim(),
       ejemplos  : Array.isArray(b.ejemplos) ? b.ejemplos.map(e => String(e || '').trim()) : [],
     };
     const problemas = validarPlantilla(datos);
+    const img = tipoEnc === 'imagen' ? leerImagen(b.imagen) : null;
+    if (tipoEnc === 'imagen' && !img) problemas.unshift('Elige la imagen de ejemplo del encabezado.');
     if (problemas.length) return res.status(422).json({ success: false, message: problemas[0], problemas });
 
     const { cfg, token, wabaId } = await cuentaConectada(req);
+    if (img) datos.imagenHandle = await subirImagenEjemplo(cfg, token, img);
     const d = await graph('POST', `${wabaId}/message_templates`, {
       cfg, token,
       body: { name: datos.nombre, language: datos.idioma, category: datos.categoria, components: componentesPlantilla(datos) },
@@ -538,14 +666,14 @@ router.post('/plantillas', async (req, res, next) => {
     // Se guarda también en la base de la clínica (para campañas y estados)
     try {
       await req.db.query(
-        `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, encabezado_tipo, encabezado_texto, cuerpo, pie,
+        `INSERT INTO wa_meta_plantillas (nombre_meta, idioma, categoria, uso, encabezado_tipo, encabezado_texto, cuerpo, variables, pie,
            meta_template_id, estado, es_estandar, activo)
-         VALUES (?,?,?,?,?,?,?,?,?,?,0,1)
-         ON DUPLICATE KEY UPDATE categoria=VALUES(categoria), cuerpo=VALUES(cuerpo), encabezado_tipo=VALUES(encabezado_tipo),
-           encabezado_texto=VALUES(encabezado_texto), pie=VALUES(pie), meta_template_id=VALUES(meta_template_id),
-           estado=VALUES(estado), activo=1`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)
+         ON DUPLICATE KEY UPDATE categoria=VALUES(categoria), cuerpo=VALUES(cuerpo), variables=VALUES(variables),
+           encabezado_tipo=VALUES(encabezado_tipo), encabezado_texto=VALUES(encabezado_texto), pie=VALUES(pie),
+           meta_template_id=VALUES(meta_template_id), estado=VALUES(estado), activo=1`,
         [datos.nombre, datos.idioma, datos.categoria, datos.categoria === 'MARKETING' ? 'campana' : 'manual',
-         datos.encabezado ? 'texto' : 'ninguno', datos.encabezado || null, datos.cuerpo, datos.pie || null,
+         tipoEnc, datos.encabezado || null, datos.cuerpo, conv.nombres ? JSON.stringify(conv.nombres) : null, datos.pie || null,
          d.id || null, ESTADO_DESDE_META[d.status] || 'pendiente']
       );
     } catch (e) { if (!errorSinMigracion(e)) logger.warn('[wa-meta] No se guardó la plantilla en la clínica: ' + e.message); }
@@ -633,7 +761,15 @@ router.post('/enviar', async (req, res, next) => {
         messaging_product: 'whatsapp', to: telefono, type: 'template',
         template: { name: nombre, language: { code: String(b.idioma || 'es') } },
       };
-      if (vars.length) payload.template.components = [{ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v })) }];
+      const comps = [];
+      // Plantilla con imagen en el encabezado: la imagen se sube antes con POST /media
+      const mediaId = String(b.imagen_media_id || '').trim();
+      if (mediaId) {
+        if (!/^\d{5,30}$/.test(mediaId)) return res.status(422).json({ success: false, message: 'Imagen inválida: vuelve a elegirla.' });
+        comps.push({ type: 'header', parameters: [{ type: 'image', image: { id: mediaId } }] });
+      }
+      if (vars.length) comps.push({ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v })) });
+      if (comps.length) payload.template.components = comps;
       resumen = String(b.vista_previa || `[plantilla ${nombre}] ${vars.join(' | ')}`).slice(0, 2000);
     }
 
@@ -656,6 +792,10 @@ router.post('/enviar', async (req, res, next) => {
     // 133010: el número está conectado pero no registrado en la API
     if (err.meta?.code === 133010) {
       return res.status(422).json({ success: false, codigo: 133010, message: 'Meta dice que tu número no está activo en la API («Account not registered»). Ve a la pestaña «Conexión» y pulsa «Revisar número con Meta».' });
+    }
+    // 132012: falta un parámetro (por ejemplo la imagen del encabezado)
+    if (err.meta?.code === 132012) {
+      return res.status(422).json({ success: false, message: 'A la plantilla le falta un dato: si tiene imagen, elígela antes de enviar.' });
     }
     // 132001: la plantilla no existe en ese idioma o aún no está aprobada
     if (err.meta?.code === 132001) {
@@ -974,7 +1114,7 @@ router.get('/campanas', async (req, res, next) => {
     let rows;
     try {
       rows = await req.db.query(
-        `SELECT c.id, c.nombre, c.mensaje, c.segmento, c.segmento_valor, c.estado, c.total, c.enviados, c.fallidos,
+        `SELECT c.id, c.nombre, c.mensaje, (c.imagen_url LIKE 'meta-media:%') AS con_imagen, c.segmento, c.segmento_valor, c.estado, c.total, c.enviados, c.fallidos,
                 c.programada_at, c.iniciada_at, c.completada_at, c.created_at, p.nombre_meta AS plantilla
          FROM wa_campanas c LEFT JOIN wa_meta_plantillas p ON p.id = c.meta_plantilla_id
          WHERE c.proveedor = 'meta' ORDER BY c.id DESC LIMIT 100`
@@ -1011,9 +1151,17 @@ router.post('/campanas', async (req, res, next) => {
     if (!t) return res.status(422).json({ success: false, message: 'La plantilla ya no existe en Meta.' });
     if (t.status !== 'APPROVED') return res.status(422).json({ success: false, message: 'La plantilla todavía no está aprobada por Meta.' });
     const vt = vistaPlantillaMeta(t);
-    if ((t.components || []).some(c => c.type === 'HEADER' && c.format && c.format !== 'TEXT')) {
-      return res.status(422).json({ success: false, message: 'Por ahora las campañas solo usan plantillas de texto (sin imagen).' });
+    let imagenUrl = null;
+    if (vt.encabezado_formato && !['TEXT', 'IMAGE'].includes(vt.encabezado_formato)) {
+      return res.status(422).json({ success: false, message: 'Las campañas usan plantillas de texto o con imagen (no video ni documento).' });
     }
+    if (vt.encabezado_formato === 'IMAGE') {
+      const mediaId = String(b.imagen_media_id || '').trim();
+      if (!/^\d{5,30}$/.test(mediaId)) return res.status(422).json({ success: false, message: 'Esta plantilla lleva imagen: elige la imagen de la campaña.' });
+      imagenUrl = 'meta-media:' + mediaId;   // id de la imagen subida a Meta (dura 30 días)
+    }
+    const tenantIdCamp = await tenantIdDe(req);
+    const blobNombre = imagenUrl && String(b.imagen_blob || '').startsWith(`meta/${tenantIdCamp}/`) ? String(b.imagen_blob).slice(0, 200) : null;
 
     const vars = Array.isArray(b.variables) ? b.variables : [];
     if (vars.length < vt.variables) return res.status(422).json({ success: false, message: 'Indica qué va en cada variable de la plantilla.' });
@@ -1041,9 +1189,9 @@ router.post('/campanas', async (req, res, next) => {
       const [fila] = await req.db.query('SELECT id FROM wa_meta_plantillas WHERE nombre_meta=? AND idioma=?', [t.name, t.language]);
       plantillaId = fila.id;
       const r = await req.db.query(
-        `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, estado, programada_at, proveedor, meta_plantilla_id, meta_variables)
-         VALUES (?,?,?,?,?,?, 'meta', ?, ?)`,
-        [nombre, vista, segmento, segValor, programada ? 'programada' : 'borrador', programada, plantillaId, JSON.stringify(mapeo)]
+        `INSERT INTO wa_campanas (nombre, mensaje, imagen_url, imagen_blob_name, segmento, segmento_valor, estado, programada_at, proveedor, meta_plantilla_id, meta_variables)
+         VALUES (?,?,?,?,?,?,?,?, 'meta', ?, ?)`,
+        [nombre, vista, imagenUrl, blobNombre, segmento, segValor, programada ? 'programada' : 'borrador', programada, plantillaId, JSON.stringify(mapeo)]
       );
       return res.status(201).json({ success: true, message: programada ? 'Campaña programada.' : 'Campaña creada.', data: { id: r.insertId } });
     } catch (e) { if (errorSinMigracion(e)) throw faltaMigracion(); throw e; }
@@ -1074,12 +1222,13 @@ router.post('/campanas/:id/:accion', async (req, res, next) => {
 // ── DELETE /campanas/:id — solo borradores, canceladas o completadas ──
 router.delete('/campanas/:id', async (req, res, next) => {
   try {
-    const [c] = await req.db.query("SELECT id, estado FROM wa_campanas WHERE id=? AND proveedor='meta'", [req.params.id]);
+    const [c] = await req.db.query("SELECT id, estado, imagen_blob_name FROM wa_campanas WHERE id=? AND proveedor='meta'", [req.params.id]);
     if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
     if (!['borrador', 'cancelada', 'completada'].includes(c.estado)) {
       return res.status(422).json({ success: false, message: 'Pausa o cancela la campaña antes de eliminarla.' });
     }
     await req.db.query('DELETE FROM wa_campanas WHERE id=?', [c.id]);
+    if (c.imagen_blob_name) await borrarDeBlob(c.imagen_blob_name);
     return res.json({ success: true, message: 'Campaña eliminada.' });
   } catch (err) { responderError(res, next, err); }
 });
