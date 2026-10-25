@@ -1,8 +1,11 @@
 -- ============================================================
--- VETNETCODIP SaaS — SCHEMA VET_MASTER v7
+-- VETNETCODIP SaaS — SCHEMA VET_MASTER v8
 -- v5: + zona_horaria en tenant_config
 -- v6: + integraciones RENIEC/SUNAT + tabla tenant_api_consumo
 -- v7: + sistema de pagos SaaS completo
+-- v8: + WhatsApp Meta: wa_config_global.ver_qr / ver_meta / meta_alerta_mensual
+--       + tabla wa_meta_cuentas (conexión de cada clínica con la API oficial)
+--       + tabla wa_meta_webhook_log (avisos de Meta)
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS vet_master
@@ -209,8 +212,63 @@ CREATE TABLE IF NOT EXISTS wa_config_global (
   msgs_usados    INT UNSIGNED  NOT NULL DEFAULT 0,
   mes_actual     CHAR(7)       NOT NULL DEFAULT (DATE_FORMAT(NOW(),'%Y-%m')),
   updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  -- v8: qué pantallas de WhatsApp ve la clínica (lo controla el admin SaaS)
+  ver_qr              TINYINT(1)   NOT NULL DEFAULT 1
+                      COMMENT 'Muestra la pantalla WhatsApp (conexión por QR / Baileys)',
+  ver_meta            TINYINT(1)   NOT NULL DEFAULT 0
+                      COMMENT 'Muestra la pantalla WhatsApp Meta (API oficial)',
+  meta_alerta_mensual INT UNSIGNED NOT NULL DEFAULT 1000
+                      COMMENT 'Al llegar a esta cantidad de mensajes Meta en el mes se avisa a la clínica',
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- ── WhatsApp Meta — conexión de cada clínica (v8) ─────────────
+-- Vive en la base maestra porque el webhook de Meta llega sin subdominio:
+-- se identifica la clínica por phone_number_id.
+CREATE TABLE IF NOT EXISTS wa_meta_cuentas (
+  tenant_id          INT UNSIGNED  NOT NULL PRIMARY KEY,
+  estado             ENUM('desconectado','conectando','conectado','error')
+                                   NOT NULL DEFAULT 'desconectado',
+  business_id        VARCHAR(40)   NULL COMMENT 'Portafolio comercial de Meta de la clínica',
+  waba_id            VARCHAR(40)   NULL COMMENT 'Cuenta de WhatsApp Business',
+  phone_number_id    VARCHAR(40)   NULL COMMENT 'Identificador del número en Cloud API',
+  numero_display     VARCHAR(30)   NULL COMMENT 'Número visible, ej. +51 987 654 321',
+  nombre_verificado  VARCHAR(150)  NULL COMMENT 'Nombre que ven los clientes',
+  access_token       TEXT          NULL COMMENT 'Token cifrado con crypto.service',
+  token_expira       DATETIME      NULL,
+  coexistencia       TINYINT(1)    NOT NULL DEFAULT 0
+                                   COMMENT '1 = el número sigue en la app WhatsApp Business del celular',
+  historial_sync     ENUM('pendiente','en_proceso','completo','rechazado','no_aplica')
+                                   NOT NULL DEFAULT 'no_aplica',
+  calidad            VARCHAR(20)   NULL COMMENT 'GREEN / YELLOW / RED según Meta',
+  limite_mensajes    VARCHAR(40)   NULL COMMENT 'Nivel de límite de mensajes que asigna Meta',
+  webhook_ok         TINYINT(1)    NOT NULL DEFAULT 0,
+  conectado_at       DATETIME      NULL,
+  ultimo_error       TEXT          NULL,
+  created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_phone_number_id (phone_number_id),
+  KEY idx_waba (waba_id),
+  CONSTRAINT fk_wa_meta_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── WhatsApp Meta — avisos recibidos del webhook (v8) ─────────
+-- Los guarda el servicio wa-meta (también la crea al arrancar si no existe).
+-- procesado: 0 = pendiente, 1 = procesado, 2 = mensaje entrante (bandeja)
+CREATE TABLE IF NOT EXISTS wa_meta_webhook_log (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  recibido_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  waba_id         VARCHAR(40)   NULL,
+  phone_number_id VARCHAR(40)   NULL,
+  campo           VARCHAR(60)   NULL COMMENT 'messages, account_update, history...',
+  tenant_id       INT UNSIGNED  NULL,
+  payload         MEDIUMTEXT    NOT NULL,
+  procesado       TINYINT(1)    NOT NULL DEFAULT 0,
+  error           TEXT          NULL,
+  INDEX idx_wl_fecha     (recibido_at),
+  INDEX idx_wl_phone     (phone_number_id),
+  INDEX idx_wl_procesado (procesado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── WhatsApp — campañas (referencia global) ───────────────────
 CREATE TABLE IF NOT EXISTS wa_campanas_global (
@@ -446,4 +504,4 @@ DELIMITER ;
 
 SET GLOBAL event_scheduler = ON;
 
-SELECT '✅ Schema vet_master v7 creado correctamente' AS resultado;
+SELECT '✅ Schema vet_master v8 creado correctamente' AS resultado;
