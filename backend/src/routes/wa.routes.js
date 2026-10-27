@@ -1,590 +1,612 @@
 'use strict';
 
 /**
- * VetClinic SaaS — WhatsApp Meta (API oficial) desde la pantalla de la clínica
- * Base: /api/v1/wa-meta   (pasa por resolveTenant → req.tenant, req.db)
- *
- *   GET  /estado      → si el botón puede activarse + estado de la conexión de la clínica
- *   POST /conectar    → recibe el "code" de Embedded Signup, lo cambia por el token de la
- *                       clínica, suscribe la app a su cuenta de WhatsApp, pide la
- *                       sincronización de contactos e historial (coexistencia) y guarda todo
- *   POST /desconectar → quita la suscripción y borra el token
- *
- * La configuración de la plataforma (App ID, App Secret, Configuration ID) se lee de
- * vet_master.saas_config (panel admin → WhatsApp → Configuración Meta).
+ * VetClinic SaaS — WhatsApp Routes (tenant)
+ * Base: /api/v1/wa
+ * Actúa como proxy entre el tenant y el WA Gateway
  */
 
-const { Router }  = require('express');
-const crypto      = require('crypto');
+const { Router } = require('express');
+const http       = require('http');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
-const { masterQuery } = require('../config/masterDB');
-const { encrypt, decrypt } = require('../services/crypto.service');
-const logger      = require('../config/logger');
+
+// ── Azure Blob — cliente singleton (no crear uno por request) ─────
+let _waAzureClient = null;
+function getWABlobClient() {
+  if (_waAzureClient) return _waAzureClient;
+  const connStr = process.env.AZURE_WA_STORAGE_CONNECTION || process.env.AZURE_STORAGE_CONNECTION_STRING;
+  if (!connStr) return null;
+  const { BlobServiceClient } = require('@azure/storage-blob');
+  _waAzureClient = BlobServiceClient.fromConnectionString(connStr);
+  return _waAzureClient;
+}
 
 const router = Router();
-router.use(authenticate, authorize('admin'));
+router.use(authenticate);
 
-const GRAPH_BASE = (process.env.META_GRAPH_BASE || 'https://graph.facebook.com').replace(/\/+$/, '');
+const WA_GATEWAY = process.env.WA_GATEWAY_URL || 'http://localhost:5001';
+const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
 
-// ── Utilidades ──────────────────────────────────────────────────────
-
-// Id real de la clínica (no se usa req.tenant.id porque tenant_config.id lo pisa en el JOIN)
-async function tenantIdDe(req) {
-  const [t] = await masterQuery('SELECT id FROM tenants WHERE db_name = ? LIMIT 1', [req.tenant.db_name]);
-  if (!t) { const e = new Error('Clínica no encontrada.'); e.status = 404; throw e; }
-  return t.id;
+// ── Helper — llamar al gateway ────────────────────────────────
+function callGateway(method, path, body = null) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = body ? JSON.stringify(body) : null;
+    const url     = new URL(WA_GATEWAY + path);
+    const options = {
+      hostname: url.hostname,
+      port    : parseInt(url.port) || 5001,
+      path    : url.pathname,
+      method,
+      headers : {
+        'Content-Type'  : 'application/json',
+        'x-internal-key': INTERNAL_KEY,
+        ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
+      },
+    };
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, data: { success: false } }); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout WA Gateway')); });
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
 }
 
-async function configPlataforma() {
-  const rows = await masterQuery(
-    `SELECT clave, valor FROM saas_config
-     WHERE clave IN ('meta_app_id','meta_app_secret','meta_config_id','meta_graph_version')`
-  );
-  const m = Object.fromEntries(rows.map(r => [r.clave, r.valor]));
-  let secret = null;
-  if (m.meta_app_secret) { try { secret = decrypt(m.meta_app_secret); } catch { secret = null; } }
-  return {
-    appId   : m.meta_app_id || '',
-    configId: m.meta_config_id || '',
-    graphVer: m.meta_graph_version || 'v25.0',
-    secret,
-    lista   : !!(m.meta_app_id && m.meta_config_id && secret),
-  };
+// Helper — obtener info del tenant desde BD
+async function getTenantInfo(req) {
+  const host = req.headers['x-tenant-host'] || req.hostname;
+  const { masterQuery } = require('../config/masterDB');
+  const [t] = await masterQuery(
+    `SELECT t.id, t.slug, tc.nombre_clinica
+     FROM tenants t
+     LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
+     WHERE t.subdominio = ? LIMIT 1`,
+    [host]
+  ).catch(() => [null]);
+  return t;
 }
 
-async function verMetaHabilitado(tenantId) {
-  const [r] = await masterQuery('SELECT ver_meta FROM wa_config_global WHERE tenant_id = ?', [tenantId]);
-  return !!(r && Number(r.ver_meta));
-}
-
-// Llamada a Graph API con mensaje de error legible
-async function graph(method, path, { token, query, body, cfg } = {}) {
-  const url = new URL(`${GRAPH_BASE}/${cfg.graphVer}/${path.replace(/^\/+/, '')}`);
-  for (const [k, v] of Object.entries(query || {})) url.searchParams.set(k, v);
-  const opts = { method, headers: {}, signal: AbortSignal.timeout(15000) };
-  if (token) opts.headers.Authorization = `Bearer ${token}`;
-  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-
-  let r, d;
-  try {
-    r = await fetch(url, opts);
-    d = await r.json().catch(() => ({}));
-  } catch (e) {
-    const err = new Error('No se pudo conectar con Meta: ' + e.message); err.status = 502; throw err;
+// Esta pantalla es solo de WhatsApp por QR (Baileys). Las campañas y mensajes de Meta viven en
+// las mismas tablas (columna proveedor, migración v18) y se manejan en /api/v1/wa-meta.
+// Devuelve el filtro SQL "solo QR", o '' si la clínica aún no tiene la columna.
+const _tieneProveedor = new Map();
+async function filtroQR(req, tabla, alias = '') {
+  const clave = `${req.tenant?.db_name || ''}:${tabla}`;
+  if (!_tieneProveedor.has(clave)) {
+    const cols = await req.db.query(`SHOW COLUMNS FROM ${tabla} LIKE 'proveedor'`).catch(() => []);
+    _tieneProveedor.set(clave, cols.length > 0);
   }
-  if (!r.ok || d.error) {
-    const err = new Error(d.error?.error_user_msg || d.error?.message || `Meta respondió ${r.status}`);
-    err.status = 422; err.meta = d.error; throw err;
-  }
-  return d;
+  return _tieneProveedor.get(clave) ? ` AND ${alias ? alias + '.' : ''}proveedor = 'qr'` : '';
 }
 
-function vistaCuenta(c) {
-  if (!c) return { estado: 'desconectado' };
-  return {
-    estado           : c.estado,
-    numero_display   : c.numero_display,
-    nombre_verificado: c.nombre_verificado,
-    coexistencia     : !!c.coexistencia,
-    historial_sync   : c.historial_sync,
-    calidad          : c.calidad,
-    conectado_at     : c.conectado_at,
-    ultimo_error     : c.ultimo_error,
-  };
-}
-
-// ── GET /estado ─────────────────────────────────────────────────────
+// ── GET /api/v1/wa/estado ─────────────────────────────────────
 router.get('/estado', async (req, res, next) => {
   try {
-    const tenantId = await tenantIdDe(req);
-    const cfg      = await configPlataforma();
-    const verMeta  = await verMetaHabilitado(tenantId);
-    const [cuenta] = await masterQuery('SELECT * FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
+    const t = await getTenantInfo(req);
+    if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
+
+    const r = await callGateway('GET', `/wa/sesion/${t.id}/estado`);
+    return res.json(r.data);
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/v1/wa/config ─────────────────────────────────────
+router.get('/config', async (req, res, next) => {
+  try {
+    const [cfg] = await req.db.query('SELECT * FROM wa_config LIMIT 1');
+    const { masterQuery } = require('../config/masterDB');
+    const t = await getTenantInfo(req);
+    const [cuota] = t ? await masterQuery(
+      'SELECT ilimitado, msgs_incluidos, msgs_usados FROM wa_config_global WHERE tenant_id=?',
+      [t.id]
+    ) : [null];
 
     return res.json({
       success: true,
       data: {
-        ...vistaCuenta(cuenta),
-        ver_meta        : verMeta,
-        plataforma_lista: cfg.lista,
-        // Datos públicos que necesita el SDK de Facebook (el App Secret nunca sale de aquí)
-        app_id          : cfg.lista ? cfg.appId : null,
-        config_id       : cfg.lista ? cfg.configId : null,
-        graph_ver       : cfg.graphVer,
+        config: cfg || {},
+        cuota : cuota || { ilimitado: false, msgs_incluidos: 0, msgs_usados: 0 },
       },
     });
   } catch (err) { next(err); }
 });
 
-// ── POST /conectar ──────────────────────────────────────────────────
-router.post('/conectar', async (req, res, next) => {
-  const tenantId = await tenantIdDe(req).catch(e => { next(e); return null; });
-  if (!tenantId) return;
-
+// ── PUT /api/v1/wa/config — solo admin ───────────────────────
+router.put('/config', authorize('admin'), async (req, res, next) => {
   try {
-    const cfg = await configPlataforma();
-    if (!cfg.lista) return res.status(409).json({ success: false, message: 'La plataforma aún no tiene configurado WhatsApp Meta.' });
-    if (!(await verMetaHabilitado(tenantId))) return res.status(403).json({ success: false, message: 'WhatsApp Meta no está habilitado para esta clínica.' });
+    const {
+      activo, codigo_pais,
+      recordatorio_citas_activo, recordatorio_citas_horas, recordatorio_citas_horas2,
+      recordatorio_vacunas_activo, recordatorio_vacunas_dias, recordatorio_vacunas_dias2,
+      recordatorio_desparasitaciones_activo,
+    } = req.body;
 
-    const code   = String(req.body.code || '').trim();
-    const evento = String(req.body.evento || '');
-    let wabaId   = String(req.body.waba_id || '').trim() || null;
-    let phoneId  = String(req.body.phone_number_id || '').trim() || null;
-    const bizId  = String(req.body.business_id || '').trim() || null;
-    if (!code) return res.status(422).json({ success: false, message: 'Falta el código de autorización de Meta.' });
-
-    await masterQuery(
-      `INSERT INTO wa_meta_cuentas (tenant_id, estado) VALUES (?, 'conectando')
-       ON DUPLICATE KEY UPDATE estado = 'conectando', ultimo_error = NULL`, [tenantId]
+    await req.db.query(
+      `UPDATE wa_config SET
+         activo=?, codigo_pais=?,
+         recordatorio_citas_activo=?, recordatorio_citas_horas=?, recordatorio_citas_horas2=?,
+         recordatorio_vacunas_activo=?, recordatorio_vacunas_dias=?, recordatorio_vacunas_dias2=?,
+         recordatorio_desparasitaciones_activo=?
+       WHERE id=1`,
+      [
+        activo ? 1 : 0,
+        codigo_pais || '+51',
+        recordatorio_citas_activo ? 1 : 0,
+        recordatorio_citas_horas || 24,
+        recordatorio_citas_horas2 || null,
+        recordatorio_vacunas_activo ? 1 : 0,
+        recordatorio_vacunas_dias || 7,
+        recordatorio_vacunas_dias2 || null,
+        recordatorio_desparasitaciones_activo ? 1 : 0,
+      ]
     );
-
-    // 1) Cambiar el code por el token de la clínica (vence en 30 s: va primero)
-    const tok = await graph('GET', 'oauth/access_token', {
-      cfg, query: { client_id: cfg.appId, client_secret: cfg.secret, code },
-    });
-    const token = tok.access_token;
-    if (!token) throw Object.assign(new Error('Meta no devolvió el token de la clínica.'), { status: 422 });
-
-    // 2) Si la ventana no envió los ids, se averiguan con el token
-    if (!wabaId) {
-      const dbg = await graph('GET', 'debug_token', {
-        cfg, query: { input_token: token, access_token: `${cfg.appId}|${cfg.secret}` },
-      });
-      const scope = (dbg.data?.granular_scopes || []).find(s => s.scope === 'whatsapp_business_management');
-      wabaId = scope?.target_ids?.[0] || null;
-    }
-    if (!wabaId) throw Object.assign(new Error('No se pudo identificar la cuenta de WhatsApp de la clínica.'), { status: 422 });
-
-    if (!phoneId) {
-      const nums = await graph('GET', `${wabaId}/phone_numbers`, { cfg, token });
-      phoneId = nums.data?.[0]?.id || null;
-    }
-    if (!phoneId) throw Object.assign(new Error('La cuenta de WhatsApp no tiene números.'), { status: 422 });
-
-    // El número no puede estar conectado a otra clínica
-    const [otro] = await masterQuery(
-      'SELECT tenant_id FROM wa_meta_cuentas WHERE phone_number_id = ? AND tenant_id <> ? LIMIT 1',
-      [phoneId, tenantId]
-    );
-    if (otro) return res.status(409).json({ success: false, message: 'Ese número ya está conectado a otra clínica.' });
-
-    // 3) Datos del número
-    const info = await graph('GET', phoneId, {
-      cfg, token,
-      query: { fields: 'display_phone_number,verified_name,quality_rating,is_on_biz_app,platform_type' },
-    });
-    const coexistencia = evento === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' || info.is_on_biz_app === true;
-
-    // 4) Suscribir nuestra app a la cuenta de WhatsApp (sin esto no llegan los avisos)
-    await graph('POST', `${wabaId}/subscribed_apps`, { cfg, token });
-
-    // 5) Coexistencia: pedir contactos e historial (solo una vez, dentro de 24 h)
-    //    Número nuevo: registrarlo con un PIN de verificación en dos pasos
-    const avisos = [];
-    let historial = 'no_aplica';
-    let pin = null;
-    if (coexistencia) {
-      historial = 'en_proceso';
-      for (const tipo of ['smb_app_state_sync', 'history']) {
-        try {
-          await graph('POST', `${phoneId}/smb_app_data`, { cfg, token, body: { messaging_product: 'whatsapp', sync_type: tipo } });
-        } catch (e) {
-          avisos.push(`No se pudo pedir ${tipo === 'history' ? 'el historial' : 'los contactos'}: ${e.message}`);
-          if (tipo === 'history') historial = 'pendiente';
-        }
-      }
-    } else {
-      pin = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-      try {
-        await graph('POST', `${phoneId}/register`, { cfg, token, body: { messaging_product: 'whatsapp', pin } });
-      } catch (e) {
-        pin = null;
-        avisos.push('No se pudo registrar el número (si es el número de prueba de Meta, puedes ignorar este aviso: ya viene registrado). Detalle: ' + e.message);
-      }
-    }
-
-    // 6) Guardar
-    await masterQuery(
-      `UPDATE wa_meta_cuentas SET
-         estado='conectado', business_id=?, waba_id=?, phone_number_id=?,
-         numero_display=?, nombre_verificado=?, access_token=?, token_expira=NULL,
-         coexistencia=?, historial_sync=?, calidad=?, webhook_ok=1,
-         conectado_at=NOW(), ultimo_error=?
-       WHERE tenant_id=?`,
-      [bizId, wabaId, phoneId, info.display_phone_number || null, info.verified_name || null,
-       encrypt(token), coexistencia ? 1 : 0, historial, info.quality_rating || null,
-       avisos.length ? avisos.join(' | ') : null, tenantId]
-    );
-    logger.info(`[wa-meta] Clínica ${tenantId} conectada a Meta: ${info.display_phone_number} (coexistencia=${coexistencia})`);
-
-    const [cuenta] = await masterQuery('SELECT * FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
-    return res.json({
-      success: true,
-      message: 'WhatsApp conectado con Meta.',
-      data   : { ...vistaCuenta(cuenta), avisos, pin },
-    });
-  } catch (err) {
-    logger.error(`[wa-meta] Error conectando clínica ${tenantId}: ${err.message}`);
-    await masterQuery(
-      `UPDATE wa_meta_cuentas SET estado='error', ultimo_error=? WHERE tenant_id=? AND estado <> 'conectado'`,
-      [String(err.message).slice(0, 1000), tenantId]
-    ).catch(() => {});
-    if (err.status && err.status < 500) return res.status(err.status).json({ success: false, message: err.message });
-    if (err.status === 502) return res.status(502).json({ success: false, message: err.message });
-    next(err);
-  }
-});
-
-// ── POST /desconectar ───────────────────────────────────────────────
-router.post('/desconectar', async (req, res, next) => {
-  try {
-    const tenantId = await tenantIdDe(req);
-    const [c] = await masterQuery('SELECT * FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
-    if (!c || c.estado === 'desconectado') return res.json({ success: true, message: 'Ya estaba desconectado.' });
-
-    // Quitar la suscripción en Meta (si falla, igual se desconecta en el sistema)
-    if (c.waba_id && c.access_token) {
-      try {
-        const cfg = await configPlataforma();
-        await graph('DELETE', `${c.waba_id}/subscribed_apps`, { cfg, token: decrypt(c.access_token) });
-      } catch (e) { logger.warn(`[wa-meta] No se pudo quitar la suscripción de ${tenantId}: ${e.message}`); }
-    }
-
-    await masterQuery(
-      `UPDATE wa_meta_cuentas SET estado='desconectado', access_token=NULL, phone_number_id=NULL,
-         ultimo_error=NULL WHERE tenant_id=?`, [tenantId]
-    );
-    return res.json({ success: true, message: 'WhatsApp Meta desconectado.' });
+    return res.json({ success: true, message: 'Configuración WA guardada.' });
   } catch (err) { next(err); }
 });
 
-// ── POST /diagnostico — vuelve a leer el número desde Meta y corrige lo guardado ──
-//    · detecta si es coexistencia (número también en la app WhatsApp Business del celular)
-//    · revisa que nuestra app siga suscrita a la cuenta (webhooks) y si no, la suscribe
-router.post('/diagnostico', async (req, res, next) => {
+// ── POST /api/v1/wa/conectar — solo admin ────────────────────
+router.post('/conectar', authorize('admin'), async (req, res, next) => {
   try {
-    const { tenantId, cfg, token, wabaId, phoneId } = await cuentaConectada(req);
-    const avisos = [];
+    const t = await getTenantInfo(req);
+    if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
 
-    // Datos del número (si Meta no acepta algún campo, se piden los básicos)
-    let info;
-    try {
-      info = await graph('GET', phoneId, {
-        cfg, token,
-        query: { fields: 'display_phone_number,verified_name,quality_rating,is_on_biz_app,platform_type,status,name_status,code_verification_status' },
-      });
-    } catch {
-      info = await graph('GET', phoneId, {
-        cfg, token, query: { fields: 'display_phone_number,verified_name,quality_rating,is_on_biz_app,platform_type' },
-      });
-    }
-
-    // Suscripción de la app a la cuenta de WhatsApp
-    let suscrito = false;
-    try {
-      const subs = await graph('GET', `${wabaId}/subscribed_apps`, { cfg, token });
-      suscrito = (subs.data || []).some(s => String(s.whatsapp_business_api_data?.id || s.id || '') === String(cfg.appId));
-      if (!suscrito) {
-        await graph('POST', `${wabaId}/subscribed_apps`, { cfg, token });
-        suscrito = true;
-        avisos.push('La app no estaba suscrita a tu cuenta de WhatsApp; se volvió a suscribir.');
-      }
-    } catch (e) { avisos.push('No se pudo revisar la suscripción de avisos: ' + e.message); }
-
-    const [c] = await masterQuery('SELECT coexistencia, historial_sync FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
-    const coexistencia = info.is_on_biz_app === true || !!Number(c?.coexistencia);
-    let historial = c?.historial_sync || 'no_aplica';
-
-    // Recién detectada como coexistencia: pedir contactos e historial (Meta solo lo permite en las primeras 24 h)
-    if (coexistencia && !Number(c?.coexistencia)) {
-      historial = 'en_proceso';
-      for (const tipo of ['smb_app_state_sync', 'history']) {
-        try {
-          await graph('POST', `${phoneId}/smb_app_data`, { cfg, token, body: { messaging_product: 'whatsapp', sync_type: tipo } });
-        } catch (e) {
-          if (tipo === 'history') historial = 'pendiente';
-          avisos.push(`No se pudo pedir ${tipo === 'history' ? 'el historial' : 'los contactos'} (Meta solo lo permite en las primeras 24 h): ${e.message}`);
-        }
-      }
-    }
-
-    await masterQuery(
-      `UPDATE wa_meta_cuentas SET numero_display = COALESCE(?, numero_display), nombre_verificado = COALESCE(?, nombre_verificado),
-         calidad = ?, coexistencia = ?, historial_sync = ?, webhook_ok = ?,
-         ultimo_error = IF(? = 1, NULL, ultimo_error)
-       WHERE tenant_id = ?`,
-      [info.display_phone_number || null, info.verified_name || null, info.quality_rating || null,
-       coexistencia ? 1 : 0, historial, suscrito ? 1 : 0, coexistencia ? 1 : 0, tenantId]
-    );
-    logger.info(`[wa-meta] Diagnóstico clínica ${tenantId}: ${JSON.stringify(info)} suscrito=${suscrito}`);
-
-    return res.json({
-      success: true,
-      data: {
-        numero        : info.display_phone_number || null,
-        nombre        : info.verified_name || null,
-        coexistencia,
-        en_app_business: info.is_on_biz_app ?? null,
-        plataforma    : info.platform_type || null,
-        estado_numero : info.status || null,
-        estado_nombre : info.name_status || null,
-        verificacion  : info.code_verification_status || null,
-        calidad       : info.quality_rating || null,
-        suscrito,
-        avisos,
-      },
+    const r = await callGateway('POST', '/wa/sesion/iniciar', {
+      tenantId    : t.id,
+      tenantSlug  : t.slug,
+      tenantNombre: t.nombre_clinica,
     });
-  } catch (err) { responderError(res, next, err); }
+    return res.status(r.status).json(r.data);
+  } catch (err) { next(err); }
 });
 
-// ── POST /registrar — registra el número en la API de Meta (error 133010 "Account not registered") ──
-//    body: { pin? }  → si el número ya tenía PIN de verificación en dos pasos, se usa ese;
-//                     si no, se crea uno nuevo y se devuelve para que la clínica lo guarde.
-router.post('/registrar', async (req, res, next) => {
+// ── POST /api/v1/wa/desconectar — solo admin ─────────────────
+router.post('/desconectar', authorize('admin'), async (req, res, next) => {
   try {
-    const { tenantId, cfg, token, phoneId } = await cuentaConectada(req);
-    const pinDado = String(req.body?.pin || '').trim();
-    if (pinDado && !/^\d{6}$/.test(pinDado)) {
-      return res.status(422).json({ success: false, message: 'El PIN debe tener 6 dígitos.' });
-    }
-    const pin = pinDado || String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    try {
-      await graph('POST', `${phoneId}/register`, { cfg, token, body: { messaging_product: 'whatsapp', pin } });
-    } catch (e) {
-      logger.warn(`[wa-meta] Registro del número falló (clínica ${tenantId}): ${e.message} ${JSON.stringify(e.meta || {})}`);
-      const det = e.meta ? ` (código ${e.meta.code}${e.meta.error_subcode ? '/' + e.meta.error_subcode : ''})` : '';
-      let ayuda = '';
-      if (/policy|polic/i.test(e.message)) {
-        ayuda = ' Revisa en el Administrador de WhatsApp (business.facebook.com → WhatsApp Manager) que la cuenta tenga un método de pago, que el nombre visible esté aprobado y que la cuenta no tenga restricciones.';
-      } else if (/pin|two.?step|verificaci/i.test(e.message)) {
-        ayuda = ' Ese número ya tiene un PIN de verificación en dos pasos: escríbelo en el campo PIN y vuelve a intentar.';
-      }
-      return res.status(422).json({ success: false, message: 'Meta no registró el número: ' + e.message + det + '.' + ayuda });
-    }
-    await masterQuery('UPDATE wa_meta_cuentas SET ultimo_error = NULL WHERE tenant_id = ?', [tenantId]);
-    logger.info(`[wa-meta] Número registrado en Meta (clínica ${tenantId})`);
-    return res.json({ success: true, message: 'Número registrado en Meta.', data: { pin: pinDado ? null : pin } });
-  } catch (err) { responderError(res, next, err); }
+    const t = await getTenantInfo(req);
+    if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
+
+    const r = await callGateway('POST', '/wa/sesion/desconectar', {
+      tenantId  : t.id,
+      tenantSlug: t.slug,
+    });
+    return res.status(r.status).json(r.data);
+  } catch (err) { next(err); }
 });
 
-// ════════════════════════════════════════════════════════════════════
-//  PLANTILLAS Y ENVÍO (requieren la clínica conectada)
-// ════════════════════════════════════════════════════════════════════
+// ── GET /api/v1/wa/qr ─────────────────────────────────────────
+router.get('/qr', authorize('admin'), async (req, res, next) => {
+  try {
+    const t = await getTenantInfo(req);
+    if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
 
-// Datos para llamar a Meta en nombre de la clínica
-async function cuentaConectada(req) {
-  const tenantId = await tenantIdDe(req);
-  const [c] = await masterQuery('SELECT * FROM wa_meta_cuentas WHERE tenant_id = ?', [tenantId]);
-  if (!c || c.estado !== 'conectado' || !c.access_token || !c.waba_id || !c.phone_number_id) {
-    const e = new Error('Primero conecta tu número con Meta.'); e.status = 409; throw e;
-  }
-  const cfg = await configPlataforma();
-  let token;
-  try { token = decrypt(c.access_token); }
-  catch { const e = new Error('No se pudo leer el token guardado. Vuelve a conectar tu número.'); e.status = 409; throw e; }
-  return { tenantId, cfg, token, wabaId: c.waba_id, phoneId: c.phone_number_id };
-}
+    const r = await callGateway('GET', `/wa/sesion/${t.id}/qr`);
+    return res.status(r.status).json(r.data);
+  } catch (err) { next(err); }
+});
 
-function responderError(res, next, err) {
-  if (err.status && err.status < 500) return res.status(err.status).json({ success: false, message: err.message });
-  if (err.status === 502) return res.status(502).json({ success: false, message: err.message });
-  return next(err);
-}
+// ── POST /api/v1/wa/enviar — admin + recepcionista ────────────
+router.post('/enviar', authorize('admin', 'recepcionista'), async (req, res, next) => {
+  try {
+    const { telefono, mensaje, imagen_base64, imagen_mimetype, propietario_id } = req.body;
+    if (!telefono || (!mensaje && !imagen_base64)) {
+      return res.status(422).json({ success: false, message: 'telefono y mensaje o imagen son requeridos' });
+    }
 
-// Variables {{1}}, {{2}}… usadas en un texto
-function variablesDe(texto) {
-  return [...String(texto).matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => parseInt(m[1], 10));
-}
+    const t = await getTenantInfo(req);
+    if (!t) return res.status(404).json({ success: false, message: 'Tenant no encontrado' });
 
-/**
- * Revisa la plantilla con las reglas que más rechaza Meta.
- * Devuelve la lista de problemas (vacía = OK).
- */
-function validarPlantilla({ nombre, categoria, cuerpo, ejemplos, pie, encabezado }) {
-  const p = [];
-  if (!/^[a-z0-9_]{1,512}$/.test(nombre || '')) p.push('El nombre solo puede tener minúsculas, números y guion bajo (ej. recordatorio_vacuna).');
-  if (!['UTILITY', 'MARKETING'].includes(categoria)) p.push('Elige la categoría: Utilidad o Marketing.');
-  const txt = String(cuerpo || '').trim();
-  if (!txt) p.push('Escribe el texto del mensaje.');
-  if (txt.length > 1024) p.push('El mensaje no puede pasar de 1024 caracteres.');
+    const [cfg] = await req.db.query('SELECT activo, codigo_pais FROM wa_config LIMIT 1');
+    if (!cfg?.activo) {
+      return res.status(422).json({ success: false, message: 'WhatsApp no está activo para esta clínica.' });
+    }
 
-  const vars = variablesDe(txt);
-  const unicas = [...new Set(vars)].sort((a, b) => a - b);
-  unicas.forEach((n, i) => { if (n !== i + 1) p.push('Las variables deben ir en orden: {{1}}, {{2}}, {{3}}…'); });
-  if (/^\{\{\s*\d+\s*\}\}/.test(txt)) p.push('El mensaje no puede empezar con una variable.');
-  if (/\{\{\s*\d+\s*\}\}[\s.!?¡¿]*$/.test(txt)) p.push('El mensaje no puede terminar con una variable (agrega texto después).');
-  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(txt)) p.push('No pongas dos variables seguidas: escribe texto entre ellas.');
-  const palabras = txt.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length;
-  if (unicas.length && palabras < unicas.length * 2 + 1) p.push('Hay demasiadas variables para tan poco texto.');
-  if ((ejemplos || []).length < unicas.length || (ejemplos || []).slice(0, unicas.length).some(e => !String(e || '').trim())) {
-    p.push('Escribe un ejemplo para cada variable (Meta lo exige).');
-  }
-  if (pie && String(pie).length > 60) p.push('El pie de mensaje no puede pasar de 60 caracteres.');
-  if (encabezado && String(encabezado).length > 60) p.push('El encabezado no puede pasar de 60 caracteres.');
-  if (encabezado && variablesDe(encabezado).length) p.push('El encabezado no puede tener variables.');
-  return [...new Set(p)];
-}
+    const r = await callGateway('POST', '/wa/enviar', {
+      tenantId       : t.id,
+      telefono,
+      mensaje        : mensaje || null,
+      imagen_base64  : imagen_base64 || null,
+      imagen_mimetype: imagen_mimetype || null,
+      propietarioId  : propietario_id || null,
+      tipo           : 'manual',
+      codigoPais     : cfg.codigo_pais || '+51',
+    });
+    return res.status(r.status).json(r.data);
+  } catch (err) { next(err); }
+});
 
-// ── GET /plantillas — lista las plantillas de la clínica en Meta ─────
+// ── GET /api/v1/wa/plantillas ─────────────────────────────────
 router.get('/plantillas', async (req, res, next) => {
   try {
-    const { cfg, token, wabaId } = await cuentaConectada(req);
-    const d = await graph('GET', `${wabaId}/message_templates`, {
-      cfg, token, query: { fields: 'id,name,language,status,category,components,rejected_reason', limit: '200' },
-    });
-    const data = (d.data || []).map(t => {
-      const body   = (t.components || []).find(c => c.type === 'BODY');
-      const header = (t.components || []).find(c => c.type === 'HEADER' && c.format === 'TEXT');
-      const footer = (t.components || []).find(c => c.type === 'FOOTER');
-      return {
-        id: t.id, nombre: t.name, idioma: t.language, estado: t.status, categoria: t.category,
-        cuerpo: body?.text || '', encabezado: header?.text || '', pie: footer?.text || '',
-        variables: [...new Set(variablesDe(body?.text || ''))].length,
-        motivo_rechazo: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
-      };
-    });
-    return res.json({ success: true, data });
-  } catch (err) { responderError(res, next, err); }
+    const rows = await req.db.query('SELECT * FROM wa_plantillas WHERE activo=1 ORDER BY tipo,nombre');
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
 });
 
-// ── POST /plantillas — crea una plantilla y la envía a revisión ──────
-router.post('/plantillas', async (req, res, next) => {
+// ── POST /api/v1/wa/plantillas — solo admin ───────────────────
+router.post('/plantillas', authorize('admin'), async (req, res, next) => {
   try {
-    const b = req.body || {};
-    const datos = {
-      nombre    : String(b.nombre || '').trim().toLowerCase(),
-      categoria : String(b.categoria || '').toUpperCase(),
-      idioma    : String(b.idioma || 'es').trim(),
-      encabezado: String(b.encabezado || '').trim(),
-      cuerpo    : String(b.cuerpo || '').trim(),
-      pie       : String(b.pie || '').trim(),
-      ejemplos  : Array.isArray(b.ejemplos) ? b.ejemplos.map(e => String(e || '').trim()) : [],
-    };
-    const problemas = validarPlantilla(datos);
-    if (problemas.length) return res.status(422).json({ success: false, message: problemas[0], problemas });
-
-    const { cfg, token, wabaId } = await cuentaConectada(req);
-    const nVars = [...new Set(variablesDe(datos.cuerpo))].length;
-    const components = [];
-    if (datos.encabezado) components.push({ type: 'HEADER', format: 'TEXT', text: datos.encabezado });
-    const body = { type: 'BODY', text: datos.cuerpo };
-    if (nVars) body.example = { body_text: [datos.ejemplos.slice(0, nVars)] };
-    components.push(body);
-    if (datos.pie) components.push({ type: 'FOOTER', text: datos.pie });
-
-    const d = await graph('POST', `${wabaId}/message_templates`, {
-      cfg, token, body: { name: datos.nombre, language: datos.idioma, category: datos.categoria, components },
-    });
-    return res.status(201).json({
-      success: true,
-      message: 'Plantilla enviada a revisión de Meta.',
-      data: { id: d.id, estado: d.status || 'PENDING', categoria: d.category || datos.categoria },
-    });
-  } catch (err) { responderError(res, next, err); }
-});
-
-// ── DELETE /plantillas/:nombre ───────────────────────────────────────
-router.delete('/plantillas/:nombre', async (req, res, next) => {
-  try {
-    const nombre = String(req.params.nombre || '');
-    if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Nombre inválido.' });
-    const { cfg, token, wabaId } = await cuentaConectada(req);
-    await graph('DELETE', `${wabaId}/message_templates`, { cfg, token, query: { name: nombre } });
-    return res.json({ success: true, message: 'Plantilla eliminada.' });
-  } catch (err) { responderError(res, next, err); }
-});
-
-// Número en formato internacional sin "+" (ej. 51987654321)
-async function normalizarTelefono(req, tel) {
-  let t = String(tel || '').replace(/\D/g, '');
-  if (!t) return null;
-  if (t.length === 9) {   // número local peruano → agregar código de país de la clínica
-    let cod = '51';
-    try {
-      const [cfg] = await req.db.query('SELECT codigo_pais FROM wa_config LIMIT 1');
-      if (cfg?.codigo_pais) cod = String(cfg.codigo_pais).replace(/\D/g, '') || '51';
-    } catch { /* sin wa_config: Perú */ }
-    t = cod + t;
-  }
-  return t.length >= 10 && t.length <= 15 ? t : null;
-}
-
-// Registro en el historial de mensajes de la clínica (si falta la migración v18, sin columnas nuevas)
-async function registrarEnvio(req, { telefono, mensaje, estado, error, wamid, propietarioId }) {
-  try {
-    await req.db.query(
-      `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at, proveedor, wamid)
-       VALUES ('manual', ?, ?, ?, ?, ?, ${estado === 'enviado' ? 'NOW()' : 'NULL'}, 'meta', ?)`,
-      [propietarioId || null, telefono, mensaje, estado, error || null, wamid || null]
+    const { nombre, tipo, contenido } = req.body;
+    if (!nombre || !contenido) {
+      return res.status(422).json({ success: false, message: 'nombre y contenido requeridos' });
+    }
+    const r = await req.db.query(
+      'INSERT INTO wa_plantillas (nombre, tipo, contenido) VALUES (?,?,?)',
+      [nombre, tipo || 'manual', contenido]
     );
-  } catch {
-    try {
-      await req.db.query(
-        `INSERT INTO wa_mensajes_log (tipo, propietario_id, telefono, mensaje, estado, error, enviado_at)
-         VALUES ('manual', ?, ?, ?, ?, ?, ${estado === 'enviado' ? 'NOW()' : 'NULL'})`,
-        [propietarioId || null, telefono, mensaje, estado, error || null]
-      );
-    } catch (e) { logger.warn('[wa-meta] No se pudo registrar el envío: ' + e.message); }
-  }
-}
+    return res.status(201).json({ success: true, data: { id: r.insertId } });
+  } catch (err) { next(err); }
+});
 
-// ── POST /enviar — envía una plantilla (o texto, si el cliente escribió en las últimas 24 h) ──
-router.post('/enviar', async (req, res, next) => {
-  let telefono = null, resumen = '';
+// ── PUT /api/v1/wa/plantillas/:id — solo admin ────────────────
+router.put('/plantillas/:id', authorize('admin'), async (req, res, next) => {
   try {
-    const b = req.body || {};
-    telefono = await normalizarTelefono(req, b.telefono);
-    if (!telefono) return res.status(422).json({ success: false, message: 'Número de teléfono inválido.' });
+    const { nombre, tipo, contenido, activo } = req.body;
+    await req.db.query(
+      'UPDATE wa_plantillas SET nombre=?, tipo=?, contenido=?, activo=? WHERE id=?',
+      [nombre, tipo, contenido, activo ? 1 : 0, req.params.id]
+    );
+    return res.json({ success: true, message: 'Plantilla actualizada.' });
+  } catch (err) { next(err); }
+});
 
-    const tipo = b.tipo === 'texto' ? 'texto' : 'plantilla';
-    const { cfg, token, phoneId } = await cuentaConectada(req);
-    let payload;
+// ── GET /api/v1/wa/log ────────────────────────────────────────
+router.get('/log', authorize('admin'), async (req, res, next) => {
+  try {
+    const { tipo, estado, limit = 50 } = req.query;
+    let sql = `SELECT l.*, CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre
+               FROM wa_mensajes_log l
+               LEFT JOIN propietarios p ON p.id = l.propietario_id
+               WHERE 1=1`;
+    const params = [];
+    if (tipo)   { sql += ' AND l.tipo=?';   params.push(tipo); }
+    if (estado) { sql += ' AND l.estado=?'; params.push(estado); }
+    sql += await filtroQR(req, 'wa_mensajes_log', 'l');
+    sql += ` ORDER BY l.created_at DESC LIMIT ${Math.min(parseInt(limit)||50, 200)}`;
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
 
-    if (tipo === 'texto') {
-      const texto = String(b.texto || '').trim();
-      if (!texto) return res.status(422).json({ success: false, message: 'Escribe el mensaje.' });
-      if (texto.length > 4096) return res.status(422).json({ success: false, message: 'El mensaje es demasiado largo.' });
-      payload = { messaging_product: 'whatsapp', to: telefono, type: 'text', text: { body: texto } };
-      resumen = texto;
-    } else {
-      const nombre = String(b.plantilla || '').trim();
-      if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return res.status(422).json({ success: false, message: 'Elige una plantilla aprobada.' });
-      const vars = Array.isArray(b.variables) ? b.variables.map(v => String(v ?? '').trim()) : [];
-      if (vars.some(v => !v)) return res.status(422).json({ success: false, message: 'Completa todas las variables de la plantilla.' });
-      payload = {
-        messaging_product: 'whatsapp', to: telefono, type: 'template',
-        template: { name: nombre, language: { code: String(b.idioma || 'es') } },
-      };
-      if (vars.length) payload.template.components = [{ type: 'body', parameters: vars.map(v => ({ type: 'text', text: v })) }];
-      resumen = String(b.vista_previa || `[plantilla ${nombre}] ${vars.join(' | ')}`).slice(0, 2000);
+// ══════════════════════════════════════════════════════════════
+// CAMPAÑAS v3
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/v1/wa/campanas
+router.get('/campanas', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado } = req.query;
+    let sql = 'SELECT * FROM wa_campanas WHERE 1=1';
+    const params = [];
+    if (estado) { sql += ' AND estado=?'; params.push(estado); }
+    sql += await filtroQR(req, 'wa_campanas');
+    sql += ' ORDER BY created_at DESC';
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/campanas/proyeccion
+router.get('/campanas/proyeccion', authorize('admin'), async (req, res, next) => {
+  try {
+    const { segmento = 'todos', segmento_valor } = req.query;
+    let sql = '';
+    switch (segmento) {
+      case 'todos':
+        sql = "SELECT COUNT(DISTINCT id) AS total FROM propietarios WHERE telefono IS NOT NULL AND telefono != ''";
+        break;
+      case 'por_especie':
+        sql = `SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p JOIN mascotas m ON m.propietario_id=p.id WHERE m.especie='${req.db.escape(segmento_valor||'perro').replace(/'/g,"'")}' AND p.telefono IS NOT NULL`;
+        break;
+      case 'vacunas_vencidas':
+        sql = "SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p JOIN mascotas m ON m.propietario_id=p.id JOIN vacunas v ON v.mascota_id=m.id WHERE v.proxima_dosis < CURDATE() AND p.telefono IS NOT NULL";
+        break;
+      case 'sin_citas_60d':
+        sql = "SELECT COUNT(DISTINCT p.id) AS total FROM propietarios p WHERE p.id NOT IN (SELECT DISTINCT mascota_id FROM citas WHERE fecha_hora >= DATE_SUB(NOW(),INTERVAL 60 DAY)) AND p.telefono IS NOT NULL";
+        break;
+      default:
+        sql = "SELECT COUNT(DISTINCT id) AS total FROM propietarios WHERE telefono IS NOT NULL AND telefono != ''";
+    }
+    const [row] = await req.db.query(sql);
+    return res.json({ success: true, data: { total: parseInt(row.total) || 0 } });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/campanas/:id
+router.get('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [c] = await req.db.query('SELECT * FROM wa_campanas WHERE id=?' + await filtroQR(req, 'wa_campanas'), [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
+    return res.json({ success: true, data: c });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/campanas/:id/contactos
+router.get('/campanas/:id/contactos', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado, limit = 100, offset = 0 } = req.query;
+    let sql = `SELECT wcc.id, wcc.propietario_id, wcc.telefono, wcc.nombre,
+                      wcc.estado, wcc.error, wcc.enviado_at,
+                      CONCAT(p.nombre,' ',p.apellido) AS prop_nombre_completo
+               FROM wa_campana_contactos wcc
+               LEFT JOIN propietarios p ON p.id = wcc.propietario_id
+               WHERE wcc.campana_id = ?`;
+    const params = [req.params.id];
+    if (estado) { sql += ' AND wcc.estado = ?'; params.push(estado); }
+    sql += ` ORDER BY wcc.id ASC LIMIT ${parseInt(limit) || 100} OFFSET ${parseInt(offset) || 0}`;
+
+    const [rows] = await req.db.execute(sql, params);
+
+    const [[{ total }]] = await req.db.execute(
+      'SELECT COUNT(*) AS total FROM wa_campana_contactos WHERE campana_id = ?', [req.params.id]
+    );
+    const [[{ enviados }]] = await req.db.execute(
+      "SELECT COUNT(*) AS enviados FROM wa_campana_contactos WHERE campana_id = ? AND estado = 'enviado'", [req.params.id]
+    );
+    const [[{ fallidos }]] = await req.db.execute(
+      "SELECT COUNT(*) AS fallidos FROM wa_campana_contactos WHERE campana_id = ? AND estado = 'fallido'", [req.params.id]
+    );
+
+    return res.json({ success: true, data: rows, meta: { total, enviados, fallidos } });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/campanas
+router.post('/campanas', authorize('admin'), async (req, res, next) => {
+  try {
+    const { nombre, mensaje, segmento = 'todos', segmento_valor, imagen_url, imagen_blob_name, estado = 'borrador', programada_at } = req.body;
+    console.log('[CAMPANA POST] imagen_url:', imagen_url, '| imagen_blob_name:', imagen_blob_name);
+    if (!nombre || !mensaje) return res.status(422).json({ success: false, message: 'Nombre y mensaje requeridos.' });
+    const result = await req.db.query(
+      `INSERT INTO wa_campanas (nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado, programada_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [nombre, mensaje, segmento, segmento_valor || null, imagen_url || null, imagen_blob_name || null,
+       estado, programada_at || null]
+    );
+    return res.status(201).json({ success: true, data: { id: result.insertId }, message: 'Campaña creada.' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/v1/wa/campanas/:id
+router.put('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { nombre, mensaje, segmento, segmento_valor, imagen_url, imagen_blob_name, estado } = req.body;
+    await req.db.query(
+      `UPDATE wa_campanas SET nombre=?, mensaje=?, segmento=?, segmento_valor=?,
+        imagen_url=?, imagen_blob_name=?, estado=? WHERE id=?${await filtroQR(req, 'wa_campanas')}`,
+      [nombre, mensaje, segmento || 'todos', segmento_valor || null,
+       imagen_url || null, imagen_blob_name || null, estado || 'borrador', req.params.id]
+    );
+    return res.json({ success: true, message: 'Campaña actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/campanas/:id/:accion
+router.post('/campanas/:id/:accion', authorize('admin'), async (req, res, next) => {
+  try {
+    const { id, accion } = req.params;
+    const acciones = {
+      pausar   : "UPDATE wa_campanas SET estado='pausada', pausada_at=NOW() WHERE id=?",
+      reanudar : "UPDATE wa_campanas SET estado='enviando' WHERE id=?",
+      iniciar  : "UPDATE wa_campanas SET estado='enviando', iniciada_at=NOW() WHERE id=?",
+      cancelar : "UPDATE wa_campanas SET estado='cancelada' WHERE id=?",
+    };
+    if (!acciones[accion]) return res.status(422).json({ success: false, message: 'Acción inválida.' });
+    await req.db.query(acciones[accion] + await filtroQR(req, 'wa_campanas'), [id]);
+    const msgs = { pausar:'Campaña pausada.', reanudar:'Campaña reanudada.', iniciar:'Campaña iniciada.', cancelar:'Campaña cancelada.' };
+    return res.json({ success: true, message: msgs[accion] });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/upload — proxy al gateway
+router.post('/upload', authorize('admin'), async (req, res, next) => {
+  try {
+    const tenant = await getTenantInfo(req);
+    const result = await callGateway('POST', '/wa/upload', {
+      tenantId   : tenant?.id,
+      base64     : req.body.base64,
+      contentType: req.body.contentType,
+      filename   : req.body.filename,
+    });
+    if (!result.data?.success) return res.status(500).json(result.data || { success: false });
+    return res.json(result.data);
+  } catch (err) { next(err); }
+});
+
+// ══════════════════════════════════════════════════════════════
+// HISTORIAS v3
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/v1/wa/historias
+router.get('/historias', authorize('admin'), async (req, res, next) => {
+  try {
+    const { estado } = req.query;
+    let sql = 'SELECT h.*, u.nombre AS creada_por_nombre FROM wa_historias h JOIN usuarios u ON u.id=h.creada_por_id WHERE 1=1';
+    const params = [];
+    if (estado) { sql += ' AND h.estado=?'; params.push(estado); }
+    sql += ' ORDER BY h.created_at DESC';
+    const rows = await req.db.query(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/wa/historias/:id
+router.get('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT * FROM wa_historias WHERE id=?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, message: 'Historia no encontrada.' });
+    return res.json({ success: true, data: h });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/historias
+router.post('/historias', authorize('admin'), async (req, res, next) => {
+  try {
+    const { titulo, tipo = 'imagen', texto, imagen_url, imagen_blob, estado = 'borrador', programada_at, publicar_ahora } = req.body;
+
+    // titulo fallback si viene vacío
+    const tituloFinal = titulo?.trim() ||
+      (texto ? texto.substring(0, 60) : null) ||
+      ('Historia ' + new Date().toLocaleDateString('es-PE'));
+
+    // Estado: si publicar_ahora → borrador (el gateway lo pone en publicada al terminar)
+    //         si programada_at → programada
+    //         si no → borrador
+    const estadoFinal = publicar_ahora ? 'borrador'
+      : (programada_at ? 'programada' : (estado || 'borrador'));
+
+    const result = await req.db.query(
+      `INSERT INTO wa_historias (titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at, creada_por_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [tituloFinal, tipo, texto || null, imagen_url || null, imagen_blob || null,
+       estadoFinal, programada_at || null, req.user.id]
+    );
+
+    const historiaId = result.insertId;
+
+    // Publicar inmediatamente si se solicitó
+    if (publicar_ahora) {
+      const tenant = await getTenantInfo(req);
+      if (tenant) {
+        callGateway('POST', '/wa/historia/publicar', {
+          tenantId : tenant.id,
+          historiaId,
+          imagenUrl: imagen_url || null,
+          texto    : texto || null,
+        }).catch(e => console.error('[WA Historia publicar]', e.message));
+      }
     }
 
-    const d = await graph('POST', `${phoneId}/messages`, { cfg, token, body: payload });
-    const wamid = d.messages?.[0]?.id || null;
-    await registrarEnvio(req, { telefono, mensaje: resumen, estado: 'enviado', wamid, propietarioId: b.propietario_id });
-    return res.json({ success: true, message: 'Mensaje enviado.', data: { wamid, telefono } });
-  } catch (err) {
-    if (telefono && err.status && err.status !== 409) {
-      await registrarEnvio(req, { telefono, mensaje: resumen || '[meta]', estado: 'fallido', error: err.message });
+    return res.status(201).json({ success: true, data: { id: historiaId }, message: publicar_ahora ? 'Historia publicando…' : 'Historia guardada.' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/v1/wa/historias/:id
+router.put('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const { titulo, tipo, texto, imagen_url, imagen_blob, estado, programada_at } = req.body;
+    const tituloFinal = titulo?.trim() ||
+      (texto ? texto.substring(0, 60) : null) ||
+      ('Historia ' + new Date().toLocaleDateString('es-PE'));
+    const estadoFinal = programada_at ? 'programada' : (estado || 'borrador');
+
+    await req.db.query(
+      `UPDATE wa_historias SET titulo=?, tipo=?, texto=?, imagen_url=?, imagen_blob=?, estado=?, programada_at=? WHERE id=?`,
+      [tituloFinal, tipo || 'imagen', texto || null, imagen_url || null, imagen_blob || null,
+       estadoFinal, programada_at || null, req.params.id]
+    );
+    return res.json({ success: true, message: 'Historia actualizada.' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/wa/historias/:id/publicar
+router.post('/historias/:id/publicar', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT * FROM wa_historias WHERE id=?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, message: 'Historia no encontrada.' });
+    const tenant = await getTenantInfo(req);
+    const result = await callGateway('POST', '/wa/historia/publicar', {
+      tenantId  : tenant?.id,
+      historiaId: h.id,
+      imagenUrl : h.imagen_url || null,
+      texto     : h.texto || null,
+    });
+    if (!result.data?.success) return res.status(500).json(result.data || { success: false });
+    return res.json({ success: true, message: 'Historia publicada.' });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/wa/campanas/:id
+router.delete('/campanas/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [c] = await req.db.query('SELECT imagen_blob_name FROM wa_campanas WHERE id=?' + await filtroQR(req, 'wa_campanas'), [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, message: 'Campaña no encontrada.' });
+    if (c.imagen_blob_name) callGateway('DELETE', '/wa/upload/'+encodeURIComponent(c.imagen_blob_name)).catch(() => {});
+    await req.db.query('DELETE FROM wa_campana_contactos WHERE campana_id=?', [req.params.id]);
+    await req.db.query('DELETE FROM wa_campanas WHERE id=?', [req.params.id]);
+    return res.json({ success: true, message: 'Campaña eliminada.' });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/wa/historias/:id
+router.delete('/historias/:id', authorize('admin'), async (req, res, next) => {
+  try {
+    const [h] = await req.db.query('SELECT imagen_blob FROM wa_historias WHERE id=?', [req.params.id]);
+    if (h?.imagen_blob) {
+      callGateway('DELETE', '/wa/upload/'+encodeURIComponent(h.imagen_blob)).catch(() => {});
     }
-    // 131047: fuera de la ventana de 24 h → solo plantillas
-    if (err.meta?.code === 131047) {
-      return res.status(422).json({ success: false, message: 'Este cliente no te escribió en las últimas 24 horas: solo puedes enviarle una plantilla aprobada.' });
+    await req.db.query('DELETE FROM wa_historias WHERE id=?', [req.params.id]);
+    return res.json({ success: true, message: 'Historia eliminada.' });
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/v1/wa/imagen/:campanaId — proxy seguro Azure ────────────────────────
+// El navegador nunca llama directo a Azure. El backend descarga con SDK y hace pipe.
+// Usa cliente singleton para no crear una conexión Azure por cada request.
+router.get('/imagen/:campanaId', authenticate, async (req, res, next) => {
+  try {
+    const container = process.env.AZURE_WA_CONTAINER || 'wa-media';
+    const azureClient = getWABlobClient();
+    if (!azureClient) return res.status(503).json({ success: false, message: 'Azure no configurado' });
+
+    const [campana] = await req.db.query(
+      'SELECT imagen_url, imagen_blob_name FROM wa_campanas WHERE id = ?', [req.params.campanaId]
+    );
+    if (!campana || !campana.imagen_url) return res.status(404).end();
+
+    // blobName: de imagen_blob_name guardado, o extraído de la URL
+    let blobName = campana.imagen_blob_name;
+    if (!blobName) {
+      const urlParts = campana.imagen_url.split(`/${container}/`);
+      blobName = urlParts[1] ? urlParts[1].split('?')[0] : null;
     }
-    // 131030: número de prueba de Meta → solo a destinatarios autorizados
-    if (err.meta?.code === 131030) {
-      return res.status(422).json({ success: false, message: 'Con el número de prueba de Meta solo puedes enviar a los números que agregaste como destinatarios en Meta (WhatsApp → Configuración de la API → "Para").' });
+    if (!blobName) return res.status(400).end();
+
+    const blobClient = azureClient.getContainerClient(container).getBlobClient(blobName);
+    const download   = await blobClient.download();
+
+    const ext  = blobName.split('.').pop().toLowerCase();
+    const mime = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    res.setHeader('Content-Type', download.contentType || mime[ext] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // 1h — imagen no cambia
+    download.readableStreamBody.pipe(res);
+  } catch (err) { next(err); }
+});
+
+
+// ── GET /api/v1/wa/imagen-historia/:historiaId — proxy Azure para historias ─────
+router.get('/imagen-historia/:historiaId', authenticate, async (req, res, next) => {
+  try {
+    const container   = process.env.AZURE_WA_CONTAINER || 'wa-media';
+    const azureClient = getWABlobClient();
+    if (!azureClient) return res.status(503).json({ success: false, message: 'Azure no configurado' });
+
+    const [h] = await req.db.query(
+      'SELECT imagen_url, imagen_blob FROM wa_historias WHERE id = ?', [req.params.historiaId]
+    );
+    if (!h || !h.imagen_url) return res.status(404).end();
+
+    let blobName = h.imagen_blob;
+    if (!blobName) {
+      const parts = h.imagen_url.split(`/${container}/`);
+      blobName = parts[1] ? parts[1].split('?')[0] : null;
     }
-    // 133010: el número está conectado pero no registrado en la API
-    if (err.meta?.code === 133010) {
-      return res.status(422).json({ success: false, codigo: 133010, message: 'Meta dice que tu número no está activo en la API («Account not registered»). Ve a la pestaña «Conexión» y pulsa «Revisar número con Meta».' });
-    }
-    // 132001: la plantilla no existe en ese idioma o aún no está aprobada
-    if (err.meta?.code === 132001) {
-      return res.status(422).json({ success: false, message: 'La plantilla no existe o todavía no está aprobada por Meta.' });
-    }
-    responderError(res, next, err);
-  }
+    if (!blobName) return res.status(400).end();
+
+    const blobClient = azureClient.getContainerClient(container).getBlobClient(blobName);
+    const download   = await blobClient.download();
+
+    const ext  = blobName.split('.').pop().toLowerCase();
+    const mime = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp' };
+    res.setHeader('Content-Type', download.contentType || mime[ext] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    download.readableStreamBody.pipe(res);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
