@@ -1346,6 +1346,24 @@ async function descargarExcelPropietario(id) {
         ]));
       }
 
+      // Baños y estética (vienen en /propietarios/:id/informe)
+      const banos = m.banos || [];
+      if (banos.length) {
+        const bR = rows.length;
+        rows.push([{ v:'BAÑOS Y ESTÉTICA ('+banos.length+')', s:{...sHdr,fill:{fgColor:{rgb:'BE185D'}},alignment:{horizontal:'left'}} },'','','','','','']);
+        merge.push({ s:{r:bR,c:0}, e:{r:bR,c:6} });
+        rows.push([{ v:'Fecha', s:sHdr },{ v:'Baño', s:sHdr },{ v:'Incluye', s:sHdr },{ v:'Productos', s:sHdr },{ v:'Observaciones', s:sHdr },{ v:'Atendido por', s:sHdr },{ v:'Precio', s:sHdr }]);
+        banos.forEach((b, i) => rows.push([
+          { v:b.fecha?String(b.fecha).split('T')[0]:'—', s:sD(i%2===0) },
+          { v:b.tipo_bano_label||'—', s:sD(i%2===0) },
+          { v:b.incluye||'—', s:sD(i%2===0) },
+          { v:b.productos||'—', s:sD(i%2===0) },
+          { v:b.observaciones||'—', s:sD(i%2===0) },
+          { v:b.atendido_por_nombre||'—', s:sD(i%2===0) },
+          { v:b.precio!=null?'S/ '+Number(b.precio).toFixed(2):'—', s:sD(i%2===0) },
+        ]));
+      }
+
       rows.push([{ v:'', s:{} },'','','','','','']);
     }
 

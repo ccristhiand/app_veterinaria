@@ -333,6 +333,18 @@ router.delete('/:id', auditMiddleware('propietarios:eliminado', 'propietarios'),
   } catch (err) { next(err); }
 });
 
+// ── Baños y estética de una mascota (para los informes) ───────────
+const TIPO_BANO = { basico: 'Básico', completo: 'Completo', medicado: 'Medicado', deslanado: 'Deslanado' };
+const extrasBano = (b) => [b.incluye_corte && 'Corte', b.incluye_unas && 'Uñas', b.incluye_dental && 'Limpieza dental'].filter(Boolean).join(', ');
+
+async function banosDeMascota(req, mascotaId) {
+  return req.db.query(
+    `SELECT s.*, u.nombre AS atendido_por_nombre
+     FROM servicios_estetica s LEFT JOIN usuarios u ON u.id = s.atendido_por_id
+     WHERE s.mascota_id = ? ORDER BY s.fecha DESC, s.created_at DESC`, [mascotaId]
+  ).catch(() => []);
+}
+
 // ── GET /api/v1/propietarios/:id/informe/pdf ──────────────────────
 router.get('/:id/informe/pdf', async (req, res, next) => {
   try {
@@ -372,9 +384,10 @@ router.get('/:id/informe/pdf', async (req, res, next) => {
          JOIN usuarios u ON u.id = d.veterinario_id
          WHERE d.mascota_id = ? ORDER BY d.fecha_aplicacion DESC`, [m.id]
       );
+      m.banos = await banosDeMascota(req, m.id);
     }
 
-    const fDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' }) : '—';
+    const fDate =(d) => d ? new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' }) : '—';
     const esc   = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const especie2emoji = (e) => ({ perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', roedor:'🐹' }[e] || '🐾');
     const especie2color = (e) => ({ perro:'#854d0e', gato:'#5b21b6', ave:'#0369a1', reptil:'#166534', roedor:'#9d174d' }[e] || '#374151');
@@ -504,6 +517,33 @@ router.get('/:id/informe/pdf', async (req, res, next) => {
           </table>`
         : `<p style="font-size:11px;color:#9ca3af;padding:8px 0;text-align:center">Sin desparasitaciones registradas.</p>`;
 
+      // ── Baños y estética ──
+      const banosHtml = m.banos.length
+        ? `<table style="width:100%;border-collapse:collapse;font-size:10px">
+            <thead>
+              <tr style="background:#fce7f3">
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Fecha</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Baño</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Incluye</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Productos / Obs.</th>
+                <th style="padding:6px 10px;text-align:right;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Precio</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:#be185d;border-bottom:2px solid #fbcfe8">Atendido por</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${m.banos.map((b, i) => `
+                <tr style="background:${i % 2 === 0 ? '#fdf2f8' : '#fff'}">
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;color:#374151">${fDate(b.fecha)}</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;font-weight:600;color:#831843">${esc(TIPO_BANO[b.tipo_bano] || b.tipo_bano)}</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;color:#374151">${esc(extrasBano(b)) || '—'}</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;color:#6b7280">${esc([b.productos, b.observaciones].filter(Boolean).join(' · ')) || '—'}</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;text-align:right;color:#374151">${b.precio != null ? 'S/ ' + Number(b.precio).toFixed(2) : '—'}</td>
+                  <td style="padding:6px 10px;border-bottom:1px solid #fce7f3;color:#6b7280">${esc(b.atendido_por_nombre)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`
+        : `<p style="font-size:11px;color:#9ca3af;padding:8px 0;text-align:center">Sin baños registrados.</p>`;
+
       return `
         <!-- ══ MASCOTA ${mi + 1} ══ -->
         <div style="margin-bottom:32px">
@@ -543,6 +583,9 @@ router.get('/:id/informe/pdf', async (req, res, next) => {
 
             ${seccionLabel('🛡️', `Desparasitaciones (${m.desparasitaciones.length})`, '#6d28d9', '#ede9fe')}
             ${desparasHtml}
+
+            ${seccionLabel('🛁', `Baños y estética (${m.banos.length})`, '#be185d', '#fce7f3')}
+            ${banosHtml}
           </div>
         </div>`;
     }).join('');
@@ -688,6 +731,9 @@ router.get('/:id/informe', async (req, res, next) => {
           'SELECT * FROM historia_seguimientos WHERE historia_id = ? ORDER BY fecha ASC', [h.id]
         );
       }
+      m.banos = (await banosDeMascota(req, m.id)).map(b => ({
+        ...b, tipo_bano_label: TIPO_BANO[b.tipo_bano] || b.tipo_bano, incluye: extrasBano(b),
+      }));
     }
     return res.json({ success: true, data: { ...p, mascotas } });
   } catch (err) { next(err); }

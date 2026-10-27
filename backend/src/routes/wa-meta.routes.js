@@ -166,7 +166,8 @@ router.post('/conectar', async (req, res, next) => {
       'SELECT tenant_id FROM wa_meta_cuentas WHERE phone_number_id = ? AND tenant_id <> ? LIMIT 1',
       [phoneId, tenantId]
     );
-    if (otro) return res.status(409).json({ success: false, message: 'Ese número ya está conectado a otra clínica.' });
+    // Se lanza (no return) para que el catch saque la fila del estado 'conectando'
+    if (otro) throw Object.assign(new Error('Ese número ya está conectado a otra clínica.'), { status: 409 });
 
     // 3) Datos del número
     const info = await graph('GET', phoneId, {
@@ -314,7 +315,7 @@ router.post('/diagnostico', async (req, res, next) => {
          ultimo_error = IF(? = 1, NULL, ultimo_error)
        WHERE tenant_id = ?`,
       [info.display_phone_number || null, info.verified_name || null, info.quality_rating || null,
-       coexistencia ? 1 : 0, historial, suscrito ? 1 : 0, coexistencia ? 1 : 0, tenantId]
+       coexistencia ? 1 : 0, historial, suscrito ? 1 : 0, suscrito ? 1 : 0, tenantId]
     );
     logger.info(`[wa-meta] Diagnóstico clínica ${tenantId}: ${JSON.stringify(info)} suscrito=${suscrito}`);
 
@@ -440,11 +441,20 @@ function faltaMigracion() {
   e.status = 409; return e;
 }
 
+// Recorre todas las páginas: si faltara alguna, sincronizarPlantillas daría por borradas
+// plantillas que siguen existiendo en Meta
 async function plantillasMeta(cfg, token, wabaId, nombre) {
   const query = { fields: 'id,name,language,status,category,components,rejected_reason', limit: '200' };
   if (nombre) query.name = nombre;
-  const d = await graph('GET', `${wabaId}/message_templates`, { cfg, token, query });
-  return d.data || [];
+  const todas = [];
+  for (let pagina = 0; pagina < 25; pagina++) {
+    const d = await graph('GET', `${wabaId}/message_templates`, { cfg, token, query });
+    todas.push(...(d.data || []));
+    const after = d.paging?.cursors?.after;
+    if (!d.paging?.next || !after) break;
+    query.after = after;
+  }
+  return todas;
 }
 
 function vistaPlantillaMeta(t) {
@@ -1100,7 +1110,7 @@ router.put('/recordatorios', async (req, res, next) => {
 const SEGMENTOS = ['todos', 'por_especie', 'vacunas_vencidas', 'citas_semana', 'sin_citas_60d'];
 const DATOS_CAMPANA = { nombre: 'Nombre del cliente', mascota: 'Mascota(s)', clinica: 'Nombre de la clínica' };
 
-// Misma consulta que usa el procesador wa-campanas (mantener iguales)
+// Misma consulta que usa el procesador wa-meta/src/wa-meta-campanas.js (mantener iguales)
 function sqlSegmento(segmento, valor) {
   const nombre = `COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.nombre,''),' ',COALESCE(p.apellido,''))),''), p.razon_social)`;
   const base = (joins, where, params = []) => ({

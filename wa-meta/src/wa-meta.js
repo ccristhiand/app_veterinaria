@@ -11,7 +11,7 @@
  *                        · mensaje enviado / entregado / leído / fallido → wa_mensajes_log
  *     GET  /health
  *   Interno (solo 127.0.0.1:5003, no pasa por Nginx)
- *     POST /interno/enviar-plantilla → lo usan wa-recordatorios y wa-campanas
+ *     POST /interno/enviar-plantilla → lo usan wa-meta-recordatorios y wa-meta-campanas
  *
  * Usa el .env del backend (base maestra + ENCRYPTION_KEY): no necesita .env propio.
  * La configuración de Meta (App Secret, token de verificación) se lee de

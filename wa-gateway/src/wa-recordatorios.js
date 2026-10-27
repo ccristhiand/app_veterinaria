@@ -4,10 +4,9 @@
  * VetClinic SaaS — Cron de Recordatorios WhatsApp
  * Revisa cada 30 minutos citas, vacunas y desparasitaciones pendientes.
  *
- * Canal de envío por clínica:
- *   · Conectada a Meta (API oficial) y con la pantalla Meta habilitada → plantilla aprobada por Meta
- *     (vía wa-meta, puerto interno 5003). Sin plantilla aprobada para ese recordatorio, no se envía.
- *   · Si no → WhatsApp por QR (wa-gateway), igual que siempre.
+ * Solo WhatsApp por QR (Baileys, wa-gateway). Las clínicas que envían por Meta
+ * (API oficial) las atiende wa-meta/src/wa-meta-recordatorios.js: aquí se excluyen
+ * para que ningún recordatorio salga dos veces.
  */
 
 const mysql = require('mysql2/promise');
@@ -17,7 +16,6 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const WA_GATEWAY   = process.env.WA_GATEWAY_URL  || 'http://localhost:5001';
 const INTERNAL_KEY = process.env.WA_INTERNAL_KEY || 'wa-internal-secret-2026';
-const WA_META_INTERNO = process.env.WA_META_INTERNAL_URL || 'http://127.0.0.1:5003';
 
 const masterPool = mysql.createPool({
   host    : process.env.MASTER_DB_HOST,
@@ -98,82 +96,12 @@ function callGateway(method, endpath, body = null) {
   });
 }
 
-// ── Envío por Meta (wa-meta interno) ──────────────────────────
-function callMeta(body) {
-  return new Promise((resolve, reject) => {
-    const bodyStr = JSON.stringify(body);
-    const url     = new URL(WA_META_INTERNO + '/interno/enviar-plantilla');
-    const req = http.request({
-      hostname: url.hostname, port: url.port || 5003, path: url.pathname, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY, 'Content-Length': Buffer.byteLength(bodyStr) },
-    }, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => { let j = {}; try { j = JSON.parse(data); } catch {} resolve({ status: res.statusCode, ...j }); });
-    });
-    req.on('error', reject);
-    req.setTimeout(20000, () => { req.destroy(); reject(new Error('Timeout wa-meta')); });
-    req.write(bodyStr);
-    req.end();
-  });
-}
-
-// Plantillas de Meta aprobadas de la clínica, por uso (se lee una vez por ciclo)
-async function plantillasAprobadas(conn) {
-  try {
-    const [rows] = await conn.execute(
-      `SELECT uso, nombre_meta, idioma, cuerpo, variables FROM wa_meta_plantillas
-       WHERE es_estandar = 1 AND activo = 1 AND estado = 'aprobada' ORDER BY id DESC`
-    );
-    const m = {};
-    for (const r of rows) {
-      if (m[r.uso]) continue;
-      let vars = [];
-      try { vars = JSON.parse(r.variables || '[]'); } catch { vars = []; }
-      m[r.uso] = { nombre: r.nombre_meta, idioma: r.idioma || 'es', cuerpo: r.cuerpo, variables: vars };
-    }
-    return m;
-  } catch { return {}; }   // clínica sin migración v18
-}
-
-/**
- * Envía un recordatorio por el canal de la clínica.
- * Devuelve 'enviado', 'fallido' (Meta lo rechazó de forma definitiva: no se reintenta)
- * u 'omitido' (sin plantilla aprobada: se reintentará cuando la aprueben).
- * Lanza error si conviene reintentar en el próximo ciclo.
- */
-async function enviarRecordatorio(tenant, cfg, { usos, datos, telefono, tipoLog, mensajeQR, propietarioId }) {
-  if (tenant.usa_meta) {
-    const p = usos.map(u => tenant.plantillas[u]).find(Boolean);
-    if (!p) {
-      const clave = usos[0];
-      if (!tenant._avisados.has(clave)) {
-        tenant._avisados.add(clave);
-        console.log(`[WA Meta] ⚠️ ${tenant.slug}: sin plantilla aprobada para "${clave}" — no se envía (apruébala en WhatsApp Meta → Recordatorios)`);
-      }
-      return 'omitido';
-    }
-    const variables = p.variables.map(k => datos[k] || '-');
-    const resumen   = p.cuerpo.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => variables[n - 1] || '');
-    const r = await callMeta({
-      tenantId: tenant.id, telefono, plantilla: p.nombre, idioma: p.idioma, variables,
-      tipo: tipoLog, propietarioId: propietarioId || null, resumen, codigoPais: cfg.codigo_pais || '+51',
-    });
-    if (!r.success) {
-      if (r.reintentar === false) {
-        console.error(`[WA Meta] ❌ ${tenant.slug} → ${telefono}: ${r.message}`);
-        return 'fallido';
-      }
-      throw new Error(r.message || 'Meta no envió el mensaje');
-    }
-    return 'enviado';
-  }
-
+// Envío por QR
+async function enviarRecordatorio(tenant, cfg, { telefono, tipoLog, mensaje }) {
   await callGateway('POST', '/wa/enviar', {
-    tenantId: tenant.id, telefono, mensaje: mensajeQR, propietarioId: propietarioId || null,
+    tenantId: tenant.id, telefono, mensaje, propietarioId: null,
     tipo: tipoLog, codigoPais: cfg.codigo_pais || '+51',
   });
-  return 'enviado';
 }
 
 function rellenarPlantilla(plantilla, vars) {
@@ -238,7 +166,7 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
          AND p.telefono IS NOT NULL
          AND c.fecha_hora BETWEEN NOW() + INTERVAL ? HOUR - INTERVAL 30 MINUTE
                               AND NOW() + INTERVAL ? HOUR + INTERVAL 30 MINUTE
-         -- Se compara por los últimos 9 dígitos: Meta guarda el número con código de país (51…)
+         -- Se compara por los últimos 9 dígitos (el log puede guardar el número con código de país)
          AND RIGHT(REPLACE(REPLACE(REPLACE(p.telefono,' ',''),'-',''),'+',''), 9) NOT IN (
            SELECT DISTINCT RIGHT(REPLACE(REPLACE(REPLACE(telefono,' ',''),'-',''),'+',''), 9) FROM wa_mensajes_log
            WHERE tipo = 'recordatorio_cita'
@@ -286,17 +214,9 @@ async function procesarRecordatoriosCitas(tenant, conn, cfg, clinica) {
           telefono: tenant.tel_clinica || '',
         });
 
-        const res = await enviarRecordatorio(tenant, cfg, {
-          usos         : [tipoPlantilla, 'recordatorio_cita'],
-          datos        : { nombre: cita.propietario, mascota: cita.mascota, fecha: fDate(cita.fecha_hora, tz), hora: fHora(cita.fecha_hora, tz) },
-          telefono     : cita.telefono,
-          tipoLog      : 'recordatorio_cita',
-          mensajeQR    : msg,
-          propietarioId: tenant.usa_meta ? cita.propietario_id : null,
-        });
-        if (res !== 'enviado') continue;
+        await enviarRecordatorio(tenant, cfg, { telefono: cita.telefono, tipoLog: 'recordatorio_cita', mensaje: msg });
 
-        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono} (${tipoCita}${tenant.usa_meta ? ', Meta' : ''})`);
+        console.log(`[WA Citas] ✅ ${tenant.slug} → ${cita.telefono} (${tipoCita})`);
       } catch (e) {
         console.error(`[WA Citas] ❌ ${tenant.slug} → ${cita.telefono}: ${e.message}`);
       }
@@ -314,7 +234,7 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
 
   for (const dias of rangos) {
     const [vacunas] = await conn.execute(
-      `SELECT v.id, v.nombre, v.proxima_dosis, p.id AS propietario_id,
+      `SELECT v.id, v.nombre, v.proxima_dosis,
               m.nombre AS mascota,
               COALESCE(NULLIF(TRIM(CONCAT_WS(' ', p.nombre, p.apellido)),''), p.razon_social) AS propietario,
               p.telefono
@@ -341,18 +261,10 @@ async function procesarRecordatoriosVacunas(tenant, conn, cfg, clinica) {
           { nombre: vac.propietario, mascota: vac.mascota, vacuna: vac.nombre, clinica }
         );
 
-        const res = await enviarRecordatorio(tenant, cfg, {
-          usos         : ['recordatorio_vacuna'],
-          datos        : { nombre: vac.propietario, mascota: vac.mascota, vacuna: vac.nombre, fecha: fDate(vac.proxima_dosis, tenant.zona_horaria) },
-          telefono     : vac.telefono,
-          tipoLog      : 'recordatorio_vacuna',
-          mensajeQR    : msg,
-          propietarioId: tenant.usa_meta ? vac.propietario_id : null,
-        });
-        if (res === 'omitido') continue;
+        await enviarRecordatorio(tenant, cfg, { telefono: vac.telefono, tipoLog: 'recordatorio_vacuna', mensaje: msg });
 
         await conn.execute('UPDATE vacunas SET notificado=1 WHERE id=?', [vac.id]);
-        if (res === 'enviado') console.log(`[WA Vacunas] ✅ ${tenant.slug} → ${vac.telefono}${tenant.usa_meta ? ' (Meta)' : ''}`);
+        console.log(`[WA Vacunas] ✅ ${tenant.slug} → ${vac.telefono}`);
       } catch (e) {
         console.error(`[WA Vacunas] ❌ ${tenant.slug}: ${e.message}`);
       }
@@ -370,7 +282,7 @@ async function procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica
 
   for (const dias of rangos) {
     const [desp] = await conn.execute(
-      `SELECT d.id, d.tipo, d.producto, d.proxima_dosis, p.id AS propietario_id,
+      `SELECT d.id, d.tipo, d.producto, d.proxima_dosis,
               m.nombre AS mascota,
               COALESCE(NULLIF(TRIM(CONCAT_WS(' ', p.nombre, p.apellido)),''), p.razon_social) AS propietario,
               p.telefono
@@ -393,18 +305,10 @@ async function procesarRecordatoriosDesparasitaciones(tenant, conn, cfg, clinica
         const tipoLabel = { interna: 'interna', externa: 'externa', interna_externa: 'interna y externa' };
         const msg = `🐛 Hola ${d.propietario}, recuerda que *${d.mascota}* tiene pendiente su desparasitación ${tipoLabel[d.tipo]||''} con *${d.producto}*. Contáctanos en *${clinica}* para coordinar.`;
 
-        const res = await enviarRecordatorio(tenant, cfg, {
-          usos         : ['recordatorio_desparasitacion'],
-          datos        : { nombre: d.propietario, mascota: d.mascota, producto: d.producto || 'su desparasitante', fecha: fDate(d.proxima_dosis, tenant.zona_horaria) },
-          telefono     : d.telefono,
-          tipoLog      : 'recordatorio_vacuna',
-          mensajeQR    : msg,
-          propietarioId: tenant.usa_meta ? d.propietario_id : null,
-        });
-        if (res === 'omitido') continue;
+        await enviarRecordatorio(tenant, cfg, { telefono: d.telefono, tipoLog: 'recordatorio_vacuna', mensaje: msg });
 
         await conn.execute('UPDATE desparasitaciones SET notificado=1 WHERE id=?', [d.id]);
-        if (res === 'enviado') console.log(`[WA Desparasitaciones] ✅ ${tenant.slug} → ${d.telefono}${tenant.usa_meta ? ' (Meta)' : ''}`);
+        console.log(`[WA Desparasitaciones] ✅ ${tenant.slug} → ${d.telefono}`);
       } catch (e) {
         console.error(`[WA Desparasitaciones] ❌ ${tenant.slug}: ${e.message}`);
       }
@@ -418,32 +322,24 @@ async function procesarRecordatorios() {
   console.log(`[WA Recordatorios] Iniciando ciclo: ${new Date().toLocaleString('es-PE')}`);
 
   try {
+    const base = `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
+                         tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria
+                  FROM tenants t
+                  JOIN tenant_config tc     ON tc.tenant_id  = t.id
+                  JOIN wa_sesiones ws       ON ws.tenant_id  = t.id
+                  JOIN wa_config_global wcg ON wcg.tenant_id = t.id
+                  WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`;
     let tenants;
     try {
-      // Clínicas con WhatsApp por QR conectado o con Meta conectado (y la pantalla Meta habilitada)
+      // Clínicas con QR conectado que NO envían por Meta (esas las atiende wa-meta-recordatorios)
       tenants = await masterQuery(
-        `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
-                tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria,
-                (wmc.estado = 'conectado' AND COALESCE(wcg.ver_meta, 0) = 1) AS usa_meta
-         FROM tenants t
-         JOIN tenant_config tc          ON tc.tenant_id  = t.id
-         JOIN wa_config_global wcg      ON wcg.tenant_id = t.id
-         LEFT JOIN wa_sesiones ws       ON ws.tenant_id  = t.id
-         LEFT JOIN wa_meta_cuentas wmc  ON wmc.tenant_id = t.id
-         WHERE t.activo = 1 AND wcg.activo = 1
-           AND (ws.estado = 'conectado' OR (wmc.estado = 'conectado' AND COALESCE(wcg.ver_meta, 0) = 1))`
+        `${base}
+           AND NOT (COALESCE(wcg.ver_meta, 0) = 1 AND EXISTS (
+             SELECT 1 FROM wa_meta_cuentas wmc WHERE wmc.tenant_id = t.id AND wmc.estado = 'conectado'))`
       );
     } catch (e) {
-      // Base maestra sin las tablas de Meta: solo QR, como antes
-      tenants = await masterQuery(
-        `SELECT t.id, t.slug, t.db_host, t.db_port, t.db_user, t.db_pass, t.db_name,
-                tc.nombre_clinica, tc.telefono AS tel_clinica, tc.zona_horaria, 0 AS usa_meta
-         FROM tenants t
-         JOIN tenant_config tc     ON tc.tenant_id  = t.id
-         JOIN wa_sesiones ws       ON ws.tenant_id  = t.id
-         JOIN wa_config_global wcg ON wcg.tenant_id = t.id
-         WHERE t.activo = 1 AND ws.estado = 'conectado' AND wcg.activo = 1`
-      );
+      // Base maestra sin las tablas de Meta (v8): todas las de QR
+      tenants = await masterQuery(base);
     }
 
     console.log(`[WA Recordatorios] Tenants activos con WA: ${tenants.length}`);
@@ -460,9 +356,6 @@ async function procesarRecordatorios() {
         }
 
         const clinica = tenant.nombre_clinica || 'VetClinic';
-        tenant.usa_meta   = !!Number(tenant.usa_meta);
-        tenant.plantillas = tenant.usa_meta ? await plantillasAprobadas(conn) : {};
-        tenant._avisados  = new Set();
 
         if (cfg.recordatorio_citas_activo) {
           await procesarRecordatoriosCitas(tenant, conn, cfg, clinica);
