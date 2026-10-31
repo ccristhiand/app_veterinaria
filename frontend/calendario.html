@@ -971,7 +971,7 @@ function irAAtenderCal() {
 // ══════════════════════════════════════════════════════════════════
 async function cargarVets() {
   try {
-    var res = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
+    var res = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
     _vets   = res?.ok ? (await res.json()).data || [] : [];
     var opts = '<option value="">Todos los veterinarios</option>' +
       _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
@@ -1019,6 +1019,7 @@ function abrirNuevaCita(fecha, hora) {
 function cerrarModalNcita() { closeModal('modal-ncita'); _ncPropSel=null; _ncMascSel=null; }
 
 function selTipoNC(tipo) {
+  if (JSON.parse(localStorage.getItem('vet_user') || '{}').rol === 'groomer') tipo = 'estetica'; // el groomer solo agenda estética
   document.getElementById('nc-tipo').value = tipo;
   Object.keys(TIPOS).forEach(t => {
     var btn = document.getElementById('nc-tipo-'+t);

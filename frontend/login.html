@@ -317,7 +317,7 @@
     const token = localStorage.getItem('vet_access');
     const user  = localStorage.getItem('vet_user');
     if (token && token !== 'undefined' && user && user !== 'undefined') {
-      window.location.href = 'dashboard';
+      window.location.href = JSON.parse(user).rol === 'groomer' ? 'citas' : 'dashboard';
     }
   } catch(e) { localStorage.clear(); }
 
@@ -389,7 +389,7 @@
       localStorage.setItem('vet_user',    JSON.stringify(user));
 
       btnText.textContent = '✅ Accediendo…';
-      setTimeout(() => window.location.href = 'dashboard', 400);
+      setTimeout(() => window.location.href = user?.rol === 'groomer' ? 'citas' : 'dashboard', 400);
 
     } catch {
       showError('No se pudo conectar al servidor.');

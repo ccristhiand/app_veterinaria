@@ -5,6 +5,9 @@ let citaId     = null;
 let motivoCita = null;
 let recetaN    = 0;
 
+// Groomer: en esta página solo trabaja la pestaña Estética (sin consultas, vacunas ni histórico)
+const ES_GROOMER = (JSON.parse(localStorage.getItem('vet_user') || '{}').rol === 'groomer');
+
 const ssMascotaId = sessionStorage.getItem('historia_mascota_id');
 const ssCitaId    = sessionStorage.getItem('historia_cita_id');
 const ssMotivo    = sessionStorage.getItem('historia_motivo');
@@ -16,10 +19,21 @@ sessionStorage.removeItem('historia_tab');
 
 initPage({ activePage:'historia', title:'Historia Clínica', subtitle:'Expedientes médicos' });
 
+if (ES_GROOMER) {
+  ['tab-consultas','tab-vacunas','tab-desparasitaciones'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const hist = document.getElementById('hh-lista')?.closest('.vcard');
+  if (hist) hist.style.display = 'none';
+  const sub = document.getElementById('page-head-sub');
+  if (sub) sub.textContent = 'Baños y estética de las mascotas';
+}
+
 if (ssCitaId) { citaId=parseInt(ssCitaId); motivoCita=ssMotivo||''; mostrarBannerCita(); }
 if (ssMascotaId) { requestAnimationFrame(()=>requestAnimationFrame(()=>cargarHistoria(parseInt(ssMascotaId)))); }
 
 function mostrarTab(tab) {
+  if (ES_GROOMER) tab = 'estetica';
   const tabs = ['consultas','vacunas','desparasitaciones','estetica'];
   tabs.forEach(t => {
     const btn = document.getElementById('tab-'+t);
@@ -215,8 +229,8 @@ async function cargarHistoria(id) {
   document.getElementById('panel').style.display              = 'flex';
   document.getElementById('panel').style.flexDirection        = 'column';
   document.getElementById('panel').style.gap                  = '1.3rem';
-  document.getElementById('btn-nueva-consulta').style.display  = 'inline-flex';
-  document.getElementById('btn-nueva-vacuna').style.display    = 'inline-flex';
+  document.getElementById('btn-nueva-consulta').style.display  = ES_GROOMER ? 'none' : 'inline-flex';
+  document.getElementById('btn-nueva-vacuna').style.display    = ES_GROOMER ? 'none' : 'inline-flex';
   document.getElementById('btn-nueva-estetica').style.display  = 'inline-flex';
   var _btnVolverHist = document.getElementById('btn-volver-historico');
   if (_btnVolverHist) _btnVolverHist.style.display = 'inline-flex';
@@ -244,6 +258,12 @@ async function cargarHistoria(id) {
     document.getElementById('est-mascota-info').textContent   = m.especie+' · '+(m.raza||'Sin raza')+' · Propietario: '+(m.propietario_nombre||'—');
     document.getElementById('est-fecha').value = fechaHoyInput();
     document.getElementById('co-fecha').value  = fechaHoraAhoraInput();
+    // Groomer: siempre la pestaña Estética (no consulta la historia clínica)
+    if (ES_GROOMER) {
+      mostrarTab('estetica');
+      if (ssTab === 'estetica') setTimeout(()=>openModal('modal-estetica'), 300);
+      return;
+    }
     // Redireccion desde calendario o citas — abrir tab y modal correcto
     if (!ssTab || ssTab === 'consultas') {
       mostrarTab('consultas');

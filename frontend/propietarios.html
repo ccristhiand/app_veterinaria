@@ -1006,6 +1006,11 @@ async function verDetalle(id) {
   };
   document.getElementById('det-excel-btn').onclick = () => descargarExcelPropietario(id);
   document.getElementById('det-pdf-btn').onclick   = () => descargarPDFPropietario(id);
+  // El informe incluye la historia clínica: el groomer no lo descarga
+  if (JSON.parse(localStorage.getItem('vet_user') || '{}').rol === 'groomer') {
+    document.getElementById('det-excel-btn').style.display = 'none';
+    document.getElementById('det-pdf-btn').style.display   = 'none';
+  }
 
   openModal('modal-det');
 

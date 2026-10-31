@@ -58,6 +58,7 @@
         <option value="veterinario">🩺 Veterinario</option>
         <option value="recepcionista">💁 Recepcionista</option>
         <option value="veterinario_recepcionista">🩺💁 Vet. Recepcionista</option>
+        <option value="groomer">✂️ Groomer</option>
       </select>
     </div>
     <div>
@@ -124,6 +125,7 @@
             <option value="recepcionista">💁 Recepcionista</option>
             <option value="veterinario">🩺 Veterinario</option>
             <option value="veterinario_recepcionista">🩺💁 Vet. Recepcionista</option>
+            <option value="groomer">✂️ Groomer (estética)</option>
             <option value="admin">👑 Administrador</option>
           </select>
         </div>
@@ -296,6 +298,7 @@ async function cargar() {
       admin         : { label:'👑 Admin',         bg:'#fef3c7', color:'#b45309', border:'#fde68a' },
       veterinario   : { label:'🩺 Veterinario',    bg:'#ecfdf5', color:'#047857', border:'#a7f3d0' },
       recepcionista : { label:'💁 Recepcionista',  bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
+      groomer       : { label:'✂️ Groomer',        bg:'#fdf2f8', color:'#be185d', border:'#fbcfe8' },
     };
 
     tbody.innerHTML = rows.map(function(u) {

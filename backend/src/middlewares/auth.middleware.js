@@ -7,6 +7,25 @@ const ACCESS_SECRET  = process.env.JWT_SECRET         || 'vetclinic-secret-key';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'vetclinic-refresh-key';
 
 /**
+ * Rol groomer: solo puede usar estos módulos de la API; todo lo demás responde 403.
+ * r = consultar (GET) · w = crear/editar (POST, PUT, PATCH) · d = eliminar (DELETE)
+ * No tiene acceso a historia clínica, exámenes, facturación, caja, inventario, reportes ni WhatsApp.
+ */
+const ACCESO_GROOMER = {
+  auth: 'r', usuarios: 'r', tenant: 'r', branding: 'r', empresa: 'r', sedes: 'r', servicios: 'r',
+  integracion: 'r', carnet: 'r', vacunas: 'r', desparasitaciones: 'r',
+  notificaciones: 'rw', citas: 'rw', propietarios: 'rw', mascotas: 'rw', estetica: 'rw', asistencia: 'rw',
+};
+
+function groomerPuede(req) {
+  const modulo = (req.baseUrl || '').split('/').pop();
+  const acceso = ACCESO_GROOMER[modulo] || '';
+  if (req.method === 'GET' || req.method === 'HEAD') return acceso.includes('r');
+  if (req.method === 'DELETE') return acceso.includes('d');
+  return acceso.includes('w');
+}
+
+/**
  * Middleware de autenticación JWT.
  * Usa req.db (inyectado por tenant middleware) para verificar el usuario.
  */
@@ -31,6 +50,9 @@ async function authenticate(req, res, next) {
     }
 
     req.user = user;
+    if (user.rol === 'groomer' && !groomerPuede(req)) {
+      return res.status(403).json({ success: false, message: 'Tu rol (Groomer) no tiene acceso a esta sección.' });
+    }
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

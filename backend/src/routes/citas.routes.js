@@ -43,6 +43,7 @@ router.get('/', async (req, res, next) => {
     if (veterinario_id) { sql += ' AND c.veterinario_id = ?';  params.push(veterinario_id); }
     if (mascota_id)     { sql += ' AND c.mascota_id = ?';      params.push(mascota_id); }
     if (tipo_cita)      { sql += ' AND c.tipo_cita = ?';       params.push(tipo_cita); }
+    if (req.user.rol === 'groomer') sql += " AND c.tipo_cita = 'estetica'";
     if (search) {
       sql += ` AND (m.nombre LIKE ? OR p.nombre LIKE ? OR p.apellido LIKE ?
                OR p.dni LIKE ? OR p.telefono LIKE ? OR c.motivo LIKE ?)`;
@@ -55,6 +56,14 @@ router.get('/', async (req, res, next) => {
     return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });
+
+// Groomer: solo trabaja con citas de estética (las ve, crea, edita y cambia de estado)
+const esGroomer = req => req.user?.rol === 'groomer';
+async function citaAjenaAlGroomer(req) {
+  if (!esGroomer(req)) return false;
+  const [c] = await req.db.query('SELECT tipo_cita FROM citas WHERE id = ?', [req.params.id]);
+  return !c || c.tipo_cita !== 'estetica';
+}
 
 // GET /api/v1/citas/:id
 router.get('/:id', async (req, res, next) => {
@@ -71,7 +80,8 @@ router.get('/:id', async (req, res, next) => {
        LEFT JOIN sedes s ON s.id = c.sede_id
        WHERE c.id = ?`, [req.params.id]
     );
-    if (!cita) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    if (!cita || (esGroomer(req) && cita.tipo_cita !== 'estetica'))
+      return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
     return res.json({ success: true, data: cita });
   } catch (err) { next(err); }
 });
@@ -86,7 +96,7 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
       return res.status(422).json({ success: false, message: 'Campos obligatorios faltantes.' });
 
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
-    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
+    const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
 
     let sedeId = req.user.sede_id ||
                  (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
@@ -129,8 +139,10 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
     const { fecha_hora, duracion_min, motivo, notas, estado, veterinario_id,
             tipo_cita } = req.body;
 
+    if (await citaAjenaAlGroomer(req))
+      return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
-    const tipoCitaFinal = tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica';
+    const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
 
     await req.db.query(
       `UPDATE citas
@@ -151,6 +163,8 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
 router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async (req, res, next) => {
   try {
     const { estado } = req.body;
+    if (await citaAjenaAlGroomer(req))
+      return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
     await req.db.query('UPDATE citas SET estado=? WHERE id=?', [estado, req.params.id]);
     const io = req.app.get('io');
     if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id, estado } });

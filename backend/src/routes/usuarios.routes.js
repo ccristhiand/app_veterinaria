@@ -48,13 +48,9 @@ router.get('/', async (req, res, next) => {
     // Filtrar por sede solo para no-admins
     if (sedeId)               { sql += ' AND u.sede_id = ?';  params.push(sedeId); }
     if (rol !== undefined) {
-      // Soporta ?rol=veterinario&rol2=veterinario_recepcionista (múltiples roles)
-      const { rol2 } = req.query;
-      if (rol2) {
-        sql += ' AND u.rol IN (?,?)'; params.push(rol, rol2);
-      } else {
-        sql += ' AND u.rol = ?'; params.push(rol);
-      }
+      // Soporta ?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer (múltiples roles)
+      const roles = [rol, req.query.rol2, req.query.rol3].filter(Boolean);
+      sql += ` AND u.rol IN (${roles.map(() => '?').join(',')})`; params.push(...roles);
     }
     if (activo !== undefined) { sql += ' AND u.activo = ?';    params.push(activo === 'false' ? 0 : 1); }
     sql += ' ORDER BY u.nombre';
@@ -116,7 +112,7 @@ router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuario
     if (!password)       return res.status(422).json({ success:false, message:'Password obligatorio.' });
     if (password.length < 8) return res.status(422).json({ success:false, message:'El password debe tener al menos 8 caracteres.' });
 
-    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista'];
+    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'];
     if (!rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
     // Validar que la sede existe (si se proporciona)
@@ -180,7 +176,7 @@ router.put('/:id', authorize('admin'), auditMiddleware('usuarios:actualizado', '
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
 
-    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista'];
+    const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'];
     if (rol && !rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
     // Validar que la sede existe (si se proporciona)

@@ -21,10 +21,13 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+const DESC_MAX = 2000;   // servicios_catalogo.descripcion es TEXT (v20)
+
 router.post('/', authorize('admin'), auditMiddleware('servicios:creado', 'servicios'), async (req, res, next) => {
   try {
     const { nombre, categoria, precio, descripcion } = req.body;
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
+    if (descripcion?.length > DESC_MAX) return res.status(422).json({ success: false, message: `La descripción admite hasta ${DESC_MAX} caracteres.` });
     const result = await req.db.query(
       'INSERT INTO servicios_catalogo (nombre, categoria, precio, descripcion) VALUES (?,?,?,?)',
       [nombre.trim(), categoria||'consulta', parseFloat(precio)||0, descripcion?.trim()||null]
@@ -36,6 +39,7 @@ router.post('/', authorize('admin'), auditMiddleware('servicios:creado', 'servic
 router.put('/:id', authorize('admin'), auditMiddleware('servicios:actualizado', 'servicios'), async (req, res, next) => {
   try {
     const { nombre, categoria, precio, descripcion, activo } = req.body;
+    if (descripcion?.length > DESC_MAX) return res.status(422).json({ success: false, message: `La descripción admite hasta ${DESC_MAX} caracteres.` });
     await req.db.query(
       'UPDATE servicios_catalogo SET nombre=?, categoria=?, precio=?, descripcion=?, activo=? WHERE id=?',
       [nombre?.trim(), categoria, parseFloat(precio)||0, descripcion?.trim()||null, activo?1:0, req.params.id]

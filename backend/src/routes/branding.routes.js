@@ -146,6 +146,21 @@ function permisosDefault(rol) {
     todos.consentimientos.firmar = true;
   }
 
+  if (rol === 'groomer') {
+    // Estética: registra baños y agenda sus citas de estética; sin historia clínica ni caja
+    todos.dashboard    = { ver:false };
+    todos.historia     = { ver:true, crear:false, editar:false };   // solo la pestaña Estética
+    todos.inventario   = { ver:false, crear:false, editar:false, actualizar_stock:false };
+    todos.facturacion  = { ver:false, crear:false, anular:false, ver_reportes:false };
+    todos.servicios    = { ver:true, crear:false, editar:false };
+    todos.caja         = { ver:false, crear_borrador:false, cerrar:false };
+    todos.reportes     = { ver:false, exportar:false };
+    todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };
+    todos.consentimientos = { ver:false, crear:false, firmar:false };
+    todos.configuracion= { ver:false, editar:false };
+    todos.citas.ver_todas = false;  // solo citas de estética
+  }
+
   if (rol === 'recepcionista') {
     todos.reportes     = { ver:false, exportar:false };
     todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };

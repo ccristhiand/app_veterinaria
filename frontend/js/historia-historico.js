@@ -225,6 +225,7 @@ function volverHistorico() {
 
 document.addEventListener('DOMContentLoaded', function() {
   if (!document.getElementById('hh-lista')) return;
+  if (typeof ES_GROOMER !== 'undefined' && ES_GROOMER) return;   // el groomer no ve el histórico clínico
   // Si se llegó con un paciente (desde citas/calendario), no hace falta cargar el histórico aún
   hhSetRango(_hhRango);
 });

@@ -391,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Selector de tipo de cita ──────────────────────────────────────
 function selTipo(tipo) {
+  if (JSON.parse(localStorage.getItem('vet_user') || '{}').rol === 'groomer') tipo = 'estetica'; // el groomer solo agenda estética
   _tipoCitaSel = tipo;
   document.getElementById('c-tipo').value = tipo;
   Object.keys(TIPOS_CITA).forEach(t => {
@@ -422,7 +423,7 @@ async function cargarVets() {
   if (!sel) return;
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
+    var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
     if (!res) return;
     var vets = (await res.json()).data || [];
     sel.innerHTML = vets.length
@@ -746,7 +747,7 @@ async function abrirEditarCita(id) {
   var sel = document.getElementById('edit-cita-vet');
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista');
+    var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
     var vets = rv ? (await rv.json()).data || [] : [];
     sel.innerHTML = '<option value="">Seleccionar…</option>' +
       vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');

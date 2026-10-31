@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v18
+-- VETNETCODIP SaaS — TENANT SCHEMA v20
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -20,6 +20,8 @@
 --       + serie_proforma / correlativo_p / proforma_validez_dias / proforma_condiciones en empresa_config
 -- v17: + Punto de Venta: propietarios.es_generico (+ cliente Publico General), facturas.origen,
 --       inventario.codigo_barras / favorito, categorias alimento y accesorio
+-- v19: + rol 'groomer' en usuarios (estética: citas de estética, baños, propietarios y mascotas)
+-- v20: + servicios_catalogo.descripcion VARCHAR(255) → TEXT (descripciones largas)
 -- v18: + WhatsApp Meta (API oficial): wa_meta_plantillas, wa_meta_conversaciones, wa_meta_mensajes
 --       + wa_mensajes_log.proveedor / wamid / estados entregado y leido
 --       + wa_campanas.proveedor / meta_plantilla_id
@@ -49,7 +51,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre               VARCHAR(100) NOT NULL,
   email                VARCHAR(150) NOT NULL UNIQUE,
   password             VARCHAR(255) NOT NULL,
-  rol                  ENUM('admin','veterinario','recepcionista','veterinario_recepcionista') NOT NULL DEFAULT 'recepcionista',
+  rol                  ENUM('admin','veterinario','recepcionista','veterinario_recepcionista','groomer') NOT NULL DEFAULT 'recepcionista',
   sede_id              INT UNSIGNED NULL DEFAULT NULL,
   activo               TINYINT(1)   NOT NULL DEFAULT 1,
   must_change_password TINYINT(1)   NOT NULL DEFAULT 1,
@@ -290,7 +292,7 @@ CREATE TABLE IF NOT EXISTS servicios_catalogo (
   categoria   ENUM('consulta','vacunacion','estetica','cirugia','laboratorio',
                    'medicamento','otro','eutanasia','internamiento','imagenologia') NOT NULL DEFAULT 'consulta',
   precio      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  descripcion VARCHAR(255)  NULL,
+  descripcion TEXT          NULL,
   activo      TINYINT(1)    NOT NULL DEFAULT 1,
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -925,4 +927,4 @@ INSERT INTO propietarios (tipo_documento, nombre, apellido, es_generico)
 SELECT 'OTRO', 'Público', 'General', 1 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM propietarios WHERE es_generico = 1);
 
-SELECT 'tenant_schema v18 ✅' AS resultado;
+SELECT 'tenant_schema v20 ✅' AS resultado;

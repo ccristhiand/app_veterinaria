@@ -345,6 +345,13 @@ async function banosDeMascota(req, mascotaId) {
   ).catch(() => []);
 }
 
+// El informe incluye la historia clínica: no disponible para el groomer
+router.use('/:id/informe', (req, res, next) => {
+  if (req.user?.rol === 'groomer')
+    return res.status(403).json({ success: false, message: 'Tu rol (Groomer) no tiene acceso al informe clínico.' });
+  next();
+});
+
 // ── GET /api/v1/propietarios/:id/informe/pdf ──────────────────────
 router.get('/:id/informe/pdf', async (req, res, next) => {
   try {

@@ -25,18 +25,18 @@ const MODULOS_POR_PLAN = {
 // NUEVO: 'sedes' con roles:['admin'] — solo el admin de la clínica lo ve
 const TODOS_LOS_LINKS = [
   { id:'dashboard',      icon:'📊', label:'Dashboard',        href:'dashboard',      roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
-  { id:'citas',          icon:'📅', label:'Citas',            href:'citas',          roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
-  { id:'calendario',     icon:'🗓️', label:'Calendario',       href:'calendario',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
-  { id:'propietarios',   icon:'👥', label:'Propietarios',     href:'propietarios',   roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
-  { id:'mascotas',       icon:'🐾', label:'Mascotas',         href:'mascotas',       roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
-  { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia',       roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
+  { id:'citas',          icon:'📅', label:'Citas',            href:'citas',          roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
+  { id:'calendario',     icon:'🗓️', label:'Calendario',       href:'calendario',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
+  { id:'propietarios',   icon:'👥', label:'Propietarios',     href:'propietarios',   roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
+  { id:'mascotas',       icon:'🐾', label:'Mascotas',         href:'mascotas',       roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
+  { id:'historia',       icon:'📋', label:'Historia Clínica', href:'historia',       roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
   { id:'inventario',     icon:'📦', label:'Inventario',       href:'inventario',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
   { id:'facturacion',    icon:'🧾', label:'Facturación',      href:'facturacion',    roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'punto_venta',    icon:'🛒', label:'Punto de Venta',   href:'punto-venta',    roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja',           roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios',      roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
-  { id:'asistencia',     icon:'🕐', label:'Asistencia',        href:'asistencia',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista'] },
+  { id:'asistencia',     icon:'🕐', label:'Asistencia',        href:'asistencia',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
   { id:'consentimientos',icon:'📄', label:'Consentimientos',  href:'consentimientos',roles:['admin','veterinario','veterinario_recepcionista'] },
   { id:'usuarios',       icon:'👤', label:'Usuarios',         href:'usuarios',       roles:['admin'] },
   { id:'sedes',          icon:'🏥', label:'Sedes',            href:'sedes',          roles:['admin'] },
@@ -274,6 +274,22 @@ function aplicarModulosPlan(branding, activePage) {
         ? `🏥 ${user2.sede_nombre}`
         : 'Gestión Veterinaria';
     }
+  }
+
+  // Groomer: páginas fuera de su rol muestran "sin acceso" (la API también las bloquea)
+  const linkActual = TODOS_LOS_LINKS.find(n => n.id === activePage);
+  if (user.rol === 'groomer' && linkActual && !linkActual.roles.includes('groomer')) {
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.innerHTML = `
+        <div class="vempty" style="margin-top:5rem">
+          <span style="font-size:3rem">🔒</span>
+          <p style="font-size:1.1rem;font-weight:700;margin-top:.75rem">Sin acceso</p>
+          <p style="font-size:.85rem;color:var(--ink-faint);margin-top:.3rem">Tu rol (Groomer) no tiene acceso a este módulo.</p>
+          <a href="citas" class="vbtn vbtn-primary" style="margin-top:1.25rem;display:inline-flex">← Ir a Citas</a>
+        </div>`;
+    }
+    return;
   }
 
   // Verificar acceso a la página actual
