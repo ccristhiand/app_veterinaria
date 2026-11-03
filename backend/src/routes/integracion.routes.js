@@ -80,15 +80,18 @@ async function getApiDocToken() {
 }
 
 // ── Registrar consumo en vet_master ──────────────────────────────
+// La tabla no tiene tenant_slug (antes se intentaba insertar y el INSERT fallaba siempre).
+// `fuente` es ENUM('cache','api'): cualquier otro valor de la API externa se normaliza.
 async function registrarConsumo(tenantId, tenantSlug, tipo, fuente, numero) {
+  const fuenteNorm = /cache|local|bd|db/i.test(String(fuente || '')) ? 'cache' : 'api';
   try {
     await masterQuery(
-      `INSERT INTO tenant_api_consumo (tenant_id, tenant_slug, tipo, fuente, numero)
-       VALUES (?,?,?,?,?)`,
-      [tenantId, tenantSlug, tipo, fuente, numero]
+      `INSERT INTO tenant_api_consumo (tenant_id, tipo, fuente, numero)
+       VALUES (?,?,?,?)`,
+      [tenantId, tipo, fuenteNorm, numero]
     );
   } catch (e) {
-    console.error('[integracion] Error registrando consumo:', e.message);
+    console.error(`[integracion] Error registrando consumo (${tenantSlug}):`, e.message);
   }
 }
 
