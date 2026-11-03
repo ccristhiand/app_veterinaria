@@ -2,48 +2,47 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>FE SUNAT — VetClinic SaaS Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    .sidebar{width:240px;background:var(--surface);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:100;transition:transform .3s}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
-    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
-    .nav-item:hover{background:#0f172a;color:#e2e8f0}
-    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:var(--inset);color:var(--text)}
+    .nav-item.active{background:linear-gradient(135deg,var(--accent-soft),var(--accent-soft));color:var(--accent-text);font-weight:700}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.5rem}
     table{width:100%;border-collapse:collapse}
-    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
-    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.83rem;vertical-align:middle}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);border-bottom:1px solid var(--border)}
+    td{padding:.8rem 1rem;border-bottom:1px solid var(--surface);font-size:.83rem;vertical-align:middle}
     tr:hover td{background:#0f172a50}
-    input,select,textarea{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
-    input:focus,select:focus{border-color:#6366f1}
-    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
-    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
+    input,select,textarea{background:var(--inset);border:1.5px solid var(--border);border-radius:.7rem;padding:.6rem .9rem;color:var(--text);font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
+    input:focus,select:focus{border-color:var(--accent)}
+    label{display:block;font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    .btn-primary{background:var(--accent);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
     .btn-primary:hover{opacity:.88}
-    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
-    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
-    .btn-green{background:linear-gradient(135deg,#166534,#15803d);color:#fff;border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
-    .btn-red{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent-text)}
+    .btn-green{background:var(--ok-text);color:var(--surface);border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .btn-red{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
-    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
-    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b;z-index:1}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
-    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#1e293b;flex-wrap:wrap}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:var(--surface);flex-wrap:wrap}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
-    .section-title{font-size:.65rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.12em;padding:.5rem 0;border-bottom:1px solid #334155;margin-bottom:.75rem}
+    .section-title{font-size:.65rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.12em;padding:.5rem 0;border-bottom:1px solid var(--border);margin-bottom:.75rem}
     .hidden{display:none!important}
-    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-    .badge-activo{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
-    .badge-inactivo{background:#1e293b;color:#475569;border:1px solid #334155;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
-    .badge-beta{background:#431407;color:#fb923c;border:1px solid #9a3412;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-prod{background:#052e16;color:#4ade80;border:1px solid #166634;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
-    .stat-val{font-size:1.6rem;font-weight:800;color:#f1f5f9;margin-top:.25rem}
-    .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .badge-activo{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border);font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
+    .badge-inactivo{background:var(--surface);color:var(--text-faint);border:1px solid var(--border);font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px}
+    .badge-beta{background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border);font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-prod{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border);font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .stat-box{background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:1rem;text-align:center}
+    .stat-val{font-size:1.6rem;font-weight:800;color:var(--text-strong);margin-top:.25rem}
+    .stat-lbl{font-size:.65rem;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
     @keyframes spin{to{transform:rotate(360deg)}}
     @media(max-width:768px){
       .sidebar{transform:translateX(-100%)}
@@ -53,6 +52,15 @@
       .hide-mobile{display:none!important}
     }
   </style>
+  <link rel="stylesheet" href="admin.css"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -62,25 +70,25 @@
 <main class="main">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div style="display:flex;align-items:center;gap:1rem">
-      <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+      <button onclick="toggleSidebar()" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
       <div>
-        <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">⚡ Facturación Electrónica</h1>
-        <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Configuración SUNAT — Nubefact OSE — por clínica</p>
+        <h1 style="font-size:1.4rem;color:var(--text-strong)">Facturación Electrónica</h1>
+        <p style="font-size:.78rem;color:var(--text-faint);margin-top:.1rem">Configuración SUNAT — Nubefact OSE — por clínica</p>
       </div>
     </div>
-    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+    <button onclick="cargar()" class="btn-ghost">Actualizar</button>
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
     <div class="stat-box"><div class="stat-lbl">Clínicas con FE</div><div class="stat-val" id="stat-fe-activas">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Docs emitidos mes</div><div class="stat-val" style="color:#4ade80" id="stat-docs-mes">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Aceptados SUNAT</div><div class="stat-val" style="color:#4ade80" id="stat-aceptados">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Con errores</div><div class="stat-val" style="color:#f87171" id="stat-errores">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Docs emitidos mes</div><div class="stat-val" style="color:var(--ok-text)" id="stat-docs-mes">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Aceptados SUNAT</div><div class="stat-val" style="color:var(--ok-text)" id="stat-aceptados">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Con errores</div><div class="stat-val" style="color:var(--danger-text)" id="stat-errores">—</div></div>
   </div>
 
   <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado FE por clínica</h2>
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Estado FE por clínica</h2>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -94,7 +102,7 @@
           </tr>
         </thead>
         <tbody id="tbody-fe">
-          <tr><td colspan="7" style="text-align:center;padding:2.5rem;color:#475569">
+          <tr><td colspan="7" style="text-align:center;padding:2.5rem;color:var(--text-faint)">
             <div class="spinner" style="margin:0 auto"></div>
           </td></tr>
         </tbody>
@@ -108,38 +116,38 @@
   <div class="modal">
     <div class="modal-head">
       <div>
-        <h3 style="font-weight:700;color:#f1f5f9" id="fe-modal-titulo">⚡ Config FE</h3>
-        <p style="font-size:.72rem;color:#475569;margin-top:.15rem" id="fe-modal-sub">Clínica</p>
+        <h3 style="font-weight:700;color:var(--text-strong)" id="fe-modal-titulo">Config FE</h3>
+        <p style="font-size:.72rem;color:var(--text-faint);margin-top:.15rem" id="fe-modal-sub">Clínica</p>
       </div>
-      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+      <button onclick="cerrarModal()" class="btn-ghost btn-icon" aria-label="Cerrar"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
 
     <div class="modal-body">
       <input type="hidden" id="fe-tenant-id"/>
 
       <!-- Estado -->
-      <div id="fe-estado-actual" style="padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#0f172a;border:1px solid #334155"></div>
+      <div id="fe-estado-actual" style="padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:var(--inset);border:1px solid var(--border)"></div>
 
       <!-- Stats -->
       <div class="grid3" id="fe-stats-grid" style="display:none">
         <div class="stat-box"><div class="stat-lbl">Emitidos</div><div class="stat-val" id="fe-stat-total" style="font-size:1.2rem">0</div></div>
-        <div class="stat-box"><div class="stat-lbl" style="color:#4ade80">Aceptados</div><div class="stat-val" id="fe-stat-ok" style="font-size:1.2rem;color:#4ade80">0</div></div>
-        <div class="stat-box"><div class="stat-lbl" style="color:#f87171">Errores</div><div class="stat-val" id="fe-stat-err" style="font-size:1.2rem;color:#f87171">0</div></div>
+        <div class="stat-box"><div class="stat-lbl" style="color:var(--ok-text)">Aceptados</div><div class="stat-val" id="fe-stat-ok" style="font-size:1.2rem;color:var(--ok-text)">0</div></div>
+        <div class="stat-box"><div class="stat-lbl" style="color:var(--danger-text)">Errores</div><div class="stat-val" id="fe-stat-err" style="font-size:1.2rem;color:var(--danger-text)">0</div></div>
       </div>
 
       <!-- Modo -->
       <div>
-        <p class="section-title">⚙️ Configuración general</p>
+        <p class="section-title">Configuración general</p>
         <label style="margin-bottom:.5rem">Modo de operación</label>
         <div style="display:flex;gap:.75rem;margin-bottom:.75rem">
-          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid #334155;border-radius:.8rem;color:#94a3b8">
-            <input type="radio" name="fe-modo" id="fe-modo-beta" value="beta" style="accent-color:#fb923c"/> 🧪 Beta
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid var(--border);border-radius:.8rem;color:var(--text-2)">
+            <input type="radio" name="fe-modo" id="fe-modo-beta" value="beta" style="accent-color:var(--warn-text)"/> Beta
           </label>
-          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid #334155;border-radius:.8rem;color:#94a3b8">
-            <input type="radio" name="fe-modo" id="fe-modo-prod" value="produccion" style="accent-color:#4ade80"/> 🚀 Producción
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.84rem;font-weight:600;padding:.5rem .9rem;border:2px solid var(--border);border-radius:.8rem;color:var(--text-2)">
+            <input type="radio" name="fe-modo" id="fe-modo-prod" value="produccion" style="accent-color:var(--ok-text)"/> Producción
           </label>
         </div>
-        <p style="font-size:.68rem;color:#fb923c;background:#431407;padding:.5rem .75rem;border-radius:.6rem">⚠️ Beta: los docs van a Nubefact pero NO a SUNAT real.</p>
+        <p style="font-size:.68rem;color:var(--warn-text);background:var(--warn-bg);padding:.5rem .75rem;border-radius:.6rem">Beta: los docs van a Nubefact pero NO a SUNAT real.</p>
       </div>
 
       <!-- Series y ubigeo -->
@@ -147,7 +155,7 @@
         <div>
           <label>Ubigeo (6 dígitos)</label>
           <input id="fe-ubigeo" type="text" maxlength="6" placeholder="150101"/>
-          <p style="font-size:.65rem;color:#475569;margin-top:.25rem">Lima: 150101 · Miraflores: 150122</p>
+          <p style="font-size:.65rem;color:var(--text-faint);margin-top:.25rem">Lima: 150101 · Miraflores: 150122</p>
         </div>
         <div>
           <label>Serie Nota de Crédito</label>
@@ -156,35 +164,35 @@
       </div>
 
       <!-- Credenciales Nubefact -->
-      <div style="background:#1a1a2e;border:1px solid #431407;border-radius:.85rem;padding:1.1rem">
-        <p class="section-title" style="color:#fb923c;border-color:#431407">🔑 Credenciales Nubefact</p>
-        <div style="background:#431407;border-radius:.65rem;padding:.65rem .9rem;margin-bottom:.85rem;font-size:.72rem;color:#fbbf24">
-          ℹ️ En tu cuenta Nubefact → menú <strong>API-Integración</strong> encontrarás la <strong>Ruta</strong> y el <strong>Token</strong>.
+      <div style="background:#1a1a2e;border:1px solid var(--warn-bg);border-radius:.85rem;padding:1.1rem">
+        <p class="section-title" style="color:var(--warn-text);border-color:var(--warn-bg)">Credenciales Nubefact</p>
+        <div style="background:var(--warn-bg);border-radius:.65rem;padding:.65rem .9rem;margin-bottom:.85rem;font-size:.72rem;color:var(--warn-text)">
+          En tu cuenta Nubefact → menú <strong>API-Integración</strong> encontrarás la <strong>Ruta</strong> y el <strong>Token</strong>.
         </div>
         <div style="display:flex;flex-direction:column;gap:.85rem">
           <div>
-            <label>🔗 Ruta — UUID de tu cuenta</label>
+            <label>Ruta — UUID de tu cuenta</label>
             <input id="fe-api-key" type="text" placeholder="Ej: 98fb674b-dc41-47b0-a29f-0f681b02c769"/>
-            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
-              En Nubefact verás: https://api.nubefact.com/api/v1/<strong style="color:#fb923c">ESTE-UUID</strong> — copia solo el UUID
+            <p style="font-size:.65rem;color:var(--text-faint);margin-top:.25rem">
+              En Nubefact verás: https://api.nubefact.com/api/v1/<strong style="color:var(--warn-text)">ESTE-UUID</strong> — copia solo el UUID
             </p>
           </div>
           <div>
-            <label>🔑 Token de autenticación</label>
+            <label>Token de autenticación</label>
             <input id="fe-usuario-sol" type="password" placeholder="Dejar vacío para no modificar"/>
-            <p style="font-size:.65rem;color:#475569;margin-top:.25rem">
+            <p style="font-size:.65rem;color:var(--text-faint);margin-top:.25rem">
               El TOKEN aparece debajo de la Ruta en API-Integración de Nubefact
             </p>
           </div>
         </div>
-        <div style="background:#0f172a;border:1px solid #334155;border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:#475569">
-          🔒 Se encriptan con AES-256-GCM. Dejar vacío para no modificar el valor guardado.
+        <div style="background:var(--inset);border:1px solid var(--border);border-radius:.65rem;padding:.65rem .9rem;margin-top:.85rem;font-size:.72rem;color:var(--text-faint)">
+          Se encriptan con AES-256-GCM. Dejar vacío para no modificar el valor guardado.
         </div>
       </div>
 
       <!-- Plan FE -->
       <div>
-        <p class="section-title">📊 Plan de documentos</p>
+        <p class="section-title">Plan de documentos</p>
         <div class="grid2">
           <div>
             <label>Docs incluidos / mes</label>
@@ -199,7 +207,7 @@
 
       <!-- Historial -->
       <div id="fe-historial-wrap" style="display:none">
-        <p class="section-title">📋 Últimos documentos emitidos</p>
+        <p class="section-title">Últimos documentos emitidos</p>
         <div style="overflow-x:auto">
           <table>
             <thead><tr><th>Número</th><th>Tipo</th><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead>
@@ -211,8 +219,8 @@
 
     <div class="modal-foot">
       <button onclick="cerrarModal()" class="btn-ghost">Cancelar</button>
-      <button onclick="toggleActivarFE()" id="btn-toggle-fe" class="btn-green">✅ Activar FE</button>
-      <button onclick="guardarConfigFE()" class="btn-primary">💾 Guardar configuración</button>
+      <button onclick="toggleActivarFE()" id="btn-toggle-fe" class="btn-green">Activar FE</button>
+      <button onclick="guardarConfigFE()" class="btn-primary">Guardar configuración</button>
     </div>
   </div>
 </div>
@@ -228,7 +236,7 @@
 
   async function cargar() {
     const tbody = document.getElementById('tbody-fe');
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-faint)"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
     try {
       const res  = await adminFetch('/fe/resumen');
       if (!res?.ok) return;
@@ -243,7 +251,7 @@
       document.getElementById('stat-errores').textContent    = totalDocs - aceptados;
 
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#475569">Sin clínicas</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-faint)">Sin clínicas</td></tr>';
         return;
       }
 
@@ -251,28 +259,28 @@
         const docsUsados    = parseInt(t.docs_usados)    || 0;
         const docsIncluidos = parseInt(t.docs_incluidos) || 50;
         const pct           = Math.min((docsUsados / docsIncluidos) * 100, 100);
-        const colorBarra    = pct > 80 ? '#f87171' : pct > 60 ? '#fb923c' : '#4ade80';
+        const colorBarra    = pct > 80 ? 'var(--danger-text)' : pct > 60 ? 'var(--warn-text)' : 'var(--ok-text)';
         return `<tr>
           <td>
             <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
-            <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
+            <p style="font-size:.68rem;color:var(--text-faint)">${esc(t.subdominio)}</p>
           </td>
-          <td>${t.sunat_activo ? '<span class="badge-activo">✅ Activa</span>' : '<span class="badge-inactivo">⏸️ Inactiva</span>'}</td>
-          <td>${t.sunat_modo === 'produccion' ? '<span class="badge-prod">🚀 Prod</span>' : t.sunat_activo ? '<span class="badge-beta">🧪 Beta</span>' : '<span style="color:#334155;font-size:.65rem">—</span>'}</td>
+          <td>${t.sunat_activo ? '<span class="badge-activo">Activa</span>' : '<span class="badge-inactivo">Inactiva</span>'}</td>
+          <td>${t.sunat_modo === 'produccion' ? '<span class="badge-prod">Prod</span>' : t.sunat_activo ? '<span class="badge-beta">Beta</span>' : '<span style="color:var(--text-faint);font-size:.65rem">—</span>'}</td>
           <td class="hide-mobile">
             <div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.2rem">
-              <span style="color:#94a3b8">${docsUsados}/${docsIncluidos}</span>
+              <span style="color:var(--text-2)">${docsUsados}/${docsIncluidos}</span>
               <span style="color:${colorBarra};font-weight:700">${pct.toFixed(0)}%</span>
             </div>
-            <div style="background:#334155;border-radius:999px;height:5px;overflow:hidden">
+            <div style="background:var(--border);border-radius:999px;height:5px;overflow:hidden">
               <div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:999px"></div>
             </div>
           </td>
-          <td class="hide-mobile" style="color:#94a3b8;font-size:.78rem">${docsIncluidos} docs/mes</td>
-          <td class="hide-mobile">${t.tiene_api_key ? '<span style="font-size:.65rem;color:#4ade80">🔑 Configurado</span>' : '<span style="font-size:.65rem;color:#f87171">⚠️ Sin config</span>'}</td>
+          <td class="hide-mobile" style="color:var(--text-2);font-size:.78rem">${docsIncluidos} docs/mes</td>
+          <td class="hide-mobile">${t.tiene_api_key ? '<span style="font-size:.65rem;color:var(--ok-text)">Configurado</span>' : '<span style="font-size:.65rem;color:var(--danger-text)">Sin config</span>'}</td>
           <td>
             <button onclick="abrirConfig(${t.id},${jsArg(t.nombre_clinica||t.slug)})" class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
-              ⚙️ Configurar
+              Configurar
             </button>
           </td>
         </tr>`;
@@ -284,7 +292,7 @@
     _tenantActual   = tenantId;
     _feActualConfig = null;
 
-    document.getElementById('fe-modal-titulo').textContent = `⚡ FE — ${nombre}`;
+    document.getElementById('fe-modal-titulo').textContent = `FE — ${nombre}`;
     document.getElementById('fe-modal-sub').textContent    = 'Cargando…';
     document.getElementById('fe-estado-actual').innerHTML  = '<div class="spinner"></div>';
     document.getElementById('fe-stats-grid').style.display = 'none';
@@ -304,20 +312,20 @@
       // Estado
       const box = document.getElementById('fe-estado-actual');
       if (cfg?.sunat_activo) {
-        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#052e16;border:1px solid #166534';
-        box.innerHTML = `<span style="color:#4ade80;font-weight:700">✅ FE Activa</span> <span style="color:#4ade80;font-size:.78rem;margin-left:.75rem">Modo: ${cfg.sunat_modo === 'produccion' ? '🚀 Producción' : '🧪 Beta'}</span>`;
+        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:var(--ok-bg);border:1px solid #166534';
+        box.innerHTML = `<span style="color:var(--ok-text);font-weight:700">FE Activa</span> <span style="color:var(--ok-text);font-size:.78rem;margin-left:.75rem">Modo: ${cfg.sunat_modo === 'produccion' ? 'Producción' : 'Beta'}</span>`;
       } else {
-        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:#0f172a;border:1px solid #334155';
-        box.innerHTML = '<span style="color:#475569;font-weight:700">⏸️ FE Inactiva</span>';
+        box.style.cssText = 'padding:.75rem 1rem;border-radius:.85rem;font-size:.82rem;background:var(--inset);border:1px solid var(--border)';
+        box.innerHTML = '<span style="color:var(--text-faint);font-weight:700">FE Inactiva</span>';
       }
 
       // Toggle button
       const btn = document.getElementById('btn-toggle-fe');
       if (cfg?.sunat_activo) {
-        btn.textContent = '⏸️ Desactivar FE';
+        btn.textContent = 'Desactivar FE';
         btn.className   = 'btn-red';
       } else {
-        btn.textContent = '✅ Activar FE';
+        btn.textContent = 'Activar FE';
         btn.className   = 'btn-green';
       }
 
@@ -345,8 +353,8 @@
         document.getElementById('fe-historial-wrap').style.display = 'block';
         document.getElementById('fe-historial-tbody').innerHTML = stats.historial.map(h => {
           const badge = h.sunat_estado === '0'
-            ? '<span class="badge-activo">✅</span>'
-            : `<span style="font-size:.65rem;color:#f87171">❌ ${esc(h.sunat_estado||'Error')}</span>`;
+            ? '<span class="badge-activo">'+adminIcon('check','ico-sm')+' Aceptado</span>'
+            : `<span style="font-size:.65rem;color:var(--danger-text)">${esc(h.sunat_estado||'Error')}</span>`;
           return `<tr>
             <td style="font-family:monospace;font-size:.75rem">${esc(h.numero)}</td>
             <td style="font-size:.75rem">${esc(h.tipo)}</td>
@@ -383,7 +391,7 @@
     const precioExtra = parseFloat(document.getElementById('fe-precio-extra').value) || 0.05;
     await adminFetch(`/fe/${_tenantActual}/plan`, { method:'PUT', body:{ docs_incluidos:docsInc, precio_extra:precioExtra } });
 
-    toast('✅ Configuración FE guardada','success');
+    toast('Configuración FE guardada','success');
     document.getElementById('fe-api-key').value    = '';
     document.getElementById('fe-usuario-sol').value = '';
     cerrarModal();
@@ -396,7 +404,7 @@
     const res  = await adminFetch(`/fe/${_tenantActual}/${endpoint}`, { method:'POST' });
     const data = await res.json();
     if (!res?.ok) { toast(data.message || 'Error.','error'); return; }
-    toast(activo ? '⏸️ FE desactivada' : '✅ FE activada','success');
+    toast(activo ? 'FE desactivada' : 'FE activada','success');
     cerrarModal();
     cargar();
   }

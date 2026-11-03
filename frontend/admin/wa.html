@@ -1,57 +1,65 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>WhatsApp — VetClinic SaaS Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    .sidebar{width:240px;background:var(--surface);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:100}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
-    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
-    .nav-item:hover{background:#0f172a;color:#e2e8f0}
-    .nav-item.active{background:linear-gradient(135deg,rgba(37,211,102,.15),rgba(18,140,126,.1));color:#4ade80;font-weight:700}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:var(--inset);color:var(--text)}
+    .nav-item.active{background:linear-gradient(135deg,rgba(37,211,102,.15),rgba(18,140,126,.1));color:var(--ok-text);font-weight:700}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.5rem}
     table{width:100%;border-collapse:collapse}
-    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
-    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.83rem;vertical-align:middle}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);border-bottom:1px solid var(--border)}
+    td{padding:.8rem 1rem;border-bottom:1px solid var(--surface);font-size:.83rem;vertical-align:middle}
     tr:hover td{background:#0f172a50}
-    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%}
+    input,select{background:var(--inset);border:1.5px solid var(--border);border-radius:.7rem;padding:.6rem .9rem;color:var(--text);font-size:.84rem;font-family:inherit;outline:none;width:100%}
     input:focus,select:focus{border-color:#25d366}
-    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    label{display:block;font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
     .btn-primary{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit}
-    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
-    .badge-conectado   {background:#052e16;color:#4ade80;border:1px solid #166534}
-    .badge-desconectado{background:#1e293b;color:#475569;border:1px solid #334155}
-    .badge-conectando  {background:#451a03;color:#fb923c;border:1px solid #9a3412}
-    .badge-error       {background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+    .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
+    .badge-conectado   {background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border)}
+    .badge-desconectado{background:var(--surface);color:var(--text-faint);border:1px solid var(--border)}
+    .badge-conectando  {background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border)}
+    .badge-error       {background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)}
     .badge-wa{font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;display:inline-block}
-    .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1rem;text-align:center}
-    .stat-val{font-size:1.5rem;font-weight:800;color:#f1f5f9;margin-top:.2rem}
-    .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    .stat-box{background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:1rem;text-align:center}
+    .stat-val{font-size:1.5rem;font-weight:800;color:var(--text-strong);margin-top:.2rem}
+    .stat-lbl{font-size:.65rem;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
-    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:500px}
-    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;width:100%;max-width:500px}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
-    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .hidden{display:none!important}
-    .pant-opt{display:flex!important;align-items:flex-start;gap:.65rem;cursor:pointer;background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.75rem .9rem;text-transform:none!important;letter-spacing:0!important;margin:0!important}
+    .pant-opt{display:flex!important;align-items:flex-start;gap:.65rem;cursor:pointer;background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:.75rem .9rem;text-transform:none!important;letter-spacing:0!important;margin:0!important}
     .pant-opt input{width:16px;height:16px;margin-top:.15rem;accent-color:#25d366;flex-shrink:0}
-    .pant-opt strong{display:block;font-size:.84rem;color:#e2e8f0;font-weight:600}
-    .pant-opt small{display:block;font-size:.7rem;color:#64748b;font-weight:500;margin-top:.1rem}
-    .badge-meta{background:#0c1f3f;color:#60a5fa;border:1px solid #1e3a8a}
-    .tabs{display:flex;gap:.4rem;border-bottom:1px solid #334155;margin-bottom:1.4rem;flex-wrap:wrap}
-    .tab{background:none;border:none;border-bottom:2px solid transparent;color:#94a3b8;padding:.65rem 1rem;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
-    .tab.activo{color:#4ade80;border-bottom-color:#25d366}
-    .ayuda{font-size:.68rem;color:#475569;margin-top:.3rem}
+    .pant-opt strong{display:block;font-size:.84rem;color:var(--text);font-weight:600}
+    .pant-opt small{display:block;font-size:.7rem;color:var(--text-muted);font-weight:500;margin-top:.1rem}
+    .badge-meta{background:#0c1f3f;color:var(--info-text);border:1px solid var(--info-border)}
+    .tabs{display:flex;gap:.4rem;border-bottom:1px solid var(--border);margin-bottom:1.4rem;flex-wrap:wrap}
+    .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-2);padding:.65rem 1rem;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
+    .tab.activo{color:var(--ok-text);border-bottom-color:#25d366}
+    .ayuda{font-size:.68rem;color:var(--text-faint);margin-top:.3rem}
     .copiable{display:flex;gap:.5rem;align-items:center}
-    .copiable code{flex:1;background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;font-size:.8rem;color:#e2e8f0;overflow-x:auto;white-space:nowrap}
-    .chip{background:#0f172a;border:1px solid #334155;border-radius:.4rem;padding:.1rem .4rem;font-size:.74rem;color:#93c5fd}
-    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#25d366;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .copiable code{flex:1;background:var(--inset);border:1.5px solid var(--border);border-radius:.7rem;padding:.6rem .9rem;font-size:.8rem;color:var(--text);overflow-x:auto;white-space:nowrap}
+    .chip{background:var(--inset);border:1px solid var(--border);border-radius:.4rem;padding:.1rem .4rem;font-size:.74rem;color:var(--info-text)}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:#25d366;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
+  <link rel="stylesheet" href="admin.css"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 <aside class="sidebar" id="sidebar"></aside>
@@ -59,23 +67,23 @@
 <main class="main">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
     <div>
-      <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">💬 WhatsApp — Control por clínica</h1>
-      <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Cuotas, estado de conexión y estadísticas</p>
+      <h1 style="font-size:1.4rem;color:var(--text-strong)">WhatsApp — Control por clínica</h1>
+      <p style="font-size:.78rem;color:var(--text-faint);margin-top:.1rem">Cuotas, estado de conexión y estadísticas</p>
     </div>
-    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+    <button onclick="cargar()" class="btn-ghost">Actualizar</button>
   </div>
 
   <!-- Pestañas -->
   <div class="tabs">
-    <button class="tab activo" data-tab="clinicas" onclick="cambiarTab('clinicas')">🏥 Clínicas</button>
-    <button class="tab" data-tab="meta" onclick="cambiarTab('meta')">⚙️ Configuración Meta (plataforma) <span id="tab-meta-badge"></span></button>
+    <button class="tab activo" data-tab="clinicas" onclick="cambiarTab('clinicas')">Clínicas</button>
+    <button class="tab" data-tab="meta" onclick="cambiarTab('meta')">Configuración Meta (plataforma) <span id="tab-meta-badge"></span></button>
   </div>
 
   <!-- ══ Pestaña: Configuración Meta ══════════════════════════════ -->
   <section id="tab-meta" class="hidden">
     <div class="card" style="margin-bottom:1rem">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Datos de tu app de Meta</h2>
-      <p style="font-size:.78rem;color:#64748b;margin-top:.25rem">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Datos de tu app de Meta</h2>
+      <p style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem">
         Se configuran una sola vez para toda la plataforma. Las clínicas nunca ven esta pantalla.
       </p>
 
@@ -108,15 +116,15 @@
       </div>
 
       <div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2rem;flex-wrap:wrap">
-        <button class="btn-ghost" onclick="probarMeta()" id="mp-btn-probar">🧪 Probar conexión</button>
-        <button class="btn-primary" onclick="guardarMeta()" id="mp-btn-guardar">💾 Guardar</button>
+        <button class="btn-ghost" onclick="probarMeta()" id="mp-btn-probar">Probar conexión</button>
+        <button class="btn-primary" onclick="guardarMeta()" id="mp-btn-guardar">Guardar</button>
       </div>
       <div id="mp-resultado" class="hidden" style="margin-top:.9rem;font-size:.8rem;border-radius:.7rem;padding:.7rem .9rem"></div>
     </div>
 
     <div class="card">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Copia esto en Meta</h2>
-      <p style="font-size:.78rem;color:#64748b;margin-top:.25rem">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Copia esto en Meta</h2>
+      <p style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem">
         Meta → WhatsApp → Configuración → Webhook → Editar. Pega la URL y el token, y luego suscríbete a los campos de abajo.
       </p>
       <div style="display:flex;flex-direction:column;gap:.9rem;margin-top:1.1rem">
@@ -124,27 +132,27 @@
           <label>URL de devolución de llamada (Callback URL)</label>
           <div class="copiable">
             <code id="mp-webhook-url">—</code>
-            <button class="btn-ghost" onclick="copiar('mp-webhook-url')">📋 Copiar</button>
+            <button class="btn-ghost" onclick="copiar('mp-webhook-url')">Copiar</button>
           </div>
         </div>
         <div>
           <label>Token de verificación (Verify token)</label>
           <div class="copiable">
             <code id="mp-verify-token">—</code>
-            <button class="btn-ghost" onclick="copiar('mp-verify-token')">📋 Copiar</button>
-            <button class="btn-ghost" onclick="regenerarToken()" title="Generar uno nuevo">🔄</button>
+            <button class="btn-ghost" onclick="copiar('mp-verify-token')">Copiar</button>
+            <button class="btn-ghost" onclick="regenerarToken()" title="Generar uno nuevo" aria-label="Generar uno nuevo"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/></svg></button>
           </div>
         </div>
         <div>
           <label>Campos a los que debes suscribirte</label>
-          <p style="font-size:.8rem;color:#cbd5e1;line-height:1.8">
+          <p style="font-size:.8rem;color:var(--text-2);line-height:1.8">
             <code class="chip">messages</code> <code class="chip">account_update</code>
             <code class="chip">message_template_status_update</code> <code class="chip">smb_message_echoes</code>
             <code class="chip">history</code> <code class="chip">smb_app_state_sync</code>
           </p>
         </div>
-        <p style="font-size:.74rem;color:#fbbf24;background:#451a03;border:1px solid #9a3412;border-radius:.6rem;padding:.55rem .75rem">
-          ⚠️ Meta verifica la URL al guardar el webhook: hazlo cuando el servicio wa-meta ya esté instalado en el servidor (paso 2).
+        <p style="font-size:.74rem;color:var(--warn-text);background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:.6rem;padding:.55rem .75rem">
+          Meta verifica la URL al guardar el webhook: hazlo cuando el servicio wa-meta ya esté instalado en el servidor (paso 2).
           Y agrega <strong id="mp-dominio">wameta.netcodip.com</strong> en Meta → Inicio de sesión con Facebook (empresas) → Configuración → Dominios permitidos.
         </p>
       </div>
@@ -156,15 +164,15 @@
   <!-- Stats globales -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
     <div class="stat-box"><div class="stat-lbl">Clínicas con WA activo</div><div class="stat-val" id="stat-activas">—</div></div>
-    <div class="stat-box"><div class="stat-lbl">Conectadas ahora</div><div class="stat-val" style="color:#4ade80" id="stat-conectadas">—</div></div>
+    <div class="stat-box"><div class="stat-lbl">Conectadas ahora</div><div class="stat-val" style="color:var(--ok-text)" id="stat-conectadas">—</div></div>
     <div class="stat-box"><div class="stat-lbl">Msgs usados este mes</div><div class="stat-val" id="stat-msgs-mes">—</div></div>
     <div class="stat-box"><div class="stat-lbl">Total cuota asignada</div><div class="stat-val" id="stat-cuota-total">—</div></div>
   </div>
 
   <!-- Tabla clínicas -->
   <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado WA por clínica</h2>
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Estado WA por clínica</h2>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -182,7 +190,7 @@
           </tr>
         </thead>
         <tbody id="tbody-wa">
-          <tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>
+          <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-faint)"><div class="spinner" style="margin:0 auto"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -194,19 +202,19 @@
 <div id="modal-cuota" class="modal-bg hidden">
   <div class="modal">
     <div class="modal-head">
-      <h3 style="font-weight:700;color:#f1f5f9" id="cuota-titulo">💬 Config WA</h3>
-      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+      <h3 style="font-weight:700;color:var(--text-strong)" id="cuota-titulo">Config WA</h3>
+      <button onclick="cerrarModal()" class="btn-ghost btn-icon" aria-label="Cerrar"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="cuota-tenant-id"/>
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
-        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
+      <div style="background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:.85rem 1rem">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:var(--text)">
           <input type="checkbox" id="cuota-activo" style="accent-color:#25d366;width:16px;height:16px"/>
           WhatsApp activo para esta clínica
         </label>
       </div>
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:.85rem 1rem">
-        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:#e2e8f0">
+      <div style="background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:.85rem 1rem">
+        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;color:var(--text)">
           <input type="checkbox" id="cuota-ilimitado" style="accent-color:#25d366;width:16px;height:16px" onchange="toggleIlimitado()"/>
           Mensajes ilimitados
         </label>
@@ -223,22 +231,22 @@
       </div>
 
       <!-- Pantallas visibles para la clínica -->
-      <div style="border-top:1px solid #334155;padding-top:1rem">
-        <p style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">
+      <div style="border-top:1px solid var(--border);padding-top:1rem">
+        <p style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">
           Pantallas que ve la clínica
         </p>
         <div style="display:flex;flex-direction:column;gap:.5rem">
           <label class="pant-opt">
             <input type="checkbox" id="cfg-ver-qr" onchange="actualizarAvisoPantallas()"/>
             <span>
-              <strong>💬 WhatsApp (QR)</strong>
+              <strong>WhatsApp (QR)</strong>
               <small>Conexión actual escaneando el código QR</small>
             </span>
           </label>
           <label class="pant-opt">
             <input type="checkbox" id="cfg-ver-meta" onchange="actualizarAvisoPantallas()"/>
             <span>
-              <strong>✅ WhatsApp Meta</strong>
+              <strong>WhatsApp Meta</strong>
               <small>API oficial de Meta (la clínica conecta su número)</small>
             </span>
           </label>
@@ -249,20 +257,20 @@
       <div id="cfg-meta-box">
         <label>Avisar a la clínica al llegar a (mensajes Meta / mes)</label>
         <input id="cfg-meta-alerta" type="number" min="1" placeholder="1000"/>
-        <p style="font-size:.7rem;color:#64748b;margin-top:.35rem">
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem">
           Meta cobra directamente a la clínica. Este número solo dispara un aviso en su pantalla.
         </p>
-        <div id="cfg-meta-estado" style="margin-top:.6rem;font-size:.78rem;color:#94a3b8"></div>
+        <div id="cfg-meta-estado" style="margin-top:.6rem;font-size:.78rem;color:var(--text-2)"></div>
       </div>
     </div>
     <div class="modal-foot">
       <button onclick="cerrarModal()" class="btn-ghost">Cancelar</button>
-      <button onclick="guardarCuota()" class="btn-primary">💾 Guardar</button>
+      <button onclick="guardarCuota()" class="btn-primary">Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- ✅ admin_shared.js DEBE ir antes del script propio -->
+<!-- admin_shared.js DEBE ir antes del script propio -->
 <script src="admin_shared.js"></script>
 <script>
   if (!isLoggedIn()) window.location.href = 'login.html';
@@ -274,7 +282,7 @@
 
   async function cargar() {
     const tbody = document.getElementById('tbody-wa');
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-faint)"><div class="spinner" style="margin:0 auto"></div></td></tr>`;
 
     try {
       const [resTenants, resEstado] = await Promise.all([
@@ -283,7 +291,7 @@
       ]);
 
       if (!resTenants?.ok) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#f87171">Error al cargar tenants</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--danger-text)">Error al cargar tenants</td></tr>`;
         return;
       }
 
@@ -309,15 +317,15 @@
       document.getElementById('stat-cuota-total').textContent = cuotaTotal || '∞';
 
       if (!tenants.length) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#475569">Sin clínicas registradas</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-faint)">Sin clínicas registradas</td></tr>`;
         return;
       }
 
       const estadoBadge = {
-        conectado   : '<span class="badge-wa badge-conectado">🟢 Conectado</span>',
-        conectando  : '<span class="badge-wa badge-conectando">🟡 Conectando…</span>',
-        desconectado: '<span class="badge-wa badge-desconectado">⚪ Desconectado</span>',
-        error       : '<span class="badge-wa badge-error">🔴 Error</span>',
+        conectado   : '<span class="badge-wa badge-conectado">Conectado</span>',
+        conectando  : '<span class="badge-wa badge-conectando">Conectando…</span>',
+        desconectado: '<span class="badge-wa badge-desconectado">Desconectado</span>',
+        error       : '<span class="badge-wa badge-error">Error</span>',
       };
 
       tbody.innerHTML = tenants.map(t => {
@@ -325,46 +333,46 @@
         const usados = wa.msgs_usados    || 0;
         const incl   = wa.msgs_incluidos || 0;
         const pct    = wa.ilimitado ? 0 : (incl > 0 ? Math.min((usados/incl)*100, 100) : 0);
-        const color  = pct > 80 ? '#f87171' : '#4ade80';
+        const color  = pct > 80 ? 'var(--danger-text)' : 'var(--ok-text)';
         const verQr   = wa.ver_qr   === undefined ? true  : !!Number(wa.ver_qr);
         const verMeta = wa.ver_meta === undefined ? false : !!Number(wa.ver_meta);
 
         return `<tr>
           <td>
             <p style="font-weight:700;font-size:.88rem">${esc(t.nombre_clinica || t.slug)}</p>
-            <p style="font-size:.68rem;color:#475569">${esc(t.subdominio)}</p>
+            <p style="font-size:.68rem;color:var(--text-faint)">${esc(t.subdominio)}</p>
           </td>
           <td>${wa.activo
-            ? '<span class="badge-wa badge-conectado">✅ Activo</span>'
-            : '<span class="badge-wa badge-desconectado">⏸️ Inactivo</span>'}</td>
+            ? '<span class="badge-wa badge-conectado">Activo</span>'
+            : '<span class="badge-wa badge-desconectado">Inactivo</span>'}</td>
           <td style="font-size:.72rem;line-height:1.6">
-            ${verQr   ? '<span class="badge-wa badge-desconectado" style="color:#cbd5e1">💬 QR</span> ' : ''}
-            ${verMeta ? '<span class="badge-wa badge-meta">✅ Meta</span>' : ''}
-            ${!verQr && !verMeta ? '<span style="color:#f87171">Ninguna</span>' : ''}
+            ${verQr   ? '<span class="badge-wa badge-desconectado" style="color:var(--text-2)">QR</span> ' : ''}
+            ${verMeta ? '<span class="badge-wa badge-meta">Meta</span>' : ''}
+            ${!verQr && !verMeta ? '<span style="color:var(--danger-text)">Ninguna</span>' : ''}
           </td>
           <td>${wa.proveedor_activo === 'meta'
-            ? `<span class="badge-wa badge-meta">✅ Meta</span>
-               <p style="font-size:.66rem;color:#64748b;margin-top:.2rem">${esc(wa.meta_numero || '')}${wa.meta_coexistencia ? ' · coexistencia' : ''}</p>`
+            ? `<span class="badge-wa badge-meta">Meta</span>
+               <p style="font-size:.66rem;color:var(--text-muted);margin-top:.2rem">${esc(wa.meta_numero || '')}${wa.meta_coexistencia ? ' · coexistencia' : ''}</p>`
             : (verQr
-                ? '<span class="badge-wa badge-desconectado" style="color:#cbd5e1">💬 QR</span>'
-                : '<span style="font-size:.72rem;color:#64748b">—</span>')}</td>
+                ? '<span class="badge-wa badge-desconectado" style="color:var(--text-2)">QR</span>'
+                : '<span style="font-size:.72rem;color:var(--text-muted)">—</span>')}</td>
           <td>${estadoBadge[wa.estado] || estadoBadge.desconectado}</td>
-          <td style="font-family:monospace;font-size:.78rem;color:#94a3b8">${esc(wa.numero_wa || '—')}</td>
+          <td style="font-family:monospace;font-size:.78rem;color:var(--text-2)">${esc(wa.numero_wa || '—')}</td>
           <td style="font-size:.78rem">
             ${wa.ilimitado
-              ? '<span style="color:#4ade80;font-weight:700">∞ Ilimitado</span>'
+              ? '<span style="color:var(--ok-text);font-weight:700">∞ Ilimitado</span>'
               : `<div style="display:flex;flex-direction:column;gap:.2rem">
                   <span style="color:${color};font-weight:700">${usados}/${incl}</span>
-                  <div style="background:#334155;border-radius:999px;height:4px;overflow:hidden;width:80px">
+                  <div style="background:var(--border);border-radius:999px;height:4px;overflow:hidden;width:80px">
                     <div style="height:100%;width:${pct}%;background:${color};border-radius:999px"></div>
                   </div>
                 </div>`}
           </td>
-          <td style="font-size:.75rem;color:#94a3b8">${wa.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
+          <td style="font-size:.75rem;color:var(--text-2)">${wa.ilimitado ? '∞ / mes' : `${incl} msgs/mes`}</td>
           <td>
             <button onclick="abrirCuota(${t.id})" data-nombre="${esc(t.nombre_clinica||t.slug)}"
               class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
-              ⚙️ Configurar
+              Configurar
             </button>
           </td>
         </tr>`;
@@ -372,7 +380,7 @@
 
     } catch(e) {
       console.error(e);
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--danger-text)">Error: ${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -383,7 +391,7 @@
     _metaActual   = null;
     const btn    = document.querySelector(`button[onclick="abrirCuota(${tenantId})"]`);
     const nombre = btn ? btn.dataset.nombre : '';
-    document.getElementById('cuota-titulo').textContent  = `💬 WA — ${nombre}`;
+    document.getElementById('cuota-titulo').textContent  = `WA — ${nombre}`;
     document.getElementById('cuota-tenant-id').value     = tenantId;
     document.getElementById('cuota-activo').checked      = false;
     document.getElementById('cuota-ilimitado').checked   = false;
@@ -411,10 +419,10 @@
 
         const est = document.getElementById('cfg-meta-estado');
         if (_metaActual && _metaActual.estado === 'conectado') {
-          est.innerHTML = `🟢 Conectada a Meta: <strong style="color:#e2e8f0">${esc(_metaActual.numero_display || '')}</strong>` +
+          est.innerHTML = `Conectada a Meta: <strong style="color:var(--text)">${esc(_metaActual.numero_display || '')}</strong>` +
             (_metaActual.coexistencia ? ' · coexistencia con el celular' : '');
         } else {
-          est.innerHTML = '⚪ La clínica aún no conecta su número con Meta.';
+          est.innerHTML = 'La clínica aún no conecta su número con Meta.';
         }
         toggleIlimitado();
         actualizarAvisoPantallas();
@@ -431,13 +439,13 @@
     document.getElementById('cfg-meta-alerta').disabled   = !meta;
 
     const metaConectado = !!(_metaActual && _metaActual.estado === 'conectado');
-    let txt = '', estilo = 'background:#0c1f3f;color:#93c5fd;border:1px solid #1e3a8a';
+    let txt = '', estilo = 'background:#0c1f3f;color:var(--info-text);border:1px solid var(--info-border)';
     if (!qr && !meta) {
-      txt = '⚠️ La clínica no verá ninguna pantalla de WhatsApp y no se enviarán mensajes.';
-      estilo = 'background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d';
+      txt = 'La clínica no verá ninguna pantalla de WhatsApp y no se enviarán mensajes.';
+      estilo = 'background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)';
     } else if (!meta && metaConectado) {
-      txt = '⚠️ Esta clínica ya tiene Meta conectado. Al ocultar la pantalla, los mensajes volverán a salir por QR (si vuelve a escanear el código).';
-      estilo = 'background:#451a03;color:#fdba74;border:1px solid #9a3412';
+      txt = 'Esta clínica ya tiene Meta conectado. Al ocultar la pantalla, los mensajes volverán a salir por QR (si vuelve a escanear el código).';
+      estilo = 'background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border)';
     } else if (qr && meta) {
       txt = metaConectado
         ? 'Verá las dos pantallas. Como ya conectó Meta, los mensajes salen por Meta y la conexión por QR queda deshabilitada.'
@@ -446,7 +454,7 @@
       txt = metaConectado
         ? 'Solo verá WhatsApp Meta. Los mensajes salen por Meta.'
         : 'Solo verá WhatsApp Meta. Mientras no conecte su número, no se enviarán mensajes.';
-      if (!metaConectado) estilo = 'background:#451a03;color:#fdba74;border:1px solid #9a3412';
+      if (!metaConectado) estilo = 'background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border)';
     }
     av.setAttribute('style',
       'margin-top:.6rem;font-size:.75rem;border-radius:.6rem;padding:.55rem .75rem;' +
@@ -472,7 +480,7 @@
     try {
       const res = await adminFetch(`/wa/${_tenantActual}/config`, { method: 'PUT', body });
       if (!res?.ok) { const d = await res.json(); toast(d.message || 'Error al guardar', 'error'); return; }
-      toast('✅ Configuración WA guardada', 'success');
+      toast('Configuración WA guardada', 'success');
       cerrarModal();
       cargar();
     } catch(e) { toast('Error: ' + e.message, 'error'); }
@@ -512,9 +520,9 @@
     const el = document.getElementById('mp-resultado');
     el.classList.remove('hidden');
     el.style.cssText = 'margin-top:.9rem;font-size:.8rem;border-radius:.7rem;padding:.7rem .9rem;' + (ok
-      ? 'background:#052e16;color:#86efac;border:1px solid #166534'
-      : 'background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d');
-    el.textContent = (ok ? '✅ ' : '❌ ') + texto;
+      ? 'background:var(--ok-bg);color:var(--ok-text);border:1px solid #166534'
+      : 'background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border)');
+    el.textContent = (ok ? '' : '') + texto;
   }
 
   async function cargarMeta() {
@@ -544,9 +552,9 @@
       mostrarResultado(true, d.data.completa
         ? 'Guardado. Ahora pulsa "Probar conexión".'
         : 'Guardado. Aún faltan datos para activar el botón en las clínicas.');
-      toast('✅ Configuración Meta guardada', 'success');
+      toast('Configuración Meta guardada', 'success');
     } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
-    finally { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+    finally { btn.disabled = false; btn.textContent = 'Guardar'; }
   }
 
   async function probarMeta() {
@@ -557,7 +565,7 @@
       const d = await res.json();
       mostrarResultado(res.ok, d.message + (res.ok && !d.data.config_id_ok ? ' Falta el Configuration ID.' : ''));
     } catch (e) { mostrarResultado(false, 'Error: ' + e.message); }
-    finally { btn.disabled = false; btn.textContent = '🧪 Probar conexión'; }
+    finally { btn.disabled = false; btn.textContent = 'Probar conexión'; }
   }
 
   async function regenerarToken() {
@@ -573,7 +581,7 @@
 
   async function copiar(id) {
     const txt = document.getElementById(id).textContent;
-    try { await navigator.clipboard.writeText(txt); toast('📋 Copiado', 'success'); }
+    try { await navigator.clipboard.writeText(txt); toast('Copiado', 'success'); }
     catch { toast('No se pudo copiar, selecciónalo manualmente', 'error'); }
   }
 

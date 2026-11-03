@@ -2,47 +2,46 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Backups — VetClinic SaaS Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    .sidebar{width:240px;background:var(--surface);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:100;transition:transform .3s}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
-    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
-    .nav-item:hover{background:#0f172a;color:#e2e8f0}
-    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
-    .stat-card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.25rem}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:var(--inset);color:var(--text)}
+    .nav-item.active{background:linear-gradient(135deg,var(--accent-soft),var(--accent-soft));color:var(--accent-text);font-weight:700}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.5rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem}
     table{width:100%;border-collapse:collapse}
-    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155;white-space:nowrap}
-    td{padding:.8rem 1rem;border-bottom:1px solid #1e293b;font-size:.82rem;vertical-align:middle}
+    th{padding:.65rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap}
+    td{padding:.8rem 1rem;border-bottom:1px solid var(--surface);font-size:.82rem;vertical-align:middle}
     tr:hover td{background:#0f172a50}
-    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.6rem .9rem;color:#e2e8f0;font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
-    input:focus,select:focus{border-color:#6366f1}
+    input,select{background:var(--inset);border:1.5px solid var(--border);border-radius:.7rem;padding:.6rem .9rem;color:var(--text);font-size:.84rem;font-family:inherit;outline:none;width:100%;transition:border-color .15s}
+    input:focus,select:focus{border-color:var(--accent)}
     input[type="time"]{width:auto}
-    label{display:block;font-size:.72rem;font-weight:600;color:#64748b;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
-    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
+    label{display:block;font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.08em}
+    .btn-primary{background:var(--accent);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:.4rem}
     .btn-primary:hover{opacity:.88}
-    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
-    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
-    .btn-green{background:linear-gradient(135deg,#166534,#15803d);color:#fff;border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
-    .badge-exitoso{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-fallido{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-proceso{background:#1e3a5f;color:#93c5fd;border:1px solid #1e40af;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-diario{background:#1e293b;color:#64748b;border:1px solid #334155;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
-    .badge-semanal{background:#3b0764;color:#d8b4fe;border:1px solid #6d28d9;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
-    .badge-mensual{background:#451a03;color:#fed7aa;border:1px solid #b45309;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
-    .badge-manual{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent-text)}
+    .btn-green{background:var(--ok-text);color:var(--surface);border:none;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+    .badge-exitoso{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border);font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-fallido{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-proceso{background:var(--info-bg);color:var(--info-text);border:1px solid var(--info-border);font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-diario{background:var(--surface);color:var(--text-muted);border:1px solid var(--border);font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-semanal{background:var(--violet-bg);color:var(--violet-text);border:1px solid var(--violet-border);font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-mensual{background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border);font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
+    .badge-manual{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border);font-size:.62rem;font-weight:700;padding:.12rem .4rem;border-radius:999px}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
-    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:580px;max-height:90vh;overflow-y:auto}
-    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;width:100%;max-width:580px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface)}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
-    .modal-foot{padding:1rem 1.5rem;border-top:1px solid #334155;display:flex;justify-content:flex-end;gap:.6rem}
+    .modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem}
     .hidden{display:none!important}
-    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-    .progress-bar{height:6px;background:#0f172a;border-radius:3px;overflow:hidden;margin-top:.4rem}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .progress-bar{height:6px;background:var(--inset);border-radius:3px;overflow:hidden;margin-top:.4rem}
     .progress-fill{height:100%;border-radius:3px;transition:width .3s}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -54,6 +53,15 @@
       .grid-stats{grid-template-columns:1fr 1fr!important}
     }
   </style>
+  <link rel="stylesheet" href="admin.css"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -67,48 +75,48 @@
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
     <div style="display:flex;align-items:center;gap:1rem">
-      <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+      <button onclick="toggleSidebar()" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
       <div>
-        <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">💾 Backups</h1>
-        <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Google Drive · Retención automática</p>
+        <h1 style="font-size:1.4rem;color:var(--text-strong)">Backups</h1>
+        <p style="font-size:.78rem;color:var(--text-faint);margin-top:.1rem">Google Drive · Retención automática</p>
       </div>
     </div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-      <button onclick="abrirConfig()" class="btn-ghost">⚙️ Configurar</button>
-      <button onclick="backupTodas()" class="btn-green">▶️ Backup todas las clínicas</button>
+      <button onclick="abrirConfig()" class="btn-ghost">Configurar</button>
+      <button onclick="backupTodas()" class="btn-green">Backup todas las clínicas</button>
     </div>
   </div>
 
   <!-- Stats -->
   <div class="grid-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
     <div class="stat-card">
-      <p style="font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Total backups</p>
-      <p style="font-size:1.8rem;font-weight:800;color:#f1f5f9;margin-top:.35rem" id="stat-total">—</p>
+      <p style="font-size:.65rem;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em">Total backups</p>
+      <p style="font-size:1.8rem;font-weight:800;color:var(--text-strong);margin-top:.35rem" id="stat-total">—</p>
     </div>
     <div class="stat-card">
-      <p style="font-size:.65rem;color:#4ade80;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Exitosos hoy</p>
-      <p style="font-size:1.8rem;font-weight:800;color:#4ade80;margin-top:.35rem" id="stat-hoy">—</p>
+      <p style="font-size:.65rem;color:var(--ok-text);font-weight:700;text-transform:uppercase;letter-spacing:.1em">Exitosos hoy</p>
+      <p style="font-size:1.8rem;font-weight:800;color:var(--ok-text);margin-top:.35rem" id="stat-hoy">—</p>
     </div>
     <div class="stat-card">
-      <p style="font-size:.65rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Fallidos (7 días)</p>
-      <p style="font-size:1.8rem;font-weight:800;color:#f87171;margin-top:.35rem" id="stat-fallidos">—</p>
+      <p style="font-size:.65rem;color:var(--danger-text);font-weight:700;text-transform:uppercase;letter-spacing:.1em">Fallidos (7 días)</p>
+      <p style="font-size:1.8rem;font-weight:800;color:var(--danger-text);margin-top:.35rem" id="stat-fallidos">—</p>
     </div>
     <div class="stat-card">
-      <p style="font-size:.65rem;color:#fed7aa;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Espacio usado</p>
-      <p style="font-size:1.8rem;font-weight:800;color:#fed7aa;margin-top:.35rem" id="stat-gb">—</p>
+      <p style="font-size:.65rem;color:var(--warn-text);font-weight:700;text-transform:uppercase;letter-spacing:.1em">Espacio usado</p>
+      <p style="font-size:1.8rem;font-weight:800;color:var(--warn-text);margin-top:.35rem" id="stat-gb">—</p>
       <!-- Barra de uso Drive -->
       <div class="progress-bar">
-        <div class="progress-fill" id="drive-progress" style="background:linear-gradient(135deg,#6366f1,#4f46e5);width:0%"></div>
+        <div class="progress-fill" id="drive-progress" style="background:var(--accent);width:0%"></div>
       </div>
-      <p style="font-size:.65rem;color:#475569;margin-top:.25rem">de 15 GB disponibles</p>
+      <p style="font-size:.65rem;color:var(--text-faint);margin-top:.25rem">de 15 GB disponibles</p>
     </div>
   </div>
 
   <!-- Estado por clínica -->
   <div class="card" style="margin-bottom:1.5rem;padding:0;overflow:hidden">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Estado por clínica</h2>
-      <button onclick="cargarStats()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem">🔄</button>
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Estado por clínica</h2>
+      <button onclick="cargarStats()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem" aria-label="Actualizar" title="Actualizar"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/></svg></button>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -123,7 +131,7 @@
           </tr>
         </thead>
         <tbody id="tbody-clinicas">
-          <tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">
+          <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-faint)">
             <div class="spinner" style="margin:0 auto"></div>
           </td></tr>
         </tbody>
@@ -133,8 +141,8 @@
 
   <!-- Historial de backups -->
   <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-      <h2 style="font-size:1rem;font-weight:700;color:#f1f5f9">Historial de backups</h2>
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text-strong)">Historial de backups</h2>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
         <select id="f-tenant" style="width:auto" onchange="cargarHistorial()">
           <option value="">Todas las clínicas</option>
@@ -148,8 +156,8 @@
         </select>
         <select id="f-estado" style="width:auto" onchange="cargarHistorial()">
           <option value="">Todos</option>
-          <option value="exitoso">✅ Exitoso</option>
-          <option value="fallido">❌ Fallido</option>
+          <option value="exitoso">Exitoso</option>
+          <option value="fallido">Fallido</option>
         </select>
       </div>
     </div>
@@ -168,14 +176,14 @@
           </tr>
         </thead>
         <tbody id="tbody-historial">
-          <tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+          <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-faint)">
             <div class="spinner" style="margin:0 auto"></div>
           </td></tr>
         </tbody>
       </table>
     </div>
-    <div style="padding:1rem 1.25rem;border-top:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-      <span id="pag-info" style="font-size:.78rem;color:#475569"></span>
+    <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span id="pag-info" style="font-size:.78rem;color:var(--text-faint)"></span>
       <div style="display:flex;gap:.4rem" id="pag-btns"></div>
     </div>
   </div>
@@ -186,8 +194,8 @@
 <div id="modal-config" class="modal-bg hidden">
   <div class="modal">
     <div class="modal-head">
-      <h3 style="font-weight:700;color:#f1f5f9">⚙️ Configurar backups</h3>
-      <button onclick="cerrarModal()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+      <h3 style="font-weight:700;color:var(--text-strong)">Configurar backups</h3>
+      <button onclick="cerrarModal()" class="btn-ghost btn-icon" aria-label="Cerrar"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="modal-body" id="config-body">
       <div style="text-align:center;padding:2rem"><div class="spinner" style="margin:0 auto"></div></div>
@@ -235,31 +243,31 @@
       // Barra de progreso Drive (15GB max)
       const pct = Math.min((total_gb / 15) * 100, 100);
       document.getElementById('drive-progress').style.width = pct + '%';
-      if (pct > 80) document.getElementById('drive-progress').style.background = '#f87171';
+      if (pct > 80) document.getElementById('drive-progress').style.background = 'var(--danger-text)';
 
       // Tabla por clínica
       const tbody = document.getElementById('tbody-clinicas');
       if (!stats.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#475569">Sin datos de backup</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-faint)">Sin datos de backup</td></tr>';
         return;
       }
 
       tbody.innerHTML = stats.map(s => {
         const ultimoStr = s.ultimo_exitoso ? fDateTime(s.ultimo_exitoso) : '—';
         const horasDesde = s.ultimo_exitoso ? Math.floor((Date.now() - new Date(s.ultimo_exitoso)) / 3600000) : 999;
-        const estadoColor = horasDesde < 25 ? '#4ade80' : horasDesde < 49 ? '#fb923c' : '#f87171';
-        const estadoLabel = horasDesde < 25 ? '✅ Al día' : horasDesde < 49 ? '⚠️ Ayer' : '❌ Atrasado';
+        const estadoColor = horasDesde < 25 ? 'var(--ok-text)' : horasDesde < 49 ? 'var(--warn-text)' : 'var(--danger-text)';
+        const estadoLabel = horasDesde < 25 ? 'Al día' : horasDesde < 49 ? 'Ayer' : 'Atrasado';
 
         return `<tr>
           <td style="font-weight:700">${esc(s.tenant_nombre||'—')}</td>
-          <td style="font-size:.78rem;color:#94a3b8">${ultimoStr}</td>
-          <td class="hide-mobile" style="color:#94a3b8">${fNum(s.total)}</td>
-          <td class="hide-mobile" style="color:#94a3b8">${s.total_mb ? (s.total_mb/1024).toFixed(2)+' GB' : '—'}</td>
+          <td style="font-size:.78rem;color:var(--text-2)">${ultimoStr}</td>
+          <td class="hide-mobile" style="color:var(--text-2)">${fNum(s.total)}</td>
+          <td class="hide-mobile" style="color:var(--text-2)">${s.total_mb ? (s.total_mb/1024).toFixed(2)+' GB' : '—'}</td>
           <td><span style="font-size:.72rem;font-weight:700;color:${estadoColor}">${estadoLabel}</span></td>
           <td>
             <button onclick="backupClinica(${jsArg(s.tenant_id||'')},${jsArg(s.tenant_nombre||'')})"
               class="btn-green" style="padding:.3rem .7rem;font-size:.72rem">
-              ▶️ Backup
+              Backup
             </button>
           </td>
         </tr>`;
@@ -285,7 +293,7 @@
     });
 
     const tbody = document.getElementById('tbody-historial');
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-faint)">
       <div class="spinner" style="margin:0 auto"></div></td></tr>`;
 
     try {
@@ -310,7 +318,7 @@
       }
 
       if (!data.length) {
-        tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">Sin backups</td></tr>';
+        tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-faint)">Sin backups</td></tr>';
         return;
       }
 
@@ -320,14 +328,14 @@
           <td style="white-space:nowrap;font-size:.78rem">${fecha}</td>
           <td style="font-weight:600">${esc(b.tenant_nombre||'—')}</td>
           <td><span class="badge-${b.tipo}">${b.tipo}</span></td>
-          <td class="hide-mobile" style="font-family:monospace;font-size:.72rem;color:#64748b">${esc(b.archivo)}</td>
-          <td class="hide-mobile" style="color:#94a3b8">${b.tamaño_mb ? b.tamaño_mb+' MB' : '—'}</td>
-          <td class="hide-mobile" style="color:#94a3b8">${b.duracion_seg ? b.duracion_seg+'s' : '—'}</td>
-          <td><span class="badge-${b.estado}">${b.estado==='exitoso'?'✅':b.estado==='fallido'?'❌':'⏳'} ${b.estado}</span></td>
+          <td class="hide-mobile" style="font-family:monospace;font-size:.72rem;color:var(--text-muted)">${esc(b.archivo)}</td>
+          <td class="hide-mobile" style="color:var(--text-2)">${b.tamaño_mb ? b.tamaño_mb+' MB' : '—'}</td>
+          <td class="hide-mobile" style="color:var(--text-2)">${b.duracion_seg ? b.duracion_seg+'s' : '—'}</td>
+          <td><span class="badge-${b.estado}"><span class="dot"></span>${b.estado}</span></td>
           <td>
             ${b.drive_url
-              ? `<a href="${esc(b.drive_url)}" target="_blank" style="color:#6366f1;font-size:.75rem;font-weight:600;text-decoration:none">📥 Drive</a>`
-              : '<span style="color:#334155;font-size:.75rem">—</span>'}
+              ? `<a href="${esc(b.drive_url)}" target="_blank" style="color:var(--accent);font-size:.75rem;font-weight:600;text-decoration:none">Drive</a>`
+              : '<span style="color:var(--text-faint);font-size:.75rem">—</span>'}
           </td>
         </tr>`;
       }).join('');
@@ -339,7 +347,7 @@
     if (!confirm(`¿Iniciar backup manual de "${nombre}"?`)) return;
     const res  = await adminFetch(`/backups/manual/${tenantId}`, { method:'POST' });
     const data = await res.json();
-    toast(data.message || (res.ok ? '✅ Backup iniciado' : '❌ Error'), res.ok ? 'success' : 'error');
+    toast(data.message || (res.ok ? 'Backup iniciado' : 'Error'), res.ok ? 'success' : 'error');
     if (res.ok) setTimeout(() => { cargarStats(); cargarHistorial(); }, 3000);
   }
 
@@ -348,7 +356,7 @@
     if (!confirm('¿Iniciar backup de TODAS las clínicas ahora?')) return;
     const res  = await adminFetch('/backups/manual-all', { method:'POST' });
     const data = await res.json();
-    toast(data.message || (res.ok ? '✅ Backup general iniciado' : '❌ Error'), res.ok ? 'success' : 'error');
+    toast(data.message || (res.ok ? 'Backup general iniciado' : 'Error'), res.ok ? 'success' : 'error');
     if (res.ok) setTimeout(() => { cargarStats(); cargarHistorial(); }, 5000);
   }
 
@@ -360,17 +368,17 @@
 
     try {
       const res  = await adminFetch('/backups/config');
-      if (!res?.ok) { body.innerHTML='<p style="color:#f87171">Error al cargar configuración</p>'; return; }
+      if (!res?.ok) { body.innerHTML='<p style="color:var(--danger-text)">Error al cargar configuración</p>'; return; }
       const rows = (await res.json()).data || [];
 
       body.innerHTML = rows.length
         ? rows.map(c => `
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:.85rem;padding:1.1rem">
+          <div style="background:var(--inset);border:1px solid var(--border);border-radius:.85rem;padding:1.1rem">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem">
               <p style="font-weight:700;font-size:.9rem">${esc(c.nombre_clinica||c.subdominio)}</p>
-              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;color:#94a3b8;text-transform:none;letter-spacing:0;margin:0">
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.8rem;color:var(--text-2);text-transform:none;letter-spacing:0;margin:0">
                 <input type="checkbox" ${c.activo?'checked':''} id="activo-${c.tenant_id}"
-                  style="width:auto;accent-color:#6366f1"/>
+                  style="width:auto;accent-color:var(--accent)"/>
                 Backups activos
               </label>
             </div>
@@ -395,13 +403,13 @@
             </div>
             <div style="margin-top:.85rem;display:flex;justify-content:flex-end">
               <button onclick="guardarConfig(${c.tenant_id})" class="btn-primary" style="font-size:.78rem;padding:.45rem .9rem">
-                💾 Guardar
+                Guardar
               </button>
             </div>
           </div>`).join('')
-        : '<p style="color:#475569;text-align:center;padding:2rem">Sin clínicas configuradas</p>';
+        : '<p style="color:var(--text-faint);text-align:center;padding:2rem">Sin clínicas configuradas</p>';
 
-    } catch(e) { body.innerHTML='<p style="color:#f87171">Error al cargar</p>'; }
+    } catch(e) { body.innerHTML='<p style="color:var(--danger-text)">Error al cargar</p>'; }
   }
 
   async function guardarConfig(tenantId) {
@@ -413,7 +421,7 @@
       retener_mensuales  : parseInt(document.getElementById(`men-${tenantId}`)?.value)||3,
     };
     const res = await adminFetch(`/backups/config/${tenantId}`, { method:'PUT', body });
-    toast(res?.ok ? '✅ Configuración guardada' : '❌ Error al guardar', res?.ok ? 'success' : 'error');
+    toast(res?.ok ? 'Configuración guardada' : 'Error al guardar', res?.ok ? 'success' : 'error');
   }
 
   function cerrarModal() {

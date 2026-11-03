@@ -2,109 +2,116 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Dashboard — VetClinic SaaS Admin</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    .sidebar{width:240px;background:var(--surface);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:100}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
-    .stat-card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.25rem}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.5rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem}
     .stat-val{font-size:2rem;font-weight:800;margin-top:.3rem}
-    .stat-lbl{font-size:.65rem;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
-    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
-    .badge-plan-b{background:#1e3a5f;color:#93c5fd;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
-    .badge-plan-p{background:#3b0764;color:#d8b4fe;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
-    .badge-plan-e{background:#451a03;color:#fed7aa;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
-    .spinner{width:18px;height:18px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+    .stat-lbl{font-size:.65rem;color:var(--text-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+    .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit}
+    .badge-plan-b{background:var(--info-bg);color:var(--info-text);font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
+    .badge-plan-p{background:var(--violet-bg);color:var(--violet-text);font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
+    .badge-plan-e{background:var(--warn-bg);color:var(--warn-text);font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
     @keyframes spin{to{transform:rotate(360deg)}}
     a{color:inherit;text-decoration:none}
-    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
-    .nav-item:hover{background:#0f172a;color:#e2e8f0}
-    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
-    .quick-card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.25rem;cursor:pointer;transition:border-color .15s;display:block}
-    .quick-card:hover{border-color:#6366f1}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:var(--inset);color:var(--text)}
+    .nav-item.active{background:linear-gradient(135deg,var(--accent-soft),var(--accent-soft));color:var(--accent-text);font-weight:700}
+    .quick-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem;cursor:pointer;transition:border-color .15s;display:block}
+    .quick-card:hover{border-color:var(--accent)}
     table{width:100%;border-collapse:collapse}
-    th{padding:.6rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155}
-    td{padding:.75rem 1rem;border-bottom:1px solid #1e293b;font-size:.82rem;vertical-align:middle}
+    th{padding:.6rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);border-bottom:1px solid var(--border)}
+    td{padding:.75rem 1rem;border-bottom:1px solid var(--surface);font-size:.82rem;vertical-align:middle}
   </style>
+  <link rel="stylesheet" href="admin.css"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 <aside class="sidebar" id="sidebar"></aside>
 <main class="main">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
     <div>
-      <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">📊 Dashboard</h1>
-      <p style="font-size:.78rem;color:#475569;margin-top:.1rem" id="ultima-actualizacion">Cargando…</p>
+      <h1 style="font-size:1.4rem;color:var(--text-strong)">Dashboard</h1>
+      <p style="font-size:.78rem;color:var(--text-faint);margin-top:.1rem" id="ultima-actualizacion">Cargando…</p>
     </div>
-    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+    <button onclick="cargar()" class="btn-ghost">Actualizar</button>
   </div>
 
   <!-- Stats principales -->
   <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.5rem">
-    <div class="stat-card"><div class="stat-lbl">Total clínicas</div><div class="stat-val" style="color:#818cf8" id="s-total">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Activas</div><div class="stat-val" style="color:#4ade80" id="s-activas">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Suspendidas</div><div class="stat-val" style="color:#f87171" id="s-suspendidas">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">WA conectadas</div><div class="stat-val" style="color:#4ade80" id="s-wa">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Backups hoy</div><div class="stat-val" style="color:#fb923c" id="s-backups">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Total clínicas</div><div class="stat-val" style="color:var(--accent-text)" id="s-total">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Activas</div><div class="stat-val" style="color:var(--ok-text)" id="s-activas">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Suspendidas</div><div class="stat-val" style="color:var(--danger-text)" id="s-suspendidas">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">WA conectadas</div><div class="stat-val" style="color:var(--ok-text)" id="s-wa">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Backups hoy</div><div class="stat-val" style="color:var(--warn-text)" id="s-backups">—</div></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
 
     <!-- Próximos a vencer -->
     <div class="card">
-      <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:#f1f5f9">⚠️ Próximos a vencer (7 días)</h3>
+      <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:var(--text-strong)">Próximos a vencer (7 días)</h3>
       <div id="proximos-vencer">
-        <div style="text-align:center;padding:1rem;color:#475569"><div class="spinner"></div></div>
+        <div style="text-align:center;padding:1rem;color:var(--text-faint)"><div class="spinner"></div></div>
       </div>
     </div>
 
     <!-- Distribución por plan -->
     <div class="card">
-      <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:#f1f5f9">📊 Distribución por plan</h3>
+      <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:var(--text-strong)">Distribución por plan</h3>
       <div id="dist-plan">
-        <div style="text-align:center;padding:1rem;color:#475569"><div class="spinner"></div></div>
+        <div style="text-align:center;padding:1rem;color:var(--text-faint)"><div class="spinner"></div></div>
       </div>
     </div>
   </div>
 
   <!-- Actividad hoy por clínica -->
   <div class="card" style="margin-bottom:1.5rem">
-    <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:#f1f5f9">📈 Actividad últimas 24h por clínica</h3>
+    <h3 style="font-weight:700;font-size:.95rem;margin-bottom:1rem;color:var(--text-strong)">Actividad últimas 24h por clínica</h3>
     <div id="actividad-hoy">
-      <div style="text-align:center;padding:1.5rem;color:#475569"><div class="spinner"></div></div>
+      <div style="text-align:center;padding:1.5rem;color:var(--text-faint)"><div class="spinner"></div></div>
     </div>
   </div>
 
   <!-- Accesos rápidos -->
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem">
     <a href="clinicas.html" class="quick-card">
-      <p style="font-size:1.5rem;margin-bottom:.5rem">🏥</p>
-      <p style="font-weight:700;font-size:.9rem;color:#f1f5f9">Clínicas</p>
-      <p style="font-size:.72rem;color:#475569;margin-top:.2rem">Gestionar tenants</p>
+      <svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 21V8.5L12 3l8 5.5V21"/><path d="M9.5 21v-5h5v5"/><path d="M12 7.5v5M9.5 10h5"/></svg>
+      <p style="font-weight:700;font-size:.9rem;color:var(--text-strong)">Clínicas</p>
+      <p style="font-size:.72rem;color:var(--text-faint);margin-top:.2rem">Gestionar tenants</p>
     </a>
     <a href="fe.html" class="quick-card">
-      <p style="font-size:1.5rem;margin-bottom:.5rem">⚡</p>
-      <p style="font-weight:700;font-size:.9rem;color:#f1f5f9">Facturación FE</p>
-      <p style="font-size:.72rem;color:#475569;margin-top:.2rem">Config SUNAT</p>
+      <svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+      <p style="font-weight:700;font-size:.9rem;color:var(--text-strong)">Facturación FE</p>
+      <p style="font-size:.72rem;color:var(--text-faint);margin-top:.2rem">Config SUNAT</p>
     </a>
     <a href="wa.html" class="quick-card">
-      <p style="font-size:1.5rem;margin-bottom:.5rem">💬</p>
-      <p style="font-weight:700;font-size:.9rem;color:#f1f5f9">WhatsApp</p>
-      <p style="font-size:.72rem;color:#475569;margin-top:.2rem">Cuotas y sesiones</p>
+      <svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.5A8.5 8.5 0 1 1 20.5 12z"/></svg>
+      <p style="font-weight:700;font-size:.9rem;color:var(--text-strong)">WhatsApp</p>
+      <p style="font-size:.72rem;color:var(--text-faint);margin-top:.2rem">Cuotas y sesiones</p>
     </a>
     <a href="backup.html" class="quick-card">
-      <p style="font-size:1.5rem;margin-bottom:.5rem">💾</p>
-      <p style="font-weight:700;font-size:.9rem;color:#f1f5f9">Backups</p>
-      <p style="font-size:.72rem;color:#475569;margin-top:.2rem">Copias de seguridad</p>
+      <svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></svg>
+      <p style="font-weight:700;font-size:.9rem;color:var(--text-strong)">Backups</p>
+      <p style="font-size:.72rem;color:var(--text-faint);margin-top:.2rem">Copias de seguridad</p>
     </a>
     <a href="logs.html" class="quick-card">
-      <p style="font-size:1.5rem;margin-bottom:.5rem">📋</p>
-      <p style="font-weight:700;font-size:.9rem;color:#f1f5f9">Logs</p>
-      <p style="font-size:.72rem;color:#475569;margin-top:.2rem">Auditoría del sistema</p>
+      <svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+      <p style="font-weight:700;font-size:.9rem;color:var(--text-strong)">Logs</p>
+      <p style="font-size:.72rem;color:var(--text-faint);margin-top:.2rem">Auditoría del sistema</p>
     </a>
   </div>
 </main>
@@ -131,15 +138,15 @@
       // Próximos a vencer
       const pv = document.getElementById('proximos-vencer');
       if (!data.proximos_vencer?.length) {
-        pv.innerHTML = '<p style="color:#475569;font-size:.82rem;text-align:center;padding:.75rem">✅ Ninguna clínica próxima a vencer</p>';
+        pv.innerHTML = '<p style="color:var(--text-faint);font-size:.82rem;text-align:center;padding:.75rem">Ninguna clínica próxima a vencer</p>';
       } else {
         pv.innerHTML = data.proximos_vencer.map(t => {
           const dias = Math.ceil((new Date(t.trial_hasta) - new Date()) / 86400000);
-          const color = dias <= 2 ? '#f87171' : '#fb923c';
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid #1e293b">
+          const color = dias <= 2 ? 'var(--danger-text)' : 'var(--warn-text)';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--surface)">
             <div>
               <p style="font-weight:700;font-size:.85rem">${esc(t.nombre_clinica||t.slug)}</p>
-              <p style="font-size:.7rem;color:#475569">Vence: ${fDate(t.trial_hasta)}</p>
+              <p style="font-size:.7rem;color:var(--text-faint)">Vence: ${fDate(t.trial_hasta)}</p>
             </div>
             <span style="color:${color};font-weight:800;font-size:.9rem">${dias}d</span>
           </div>`;
@@ -150,31 +157,31 @@
       const dp = document.getElementById('dist-plan');
       const planMap = { basic:'badge-plan-b', pro:'badge-plan-p', enterprise:'badge-plan-e' };
       if (!data.por_plan?.length) {
-        dp.innerHTML = '<p style="color:#475569;font-size:.82rem">Sin datos</p>';
+        dp.innerHTML = '<p style="color:var(--text-faint);font-size:.82rem">Sin datos</p>';
       } else {
         dp.innerHTML = data.por_plan.map(p => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 0;border-bottom:1px solid #1e293b">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 0;border-bottom:1px solid var(--surface)">
             <span class="${planMap[p.plan]||'badge-plan-b'}">${(p.plan||'').toUpperCase()}</span>
-            <div style="flex:1;margin:0 1rem;background:#334155;border-radius:999px;height:6px;overflow:hidden">
-              <div style="height:100%;background:#6366f1;border-radius:999px;width:${Math.round((p.n/data.total_tenants)*100)}%"></div>
+            <div style="flex:1;margin:0 1rem;background:var(--border);border-radius:999px;height:6px;overflow:hidden">
+              <div style="height:100%;background:var(--accent);border-radius:999px;width:${Math.round((p.n/data.total_tenants)*100)}%"></div>
             </div>
-            <span style="font-weight:700;font-size:.9rem;color:#f1f5f9">${p.n}</span>
+            <span style="font-weight:700;font-size:.9rem;color:var(--text-strong)">${p.n}</span>
           </div>`).join('');
       }
 
       // Actividad hoy
       const ah = document.getElementById('actividad-hoy');
       if (!data.actividad_hoy?.length) {
-        ah.innerHTML = '<p style="color:#475569;font-size:.82rem;text-align:center;padding:1rem">Sin actividad en las últimas 24 horas</p>';
+        ah.innerHTML = '<p style="color:var(--text-faint);font-size:.82rem;text-align:center;padding:1rem">Sin actividad en las últimas 24 horas</p>';
       } else {
         ah.innerHTML = `<table>
           <thead><tr><th>Clínica</th><th>Acciones</th><th>Errores</th></tr></thead>
           <tbody>${data.actividad_hoy.map(a => `<tr>
             <td style="font-weight:600">${esc(a.tenant_nombre||'—')}</td>
-            <td><span style="background:#1e3a5f;color:#93c5fd;font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">${a.acciones}</span></td>
+            <td><span style="background:var(--info-bg);color:var(--info-text);font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">${a.acciones}</span></td>
             <td>${a.errores > 0
-              ? `<span style="background:#450a0a;color:#f87171;font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">${a.errores}</span>`
-              : '<span style="color:#475569;font-size:.78rem">—</span>'}</td>
+              ? `<span style="background:var(--danger-bg);color:var(--danger-text);font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">${a.errores}</span>`
+              : '<span style="color:var(--text-faint);font-size:.78rem">—</span>'}</td>
           </tr>`).join('')}</tbody>
         </table>`;
       }

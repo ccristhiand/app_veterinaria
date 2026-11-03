@@ -1,0 +1,26 @@
+{
+  "name": "VetClinic — Panel de plataforma",
+  "short_name": "VetClinic Admin",
+  "description": "Administración de clínicas, pagos, facturación y WhatsApp de VetClinic.",
+  "lang": "es",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f4f1",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "logo.jpg",
+      "sizes": "200x200",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -2,36 +2,35 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Logs de Auditoría — VetClinic SaaS Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-    .sidebar{width:240px;background:#1e293b;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid #334155;z-index:100;transition:transform .3s}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    .sidebar{width:240px;background:var(--surface);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;border-right:1px solid var(--border);z-index:100;transition:transform .3s}
     .main{margin-left:240px;padding:2rem;min-height:100vh}
-    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:#94a3b8;text-decoration:none;transition:all .15s;margin-bottom:2px}
-    .nav-item:hover{background:#0f172a;color:#e2e8f0}
-    .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(79,70,229,.1));color:#818cf8;font-weight:700}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem}
+    .nav-item{display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;border-radius:.75rem;font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .15s;margin-bottom:2px}
+    .nav-item:hover{background:var(--inset);color:var(--text)}
+    .nav-item.active{background:linear-gradient(135deg,var(--accent-soft),var(--accent-soft));color:var(--accent-text);font-weight:700}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.5rem}
     table{width:100%;border-collapse:collapse}
-    th{padding:.6rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;border-bottom:1px solid #334155;white-space:nowrap}
-    td{padding:.75rem 1rem;border-bottom:1px solid #1e293b;font-size:.8rem;vertical-align:top}
+    th{padding:.6rem 1rem;text-align:left;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap}
+    td{padding:.75rem 1rem;border-bottom:1px solid var(--surface);font-size:.8rem;vertical-align:top}
     tr:hover td{background:#0f172a50}
-    input,select{background:#0f172a;border:1.5px solid #334155;border-radius:.7rem;padding:.55rem .85rem;color:#e2e8f0;font-size:.82rem;font-family:inherit;outline:none;transition:border-color .15s}
-    input:focus,select:focus{border-color:#6366f1}
-    .btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit}
-    .btn-ghost{background:transparent;color:#94a3b8;border:1px solid #334155;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
-    .btn-ghost:hover{border-color:#6366f1;color:#818cf8}
-    .badge-exito{background:#052e16;color:#4ade80;border:1px solid #166534;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
-    .badge-error{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    input,select{background:var(--inset);border:1.5px solid var(--border);border-radius:.7rem;padding:.55rem .85rem;color:var(--text);font-size:.82rem;font-family:inherit;outline:none;transition:border-color .15s}
+    input:focus,select:focus{border-color:var(--accent)}
+    .btn-primary{background:var(--accent);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;cursor:pointer;font-weight:600;font-size:.84rem;font-family:inherit}
+    .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;font-size:.82rem;font-family:inherit;transition:all .15s}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent-text)}
+    .badge-exito{background:var(--ok-bg);color:var(--ok-text);border:1px solid var(--ok-border);font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
+    .badge-error{background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-border);font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:999px}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
-    .modal{background:#1e293b;border:1px solid #334155;border-radius:1.25rem;width:100%;max-width:700px;max-height:90vh;overflow-y:auto}
-    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#1e293b}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:1.25rem;width:100%;max-width:700px;max-height:90vh;overflow-y:auto}
+    .modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface)}
     .modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
     .hidden{display:none!important}
-    .spinner{width:20px;height:20px;border:2px solid #334155;border-top-color:#6366f1;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-    .json-box{background:#0f172a;border:1px solid #334155;border-radius:.75rem;padding:1rem;font-family:'Courier New',monospace;font-size:.72rem;color:#94a3b8;overflow-x:auto;white-space:pre-wrap;max-height:300px;overflow-y:auto}
+    .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+    .json-box{background:var(--inset);border:1px solid var(--border);border-radius:.75rem;padding:1rem;font-family:'Courier New',monospace;font-size:.72rem;color:var(--text-2);overflow-x:auto;white-space:pre-wrap;max-height:300px;overflow-y:auto}
     @keyframes spin{to{transform:rotate(360deg)}}
     @media(max-width:768px){
       .sidebar{transform:translateX(-100%)}
@@ -40,6 +39,15 @@
       .hide-mobile{display:none!important}
     }
   </style>
+  <link rel="stylesheet" href="admin.css"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="apple-touch-icon" href="logo.jpg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -51,12 +59,12 @@
 <main class="main">
 
   <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
-    <button onclick="toggleSidebar()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:1.3rem;display:none" id="btn-menu">☰</button>
     <div style="flex:1">
-      <h1 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#f1f5f9">Logs de auditoría</h1>
-      <p style="font-size:.78rem;color:#475569;margin-top:.1rem">Registro completo de actividad del sistema</p>
+      <h1 style="font-size:1.4rem;color:var(--text-strong)">Logs de auditoría</h1>
+      <p style="font-size:.78rem;color:var(--text-faint);margin-top:.1rem">Registro completo de actividad del sistema</p>
     </div>
-    <button onclick="cargar()" class="btn-ghost">🔄 Actualizar</button>
+    <button onclick="cargar()" class="btn-ghost">Actualizar</button>
   </div>
 
   <!-- Filtros -->
@@ -66,21 +74,21 @@
     </select>
     <select id="f-modulo" style="max-width:150px" onchange="cargar()">
       <option value="">Todos los módulos</option>
-      <option value="autenticacion">🔐 Autenticación</option>
-      <option value="mascotas">🐾 Mascotas</option>
-      <option value="propietarios">👥 Propietarios</option>
-      <option value="citas">📅 Citas</option>
-      <option value="historia_clinica">📋 Historia clínica</option>
-      <option value="facturacion">💰 Facturación</option>
-      <option value="inventario">📦 Inventario</option>
-      <option value="vacunas">💉 Vacunas</option>
-      <option value="usuarios">👤 Usuarios</option>
-      <option value="configuracion">⚙️ Configuración</option>
+      <option value="autenticacion">Autenticación</option>
+      <option value="mascotas">Mascotas</option>
+      <option value="propietarios">Propietarios</option>
+      <option value="citas">Citas</option>
+      <option value="historia_clinica">Historia clínica</option>
+      <option value="facturacion">Facturación</option>
+      <option value="inventario">Inventario</option>
+      <option value="vacunas">Vacunas</option>
+      <option value="usuarios">Usuarios</option>
+      <option value="configuracion">Configuración</option>
     </select>
     <select id="f-resultado" style="max-width:130px" onchange="cargar()">
       <option value="">Todos</option>
-      <option value="exito">✅ Éxito</option>
-      <option value="error">❌ Error</option>
+      <option value="exito">Éxito</option>
+      <option value="error">Error</option>
     </select>
     <input id="f-desde" type="date" style="max-width:150px" onchange="cargar()"/>
     <input id="f-hasta" type="date" style="max-width:150px" onchange="cargar()"/>
@@ -104,15 +112,15 @@
           </tr>
         </thead>
         <tbody id="tbody-logs">
-          <tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#475569">
+          <tr><td colspan="8" style="text-align:center;padding:2.5rem;color:var(--text-faint)">
             <div style="display:flex;align-items:center;justify-content:center;gap:.75rem"><div class="spinner"></div> Cargando logs…</div>
           </td></tr>
         </tbody>
       </table>
     </div>
     <!-- Paginación -->
-    <div style="padding:1rem 1.25rem;border-top:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-      <span id="pag-info" style="font-size:.78rem;color:#475569"></span>
+    <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span id="pag-info" style="font-size:.78rem;color:var(--text-faint)"></span>
       <div style="display:flex;gap:.4rem" id="pag-btns"></div>
     </div>
   </div>
@@ -123,8 +131,8 @@
 <div id="modal-log" class="modal-bg hidden">
   <div class="modal">
     <div class="modal-head">
-      <h3 style="font-weight:700;color:#f1f5f9" id="log-titulo">Detalle del log</h3>
-      <button onclick="document.getElementById('modal-log').classList.add('hidden')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+      <h3 style="font-weight:700;color:var(--text-strong)" id="log-titulo">Detalle del log</h3>
+      <button onclick="document.getElementById('modal-log').classList.add('hidden')" class="btn-ghost btn-icon" aria-label="Cerrar"><svg class="ico " viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div class="modal-body" id="log-body"></div>
   </div>
@@ -175,13 +183,13 @@
     });
 
     const tbody = document.getElementById('tbody-logs');
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-faint)">
       <div style="display:flex;align-items:center;justify-content:center;gap:.75rem"><div class="spinner"></div> Cargando…</div>
     </td></tr>`;
 
     try {
       const res  = await adminFetch(`/logs?${params}`);
-      if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error al cargar logs</td></tr>'; return; }
+      if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--danger-text)">Error al cargar logs</td></tr>'; return; }
       const { data, meta } = await res.json();
 
       document.getElementById('pag-info').textContent =
@@ -204,7 +212,7 @@
       }
 
       if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#475569">Sin logs para los filtros seleccionados</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-faint)">Sin logs para los filtros seleccionados</td></tr>';
         return;
       }
 
@@ -212,27 +220,27 @@
         const fechaStr = fDate(log.created_at);
         const horaStr  = new Date(log.created_at).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
         const moduloIcons = {
-          autenticacion:'🔐', mascotas:'🐾', propietarios:'👥', citas:'📅',
-          historia_clinica:'📋', facturacion:'💰', inventario:'📦', vacunas:'💉',
-          usuarios:'👤', configuracion:'⚙️', sistema:'🖥️',
+          autenticacion:'lock', mascotas:'paw', propietarios:'users', citas:'calendar',
+          historia_clinica:'logs', facturacion:'money', inventario:'box', vacunas:'plus',
+          usuarios:'users', configuracion:'gear', sistema:'wrench',
         };
         return `<tr style="cursor:pointer" onclick="verDetalle(${i})" data-log-idx="${i}">
           <td style="white-space:nowrap">
-            <p style="font-size:.78rem;color:#f1f5f9">${fechaStr}</p>
-            <p style="font-size:.68rem;color:#475569;font-family:monospace">${horaStr}</p>
+            <p style="font-size:.78rem;color:var(--text-strong)">${fechaStr}</p>
+            <p style="font-size:.68rem;color:var(--text-faint);font-family:monospace">${horaStr}</p>
           </td>
           <td style="font-size:.78rem;font-weight:600">${esc(log.tenant_nombre||'—')}</td>
           <td>
             <p style="font-size:.78rem">${esc(log.usuario_nombre||'Sistema')}</p>
-            <p style="font-size:.65rem;color:#475569">${esc(log.usuario_rol||'')}</p>
+            <p style="font-size:.65rem;color:var(--text-faint)">${esc(log.usuario_rol||'')}</p>
           </td>
           <td style="white-space:nowrap">
-            ${moduloIcons[log.modulo]||'📌'} <span style="font-size:.75rem">${esc(log.modulo)}</span>
+            <span style="display:inline-flex;align-items:center;color:var(--text-muted)">${adminIcon(moduloIcons[log.modulo]||'info','ico-sm')}</span> <span style="font-size:.75rem">${esc(log.modulo)}</span>
           </td>
-          <td style="font-size:.75rem;font-family:monospace;color:#818cf8">${esc(log.accion)}</td>
-          <td class="hide-mobile" style="font-size:.7rem;color:#475569;font-family:monospace">${esc(log.ip||'—')}</td>
-          <td><span class="badge-${log.resultado}">${log.resultado === 'exito' ? '✅' : '❌'} ${log.resultado}</span></td>
-          <td><button onclick="event.stopPropagation();verDetalle(${i})" style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:.75rem;font-weight:600">Ver JSON</button></td>
+          <td style="font-size:.75rem;font-family:monospace;color:var(--accent-text)">${esc(log.accion)}</td>
+          <td class="hide-mobile" style="font-size:.7rem;color:var(--text-faint);font-family:monospace">${esc(log.ip||'—')}</td>
+          <td><span class="badge-${log.resultado}"><span class="dot"></span>${log.resultado}</span></td>
+          <td><button onclick="event.stopPropagation();verDetalle(${i})" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:.75rem;font-weight:600">Ver JSON</button></td>
         </tr>`;
       }).join('');
 
@@ -240,14 +248,14 @@
       window._logsData = data;
 
     } catch(e) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--danger-text)">Error: ${esc(e.message)}</td></tr>`;
     }
   }
 
   function verDetalle(idx) {
     const log = window._logsData?.[idx];
     if (!log) return;
-    document.getElementById('log-titulo').textContent = `📋 ${log.accion}`;
+    document.getElementById('log-titulo').textContent = `${log.accion}`;
     const fecha = fDateTime(log.created_at);
     document.getElementById('log-body').innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
@@ -263,30 +271,30 @@
           ['Duración', log.duracion_ms ? log.duracion_ms+'ms' : '—'],
           ['Resultado', log.resultado],
         ].map(([k,v]) => `
-          <div style="background:#0f172a;border-radius:.65rem;padding:.6rem .85rem">
-            <p style="font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${k}</p>
-            <p style="font-size:.82rem;color:#e2e8f0;font-weight:600;margin-top:.15rem">${esc(v||'—')}</p>
+          <div style="background:var(--inset);border-radius:.65rem;padding:.6rem .85rem">
+            <p style="font-size:.6rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700">${k}</p>
+            <p style="font-size:.82rem;color:var(--text);font-weight:600;margin-top:.15rem">${esc(v||'—')}</p>
           </div>`).join('')}
       </div>
       ${log.endpoint ? `
         <div style="margin-bottom:1rem">
-          <p style="font-size:.68rem;color:#475569;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Endpoint</p>
+          <p style="font-size:.68rem;color:var(--text-faint);margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Endpoint</p>
           <div class="json-box">${esc(log.endpoint)}</div>
         </div>` : ''}
       ${log.error_mensaje ? `
         <div style="margin-bottom:1rem">
-          <p style="font-size:.68rem;color:#f87171;margin-bottom:.35rem;font-weight:700">❌ Error</p>
-          <div class="json-box" style="border-color:#7f1d1d;color:#f87171">${esc(log.error_mensaje)}</div>
+          <p style="font-size:.68rem;color:var(--danger-text);margin-bottom:.35rem;font-weight:700">Error</p>
+          <div class="json-box" style="border-color:var(--danger-border);color:var(--danger-text)">${esc(log.error_mensaje)}</div>
         </div>` : ''}
       ${log.data_anterior ? `
         <div style="margin-bottom:1rem">
-          <p style="font-size:.68rem;color:#fb923c;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📤 Data anterior</p>
-          <div class="json-box" style="border-color:#431407">${esc(JSON.stringify(JSON.parse(typeof log.data_anterior === 'string' ? log.data_anterior : JSON.stringify(log.data_anterior)), null, 2))}</div>
+          <p style="font-size:.68rem;color:var(--warn-text);margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Data anterior</p>
+          <div class="json-box" style="border-color:var(--warn-bg)">${esc(JSON.stringify(JSON.parse(typeof log.data_anterior === 'string' ? log.data_anterior : JSON.stringify(log.data_anterior)), null, 2))}</div>
         </div>` : ''}
       ${log.data_nueva ? `
         <div>
-          <p style="font-size:.68rem;color:#4ade80;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📥 Data nueva</p>
-          <div class="json-box" style="border-color:#052e16">${esc(JSON.stringify(JSON.parse(typeof log.data_nueva === 'string' ? log.data_nueva : JSON.stringify(log.data_nueva)), null, 2))}</div>
+          <p style="font-size:.68rem;color:var(--ok-text);margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Data nueva</p>
+          <div class="json-box" style="border-color:var(--ok-bg)">${esc(JSON.stringify(JSON.parse(typeof log.data_nueva === 'string' ? log.data_nueva : JSON.stringify(log.data_nueva)), null, 2))}</div>
         </div>` : ''}
     `;
     document.getElementById('modal-log').classList.remove('hidden');
