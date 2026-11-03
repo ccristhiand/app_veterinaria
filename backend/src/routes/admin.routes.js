@@ -25,6 +25,65 @@ function sinPrivados(row) {
   return out;
 }
 
+// ── Campos editables de tenant_config ────────────────────────────
+// Cada campo normaliza su valor; solo se guardan los que vienen en el body
+// (así un PUT parcial no pisa con valores por defecto lo que no se envió).
+const txt  = v => String(v ?? '').trim() || null;
+const flag = v => (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0;
+const CAMPOS_CONFIG = {
+  nombre_clinica        : v => txt(v) || 'VetClinic',
+  ruc                   : txt,
+  razon_social          : txt,
+  telefono              : txt,
+  email                 : txt,
+  direccion             : txt,
+  web                   : txt,
+  logo_url              : txt,
+  favicon_url           : txt,
+  color_primario        : v => txt(v) || '#10b981',
+  color_sidebar         : v => txt(v) || '#0d3b2e',
+  color_acento          : v => txt(v) || '#059669',
+  moneda                : v => txt(v) || 'PEN',
+  simbolo_moneda        : v => txt(v) || 'S/.',
+  zona_horaria          : v => txt(v) || 'America/Lima',
+  pais                  : v => txt(v) || 'Peru',
+  max_usuarios          : v => Math.max(1, parseInt(v, 10) || 5),
+  // 0 es válido (clínicas exoneradas); antes `|| 18` lo convertía en 18
+  igv_porcentaje        : v => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 18; },
+  modulo_estetica       : flag,
+  modulo_facturacion    : flag,
+  modulo_inventario     : flag,
+  modulo_vacunas        : flag,
+  modulo_consentimientos: flag,
+  modulo_carnet         : flag,
+};
+
+function valoresConfig(body, { todos = false } = {}) {
+  const out = {};
+  for (const [col, conv] of Object.entries(CAMPOS_CONFIG)) {
+    if (todos || body[col] !== undefined) out[col] = conv(body[col]);
+  }
+  return out;
+}
+
+// tenant_config → empresa_config (BD de la clínica). Los vacíos (null) no se copian
+// para no borrar datos que la clínica cargó desde su propia configuración.
+const MAPA_EMPRESA = {
+  nombre_clinica: 'nombre', razon_social: 'razon_social', ruc: 'ruc', direccion: 'direccion',
+  telefono: 'telefono', email: 'email', web: 'web', logo_url: 'logo_url',
+  moneda: 'moneda', simbolo_moneda: 'simbolo_moneda', igv_porcentaje: 'igv_porcentaje',
+};
+async function sincronizarEmpresaConfig(conn, cfg) {
+  const sets = [], vals = [];
+  for (const [col, colEmpresa] of Object.entries(MAPA_EMPRESA)) {
+    if (cfg[col] === undefined || cfg[col] === null) continue;
+    sets.push(`${colEmpresa}=?`);
+    vals.push(cfg[col]);
+  }
+  if (!sets.length) return;
+  await conn.execute(`UPDATE empresa_config SET ${sets.join(', ')} WHERE id=1`, vals);
+}
+
 // POST /admin/api/login
 router.post('/login', async (req, res) => {
   try {
@@ -58,11 +117,37 @@ router.get('/tenants', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// ── GET /admin/api/tenants/consumo ────────────────────────────────
+// Debe ir ANTES de /tenants/:id, si no Express lo toma como id="consumo"
+router.get('/tenants/consumo', async (req, res, next) => {
+  try {
+    const { tenant_id, mes, tipo, fuente } = req.query;
+    if (!tenant_id) return res.status(422).json({ success: false, message: 'tenant_id requerido.' });
+
+    let where  = 'WHERE tenant_id = ?';
+    const vals = [tenant_id];
+    if (mes)    { where += " AND DATE_FORMAT(created_at, '%Y-%m') = ?"; vals.push(mes); }
+    if (tipo)   { where += ' AND tipo = ?';   vals.push(tipo); }
+    if (fuente) { where += ' AND fuente = ?'; vals.push(fuente); }
+
+    const rows = await masterQuery(
+      `SELECT id, tipo, fuente, numero, created_at
+       FROM tenant_api_consumo ${where}
+       ORDER BY created_at DESC LIMIT 200`, vals
+    );
+    const [totales] = await masterQuery(
+      `SELECT COUNT(*) AS total, SUM(fuente='cache') AS cache, SUM(fuente='api') AS api
+       FROM tenant_api_consumo ${where}`, vals
+    );
+    return res.json({ success: true, data: rows, totales });
+  } catch (err) { next(err); }
+});
+
 // ── GET /admin/api/tenants/:id ────────────────────────────────────
 router.get('/tenants/:id', async (req, res) => {
   try {
     const [tenant] = await masterQuery(
-      `SELECT t.*, tc.*
+      `SELECT tc.*, t.*
        FROM tenants t
        LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
        WHERE t.id = ?`, [req.params.id]
@@ -76,13 +161,10 @@ router.get('/tenants/:id', async (req, res) => {
 router.post('/tenants', async (req, res) => {
   try {
     const {
-      nombre_clinica, subdominio,
-      plan, color_primario, color_sidebar, color_acento,
-      logo_url, moneda, simbolo_moneda, igv_porcentaje,
-      max_usuarios, modulo_estetica, modulo_facturacion, modulo_inventario,
-      modulo_vacunas, modulo_consentimientos, modulo_carnet,
+      nombre_clinica, subdominio, plan,
       admin_nombre, admin_email, admin_password,
     } = req.body;
+    const cfg = valoresConfig(req.body, { todos: true });
 
     if (!nombre_clinica || !subdominio) {
       return res.status(422).json({ success: false, message: 'nombre_clinica y subdominio son obligatorios.' });
@@ -158,19 +240,12 @@ router.post('/tenants', async (req, res) => {
     );
     const tenantId = result.insertId;
 
-    // 5. Config inicial en tenant_config
+    // 5. Config inicial en tenant_config — todos los campos del formulario
+    const colsCfg = Object.keys(cfg);
     await masterQuery(
-      `INSERT INTO tenant_config
-         (tenant_id, nombre_clinica, logo_url, color_primario, color_sidebar, color_acento,
-          moneda, simbolo_moneda, igv_porcentaje, max_usuarios,
-          modulo_estetica, modulo_facturacion, modulo_inventario,
-          modulo_vacunas, modulo_consentimientos, modulo_carnet)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [tenantId, nombre_clinica, logo_url||null,
-       color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
-       moneda||'PEN', simbolo_moneda||'S/.', igv_porcentaje||18, max_usuarios||5,
-       modulo_estetica?1:0, modulo_facturacion?1:0, modulo_inventario?1:0,
-       modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0]
+      `INSERT INTO tenant_config (tenant_id, ${colsCfg.join(', ')})
+       VALUES (?, ${colsCfg.map(() => '?').join(', ')})`,
+      [tenantId, ...Object.values(cfg)]
     );
 
     // 6. Crear usuario admin inicial en la BD del tenant
@@ -183,11 +258,8 @@ router.post('/tenants', async (req, res) => {
       [admin_nombre || 'Administrador', admin_email, hashedPass]
     );
 
-    // 7. Actualizar empresa_config con nombre de la clínica
-    await tenantConn2.execute(
-      'UPDATE empresa_config SET nombre=?, simbolo_moneda=?, igv_porcentaje=? WHERE id=1',
-      [nombre_clinica, simbolo_moneda||'S/.', igv_porcentaje||18]
-    );
+    // 7. Copiar datos de la empresa (RUC, razón social, dirección…) a empresa_config
+    await sincronizarEmpresaConfig(tenantConn2, cfg);
     await tenantConn2.end();
 
     // 8. Config de backup por defecto
@@ -299,67 +371,52 @@ router.post('/tenants', async (req, res) => {
 // ── PUT /admin/api/tenants/:id ────────────────────────────────────
 router.put('/tenants/:id', async (req, res) => {
   try {
-    const {
-      nombre_clinica, ruc, razon_social, telefono, email, direccion, web,
-      logo_url, favicon_url, color_primario, color_sidebar, color_acento,
-      plan, activo, trial_hasta, max_usuarios, moneda, simbolo_moneda, igv_porcentaje,
-      modulo_estetica, modulo_facturacion, modulo_inventario, modulo_vacunas,
-      modulo_consentimientos, modulo_carnet, zona_horaria, pais,
-    } = req.body;
-
-    await masterQuery(
-      'UPDATE tenants SET plan=?, activo=?, trial_hasta=? WHERE id=?',
-      [plan||'pro', activo !== undefined ? (activo?1:0) : 1, trial_hasta||null, req.params.id]
+    const b = req.body || {};
+    const [t] = await masterQuery(
+      'SELECT subdominio, db_host, db_port, db_user, db_pass, db_name FROM tenants WHERE id=?',
+      [req.params.id]
     );
+    if (!t) return res.status(404).json({ success: false, message: 'No encontrado.' });
 
-    await masterQuery(
-      `UPDATE tenant_config SET
-         nombre_clinica=?, ruc=?, razon_social=?, telefono=?, email=?, direccion=?, web=?,
-         logo_url=?, favicon_url=?,
-         color_primario=?, color_sidebar=?, color_acento=?,
-         max_usuarios=?, moneda=?, simbolo_moneda=?, igv_porcentaje=?,
-         modulo_estetica=?, modulo_facturacion=?, modulo_inventario=?,
-         modulo_vacunas=?, modulo_consentimientos=?, modulo_carnet=?,
-         zona_horaria=?, pais=?
-       WHERE tenant_id=?`,
-      [
-        nombre_clinica||'VetClinic', ruc||null, razon_social||null,
-        telefono||null, email||null, direccion||null, web||null,
-        logo_url||null, favicon_url||null,
-        color_primario||'#10b981', color_sidebar||'#0d3b2e', color_acento||'#059669',
-        max_usuarios||5, moneda||'PEN', simbolo_moneda||'S/.', igv_porcentaje||18,
-        modulo_estetica?1:0, modulo_facturacion?1:0, modulo_inventario?1:0,
-        modulo_vacunas?1:0, modulo_consentimientos?1:0, modulo_carnet?1:0,
-        zona_horaria||'America/Lima', pais||'Peru',
-        req.params.id
-      ]
-    );
-
-    // Sincronizar con empresa_config del tenant
-    try {
-      const [t] = await masterQuery(
-        'SELECT db_host, db_port, db_user, db_pass, db_name FROM tenants WHERE id=?',
-        [req.params.id]
-      );
-      if (t) {
-        const conn = await mysql.createConnection({
-          host: t.db_host, port: t.db_port||3306,
-          user: t.db_user, password: t.db_pass, database: t.db_name,
-        });
-        await conn.execute(
-          'UPDATE empresa_config SET nombre=?, simbolo_moneda=?, igv_porcentaje=? WHERE id=1',
-          [nombre_clinica||'VetClinic', simbolo_moneda||'S/.', igv_porcentaje||18]
-        );
-        await conn.end();
-      }
-    } catch(e) {
-      console.warn('[admin] No se pudo sincronizar empresa_config:', e.message);
+    // tenants — solo lo enviado
+    const setsT = [], valsT = [];
+    if (b.plan !== undefined)        { setsT.push('plan=?');        valsT.push(txt(b.plan) || 'pro'); }
+    if (b.activo !== undefined)      { setsT.push('activo=?');      valsT.push(flag(b.activo)); }
+    if (b.trial_hasta !== undefined) { setsT.push('trial_hasta=?'); valsT.push(txt(b.trial_hasta)); }
+    if (setsT.length) {
+      await masterQuery(`UPDATE tenants SET ${setsT.join(', ')} WHERE id=?`, [...valsT, req.params.id]);
     }
 
-    const [t2] = await masterQuery('SELECT subdominio FROM tenants WHERE id=?', [req.params.id]);
-    if (t2) invalidateTenantCache(t2.subdominio);
+    // tenant_config — solo lo enviado; si la fila no existe se crea
+    const cfg = valoresConfig(b);
+    const cols = Object.keys(cfg);
+    if (cols.length) {
+      await masterQuery(
+        `INSERT INTO tenant_config (tenant_id, ${cols.join(', ')})
+         VALUES (?, ${cols.map(() => '?').join(', ')})
+         ON DUPLICATE KEY UPDATE ${cols.map(c => `${c}=VALUES(${c})`).join(', ')}`,
+        [req.params.id, ...Object.values(cfg)]
+      );
+    }
 
-    return res.json({ success: true, message: 'Clínica actualizada.' });
+    // Sincronizar con empresa_config del tenant (RUC, razón social, dirección…)
+    let aviso = null;
+    try {
+      const conn = await mysql.createConnection({
+        host: t.db_host, port: t.db_port||3306,
+        user: t.db_user, password: t.db_pass, database: t.db_name,
+      });
+      try { await sincronizarEmpresaConfig(conn, cfg); }
+      finally { await conn.end(); }
+    } catch(e) {
+      logger.warn(`[admin] No se pudo sincronizar empresa_config de ${t.subdominio}: ${e.message}`);
+      aviso = 'Guardado en el panel, pero no se pudo copiar a la configuración interna de la clínica.';
+    }
+
+    invalidateTenantCache(t.subdominio);
+    if (b.activo !== undefined && !flag(b.activo)) evictTenantPool(t.db_name);
+
+    return res.json({ success: true, message: 'Clínica actualizada.', aviso });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -515,31 +572,6 @@ router.get('/tenants/:id/stats', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-
-// ── GET /admin/api/tenants/consumo ────────────────────────────────
-router.get('/tenants/consumo', async (req, res, next) => {
-  try {
-    const { tenant_id, mes, tipo, fuente } = req.query;
-    if (!tenant_id) return res.status(422).json({ success: false, message: 'tenant_id requerido.' });
-
-    let where  = 'WHERE tenant_id = ?';
-    const vals = [tenant_id];
-    if (mes)    { where += ' AND DATE_FORMAT(created_at, "%Y-%m") = ?'; vals.push(mes); }
-    if (tipo)   { where += ' AND tipo = ?';   vals.push(tipo); }
-    if (fuente) { where += ' AND fuente = ?'; vals.push(fuente); }
-
-    const rows = await masterQuery(
-      `SELECT id, tipo, fuente, numero, created_at
-       FROM tenant_api_consumo ${where}
-       ORDER BY created_at DESC LIMIT 200`, vals
-    );
-    const [totales] = await masterQuery(
-      `SELECT COUNT(*) AS total, SUM(fuente='cache') AS cache, SUM(fuente='api') AS api
-       FROM tenant_api_consumo ${where}`, vals
-    );
-    return res.json({ success: true, data: rows, totales });
-  } catch (err) { next(err); }
-});
 
 // ── GET /admin/api/tenants/:id/integraciones ──────────────────────
 router.get('/tenants/:id/integraciones', async (req, res, next) => {

@@ -929,8 +929,15 @@
   }
 
   async function abrirModalEditar(id) {
-    const c = todasClinicas.find(x => x.id === id);
+    let c = todasClinicas.find(x => x.id === id);
     if (!c) return;
+    // La lista no trae todos los campos (zona horaria, país…): pedir la clínica completa
+    // para no sobrescribirlos con valores por defecto al guardar.
+    try {
+      const res = await adminFetch(`/tenants/${id}`);
+      if (res?.ok) c = { ...c, ...((await res.json()).data || {}) };
+      else { toast('No se pudo cargar la clínica completa.', 'error'); return; }
+    } catch { toast('Error de conexión.', 'error'); return; }
     editandoId = id;
     document.getElementById('modal-titulo').textContent   = '✏️ Editar Clínica';
     document.getElementById('btn-guardar').textContent    = '💾 Guardar cambios';
@@ -956,7 +963,7 @@
     document.getElementById('m-pais').value           = c.pais           || 'Peru';
     document.getElementById('m-moneda').value         = c.moneda         || 'PEN';
     document.getElementById('m-simbolo').value        = c.simbolo_moneda || 'S/.';
-    document.getElementById('m-igv').value            = c.igv_porcentaje || '18';
+    document.getElementById('m-igv').value            = c.igv_porcentaje ?? '18';
 
     const cp = c.color_primario || '#166534';
     const cs = c.color_sidebar  || '#0d3b2e';
@@ -1008,7 +1015,7 @@
       pais                  : document.getElementById('m-pais').value || 'Peru',
       moneda                : document.getElementById('m-moneda').value,
       simbolo_moneda        : document.getElementById('m-simbolo').value.trim() || 'S/.',
-      igv_porcentaje        : parseFloat(document.getElementById('m-igv').value) || 18,
+      igv_porcentaje        : document.getElementById('m-igv').value.trim() === '' ? 18 : parseFloat(document.getElementById('m-igv').value),
       color_primario        : document.getElementById('m-color-p-hex').value || '#166534',
       color_sidebar         : document.getElementById('m-color-s-hex').value || '#0d3b2e',
       color_acento          : document.getElementById('m-color-a-hex').value || '#10b981',
@@ -1040,7 +1047,8 @@
       const res  = await adminFetch(url, { method, body });
       const data = await res.json();
       if (!res?.ok) { toast(data.message||'Error.','error'); return; }
-      toast(editandoId ? '✅ Clínica actualizada' : '🏥 Clínica creada correctamente','success');
+      if (data.aviso) toast(data.aviso, 'warning', 6000);
+      else toast(editandoId ? '✅ Clínica actualizada' : '🏥 Clínica creada correctamente','success');
       cerrarModal();
       cargar();
     } catch { toast('Error de conexión.','error'); }
