@@ -42,6 +42,68 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/branding/manifest.webmanifest — público ───────
+// Manifest de la PWA por clínica: nombre y colores propios para "Instalar app".
+// En producción el frontend lo pide en su mismo dominio (Nginx proxea /api/ con X-Tenant-Host).
+router.get('/manifest.webmanifest', async (req, res, next) => {
+  try {
+    const b      = await brandingDelHost(req);
+    const nombre = String(b.nombre_clinica || 'VetClinic').trim();
+    const fondo  = colorHex(b.color_sidebar, '#0d3b2e');
+
+    res.type('application/manifest+json');
+    res.set('Cache-Control', 'no-cache');
+    return res.json({
+      id              : '/',
+      name            : nombre,
+      short_name      : nombre.length > 12 ? nombre.slice(0, 12).trim() : nombre,
+      description     : `Gestión veterinaria de ${nombre}`,
+      lang            : 'es',
+      dir             : 'ltr',
+      start_url       : '/index.html?source=pwa',
+      scope           : '/',
+      display         : 'standalone',
+      orientation     : 'any',
+      theme_color     : fondo,
+      background_color: '#faf9f6',
+      categories      : ['medical', 'business', 'productivity'],
+      icons: [
+        { src: '/icons/icon-192.png',          sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/icons/icon-512.png',          sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/api/v1/branding/icon.svg',    sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
+      ],
+      shortcuts: [
+        { name: 'Citas',          url: '/citas',       icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+        { name: 'Calendario',     url: '/calendario',  icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+        { name: 'Mascotas',       url: '/mascotas',    icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+        { name: 'Punto de Venta', url: '/punto-venta', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+      ],
+    });
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/v1/branding/icon.svg — público ───────────────────
+// Ícono de la app con los colores de la clínica (huella sobre degradado).
+router.get('/icon.svg', async (req, res, next) => {
+  try {
+    const b  = await brandingDelHost(req);
+    const c1 = colorHex(b.color_primario, '#10b981');
+    const c2 = colorHex(b.color_acento,   '#059669');
+
+    res.type('image/svg+xml');
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <g transform="translate(97 97) scale(13.2)" fill="#ffffff">
+    <circle cx="6.5" cy="10" r="2.1"/><circle cx="10" cy="5.8" r="2.1"/><circle cx="14.5" cy="5.8" r="2.1"/><circle cx="18" cy="10" r="2.1"/>
+    <ellipse cx="12.2" cy="15.8" rx="5.6" ry="4.2"/>
+  </g>
+</svg>`);
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/branding/permisos — requiere auth ─────────────
 // Devuelve los permisos del rol del usuario logueado
 router.get('/permisos', authenticate, async (req, res, next) => {
@@ -81,6 +143,25 @@ router.get('/permisos', authenticate, async (req, res, next) => {
     return res.json({ success:true, data: map });
   } catch (err) { next(err); }
 });
+
+// Branding mínimo de la clínica del host actual (o el de por defecto)
+async function brandingDelHost(req) {
+  const host = req.headers['x-tenant-host'] || req.hostname || '';
+  const [config] = await masterQuery(
+    `SELECT tc.nombre_clinica, tc.color_primario, tc.color_sidebar, tc.color_acento
+     FROM tenants t
+     JOIN tenant_config tc ON tc.tenant_id = t.id
+     WHERE t.subdominio = ? AND t.activo = 1
+     LIMIT 1`, [host]
+  );
+  return config || defaultBranding();
+}
+
+// Solo acepta #rgb / #rrggbb; evita inyectar texto arbitrario en el SVG o el manifest
+function colorHex(valor, porDefecto) {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(valor || '').trim())
+    ? String(valor).trim() : porDefecto;
+}
 
 function defaultBranding() {
   return {

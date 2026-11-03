@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Asistencia</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -24,6 +35,14 @@
     .cal-cell { border-right:1px solid var(--line);border-bottom:1px solid var(--line);
                 padding:.25rem;min-height:54px;position:relative;cursor:pointer;transition:background .1s; }
     .cal-cell:hover { background:var(--green-50); }
+    /* Al deslizar la semana (celular/tablet) la columna del empleado queda fija */
+    .cal-label, .cal-grid > .cal-head:first-child { position:sticky; left:0; z-index:2; }
+    .cal-label { background:#fff; }
+    /* Celular: ◀ semana ▶ Hoy en un solo renglón (el título tenía un ancho mínimo de 220px) */
+    @media (max-width:639px) {
+      #label-semana { min-width:0 !important; flex:1; font-size:.82rem !important; }
+      #cal-sede { flex:1 1 100%; }
+    }
     .cal-evento { font-size:.65rem;border-radius:.4rem;padding:.15rem .35rem;margin-bottom:.15rem;
                   line-height:1.3;cursor:pointer;transition:opacity .15s; }
     .cal-evento:hover { opacity:.85; }
@@ -149,7 +168,7 @@
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">👥 Por empleado</h3>
       </div>
       <div style="overflow-x:auto">
-        <table class="vtable" id="rep-tabla-usuarios">
+        <table class="vtable vtable-stack" id="rep-tabla-usuarios">
           <thead><tr>
             <th>Empleado</th><th>Rol</th><th>Sede</th>
             <th style="text-align:center">Turnos</th>
@@ -173,9 +192,9 @@
         <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">📋 Detalle diario</h3>
       </div>
       <div style="overflow-x:auto">
-        <table class="vtable">
+        <table class="vtable vtable-stack">
           <thead><tr>
-            <th>Fecha</th><th>Empleado</th><th>Sede</th>
+            <th>Fecha</th><th data-main>Empleado</th><th>Sede</th>
             <th>Turno</th><th>Marcó a</th><th>Estado</th><th>Diferencia</th>
           </tr></thead>
           <tbody id="rep-tbody-detalle">

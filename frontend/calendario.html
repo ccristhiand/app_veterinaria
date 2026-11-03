@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Calendario</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -116,7 +127,7 @@
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
-<div id="main-content" class="page" style="overflow:hidden;display:flex;flex-direction:column;height:100vh;box-sizing:border-box">
+<div id="main-content" class="page" style="overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box">
 
   <!-- ── Cabecera ── -->
   <div class="page-head" style="flex-wrap:wrap;gap:.6rem;flex-shrink:0;padding-bottom:.6rem">
@@ -794,7 +805,7 @@ function renderEstructuraLista(cont) {
       '<p style="font-size:.82rem;font-weight:700;color:var(--ink);text-align:center;flex:1">'+esc(label)+'</p>' +
       '<button onclick="navListaDia(1)" style="background:none;border:1px solid var(--line);border-radius:.5rem;padding:.3rem .7rem;cursor:pointer;font-size:.88rem">▶</button>' +
     '</div>' +
-    '<div id="lista-eventos" style="overflow-y:auto;max-height:calc(100vh - 260px)">' +
+    '<div id="lista-eventos" style="overflow-y:auto;flex:1;min-height:0">' +
       '<div class="vempty" style="padding:2rem"><div class="vspinner"></div></div>' +
     '</div>' +
     '<div style="padding:.75rem 1rem;border-top:1px solid var(--line)">' +

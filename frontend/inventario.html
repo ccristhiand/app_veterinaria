@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Inventario</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <!-- SheetJS para template Excel y carga masiva -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -78,7 +89,7 @@
   <!-- Tabla -->
   <div class="vcard">
     <div style="overflow-x:auto">
-      <table class="vtable">
+      <table class="vtable vtable-stack">
         <thead>
           <tr>
             <th>Producto</th>
@@ -443,13 +454,13 @@ function renderStats(meta) {
 
 function stat(icon, val, label, color, bg, border) {
   return `<div class="vcard vcard-pad" style="border-top:3px solid ${color}">
-    <div style="display:flex;align-items:center;gap:.75rem">
+    <div style="display:flex;align-items:center;gap:.6rem .75rem;flex-wrap:wrap">
       <div style="width:40px;height:40px;border-radius:.75rem;background:${bg};border:1px solid ${border};
         display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${icon}</div>
-      <div>
+      <div style="flex:1 1 92px;min-width:0">
         <p style="font-size:1.5rem;font-weight:800;color:${color};line-height:1">${val}</p>
-        <p style="font-size:.62rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;
-          letter-spacing:.1em;margin-top:.2rem">${label}</p>
+        <p class="inv-stat-label" style="font-size:.62rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;
+          letter-spacing:.05em;margin-top:.2rem;overflow-wrap:anywhere">${label}</p>
       </div>
     </div>
   </div>`;

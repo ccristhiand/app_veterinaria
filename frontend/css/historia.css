@@ -33,3 +33,15 @@
       font-size: .62rem; color: var(--green-600);
       font-style: italic; white-space: nowrap;
     }
+
+/* ── Celular ────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  /* Con un paciente abierto, las acciones ya están en su tarjeta:
+     se ocultan las de la cabecera para no repetir 3 botones grandes */
+  #btn-nueva-consulta, #btn-nueva-vacuna, #btn-nueva-estetica { display: none !important; }
+
+  /* Acciones de la tarjeta del paciente: en fila, a todo el ancho */
+  .h-acciones { flex-direction: row !important; flex-wrap: wrap; align-items: stretch !important; width: 100%; }
+  .h-acciones > button { flex: 1 1 auto; min-height: var(--touch-min); justify-content: center; }
+  .h-acciones > p { width: 100%; text-align: center; }
+}

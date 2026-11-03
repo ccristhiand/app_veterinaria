@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — WhatsApp</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -301,8 +312,8 @@
     </div>
     <div class="vcard" style="padding:0">
       <div style="overflow-x:auto">
-        <table class="vtable">
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Destinatario</th><th>Teléfono</th><th>Estado</th><th>Mensaje</th></tr></thead>
+        <table class="vtable vtable-stack">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th data-main>Destinatario</th><th>Teléfono</th><th>Estado</th><th>Mensaje</th></tr></thead>
           <tbody id="log-tbody"><tr><td colspan="6"><div class="vempty"><div class="vspinner"></div></div></td></tr></tbody>
         </table>
       </div>

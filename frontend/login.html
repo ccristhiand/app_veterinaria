@@ -2,7 +2,17 @@
 <html lang="es">
 <head>
   <link id="vet-favicon" rel="icon" href="data:,"/>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>Iniciar Sesión — VetClinic</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet"/>
@@ -87,13 +97,13 @@
       font-size:.88rem; font-family:'Inter',sans-serif;
       transition:all .2s; outline:none; background:#fafafa; color:#0f172a;
     }
-    .field-input:focus { border-color:var(--brand-primary,var(--green-500)); background:#fff;
+    .field-input:focus { border-color:var(--brand-primary,var(--green-500,#10b981)); background:#fff;
                          box-shadow:0 0 0 3px rgba(var(--brand-rgb),.1); }
 
     .btn-login {
       width:100%; padding:.9rem; border:none; border-radius:.9rem;
       font-size:.95rem; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif;
-      background:linear-gradient(135deg, var(--brand-primary,var(--green-500)), var(--brand-dark-btn,var(--green-600)));
+      background:linear-gradient(135deg, var(--brand-primary,var(--green-500,#10b981)), var(--brand-dark-btn,var(--green-600,#059669)));
       color:#fff; transition:all .2s; position:relative; overflow:hidden; margin-top:.5rem;
     }
     .btn-login:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(var(--brand-rgb),.35); }
@@ -105,6 +115,15 @@
       display:flex; align-items:flex-start; gap:.6rem;
     }
     .error-box.hidden { display:none; }
+
+    .btn-install {
+      width:100%; min-height:48px; margin-top:.75rem; border-radius:.9rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:.5rem;
+      font-size:.88rem; font-weight:600; font-family:'Inter',sans-serif;
+      background:#fff; color:var(--brand-primary,var(--green-600,#059669));
+      border:1.5px solid var(--brand-primary,var(--green-500,#10b981)); transition:background .2s;
+    }
+    .btn-install:hover { background:rgba(var(--brand-rgb,16,185,129),.06); }
 
     .footer-note { text-align:center; font-size:.72rem; color:#94a3b8; margin-top:1.5rem; }
 
@@ -180,7 +199,7 @@
 
       <!-- Logo mobile -->
       <div style="display:none;text-align:center;margin-bottom:1.5rem" id="mobile-brand">
-        <div style="width:52px;height:52px;border-radius:1rem;background:var(--brand-primary,var(--green-500));
+        <div style="width:52px;height:52px;border-radius:1rem;background:var(--brand-primary,var(--green-500,#10b981));
           display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto .75rem">
           🐾
         </div>
@@ -227,6 +246,15 @@
       <!-- Botón -->
       <button class="btn-login" id="btn-login" onclick="doLogin()">
         <span id="btn-text">Iniciar Sesión</span>
+      </button>
+
+      <!-- Instalar como app (js/pwa.js lo muestra solo si el dispositivo lo permite) -->
+      <button type="button" class="btn-install" data-pwa-install hidden onclick="pwaInstalar()">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"/>
+        </svg>
+        <span>Instalar app</span>
       </button>
 
       <p class="footer-note">

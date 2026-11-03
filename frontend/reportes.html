@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Reportes</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -28,6 +39,17 @@
                     border-bottom:1px solid var(--line); }
     .rep-table td { padding:.7rem .85rem;border-bottom:1px solid #f2f5f2; }
     .rep-table tr:last-child td { border-bottom:none; }
+    /* Celular: la tabla se desplaza dentro de su tarjeta en lugar de ensanchar la página
+       (varias tablas de reporte no tienen contenedor con scroll) y los montos no se parten */
+    @media (max-width:639px) {
+      .rep-table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .rep-table th, .rep-table td { white-space:nowrap; padding:.6rem .7rem; }
+      .rep-table td:first-child { white-space:normal; min-width:130px; }
+      /* 12 pestañas: en un renglón deslizable en vez de 6 renglones apilados */
+      .rep-tabs { flex-wrap:nowrap !important; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+      .rep-tabs::-webkit-scrollbar { display:none; }
+      .rep-tabs > * { flex-shrink:0; white-space:nowrap; }
+    }
     .bar-h { height:8px;background:#e8ede9;border-radius:999px;overflow:hidden;margin-top:.3rem; }
     .bar-h-fill { height:100%;border-radius:999px;
                   background:linear-gradient(90deg,var(--green-500),var(--green-600));transition:width .5s; }
@@ -77,9 +99,9 @@
     <div id="selector-sede-reportes" style="display:none;margin-left:auto"></div>
   </div>
 
-  <!-- Tabs -->
+  <!-- Tabs (en celular se deslizan con el dedo: .vtabs anula el flex-wrap) -->
   <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);
-    margin-bottom:1.3rem;flex-wrap:wrap" class="no-print">
+    margin-bottom:1.3rem;flex-wrap:wrap" class="no-print rep-tabs">
     <button class="rep-tab active" id="tab-resumen" onclick="mostrarTab('resumen')">🧭 Resumen</button>
     <button class="rep-tab" id="tab-financiero"   onclick="mostrarTab('financiero')">💰 Financiero</button>
     <button class="rep-tab" id="tab-clientes"     onclick="mostrarTab('clientes')">👥 Clientes</button>
@@ -240,6 +262,11 @@ function mostrarTab(tab) {
     const el = document.getElementById(`contenido-${t}`);
     if (el) el.style.display = t===tab ? 'block' : 'none';
   });
+  // En celular las pestañas se deslizan: traer la activa a la vista
+  const btn = document.getElementById(`tab-${tab}`), barra = btn?.parentElement;
+  if (barra && barra.scrollWidth > barra.clientWidth) {
+    barra.scrollTo({ left: btn.offsetLeft - barra.offsetLeft - 16, behavior: 'smooth' });
+  }
   // Cargar si no está cargado aún
   if (!datosReporte[tab]) cargarTab(tab);
 }

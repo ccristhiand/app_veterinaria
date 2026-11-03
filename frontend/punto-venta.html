@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Punto de Venta</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -40,6 +51,7 @@
     .pv-cart-items { min-height:90px; }
     .pv-row { display:grid; grid-template-columns:1fr auto; gap:.35rem .6rem; padding:.6rem .2rem; border-bottom:1px dashed var(--line); }
     .pv-row .n { font-size:.82rem; font-weight:600; line-height:1.3; }
+    .pv-row > div:nth-child(2) { white-space:nowrap; }
     .pv-qty { display:flex; align-items:center; gap:.25rem; }
     .pv-qty button { width:28px; height:28px; border-radius:.5rem; border:1px solid var(--line); background:#fff; cursor:pointer;
                      font-weight:800; font-size:.95rem; line-height:1; }
@@ -68,6 +80,34 @@
     .pv-vuelto { background:var(--green-50); border:1px solid var(--green-200); border-radius:.8rem; padding:.55rem .8rem;
                  display:flex; justify-content:space-between; align-items:center; font-weight:800; color:var(--green-700); }
     .pv-split-row { display:grid; grid-template-columns:1fr 110px 28px; gap:.4rem; align-items:center; }
+
+    /* Pantallas táctiles: los atajos de teclado no aplican y los controles crecen para el dedo */
+    @media (hover:none) {
+      .pv-atajos, .pv-kbd { display:none !important; }
+      .pv-qty button { width:40px; height:40px; font-size:1.1rem; }
+      .pv-qty input  { width:58px; min-height:40px; }
+      .pv-price      { min-height:40px; }
+    }
+
+    /* Barra flotante del carrito: solo cuando el carrito queda debajo (≤900px) y fuera de la vista */
+    .pv-barra { display:none; }
+    @media (max-width:900px) {
+      .pv-barra.on {
+        display:flex; align-items:center; gap:.7rem; position:fixed; z-index:25;
+        left:max(1rem, env(safe-area-inset-left)); right:max(1rem, env(safe-area-inset-right)); bottom:1rem;
+        padding:.8rem 1rem; border:none; border-radius:1rem; cursor:pointer; font-family:inherit;
+        background:linear-gradient(135deg,var(--green-600),var(--green-800)); color:#fff;
+        font-size:.9rem; font-weight:700; box-shadow:0 10px 28px rgba(13,59,46,.3);
+        animation:fadeUp .25s ease;
+      }
+      .pv-barra .cant { min-width:28px; height:28px; padding:0 .4rem; border-radius:999px; background:rgba(255,255,255,.22);
+                        display:flex; align-items:center; justify-content:center; font-size:.8rem; }
+      .pv-barra .tot  { font-size:1.05rem; font-weight:800; }
+    }
+    @media (max-width:639px) {
+      .pv-barra.on { bottom:calc(var(--bnav-h) + env(safe-area-inset-bottom) + .6rem); }
+      html.teclado-abierto .pv-barra.on { display:none; }
+    }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -76,7 +116,7 @@
   <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
     <div>
       <h2>🛒 Punto de Venta</h2>
-      <p>Ventas de mostrador · <span class="pv-kbd">F2</span> buscar · <span class="pv-kbd">F4</span> cobrar · <span class="pv-kbd">Esc</span> vaciar</p>
+      <p>Ventas de mostrador<span class="pv-atajos"> · <span class="pv-kbd">F2</span> buscar · <span class="pv-kbd">F4</span> cobrar · <span class="pv-kbd">Esc</span> vaciar</span></p>
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
       <div id="selector-sede-pv"></div>
@@ -96,7 +136,7 @@
           <input id="pv-q" type="text" class="vinput" autocomplete="off" spellcheck="false"
             placeholder="Escanea el código de barras o escribe el producto / servicio…"/>
         </div>
-        <p style="font-size:.68rem;color:var(--ink-faint);margin-top:.45rem">
+        <p class="pv-atajos" style="font-size:.68rem;color:var(--ink-faint);margin-top:.45rem">
           <span class="pv-kbd">Enter</span> agrega el resultado marcado · <span class="pv-kbd">↑</span><span class="pv-kbd">↓</span> para moverte entre resultados
         </p>
         <div id="pv-resultados" style="margin-top:.9rem;display:none"></div>
@@ -115,8 +155,8 @@
           <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem">🧾 Ventas de mostrador de hoy</h3>
           <button onclick="pvCargarVentasHoy()" class="vlink" style="font-size:.75rem">↻ Actualizar</button>
         </div>
-        <div style="overflow-x:auto"><table class="vtable"><thead><tr>
-          <th>Hora</th><th>Número</th><th>Cliente</th><th>Pago</th><th>Total</th><th></th>
+        <div style="overflow-x:auto"><table class="vtable vtable-stack"><thead><tr>
+          <th>Hora</th><th>Número</th><th data-main>Cliente</th><th>Pago</th><th>Total</th><th></th>
         </tr></thead><tbody id="pv-ventas-tbody"></tbody></table></div>
       </div>
     </div>
@@ -194,6 +234,12 @@
         <label style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--ink-soft);cursor:pointer;align-self:center">
           <input type="checkbox" id="pv-autoprint" style="accent-color:var(--green-600)"/> Imprimir ticket automáticamente
         </label>
+        <!-- Celular/tablet: el carrito queda debajo; esta barra fija lleva al botón COBRAR -->
+        <button type="button" id="pv-barra" class="pv-barra" onclick="pvIrAlCobro()">
+          <span class="cant" id="pv-barra-cant">0</span>
+          <span style="flex:1;text-align:left">Ver carrito y cobrar</span>
+          <span class="tot" id="pv-barra-total">S/. 0.00</span>
+        </button>
       </div>
     </div>
   </div>
@@ -449,8 +495,32 @@ function pvAgregar(it) {
   else PV.carrito.push({ key: key, tipo: it.tipo, id: it.id, nombre: it.nombre, precio: r2(it.precio),
                          cant: 1, stock: it.stock, unidad: it.unidad });
   pvRender();
+  // En escritorio el carrito tiene su propio scroll: mostrar el último agregado.
+  // En celular/tablet el carrito está debajo y esto arrastraba la página lejos del buscador.
   var rows = document.querySelectorAll('#pv-items .pv-row');
-  if (rows.length) rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
+  if (rows.length && window.innerWidth > 900) rows[rows.length - 1].scrollIntoView({ block: 'nearest' });
+}
+
+// ── Barra flotante del carrito (celular/tablet) ──────────────────
+// Visible si hay productos y el botón COBRAR está fuera de la pantalla.
+var _pvCobrarVisible = false;
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(function (e) { _pvCobrarVisible = e[0].isIntersecting; pvActualizarBarra(); })
+    .observe(document.getElementById('pv-btn-cobrar'));
+}
+
+function pvActualizarBarra() {
+  var barra = document.getElementById('pv-barra');
+  var cant  = PV.carrito.reduce(function (a, c) { return a + c.cant; }, 0);
+  document.getElementById('pv-barra-cant').textContent  = cant % 1 ? cant.toFixed(2) : cant;
+  document.getElementById('pv-barra-total').textContent = S(pvCalcular().total);
+  barra.classList.toggle('on', PV.carrito.length > 0 && !_pvCobrarVisible);
+}
+
+function pvIrAlCobro() {
+  var page = document.querySelector('.page');
+  var btn  = document.getElementById('pv-btn-cobrar');
+  page.scrollTo({ top: page.scrollTop + btn.getBoundingClientRect().bottom - page.getBoundingClientRect().bottom + 24, behavior: 'smooth' });
 }
 
 function pvCambiarCant(i, delta, valor) {
@@ -546,6 +616,7 @@ function pvRenderTotales() {
 
   if (PV.mixto) pvRenderMixto(t.total);
   pvValidar(t);
+  pvActualizarBarra();
 }
 
 function pvSetRecibe(v) { document.getElementById('pv-recibe').value = v; pvRenderTotales(); }

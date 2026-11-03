@@ -44,6 +44,11 @@ function mostrarTab(tab) {
     btn.style.color             = isActive ? activeColor[t]  : 'var(--ink-faint)';
     btn.style.borderBottomColor = isActive ? activeBorder[t] : 'transparent';
     btn.style.fontWeight        = isActive ? '700' : '600';
+    // En celular las pestañas se deslizan: traer la activa a la vista
+    const barra = btn.parentElement;
+    if (isActive && barra.scrollWidth > barra.clientWidth) {
+      barra.scrollTo({ left: btn.offsetLeft - barra.offsetLeft - 16, behavior: 'smooth' });
+    }
   });
   document.getElementById('contenido-consultas').style.display         = tab==='consultas'         ? 'block' : 'none';
   document.getElementById('contenido-vacunas').style.display           = tab==='vacunas'           ? 'block' : 'none';
@@ -232,6 +237,9 @@ async function cargarHistoria(id) {
   document.getElementById('btn-nueva-consulta').style.display  = ES_GROOMER ? 'none' : 'inline-flex';
   document.getElementById('btn-nueva-vacuna').style.display    = ES_GROOMER ? 'none' : 'inline-flex';
   document.getElementById('btn-nueva-estetica').style.display  = 'inline-flex';
+  // Botones de la tarjeta del paciente: mismo criterio por rol que los de la cabecera
+  document.getElementById('h-btn-consulta').style.display = ES_GROOMER ? 'none' : '';
+  document.getElementById('h-btn-vacuna').style.display   = ES_GROOMER ? 'none' : '';
   var _btnVolverHist = document.getElementById('btn-volver-historico');
   if (_btnVolverHist) _btnVolverHist.style.display = 'inline-flex';
   document.getElementById('consultas').innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div>';

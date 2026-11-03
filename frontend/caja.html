@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
   <title>VetClinic — Cierre de Caja</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/app.css?v=20261103"/>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
@@ -20,6 +31,13 @@
     .dif-negativa { color:#be123c;background:#fff1f2;border:1.5px solid #fecdd3; }
     .dif-cero     { color:#1d4ed8;background:#eff6ff;border:1.5px solid #bfdbfe; }
     .gasto-fila   { display:grid;grid-template-columns:1fr 130px 130px 32px;gap:.4rem;align-items:center; }
+    /* Celular: descripción en su propio renglón; monto, categoría y ✕ debajo */
+    @media (max-width:639px) {
+      .gasto-fila { grid-template-columns:1fr 1fr 40px; padding-bottom:.45rem; border-bottom:1px dashed var(--line); }
+      .gasto-fila > :first-child { grid-column:1 / -1; }
+      .gasto-fila:has(> p) { display:none; }   /* encabezados: los campos ya tienen su texto guía */
+      .gasto-fila > button { min-height:var(--touch-min); }
+    }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -241,7 +259,7 @@
     </div>
     <div class="vcard">
       <div style="overflow-x:auto">
-        <table class="vtable">
+        <table class="vtable vtable-stack">
           <thead>
             <tr>
               <th>Fecha</th><th>Turno</th><th class="hidden lg:table-cell">Sede</th><th>Efectivo sistema</th>

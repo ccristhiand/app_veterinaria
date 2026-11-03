@@ -42,6 +42,19 @@
   --shadow-lg: 0 20px 50px rgba(13,59,46,.12);
   /* Touch target mínimo recomendado */
   --touch-min: 44px;
+
+  /* Superficies y radios (usar en componentes nuevos en lugar de valores sueltos) */
+  --card     : #ffffff;
+  --surface-2: #f6f8f6;
+  --radius-sm: .65rem;
+  --radius-md: .85rem;
+  --radius-lg: 1.25rem;
+  --topbar-h : 64px;
+  --rail-w   : 76px;   /* menú angosto en tablet */
+  --bnav-h   : 64px;   /* barra inferior en celular */
+
+  /* Breakpoints de referencia (los @media no aceptan variables; usar estos valores):
+     teléfono < 640px · tablet 640–1023px · escritorio ≥ 1024px · pantalla grande ≥ 1440px */
 }
 
 * { box-sizing: border-box; margin: 0; }
@@ -127,7 +140,8 @@ body {
   width: 3px; height: 22px; border-radius: 0 3px 3px 0;
   background: var(--green-500); box-shadow: 0 0 10px rgba(var(--brand-rgb),.8);
 }
-.sb-link .icon { font-size: 1.05rem; width: 22px; text-align: center; flex-shrink: 0; }
+.sb-link .icon { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.sb-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .sb-user {
   padding: 1rem 1.1rem; border-top: 1px solid var(--sidebar-line);
@@ -574,6 +588,19 @@ textarea.vinput { resize: vertical; min-height: 80px; }
   font-size: .6rem; font-weight: 700; padding: .2rem .5rem; border-radius: 999px;
 }
 
+/* En celular la tarjeta pasa a fila de lista: foto a la izquierda, datos a la derecha
+   y los botones debajo a todo el ancho (entran el doble de mascotas por pantalla) */
+@media (max-width: 639px) {
+  .pet-card { display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: .85rem; align-items: start; padding: .9rem; }
+  .pet-card .pet-avatar { grid-row: 1 / span 3; }
+  .pet-card .pet-name { margin-top: 0; }
+  .pet-card:has(.pet-alert) .pet-name { padding-right: 4.8rem; }
+  .pet-card .pet-details { margin-top: .35rem; flex-direction: row; flex-wrap: wrap; gap: .2rem .8rem; }
+  .pet-card > div:last-child { grid-column: 1 / -1; }
+  .pet-card .pet-alert { top: .9rem; right: .9rem; }
+  .pet-card:hover { transform: none; }
+}
+
 /* ── TIMELINE ────────────────────────────────────────────────────── */
 .timeline { position: relative; padding-left: 1.4rem; }
 @media (min-width: 640px) { .timeline { padding-left: 1.6rem; } }
@@ -657,9 +684,222 @@ body {
   padding-bottom:env(safe-area-inset-bottom);
 }
 
+/* ── ALTO REAL DE PANTALLA ───────────────────────────────────────── */
+/* En celulares 100vh incluye la barra del navegador y corta el final de la página.
+   Las páginas con shell traen height:100vh en línea; 100dvh usa el alto visible. */
+@supports (height: 100dvh) {
+  body:has(> #sidebar) { height: 100dvh !important; }
+}
+
+/* ── APP INSTALADA (PWA) ─────────────────────────────────────────── */
+.pwa-install-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+  min-width: var(--touch-min); min-height: var(--touch-min);
+  padding: 0 .75rem; flex-shrink: 0;
+  border-radius: 12px; cursor: pointer; font-family: inherit;
+  font-size: .78rem; font-weight: 600;
+  background: var(--green-50); color: var(--green-700);
+  border: 1px solid var(--green-200);
+  transition: all .15s; touch-action: manipulation;
+}
+.pwa-install-btn:hover { background: var(--green-100); border-color: var(--green-500); }
+.pwa-install-btn span { display: none; }
+@media (min-width: 640px) { .pwa-install-btn span { display: inline; } .pwa-install-btn { padding: 0 .9rem; } }
+
+/* Abierta como app: sin rebote de scroll ni resaltado azul al tocar */
+html.pwa-standalone, html.pwa-standalone body { overscroll-behavior-y: none; }
+html.pwa-standalone a, html.pwa-standalone button { -webkit-tap-highlight-color: transparent; }
+.topbar { padding-top: env(safe-area-inset-top); height: calc(var(--topbar-h) + env(safe-area-inset-top)); }
+
+/* ── NAVEGACIÓN POR TAMAÑO DE PANTALLA ───────────────────────────── */
+/* Celular (<640): barra inferior + menú completo como cajón desde "Más".
+   Tablet (640–1023): barra angosta de íconos; el hamburguesa la despliega encima.
+   Escritorio (≥1024): menú completo fijo (estilos base de #sidebar). */
+
+/* Barra inferior */
+.bnav { display: none; }
+@media (max-width: 639px) {
+  .bnav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    height: calc(var(--bnav-h) + env(safe-area-inset-bottom));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: rgba(255,255,255,.94);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 18px rgba(13,59,46,.06);
+  }
+  .bnav-item {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    background: none; border: none; padding: 0 2px; cursor: pointer; font-family: inherit;
+    color: var(--ink-faint); text-decoration: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .bnav-ico {
+    width: 56px; height: 30px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, color .2s;
+  }
+  .bnav-txt { font-size: .66rem; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bnav-item.active { color: var(--green-700); }
+  .bnav-item.active .bnav-ico { background: var(--green-100); }
+  .bnav-item:active .bnav-ico { transform: scale(.92); }
+
+  /* El contenido no queda tapado por la barra */
+  body:has(> .bnav) .page { padding-bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom) + 1.5rem); }
+  /* Con el teclado abierto la barra estorba (layout.js marca html.teclado-abierto) */
+  html.teclado-abierto .bnav { display: none; }
+
+  /* El hamburguesa sobra: "Más" abre el menú */
+  .hamburger { display: none; }
+}
+
+/* Barra angosta en tablet */
+@media (min-width: 640px) and (max-width: 1023px) {
+  body:has(> #sidebar) { padding-left: calc(var(--rail-w) + env(safe-area-inset-left)); }
+
+  #sidebar { transition: transform .32s cubic-bezier(.4,0,.2,1), width .25s ease, box-shadow .25s; }
+  #sidebar.sidebar-closed { transform: none; width: calc(var(--rail-w) + env(safe-area-inset-left)); }
+  #sidebar:not(.sidebar-closed) { box-shadow: var(--shadow-lg); }
+
+  #sidebar.sidebar-closed::before,
+  #sidebar.sidebar-closed .sb-logo > div:last-child,
+  #sidebar.sidebar-closed .sb-section,
+  #sidebar.sidebar-closed .sb-label,
+  #sidebar.sidebar-closed .sb-user > div { display: none; }
+
+  #sidebar.sidebar-closed .sb-logo { justify-content: center; padding: 0; }
+  #sidebar.sidebar-closed .sb-nav  { padding: 1rem .6rem; }
+  #sidebar.sidebar-closed .sb-link { justify-content: center; padding: .7rem 0; }
+  #sidebar.sidebar-closed .sb-link.active::before { left: -.6rem; }
+  #sidebar.sidebar-closed .sb-user { flex-direction: column; padding: .8rem 0; gap: .4rem; }
+  #sidebar.sidebar-closed .sb-logout { margin-left: 0; }
+}
+
+/* Pantallas grandes: el contenido no se estira más de 1600px y queda centrado */
+@media (min-width: 1440px) {
+  .page { padding-inline: max(2.2rem, calc((100% - 1600px) / 2)); }
+}
+
+/* ── TABLA → FICHAS EN CELULAR ───────────────────────────────────── */
+/* Uso: <table class="vtable vtable-stack">. layout.js pone solo las etiquetas
+   (data-label) a partir del <thead>, también en filas que se cargan después:
+     - <th data-main> o la primera con título (no "#") → .cell-main: arriba, sin etiqueta
+     - columna sin título o "Acciones"              → .cell-actions: botones al final
+     - celda con colspan (vacío/cargando)           → .cell-full
+   En teléfono cada fila queda como una ficha "etiqueta: valor". */
+@media (max-width: 639px) {
+  .vtable-stack thead { display: none; }
+  .vtable-stack, .vtable-stack tbody { display: block; width: 100%; }
+  .vtable-stack tr { display: flex; flex-direction: column; padding: .8rem 1rem; border-bottom: 1px solid var(--line); }
+  .vtable-stack tbody tr:last-child { border-bottom: none; }
+  .vtable-stack td {
+    display: block; position: relative; border: none !important;
+    width: auto !important; max-width: none !important;
+    padding: .22rem 0 .22rem 38% !important; min-height: 1.6rem;
+    text-align: left !important; white-space: normal !important;
+    overflow-wrap: anywhere;   /* correos y enlaces largos no se cortan en el borde */
+  }
+  .vtable-stack td[data-label]::before {
+    content: attr(data-label);
+    position: absolute; left: 0; top: .42rem; width: 35%; padding-right: .5rem;
+    font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* Columnas que la tabla ocultaba en celular solo por falta de ancho (hidden sm:table-cell):
+     en ficha sí caben, así que se muestran (p. ej. el teléfono del cliente) */
+  .vtable-stack td.sm\:table-cell { display: block !important; }
+  .vtable-stack td.cell-main { order: -1; padding-left: 0 !important; font-size: .92rem; margin-bottom: .2rem; }
+  .vtable-stack td.cell-full { padding-left: 0 !important; }
+  .vtable-stack td.cell-actions {
+    padding-left: 0 !important; margin-top: .5rem;
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end;
+  }
+  .vtable-stack td.cell-actions:empty { display: none; }
+  /* Botones que venían en columna: en la ficha van en fila */
+  .vtable-stack td.cell-actions > div { flex-direction: row !important; flex-wrap: wrap; align-items: center !important; justify-content: flex-end; }
+}
+
+/* ── PESTAÑAS DESLIZABLES ────────────────────────────────────────── */
+/* Uso: <div class="vtabs"> con <button> dentro. Si no caben, se deslizan
+   con el dedo en lugar de desbordar la página. */
+.vtabs {
+  overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap !important;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.vtabs::-webkit-scrollbar { display: none; }
+.vtabs > * { flex-shrink: 0; white-space: nowrap; scroll-snap-align: start; }
+@media (max-width: 639px) {
+  .vtabs > button { padding-left: .85rem !important; padding-right: .85rem !important; min-height: var(--touch-min); }
+}
+
+/* ── PAGINACIÓN (#paginacion en propietarios / mascotas) ─────────── */
+/* En celular los números de página no caben junto a Anterior/Siguiente:
+   queda "Mostrando X–Y de Z" arriba y las dos flechas a los lados. */
+@media (max-width: 639px) {
+  #paginacion { justify-content: center !important; }
+  #pag-info   { width: 100%; text-align: center; }
+  #pag-nums   { display: none !important; }
+  #paginacion > div { width: 100%; justify-content: space-between; }
+}
+
+/* ── FORMULARIOS ─────────────────────────────────────────────────── */
+/* Grilla de campos: 1 columna en celular, 2 en tablet, 3 en pantallas anchas.
+   Uso: <div class="vform-grid"> … </div>; un campo ancho con .vform-full */
+.vform-grid { display: grid; gap: .9rem 1rem; grid-template-columns: 1fr; }
+@media (min-width: 640px)  { .vform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .vform-grid.vform-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.vform-grid .vform-full { grid-column: 1 / -1; }
+
+@media (max-width: 639px) {
+  /* iPhone hace zoom al enfocar campos con letra menor a 16px */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+  select, textarea { font-size: 16px !important; }
+}
+
+/* ── MODALES ─────────────────────────────────────────────────────── */
+/* En celular la hoja inferior usa el alto visible real (sin la barra del navegador) */
+@supports (height: 100dvh) {
+  .vmodal { max-height: 92dvh; }
+  @media (min-width: 640px) { .vmodal { max-height: 90dvh; } }
+}
+/* Con un modal abierto el fondo no se desplaza */
+body:has(.vmodal-backdrop:not(.hidden):not([style*="display: none"]):not([style*="display:none"])) .page { overflow: hidden; }
+
+/* ── RED DE SEGURIDAD: GRILLAS FIJAS EN LÍNEA ────────────────────── */
+/* Varias pantallas traen columnas fijas en style="" que no caben en celular.
+   Esto las adapta mientras cada página se migra a .vform-grid (Fase 4);
+   al migrar una página, sus casos dejan de coincidir solos. */
+@media (max-width: 1023px) {
+  /* Dos paneles lado a lado (contenido + panel lateral, o dos tarjetas grandes) */
+  [style*="grid-template-columns:1fr 380px"],
+  [style*="grid-template-columns:1fr 1fr;gap:1.3rem"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns:1fr 380px"] > [style*="grid-column:span"],
+  [style*="grid-template-columns:1fr 1fr;gap:1.3rem"] > [style*="grid-column:span"] { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 639px) {
+  /* 3 o 4 columnas → 2 */
+  [style*="grid-template-columns:1fr 1fr 1fr"],
+  [style*="grid-template-columns:repeat(3,1fr)"],
+  [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* Un campo que abarcaba 3 o 4 columnas ahora ocupa la fila completa */
+  [style*="grid-template-columns:1fr 1fr 1fr"] > [style*="grid-column:span"],
+  [style*="grid-template-columns:repeat(3,1fr)"] > [style*="grid-column:span"],
+  [style*="grid-template-columns:repeat(4,1fr)"] > [style*="grid-column:span"] { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 479px) {
+  /* Pares de campos de formulario → uno debajo del otro */
+  [style*="grid-template-columns:1fr 1fr;gap:1rem"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns:1fr 1fr;gap:1rem"] > [style*="grid-column:span"] { grid-column: 1 / -1 !important; }
+}
+
+/* Envoltura para tablas que siguen con scroll horizontal */
+.vtable-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.vtable-scroll > .vtable { min-width: 640px; }
+
 /* ── PRINT (facturas) ────────────────────────────────────────────── */
 @media print {
-  .hamburger, .notif-btn, .ws-pill,
+  .hamburger, .notif-btn, .ws-pill, .pwa-install-btn,
   .vbtn, #sidebar, .topbar { display: none !important; }
   .page { padding: 0 !important; }
   .vcard { border: none !important; box-shadow: none !important; }
