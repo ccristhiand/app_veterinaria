@@ -80,8 +80,12 @@
   <!-- Tabs -->
   <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);
     margin-bottom:1.3rem;flex-wrap:wrap" class="no-print">
-    <button class="rep-tab active" id="tab-financiero"   onclick="mostrarTab('financiero')">💰 Financiero</button>
+    <button class="rep-tab active" id="tab-resumen" onclick="mostrarTab('resumen')">🧭 Resumen</button>
+    <button class="rep-tab" id="tab-financiero"   onclick="mostrarTab('financiero')">💰 Financiero</button>
+    <button class="rep-tab" id="tab-clientes"     onclick="mostrarTab('clientes')">👥 Clientes</button>
+    <button class="rep-tab" id="tab-cobranzas"    onclick="mostrarTab('cobranzas')">🧾 Cobranzas</button>
     <button class="rep-tab" id="tab-citas"        onclick="mostrarTab('citas')">📅 Citas</button>
+    <button class="rep-tab" id="tab-demanda"      onclick="mostrarTab('demanda')">🕒 Demanda</button>
     <button class="rep-tab" id="tab-mascotas"     onclick="mostrarTab('mascotas')">🐾 Mascotas</button>
     <button class="rep-tab" id="tab-vacunas"      onclick="mostrarTab('vacunas')">💉 Vacunas</button>
     <button class="rep-tab" id="tab-inventario"   onclick="mostrarTab('inventario')">📦 Inventario</button>
@@ -91,11 +95,14 @@
   </div>
 
   <!-- Contenidos -->
-  <div id="contenido-financiero">
-    <div id="fin-loading" class="vempty"><div class="vspinner"></div><p>Generando reporte…</p></div>
-    <div id="fin-content" style="display:none"></div>
+  <div id="contenido-resumen">
+    <div class="vempty"><div class="vspinner"></div><p>Generando reporte…</p></div>
   </div>
+  <div id="contenido-financiero"   style="display:none"></div>
+  <div id="contenido-clientes"     style="display:none"></div>
+  <div id="contenido-cobranzas"    style="display:none"></div>
   <div id="contenido-citas"        style="display:none"></div>
+  <div id="contenido-demanda"      style="display:none"></div>
   <div id="contenido-mascotas"     style="display:none"></div>
   <div id="contenido-vacunas"      style="display:none"></div>
   <div id="contenido-inventario"   style="display:none"></div>
@@ -125,7 +132,9 @@
 <script>
 // Estado global de datos cargados
 const datosReporte = {};
-let tabActiva = 'financiero';
+const TABS = ['resumen','financiero','clientes','cobranzas','citas','demanda','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'];
+let tabActiva = 'resumen';
+let _diasInactivo = 180;
 
 
 function renderPorSede(data, tab) {
@@ -216,7 +225,7 @@ function setPeriodo(p) {
   const fmt  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const desde = new Date(hoy);
   if      (p==='hoy')    { /* mismo día */ }
-  else if (p==='semana') { desde.setDate(hoy.getDate()-6); }
+  else if (p==='semana') { desde.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7)); }  // lunes de esta semana
   else if (p==='mes')    { desde.setDate(1); }
   else if (p==='anio')   { desde.setMonth(0); desde.setDate(1); }
   document.getElementById('r-desde').value = fmt(desde);
@@ -226,7 +235,7 @@ function setPeriodo(p) {
 
 function mostrarTab(tab) {
   tabActiva = tab;
-  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'].forEach(t => {
+  TABS.forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.toggle('active', t===tab);
     const el = document.getElementById(`contenido-${t}`);
     if (el) el.style.display = t===tab ? 'block' : 'none';
@@ -238,7 +247,7 @@ function mostrarTab(tab) {
 async function cargarReporte() {
   // Limpiar caché y recargar tab activa
   Object.keys(datosReporte).forEach(k => delete datosReporte[k]);
-  ['financiero','citas','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'].forEach(t => {
+  TABS.forEach(t => {
     const el = document.getElementById(`contenido-${t}`);
     if (el) el.innerHTML = `<div class="vempty"><div class="vspinner"></div><p>Generando…</p></div>`;
   });
@@ -255,7 +264,7 @@ async function cargarTab(tab) {
   try {
     let endpoint = tab === 'veterinarios' ? 'veterinarios' : tab;
     const sedeParam   = _reporteSedeActiva ? `&sede_id=${_reporteSedeActiva}` : '';
-    const filtroParam = tab === 'rentabilidad' ? `&filtro=${_filtroRent}` : '';
+    const filtroParam = tab === 'rentabilidad' ? `&filtro=${_filtroRent}` : tab === 'clientes' ? `&dias_inactivo=${_diasInactivo}` : '';
     const res  = await api(`/reportes/${endpoint}?desde=${desde}&hasta=${hasta}${sedeParam}${filtroParam}`);
     if (!res?.ok) { cont.innerHTML=`<div class="vempty"><span class="icon">😿</span><p>Error al cargar.</p></div>`; return; }
     const d = (await res.json()).data;
@@ -277,7 +286,296 @@ function renderTab(tab, d, cont) {
     case 'estetica':     cont.innerHTML = renderEstetica(d);     break;
     case 'veterinarios': cont.innerHTML = renderVeterinarios(d); break;
     case 'rentabilidad': cont.innerHTML = renderRentabilidad(d); break;
+    case 'resumen':      cont.innerHTML = renderResumen(d);      break;
+    case 'clientes':     cont.innerHTML = renderClientes(d);     break;
+    case 'cobranzas':    cont.innerHTML = renderCobranzas(d);    break;
+    case 'demanda':      cont.innerHTML = renderDemanda(d);      break;
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Reportes para decidir: Resumen, Clientes, Cobranzas, Demanda
+// ════════════════════════════════════════════════════════════════
+const money = n => 'S/. ' + (parseFloat(n) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fCorta = f => f ? String(f).slice(0, 10).split('-').reverse().slice(0, 2).join('/') : '—';
+const titulo = (t, sub) => `<h3 style="font-family:'Playfair Display',serif;font-weight:700;margin-bottom:${sub ? '.2rem' : '1rem'}">${t}</h3>` +
+  (sub ? `<p style="font-size:.75rem;color:var(--ink-faint);margin-bottom:1rem">${sub}</p>` : '');
+const vacio = msg => `<p style="color:var(--ink-faint);font-size:.8rem;padding:.5rem 0">${msg}</p>`;
+
+// Variación vs período anterior. invertir=true cuando subir es malo (ej. cancelaciones).
+function deltaHtml(v, invertir) {
+  if (v === null) return '<span style="color:#15803d;font-weight:700">nuevo</span>';
+  if (!v) return '<span style="color:var(--ink-faint)">sin cambio</span>';
+  const bueno = invertir ? v < 0 : v > 0;
+  return `<span style="color:${bueno ? '#15803d' : '#be123c'};font-weight:700">${v > 0 ? '▲' : '▼'} ${Math.abs(v)}%</span>`;
+}
+function kpiComp(val, label, delta, anterior, invertir) {
+  return `<div class="kpi">
+    <p class="kpi-val" style="color:#1a2e28">${val}</p>
+    <p class="kpi-label">${label}</p>
+    <p style="font-size:.72rem;margin-top:.5rem">${deltaHtml(delta, invertir)} <span style="color:var(--ink-faint)">vs ${anterior}</span></p>
+  </div>`;
+}
+// Link de WhatsApp (asume Perú si el número tiene 9 dígitos)
+function waLink(tel, texto) {
+  let n = String(tel || '').replace(/\D/g, '');
+  if (!n) return '';
+  if (n.length === 9) n = '51' + n;
+  return `<a href="https://wa.me/${n}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener"
+    class="vbtn vbtn-ghost" style="padding:.25rem .6rem;font-size:.72rem;white-space:nowrap">WhatsApp</a>`;
+}
+
+function renderResumen(d) {
+  const a = d.actual, p = d.anterior, c = d.cambio, al = d.alertas;
+  const pa = `${fCorta(d.periodo_anterior.desde)}–${fCorta(d.periodo_anterior.hasta)}`;
+
+  // Alertas accionables: solo las que tienen algo
+  const alertas = [
+    al.por_cobrar_30 > 0      && { txt: `${money(al.por_cobrar_30)} por cobrar con más de 30 días`, tab: 'cobranzas', color: '#be123c' },
+    al.vacunas_vencidas_30 > 0 && { txt: `${al.vacunas_vencidas_30} vacunas vencidas en el último mes sin reaplicar`, tab: 'vacunas', color: '#be123c' },
+    al.vacunas_proximas_7 > 0  && { txt: `${al.vacunas_proximas_7} vacunas vencen en los próximos 7 días`, tab: 'vacunas', color: '#b45309' },
+    al.stock_bajo > 0          && { txt: `${al.stock_bajo} productos con stock bajo`, tab: 'inventario', color: '#b45309' },
+    al.inventario_por_vencer > 0 && { txt: `${al.inventario_por_vencer} productos vencen en 30 días`, tab: 'inventario', color: '#b45309' },
+  ].filter(Boolean);
+
+  // Lectura automática de los números
+  const ideas = [];
+  if (c.ingresos !== null && c.ingresos <= -10) ideas.push(`Los ingresos bajaron ${Math.abs(c.ingresos)}% frente al período anterior. Revisa en <b>Clientes</b> a los que dejaron de venir.`);
+  if (c.ingresos > 10) ideas.push(`Los ingresos subieron ${c.ingresos}%. Mira en <b>Financiero</b> qué servicios lo impulsaron.`);
+  if (a.tasa_cancelacion >= 15) ideas.push(`El ${a.tasa_cancelacion}% de las citas se cancela. Activar recordatorios por WhatsApp suele reducirlo.`);
+  if (c.ticket_promedio !== null && c.ticket_promedio <= -10) ideas.push(`El ticket promedio cayó ${Math.abs(c.ticket_promedio)}%: conviene ofrecer servicios complementarios (vacunas, desparasitación, estética).`);
+  if (a.clientes_atendidos > 0 && a.clientes_nuevos === 0) ideas.push('No hubo clientes nuevos en el período. Considera una campaña de captación o referidos.');
+  if (al.por_cobrar > 0 && a.ingresos > 0 && al.por_cobrar / a.ingresos > 0.2) ideas.push(`Lo pendiente de cobro (${money(al.por_cobrar)}) supera el 20% de los ingresos del período.`);
+
+  const maxDia = Math.max(...(d.porDia || []).map(x => parseFloat(x.ingresos) || 0), 1);
+
+  return `
+    <p style="font-size:.78rem;color:var(--ink-faint);margin-bottom:.9rem">
+      ${fCorta(d.periodo.desde)}–${fCorta(d.periodo.hasta)} comparado con ${pa}
+    </p>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" style="margin-bottom:1rem">
+      ${kpiComp(money(a.ingresos), 'Ingresos', c.ingresos, money(p.ingresos))}
+      ${kpiComp(money(a.ticket_promedio), 'Ticket promedio', c.ticket_promedio, money(p.ticket_promedio))}
+      ${kpiComp(a.clientes_atendidos, 'Clientes atendidos', c.clientes_atendidos, p.clientes_atendidos)}
+      ${kpiComp(a.clientes_nuevos, 'Clientes nuevos', c.clientes_nuevos, p.clientes_nuevos)}
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpiComp(a.citas, 'Citas', c.citas, p.citas)}
+      ${kpiComp(a.tasa_cancelacion + '%', 'Citas canceladas', c.tasa_cancelacion, p.tasa_cancelacion + '%', true)}
+      ${kpiComp(a.consultas, 'Consultas', c.consultas, p.consultas)}
+      ${kpiComp(a.mascotas_nuevas, 'Mascotas nuevas', c.mascotas_nuevas, p.mascotas_nuevas)}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        ${titulo('⚠️ Requiere atención', 'Situación actual, independiente del período')}
+        ${alertas.length ? alertas.map(x => `
+          <button onclick="mostrarTab('${x.tab}')" style="display:flex;align-items:center;gap:.6rem;width:100%;text-align:left;
+            background:none;border:none;border-bottom:1px solid var(--line);padding:.65rem 0;cursor:pointer;font-family:inherit">
+            <span style="width:8px;height:8px;border-radius:50%;background:${x.color};flex-shrink:0"></span>
+            <span style="flex:1;font-size:.84rem">${x.txt}</span>
+            <span style="font-size:.75rem;color:var(--ink-faint)">Ver ›</span>
+          </button>`).join('') : vacio('Todo en orden: no hay alertas pendientes.')}
+      </div>
+      <div class="vcard vcard-pad">
+        ${titulo('💡 Lectura del período')}
+        ${ideas.length ? `<ul style="display:flex;flex-direction:column;gap:.6rem;font-size:.84rem;padding-left:1rem;list-style:disc">
+            ${ideas.map(i => `<li>${i}</li>`).join('')}</ul>`
+          : vacio('Sin variaciones importantes respecto al período anterior.')}
+      </div>
+    </div>
+    <div class="vcard vcard-pad">
+      ${titulo('📈 Ingresos por día')}
+      ${d.porDia?.length ? `
+        <div style="display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:.5rem">
+          ${d.porDia.map(x => {
+            const v = parseFloat(x.ingresos) || 0;
+            return `<div title="${fCorta(x.dia)}: ${money(v)}" style="flex:1;min-width:4px;height:${Math.max((v / maxDia) * 100, 2)}%;
+              background:linear-gradient(180deg,#10b981,#059669);border-radius:3px 3px 0 0"></div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--ink-faint);margin-top:.35rem">
+          <span>${fCorta(d.porDia[0].dia)}</span><span>${fCorta(d.porDia[d.porDia.length - 1].dia)}</span>
+        </div>` : vacio('Sin ventas en el período.')}
+    </div>`;
+}
+
+function cambiarDiasInactivo(v) {
+  _diasInactivo = parseInt(v, 10) || 180;
+  delete datosReporte.clientes;
+  cargarTab('clientes');
+}
+
+function renderClientes(d) {
+  const r = d.resumen;
+  const totalVentas = r.ingresos_identificados + r.ingresos_sin_cliente;
+  const pctSin = totalVentas > 0 ? Math.round((r.ingresos_sin_cliente / totalVentas) * 100) : 0;
+  const pctRec = r.atendidos > 0 ? Math.round((r.recurrentes / r.atendidos) * 100) : 0;
+  const maxF = Math.max(...d.frecuencia.map(f => f.clientes), 1);
+
+  return `
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(r.atendidos, 'Clientes atendidos', '#1d4ed8')}
+      ${kpi(r.nuevos, 'Primera compra', '#15803d')}
+      ${kpi(`${r.recurrentes} <span style="font-size:.9rem">(${pctRec}%)</span>`, 'Recurrentes', '#6d28d9')}
+      ${kpi(money(r.gasto_promedio), 'Gasto por cliente', '#b45309')}
+    </div>
+    ${pctSin >= 15 ? `<div class="vcard vcard-pad" style="margin-bottom:1.3rem;border-left:4px solid #f59e0b">
+      <p style="font-size:.84rem"><b>${pctSin}% de las ventas</b> (${money(r.ingresos_sin_cliente)}) se registraron como "Público general".
+      Registrar al cliente permite medir su recurrencia y recordarle sus vacunas.</p></div>` : ''}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        ${titulo('🔁 Frecuencia de compra', 'Compras por cliente en el período')}
+        ${d.frecuencia.map(f => `
+          <div style="margin-bottom:.6rem">
+            <div style="display:flex;justify-content:space-between;font-size:.78rem"><span>${f.rango}</span><b>${f.clientes}</b></div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${(f.clientes / maxF) * 100}%"></div></div>
+          </div>`).join('')}
+      </div>
+      <div class="vcard lg:col-span-2" style="overflow:hidden">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">${titulo('🏆 Mejores clientes del período')}</div>
+        <div style="overflow-x:auto"><table class="rep-table">
+          <thead><tr><th>Cliente</th><th>Compras</th><th>Gasto</th><th>Última</th></tr></thead>
+          <tbody>${d.top.length ? d.top.map(t => `<tr>
+            <td style="font-weight:600">${esc(t.cliente)} ${+t.es_nuevo ? '<span class="badge-ok">nuevo</span>' : ''}</td>
+            <td>${t.compras}</td><td style="font-weight:700;color:#15803d">${money(t.gasto)}</td><td>${fCorta(t.ultima)}</td>
+          </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--ink-faint);padding:1.2rem">Sin compras de clientes registrados</td></tr>'}
+          </tbody></table></div>
+      </div>
+    </div>
+    <div class="vcard" style="overflow:hidden">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;justify-content:space-between">
+        <div>${titulo('😿 Clientes que dejaron de venir', 'Ordenados por lo que gastaron en total: empieza por los más valiosos')}</div>
+        <select class="vinput no-print" style="width:auto" onchange="cambiarDiasInactivo(this.value)">
+          ${[90, 180, 365].map(n => `<option value="${n}" ${n === d.dias_inactivo ? 'selected' : ''}>Sin venir hace ${n}+ días</option>`).join('')}
+        </select>
+      </div>
+      <div style="overflow-x:auto"><table class="rep-table">
+        <thead><tr><th>Cliente</th><th>Mascotas</th><th>Última visita</th><th>Gasto histórico</th><th class="no-print"></th></tr></thead>
+        <tbody>${d.inactivos.length ? d.inactivos.map(x => `<tr>
+          <td style="font-weight:600">${esc(x.cliente)}<br><span style="font-size:.72rem;color:var(--ink-faint)">${esc(x.telefono || 'sin teléfono')}</span></td>
+          <td style="font-size:.78rem">${esc(x.mascotas || '—')}</td>
+          <td>${fDate(x.ultima_visita)}</td>
+          <td style="font-weight:700">${money(x.gasto_total)}</td>
+          <td class="no-print">${waLink(x.telefono, `Hola ${x.cliente}, te saludamos de la veterinaria. ¡Hace tiempo no los vemos! ¿Agendamos un control${x.mascotas ? ' para ' + x.mascotas : ''}?`)}</td>
+        </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--ink-faint);padding:1.2rem">Ningún cliente inactivo en ese rango</td></tr>'}
+        </tbody></table></div>
+    </div>`;
+}
+
+function renderCobranzas(d) {
+  const r = d.resumen;
+  const colores = ['#10b981', '#f59e0b', '#f97316', '#e11d48'];
+  const maxT = Math.max(...d.tramos.map(t => t.monto), 1);
+  return `
+    <p style="font-size:.78rem;color:var(--ink-faint);margin-bottom:.9rem">Situación al ${fDate(d.fecha_corte)} (no depende del período elegido)</p>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(money(r.total), 'Total por cobrar', '#b45309')}
+      ${kpi(r.documentos, 'Comprobantes pendientes', '#1d4ed8')}
+      ${kpi(r.clientes, 'Clientes con deuda', '#6d28d9')}
+      ${kpi(money(d.tramos[3].monto + d.tramos[2].monto), 'Con más de 60 días', '#be123c')}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        ${titulo('⏳ Antigüedad de la deuda', 'Mientras más antigua, más difícil de cobrar')}
+        ${d.tramos.map((t, i) => `
+          <div style="margin-bottom:.7rem">
+            <div style="display:flex;justify-content:space-between;font-size:.78rem">
+              <span>${t.tramo} <span style="color:var(--ink-faint)">(${t.documentos})</span></span><b>${money(t.monto)}</b>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${(t.monto / maxT) * 100}%;background:${colores[i]}"></div></div>
+          </div>`).join('')}
+      </div>
+      <div class="vcard lg:col-span-2" style="overflow:hidden">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">${titulo('👤 Mayores deudores')}</div>
+        <div style="overflow-x:auto"><table class="rep-table">
+          <thead><tr><th>Cliente</th><th>Docs.</th><th>Deuda</th><th>Más antigua</th><th class="no-print"></th></tr></thead>
+          <tbody>${d.porCliente.length ? d.porCliente.map(x => `<tr>
+            <td style="font-weight:600">${esc(x.cliente)}</td><td>${x.documentos}</td>
+            <td style="font-weight:700;color:#b45309">${money(x.total)}</td>
+            <td><span class="${x.dias_max > 60 ? 'badge-vencida' : x.dias_max > 30 ? 'badge-proxima' : 'badge-ok'}">${x.dias_max} días</span></td>
+            <td class="no-print">${waLink(x.telefono, `Hola ${x.cliente}, te escribimos de la veterinaria para recordarte un saldo pendiente de ${money(x.total)}. ¡Gracias!`)}</td>
+          </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--ink-faint);padding:1.2rem">No hay cuentas por cobrar 🎉</td></tr>'}
+          </tbody></table></div>
+      </div>
+    </div>
+    ${d.detalle.length ? `<div class="vcard" style="overflow:hidden">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">${titulo('🧾 Comprobantes pendientes')}</div>
+      <div style="overflow-x:auto"><table class="rep-table">
+        <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th>Días</th><th>Total</th></tr></thead>
+        <tbody>${d.detalle.map(x => `<tr>
+          <td style="font-family:monospace;font-weight:700">${esc(x.numero)}</td><td>${fDate(x.fecha)}</td>
+          <td>${esc(x.cliente)}</td><td>${x.dias}</td><td style="font-weight:700">${money(x.total)}</td>
+        </tr>`).join('')}</tbody></table></div>
+    </div>` : ''}`;
+}
+
+function renderDemanda(d) {
+  // DAYOFWEEK de MySQL: 1=domingo … 7=sábado → filas de lunes a domingo
+  const dias = [[2, 'Lun'], [3, 'Mar'], [4, 'Mié'], [5, 'Jue'], [6, 'Vie'], [7, 'Sáb'], [1, 'Dom']];
+  const celda = {}; let max = 0;
+  const porDia = {}, porHora = {}, cancelDia = {};
+  for (const m of d.mapa) {
+    const t = +m.total;
+    celda[`${m.dow}-${m.hora}`] = t; max = Math.max(max, t);
+    porDia[m.dow] = (porDia[m.dow] || 0) + t;
+    porHora[m.hora] = (porHora[m.hora] || 0) + t;
+    cancelDia[m.dow] = (cancelDia[m.dow] || 0) + (+m.canceladas || 0);
+  }
+  const total = Object.values(porDia).reduce((a, b) => a + b, 0);
+  if (!total) return `<div class="vcard vcard-pad">${vacio('No hay citas en el período para analizar la demanda.')}</div>`;
+
+  const horas = Object.keys(porHora).map(Number);
+  const hMin = Math.min(...horas, 8), hMax = Math.max(...horas, 19);
+  const rango = Array.from({ length: hMax - hMin + 1 }, (_, i) => hMin + i);
+  const picoHora = Object.entries(porHora).sort((a, b) => b[1] - a[1])[0];
+  const picoDia  = dias.map(([n, l]) => [l, porDia[n] || 0]).sort((a, b) => b[1] - a[1])[0];
+  const flojoDia = dias.map(([n, l]) => [l, porDia[n] || 0]).filter(x => x[1] > 0).sort((a, b) => a[1] - b[1])[0];
+  const tipos = { medica: 'Consulta médica', vacuna: 'Vacunación', desparasitacion: 'Desparasitación', estetica: 'Estética' };
+
+  return `
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" style="margin-bottom:1.3rem">
+      ${kpi(total, 'Citas en el período', '#1d4ed8')}
+      ${kpi(`${picoHora[0]}:00`, 'Hora más demandada', '#15803d')}
+      ${kpi(picoDia[0], 'Día más fuerte', '#6d28d9')}
+      ${kpi(flojoDia ? flojoDia[0] : '—', 'Día más flojo', '#b45309')}
+    </div>
+    <div class="vcard vcard-pad" style="margin-bottom:1.3rem">
+      ${titulo('🗓️ Mapa de demanda', 'Citas por día y hora. Úsalo para organizar turnos y lanzar promociones en las horas flojas.')}
+      <div style="overflow-x:auto">
+        <table style="border-collapse:separate;border-spacing:3px;font-size:.72rem;min-width:100%">
+          <thead><tr><th></th>${rango.map(h => `<th style="font-weight:600;color:var(--ink-faint);padding:0 2px">${h}h</th>`).join('')}
+            <th style="padding-left:.5rem;color:var(--ink-faint)">Total</th><th style="color:var(--ink-faint)">Cancel.</th></tr></thead>
+          <tbody>${dias.map(([n, l]) => `<tr>
+            <td style="font-weight:700;padding-right:.4rem">${l}</td>
+            ${rango.map(h => {
+              const v = celda[`${n}-${h}`] || 0;
+              const a = v ? 0.15 + (v / max) * 0.85 : 0;
+              return `<td title="${l} ${h}:00 — ${v} citas" style="width:32px;height:28px;text-align:center;border-radius:5px;
+                background:${v ? `rgba(5,150,105,${a.toFixed(2)})` : '#f3f5f3'};color:${a > 0.55 ? '#fff' : '#1a2e28'};font-weight:600">${v || ''}</td>`;
+            }).join('')}
+            <td style="padding-left:.5rem;font-weight:700">${porDia[n] || 0}</td>
+            <td style="color:#be123c">${porDia[n] ? Math.round(((cancelDia[n] || 0) / porDia[n]) * 100) + '%' : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="vcard" style="overflow:hidden">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">${titulo('🩺 Por tipo de atención')}</div>
+        <table class="rep-table"><thead><tr><th>Tipo</th><th>Citas</th><th>Completadas</th><th>Canceladas</th></tr></thead>
+          <tbody>${d.porTipo.map(t => `<tr><td style="font-weight:600">${tipos[t.tipo_cita] || esc(t.tipo_cita)}</td>
+            <td>${t.total}</td><td style="color:#15803d">${t.completadas}</td><td style="color:#be123c">${t.canceladas}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="vcard vcard-pad">
+        ${titulo('📝 Motivos más frecuentes')}
+        ${d.motivos.length ? d.motivos.map(m => `
+          <div style="margin-bottom:.55rem">
+            <div style="display:flex;justify-content:space-between;font-size:.78rem"><span style="text-transform:capitalize">${esc(m.motivo)}</span><b>${m.total}</b></div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${(m.total / d.motivos[0].total) * 100}%"></div></div>
+          </div>`).join('') : vacio('Sin motivos registrados.')}
+      </div>
+    </div>`;
 }
 
 // ── FINANCIERO ────────────────────────────────────────────────────
@@ -427,8 +725,12 @@ function renderMascotas(d) {
   const r = d.resumen;
   const icons = { perro:'🐕', gato:'🐈', ave:'🦜', reptil:'🦎', otro:'🐾' };
   return `
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" style="margin-bottom:1.3rem">
-      ${kpi(r.total||0, 'Total mascotas', '#15803d')}
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4" style="margin-bottom:1rem">
+      ${kpi(r.nuevas_periodo||0, 'Nuevas en el período', '#1d4ed8')}
+      ${kpi(r.atendidas_periodo||0, 'Atendidas en el período', '#15803d')}
+      ${kpi(r.total||0, 'Registradas (histórico)', '#78716c')}
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4" style="margin-bottom:1.3rem">
       ${kpi(r.perros||0, '🐕 Caninos', '#b45309')}
       ${kpi(r.gatos||0, '🐈 Felinos', '#6d28d9')}
       ${kpi(r.aves||0, '🦜 Aves', '#0369a1')}
@@ -655,7 +957,7 @@ function renderVeterinarios(d) {
         <table class="rep-table">
           <thead><tr>
             <th>Veterinario</th><th>Citas</th><th>Completadas</th><th>Canceladas</th>
-            <th>Consultas</th><th>Vacunas</th><th>Efectividad</th>
+            <th>Consultas</th><th>Vacunas</th><th>Ingresos</th><th>Efectividad</th>
           </tr></thead>
           <tbody>${d.veterinarios?.map(v=>{
             const ef = v.citas_total>0 ? Math.round((v.citas_completadas/v.citas_total)*100) : 0;
@@ -666,6 +968,7 @@ function renderVeterinarios(d) {
               <td style="color:#be123c">${v.citas_canceladas||0}</td>
               <td>${v.consultas||0}</td>
               <td style="color:#6d28d9">${v.vacunas||0}</td>
+              <td style="font-weight:700">${money(v.ingresos)}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:.5rem">
                   <div class="bar-h" style="width:80px;flex-shrink:0">
@@ -675,7 +978,7 @@ function renderVeterinarios(d) {
                 </div>
               </td>
             </tr>`;
-          }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--ink-faint);padding:1.5rem">Sin veterinarios activos</td></tr>'}
+          }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--ink-faint);padding:1.5rem">Sin veterinarios activos</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -698,7 +1001,8 @@ function descargarExcel() {
   const titulos = {
     financiero:'Financiero', citas:'Citas', mascotas:'Mascotas',
     vacunas:'Vacunas', inventario:'Inventario', estetica:'Estética',
-    veterinarios:'Veterinarios'
+    veterinarios:'Veterinarios', resumen:'Resumen', clientes:'Clientes',
+    cobranzas:'Cobranzas', demanda:'Demanda'
   };
   const titulo = titulos[tabActiva] || tabActiva;
   if (!d) { toast('Genera el reporte primero.','warning'); return; }
@@ -1082,6 +1386,82 @@ function descargarExcel() {
       XS.utils.book_append_sheet(wb, ws, 'Veterinarios');
       break;
     }
+
+    case 'resumen': {
+      const et = { ingresos:'Ingresos', ticket_promedio:'Ticket promedio', clientes_atendidos:'Clientes atendidos',
+        clientes_nuevos:'Clientes nuevos', citas:'Citas', tasa_cancelacion:'Citas canceladas (%)',
+        consultas:'Consultas', mascotas_nuevas:'Mascotas nuevas' };
+      const ws = buildSheet([{
+        titulo: `RESUMEN ${d.periodo.desde} a ${d.periodo.hasta} vs ${d.periodo_anterior.desde} a ${d.periodo_anterior.hasta}`,
+        headers: ['Indicador','Período','Período anterior','Variación'],
+        colWidths: [28, 18, 18, 14],
+        rows: Object.keys(et).map(k => [et[k], d.actual[k], d.anterior[k],
+          d.cambio[k] === null ? 'nuevo' : d.cambio[k] + '%']),
+      }, {
+        titulo: 'ALERTAS (situación actual)',
+        headers: ['Alerta','Valor'],
+        rows: [
+          ['Por cobrar total', money(d.alertas.por_cobrar)],
+          ['Por cobrar con más de 30 días', money(d.alertas.por_cobrar_30)],
+          ['Vacunas vencidas (último mes)', d.alertas.vacunas_vencidas_30],
+          ['Vacunas que vencen en 7 días', d.alertas.vacunas_proximas_7],
+          ['Productos con stock bajo', d.alertas.stock_bajo],
+          ['Productos que vencen en 30 días', d.alertas.inventario_por_vencer],
+        ],
+      }]);
+      XS.utils.book_append_sheet(wb, ws, 'Resumen');
+      break;
+    }
+
+    case 'clientes': {
+      const r = d.resumen;
+      const ws = buildSheet([{
+        titulo: 'RESUMEN DE CLIENTES', headers: ['Concepto','Valor'], colWidths: [34, 40, 18, 16, 18],
+        rows: [['Clientes atendidos', r.atendidos], ['Primera compra', r.nuevos], ['Recurrentes', r.recurrentes],
+          ['Gasto promedio por cliente', money(r.gasto_promedio)], ['Ticket promedio', money(r.ticket_promedio)],
+          ['Ventas sin cliente (Público general)', money(r.ingresos_sin_cliente)]],
+      }, {
+        titulo: 'MEJORES CLIENTES', headers: ['Cliente','Teléfono','Compras','Gasto','Última compra'],
+        rows: d.top.map(t => [t.cliente, t.telefono || '', t.compras, money(t.gasto), String(t.ultima).slice(0,10)]),
+      }, {
+        titulo: `CLIENTES SIN VENIR HACE ${d.dias_inactivo}+ DÍAS`, headers: ['Cliente','Teléfono','Mascotas','Última visita','Gasto histórico'],
+        rows: d.inactivos.map(x => [x.cliente, x.telefono || '', x.mascotas || '', String(x.ultima_visita).slice(0,10), money(x.gasto_total)]),
+      }]);
+      XS.utils.book_append_sheet(wb, ws, 'Clientes');
+      break;
+    }
+
+    case 'cobranzas': {
+      const ws = buildSheet([{
+        titulo: `CUENTAS POR COBRAR AL ${d.fecha_corte}`, headers: ['Antigüedad','Comprobantes','Monto'], colWidths: [28, 16, 18, 14, 16],
+        rows: d.tramos.map(t => [t.tramo, t.documentos, money(t.monto)]).concat([['TOTAL', d.resumen.documentos, money(d.resumen.total)]]),
+      }, {
+        titulo: 'POR CLIENTE', headers: ['Cliente','Teléfono','Comprobantes','Deuda','Días (más antigua)'],
+        rows: d.porCliente.map(x => [x.cliente, x.telefono || '', x.documentos, money(x.total), x.dias_max]),
+      }, {
+        titulo: 'DETALLE', headers: ['Número','Fecha','Cliente','Días','Total'],
+        rows: d.detalle.map(x => [x.numero, String(x.fecha).slice(0,10), x.cliente, x.dias, money(x.total)]),
+      }]);
+      XS.utils.book_append_sheet(wb, ws, 'Cobranzas');
+      break;
+    }
+
+    case 'demanda': {
+      const nombres = { 1:'Domingo', 2:'Lunes', 3:'Martes', 4:'Miércoles', 5:'Jueves', 6:'Viernes', 7:'Sábado' };
+      const ws = buildSheet([{
+        titulo: 'CITAS POR DÍA Y HORA', headers: ['Día','Hora','Citas','Canceladas'], colWidths: [22, 12, 12, 14],
+        rows: [...d.mapa].sort((a, b) => ((a.dow + 5) % 7) - ((b.dow + 5) % 7) || a.hora - b.hora)
+          .map(m => [nombres[m.dow], `${m.hora}:00`, +m.total, +m.canceladas]),
+      }, {
+        titulo: 'POR TIPO DE ATENCIÓN', headers: ['Tipo','Citas','Completadas','Canceladas'],
+        rows: d.porTipo.map(t => [t.tipo_cita, +t.total, +t.completadas, +t.canceladas]),
+      }, {
+        titulo: 'MOTIVOS MÁS FRECUENTES', headers: ['Motivo','Citas'],
+        rows: d.motivos.map(m => [m.motivo, +m.total]),
+      }]);
+      XS.utils.book_append_sheet(wb, ws, 'Demanda');
+      break;
+    }
   }
 
   XS.writeFile(wb, `VetClinic_${titulo}_${desde}_${hasta}.xlsx`);
@@ -1183,8 +1563,11 @@ function renderRentabilidad(d) {
   html += kpi('S/. '+ingreso.toFixed(2),  'Ingreso total',   '#1d4ed8');
   html += kpi('S/. '+costo.toFixed(2),    'Costo total',     '#be123c');
   html += kpi('S/. '+ganancia.toFixed(2), 'Ganancia neta',   '#15803d');
-  html += kpi(margen.toFixed(1)+'%',      'Margen promedio', colorM);
+  html += kpi(margen.toFixed(1)+'%',      'Margen en productos', colorM);
   html += '</div>';
+  // El margen solo puede medirse donde hay costo de compra; los servicios no lo tienen
+  html += '<p style="font-size:.75rem;color:var(--ink-faint);margin:-.6rem 0 1.3rem">El margen se calcula sobre productos con precio de compra registrado ('
+       + (parseFloat(k.cobertura_costo_pct)||0) + '% de las ventas). Los servicios no tienen costo cargado, por eso no se incluyen.</p>';
 
   // ── Ganancia por día ──
   html += '<div class="vcard vcard-pad" style="margin-bottom:1.3rem">';
