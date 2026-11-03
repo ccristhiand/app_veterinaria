@@ -671,7 +671,13 @@ function aplicarBranding(b) {
     set('--sidebar-hover',  `rgba(${tinta},${claro ? .06 : .07})`);
     set('--sidebar-line',   `rgba(${tinta},${claro ? .1 : .08})`);
     // Ítem activo: el color de marca, aclarado sobre sidebar oscuro u oscurecido sobre uno claro
-    if (p) set('--sidebar-active', _hex(claro ? _legibleSobreBlanco(p) : _mix(p, _lum(p) < 0.2 ? 0.55 : 0.35)));
+    if (p) {
+      // Se ajusta contra el fondo real del ítem activo (primario al 16% sobre el sidebar) hasta 4.5:1
+      const fondoActivo = s.map((v, i) => p[i] * 0.16 + v * 0.84);
+      let act = claro ? p : _mix(p, _lum(p) < 0.2 ? 0.55 : 0.35);
+      for (let i = 0; i < 24 && _contraste(act, fondoActivo) < 4.5; i++) act = _mix(act, claro ? -0.08 : 0.08);
+      set('--sidebar-active', _hex(act));
+    }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = _hex(s);
   }

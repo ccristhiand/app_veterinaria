@@ -54,7 +54,7 @@
       .hide-mobile{display:none!important}
     }
   </style>
-  <link rel="stylesheet" href="admin.css?v=20261103"/>
+  <link rel="stylesheet" href="admin.css?v=20261103b"/>
   <link rel="icon" href="logo.jpg" type="image/jpeg"/>
   <link rel="apple-touch-icon" href="logo.jpg"/>
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -857,22 +857,66 @@
   });
 
   // ── Temas profesionales: primario · sidebar · acento ─────────────
-  const TEMAS = [
-    { id:'bosque',    nombre:'Bosque clínico',  p:'#166534', s:'#0d3b2e', a:'#10b981' },
-    { id:'confianza', nombre:'Azul confianza',  p:'#1d5fc0', s:'#0f2747', a:'#1aa3bd' },
-    { id:'turquesa',  nombre:'Turquesa salud',  p:'#0f766e', s:'#0b2f2c', a:'#14b8a6' },
-    { id:'oceano',    nombre:'Océano',          p:'#0369a1', s:'#082f49', a:'#0ea5e9' },
-    { id:'lavanda',   nombre:'Lavanda felina',  p:'#6d28d9', s:'#1e1b4b', a:'#a855f7' },
-    { id:'coral',     nombre:'Coral cálido',    p:'#d9483b', s:'#2a1715', a:'#f59e0b' },
-    { id:'terracota', nombre:'Terracota',       p:'#b45309', s:'#292017', a:'#d97706' },
-    { id:'noche',     nombre:'Noche y oro',     p:'#a16207', s:'#111827', a:'#d4a017' },
-    { id:'grafito',   nombre:'Grafito',         p:'#475569', s:'#0f172a', a:'#0ea5e9' },
-    { id:'menta',     nombre:'Menta clara',     p:'#047857', s:'#ecfdf5', a:'#10b981' },
-    { id:'cielo',     nombre:'Cielo claro',     p:'#1d4ed8', s:'#eff6ff', a:'#3b82f6' },
-    { id:'rosa',      nombre:'Rosa estética',   p:'#be185d', s:'#fdf2f8', a:'#ec4899' },
+  // Todos validados (WCAG): texto blanco sobre primario ≥ 4.5:1, sobre acento ≥ 3:1,
+  // menú e ítem activo sobre el sidebar ≥ 4.5:1. `legado`: acentos de versiones anteriores
+  // del tema, para que las clínicas que ya lo tenían no aparezcan como "Personalizado".
+  const CATEGORIAS = [
+    ['todos', 'Todos'], ['clinicos', 'Clínicos'], ['calidos', 'Cálidos'],
+    ['vibrantes', 'Vibrantes'], ['elegantes', 'Elegantes'], ['claros', 'Sidebar claro'],
   ];
-  const _lumHex = h => { const n = parseInt(String(h).replace('#',''), 16) || 0;
-    return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
+  const TEMAS = [
+    { id:'bosque',     cat:'clinicos',  nombre:'Bosque clínico', p:'#166534', s:'#0d3b2e', a:'#059669', legado:['#10b981'] },
+    { id:'esmeralda',  cat:'clinicos',  nombre:'Esmeralda',      p:'#047857', s:'#062a21', a:'#0d9488' },
+    { id:'salvia',     cat:'clinicos',  nombre:'Salvia',         p:'#4a6b52', s:'#1c2620', a:'#5f7f63' },
+    { id:'turquesa',   cat:'clinicos',  nombre:'Turquesa salud', p:'#0f766e', s:'#0b2f2c', a:'#0d9488', legado:['#14b8a6'] },
+    { id:'confianza',  cat:'clinicos',  nombre:'Azul confianza', p:'#1d5fc0', s:'#0f2747', a:'#1688a5', legado:['#1aa3bd'] },
+    { id:'oceano',     cat:'clinicos',  nombre:'Océano',         p:'#0369a1', s:'#082f49', a:'#0284c7', legado:['#0ea5e9'] },
+    { id:'petroleo',   cat:'clinicos',  nombre:'Petróleo',       p:'#155e75', s:'#0a2a33', a:'#0e7490' },
+    { id:'marino',     cat:'clinicos',  nombre:'Azul marino',    p:'#1e3a8a', s:'#0b1533', a:'#2563eb' },
+
+    { id:'coral',      cat:'calidos',   nombre:'Coral cálido',   p:'#c2412f', s:'#2a1715', a:'#d97706' },
+    { id:'terracota',  cat:'calidos',   nombre:'Terracota',      p:'#b45309', s:'#292017', a:'#c2410c', legado:['#d97706'] },
+    { id:'canela',     cat:'calidos',   nombre:'Canela',         p:'#93542a', s:'#2b1d14', a:'#b45309' },
+    { id:'miel',       cat:'calidos',   nombre:'Miel',           p:'#a16207', s:'#1f1a10', a:'#b45309' },
+    { id:'mandarina',  cat:'calidos',   nombre:'Mandarina',      p:'#c2410c', s:'#1c1917', a:'#ea580c' },
+    { id:'granate',    cat:'calidos',   nombre:'Granate',        p:'#9f1239', s:'#2a0f17', a:'#be123c' },
+
+    { id:'lavanda',    cat:'vibrantes', nombre:'Lavanda felina', p:'#6d28d9', s:'#1e1b4b', a:'#9333ea', legado:['#a855f7'] },
+    { id:'uva',        cat:'vibrantes', nombre:'Uva',            p:'#7e22ce', s:'#2e1065', a:'#a21caf' },
+    { id:'fucsia',     cat:'vibrantes', nombre:'Fucsia',         p:'#be185d', s:'#2b0a1a', a:'#db2777' },
+    { id:'cobalto',    cat:'vibrantes', nombre:'Cobalto',        p:'#1d4ed8', s:'#0c1a3d', a:'#2563eb' },
+    { id:'indigo',     cat:'vibrantes', nombre:'Índigo',         p:'#4338ca', s:'#1e1b4b', a:'#6366f1' },
+    { id:'verdevivo',  cat:'vibrantes', nombre:'Verde vivo',     p:'#15803d', s:'#052e16', a:'#16a34a' },
+    { id:'caribe',     cat:'vibrantes', nombre:'Caribe',         p:'#0e7490', s:'#0c1f2e', a:'#0891b2' },
+
+    { id:'noche',      cat:'elegantes', nombre:'Noche y oro',    p:'#a16207', s:'#111827', a:'#b45309', legado:['#d4a017'] },
+    { id:'grafito',    cat:'elegantes', nombre:'Grafito',        p:'#475569', s:'#0f172a', a:'#0369a1', legado:['#0ea5e9'] },
+    { id:'carbon',     cat:'elegantes', nombre:'Carbón y jade',  p:'#3f3f46', s:'#09090b', a:'#0f766e' },
+    { id:'ciruela',    cat:'elegantes', nombre:'Ciruela',        p:'#86198f', s:'#2a0a2e', a:'#a21caf' },
+    { id:'vino',       cat:'elegantes', nombre:'Vino',           p:'#881337', s:'#1f0a12', a:'#be123c' },
+    { id:'medianoche', cat:'elegantes', nombre:'Medianoche',     p:'#1e40af', s:'#020617', a:'#4f46e5' },
+
+    { id:'menta',      cat:'claros',    nombre:'Menta',          p:'#047857', s:'#ecfdf5', a:'#059669', legado:['#10b981'] },
+    { id:'agua',       cat:'claros',    nombre:'Agua',           p:'#0f766e', s:'#f0fdfa', a:'#0d9488' },
+    { id:'cielo',      cat:'claros',    nombre:'Cielo',          p:'#1d4ed8', s:'#eff6ff', a:'#2563eb', legado:['#3b82f6'] },
+    { id:'perla',      cat:'claros',    nombre:'Perla',          p:'#334155', s:'#f8fafc', a:'#0369a1' },
+    { id:'lila',       cat:'claros',    nombre:'Lila',           p:'#6d28d9', s:'#f5f3ff', a:'#7c3aed' },
+    { id:'rosa',       cat:'claros',    nombre:'Rosa estética',  p:'#be185d', s:'#fdf2f8', a:'#db2777', legado:['#ec4899'] },
+    { id:'durazno',    cat:'claros',    nombre:'Durazno',        p:'#c2410c', s:'#fff7ed', a:'#ea580c' },
+    { id:'arena',      cat:'claros',    nombre:'Arena',          p:'#92400e', s:'#faf5ef', a:'#b45309' },
+    { id:'oliva',      cat:'claros',    nombre:'Oliva',          p:'#3f6212', s:'#f7fee7', a:'#4d7c0f' },
+  ];
+  let _catTema = null;   // categoría visible; null = la del tema actual
+
+  // Contraste WCAG para avisar cuando una combinación personalizada no se lee bien
+  const _rgbHex = h => { const m = /^#([0-9a-f]{6})$/i.exec(String(h).trim()); if (!m) return null;
+    const n = parseInt(m[1], 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const _lumW = c => { const [r, g, b] = c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const _cr = (a, b) => { const [x, y] = [_lumW(a), _lumW(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const _lumHex = h => { const c = _rgbHex(h); return c ? _lumW(c) : 0; };
+  const _coincide = (t, c) => t.p === c.p && t.s === c.s && (t.a === c.a || (t.legado || []).includes(c.a));
+  function filtrarTemas(cat) { _catTema = cat; actualizarTemaUI(); }
   const _colores = () => ({
     p: document.getElementById('m-color-p-hex').value.trim().toLowerCase(),
     s: document.getElementById('m-color-s-hex').value.trim().toLowerCase(),
@@ -891,22 +935,43 @@
 
   function actualizarTemaUI() {
     const c = _colores();
-    const actual = TEMAS.find(t => t.p === c.p && t.s === c.s && t.a === c.a);
+    const actual = TEMAS.find(t => _coincide(t, c));
+    const cat = _catTema || actual?.cat || 'todos';
+    const visibles = cat === 'todos' ? TEMAS : TEMAS.filter(t => t.cat === cat);
     const grid = document.getElementById('temas-grid');
-    grid.innerHTML = TEMAS.map(t => `
-      <button type="button" class="tema-card${actual?.id === t.id ? ' sel' : ''}" role="radio"
-        aria-checked="${actual?.id === t.id}" onclick="seleccionarTema('${t.id}')" title="${t.nombre}">
-        <span class="tema-muestra">
-          <span style="background:${t.s}"></span><span style="background:${t.p}"></span><span style="background:${t.a}"></span>
-        </span>
-        <span class="tema-nombre">${t.nombre}</span>
-      </button>`).join('') +
-      `<div class="tema-card tema-custom${actual ? '' : ' sel'}" aria-hidden="true">
-        <span class="tema-muestra"><span style="background:${esc(c.s)}"></span><span style="background:${esc(c.p)}"></span><span style="background:${esc(c.a)}"></span></span>
-        <span class="tema-nombre">Personalizado</span></div>`;
+    grid.innerHTML = `
+      <div class="tema-estado">
+        <span class="tema-muestra tema-muestra-sm"><span style="background:${esc(c.s)}"></span><span style="background:${esc(c.p)}"></span><span style="background:${esc(c.a)}"></span></span>
+        <span>Tema actual: <b>${actual ? actual.nombre : 'Personalizado'}</b></span>
+      </div>
+      <div class="tema-cats" role="tablist" aria-label="Categorías de temas">
+        ${CATEGORIAS.map(([id, txt]) => `<button type="button" role="tab" aria-selected="${cat === id}"
+          class="tema-cat${cat === id ? ' on' : ''}" onclick="filtrarTemas('${id}')">${txt}</button>`).join('')}
+      </div>
+      <div class="temas-cards" role="radiogroup" aria-label="Temas de colores">
+        ${visibles.map(t => `
+        <button type="button" class="tema-card${actual?.id === t.id ? ' sel' : ''}" role="radio"
+          aria-checked="${actual?.id === t.id}" onclick="seleccionarTema('${t.id}')" title="${t.nombre}">
+          <span class="tema-muestra">
+            <span style="background:${t.s}"></span><span style="background:${t.p}"></span><span style="background:${t.a}"></span>
+          </span>
+          <span class="tema-nombre">${t.nombre}</span>
+        </button>`).join('')}
+      </div>`;
+
+    // Aviso de contraste para combinaciones hechas a mano
+    const P = _rgbHex(c.p), A = _rgbHex(c.a), S = _rgbHex(c.s), W = [255, 255, 255];
+    const avisos = [];
+    if (!P || !S || !A) avisos.push('Usa colores en formato #RRGGBB.');
+    else {
+      const cp = _cr(P, W), ca = _cr(A, W);
+      if (cp < 4.5) avisos.push(`El color primario tiene poco contraste con el texto blanco de los botones (${cp.toFixed(1)}:1; se recomienda 4.5:1 o más). Usa un tono más oscuro.`);
+      if (ca < 3)   avisos.push(`El acento es muy claro para llevar texto blanco (${ca.toFixed(1)}:1; mínimo 3:1).`);
+      if (_cr(P, S) < 1.6) avisos.push('El primario y el sidebar son casi iguales: el ítem activo del menú no se distinguirá.');
+    }
 
     // Vista previa: cómo se verá el sistema de la clínica
-    const claro  = _lumHex(c.s) > 0.6;
+    const claro  = _lumHex(c.s) > 0.45;          // mismo umbral que aplicarBranding() en la app
     const txt    = claro ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.7)';
     const fuerte = claro ? '#111827' : '#ffffff';
     const nombre = esc(document.getElementById('m-nombre').value.trim() || 'Mi Veterinaria');
@@ -918,7 +983,7 @@
           <div class="tp-item">Citas</div><div class="tp-item">Mascotas</div><div class="tp-item">Facturación</div>
         </div>
         <div class="tp-main">
-          <div class="tp-head"><b>Citas de hoy</b><span class="tp-btn" style="background:linear-gradient(135deg,${esc(c.p)},${esc(c.a)});color:${_lumHex(c.p) > 0.7 ? '#111827' : '#fff'}">+ Nueva cita</span></div>
+          <div class="tp-head"><b>Citas de hoy</b><span class="tp-btn" style="background:linear-gradient(135deg,${esc(c.p)},${esc(c.a)});color:${P && _cr(P, W) < 2.6 ? '#111827' : '#fff'}">+ Nueva cita</span></div>
           <div class="tp-kpis">
             <div><small>Citas</small><b style="color:${esc(c.p)}">12</b></div>
             <div><small>Atendidas</small><b style="color:${esc(c.p)}">8</b></div>
@@ -926,7 +991,9 @@
           </div>
           <div class="tp-tabs"><span style="color:${esc(c.p)};border-color:${esc(c.p)}">Todas</span><span>Pendientes</span><span>Completadas</span></div>
         </div>
-      </div>`;
+      </div>
+      ${avisos.length ? `<div class="tema-aviso" role="status">${adminIcon('alert', 'ico-sm')}<div>${avisos.map(a => `<p>${a}</p>`).join('')}</div></div>`
+        : `<div class="tema-ok">${adminIcon('checkc', 'ico-sm')}<span>Buen contraste: textos y botones se leerán con claridad.</span></div>`}`;
   }
   document.getElementById('m-nombre').addEventListener('input', () => {
     if (!document.getElementById('modal-clinica').classList.contains('hidden')) actualizarTemaUI();
@@ -1016,10 +1083,11 @@
     document.getElementById('m-color-p-hex').value  = '#166534';
     document.getElementById('m-color-s').value      = '#0d3b2e';
     document.getElementById('m-color-s-hex').value  = '#0d3b2e';
-    document.getElementById('m-color-a').value      = '#10b981';
-    document.getElementById('m-color-a-hex').value  = '#10b981';
+    document.getElementById('m-color-a').value      = '#059669';
+    document.getElementById('m-color-a-hex').value  = '#059669';
     ['m-estetica','m-facturacion','m-inventario','m-vacunas','m-consentimientos','m-carnet']
       .forEach(id => document.getElementById(id).checked = true);
+    _catTema = null;
     actualizarTemaUI();
     document.getElementById('modal-clinica').classList.remove('hidden');
   }
@@ -1078,6 +1146,7 @@
     document.getElementById('m-consentimientos').checked = !!c.modulo_consentimientos;
     document.getElementById('m-carnet').checked          = !!c.modulo_carnet;
 
+    _catTema = null;
     actualizarTemaUI();
     document.getElementById('modal-clinica').classList.remove('hidden');
   }

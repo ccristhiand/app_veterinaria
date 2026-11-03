@@ -451,7 +451,25 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text-2)
 }
 
 /* ── Selector de temas de la clínica (clinicas.html) ─────────────── */
-.temas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.temas-grid { display: flex; flex-direction: column; gap: 10px; }
+.temas-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 8px; }
+.tema-estado { display: flex; align-items: center; gap: 10px; font-size: .86rem; color: var(--text-2); }
+.tema-estado b { color: var(--text-strong); }
+.tema-muestra-sm { width: 54px; height: 20px; flex-shrink: 0; }
+.tema-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.tema-cat {
+  min-height: 32px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2);
+  font-family: inherit; font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.tema-cat:hover { background: var(--hover); color: var(--text-strong); }
+.tema-cat.on { background: var(--text-strong); border-color: var(--text-strong); color: var(--surface); }
+.tema-aviso, .tema-ok { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: .82rem; line-height: 1.45; }
+.tema-aviso { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+.tema-aviso p + p { margin-top: 4px; }
+.tema-ok { background: var(--ok-bg); color: var(--ok-text); border: 1px solid var(--ok-border); }
+.tema-aviso .ico, .tema-ok .ico { margin-top: 2px; }
 .tema-card {
   display: flex; flex-direction: column; gap: 6px; align-items: stretch;
   padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
@@ -460,7 +478,6 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text-2)
 }
 .tema-card:hover { border-color: var(--text-faint); }
 .tema-card.sel { border-color: var(--accent); box-shadow: var(--focus); }
-.tema-custom { cursor: default; border-style: dashed; }
 .tema-muestra { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
 .tema-muestra span { flex: 1; }
 .tema-muestra span:first-child { flex: 1.4; }
