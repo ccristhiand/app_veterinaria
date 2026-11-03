@@ -20,16 +20,32 @@ router.get('/', async (req, res, next) => {
        WHERE h.mascota_id = ?
        ORDER BY h.fecha DESC`, [mascota_id]
     );
-    for (const h of rows) {
-      h.recetas      = await req.db.query('SELECT * FROM recetas WHERE historia_clinica_id = ?', [h.id]);
-      h.seguimientos = await req.db.query(
+    if (!rows.length) return res.json({ success: true, data: rows });
+
+    // Recetas y seguimientos de todas las atenciones en 2 consultas en paralelo.
+    // Antes eran 2 consultas por atención, una tras otra: con mucho historial la carga se volvía lenta.
+    const ids    = rows.map(h => h.id);
+    const marcas = ids.map(() => '?').join(',');
+    const [recetas, seguimientos] = await Promise.all([
+      req.db.query(
+        `SELECT * FROM recetas WHERE historia_clinica_id IN (${marcas})
+         ORDER BY historia_clinica_id, id`, ids
+      ),
+      req.db.query(
         `SELECT s.*, u.nombre AS veterinario_nombre
          FROM historia_seguimientos s
          JOIN usuarios u ON u.id = s.veterinario_id
-         WHERE s.historia_id = ?
-         ORDER BY s.fecha ASC`, [h.id]
-      );
-    }
+         WHERE s.historia_id IN (${marcas})
+         ORDER BY s.fecha ASC, s.id ASC`, ids
+      ),
+    ]);
+
+    // Repartir a cada atención conservando el orden de cada consulta
+    const porHistoria = new Map(rows.map(h => [h.id, h]));
+    rows.forEach(h => { h.recetas = []; h.seguimientos = []; });
+    recetas.forEach(r => porHistoria.get(r.historia_clinica_id)?.recetas.push(r));
+    seguimientos.forEach(s => porHistoria.get(s.historia_id)?.seguimientos.push(s));
+
     return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });
