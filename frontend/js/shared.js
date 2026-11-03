@@ -585,28 +585,84 @@ async function cargarBranding() {
     if (!res.ok) return null;
     _branding = (await res.json()).data;
     aplicarBranding(_branding);
+    // Guardar los colores para aplicarlos al instante en la próxima carga (sin parpadeo)
+    try {
+      localStorage.setItem('vet_brand_colors', JSON.stringify({
+        color_primario: _branding?.color_primario, color_sidebar: _branding?.color_sidebar, color_acento: _branding?.color_acento,
+      }));
+    } catch {}
     return _branding;
   } catch { return null; }
 }
 
+// ── Utilidades de color para la marca ──────────────────────────────
+function _rgb(hex) {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(hex || '').trim());
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const _hex = ([r, g, b]) => '#' + [r, g, b].map(v => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('');
+// Mezcla con blanco (t>0) o negro (t<0); t en [-1, 1]
+const _mix = (rgb, t) => rgb.map(v => (t >= 0 ? v + (255 - v) * t : v * (1 + t)));
+function _lum(rgb) {
+  const [r, g, b] = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const _contraste = (a, b) => { const [x, y] = [_lum(a), _lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+// Oscurece hasta lograr contraste legible sobre blanco (texto de marca)
+function _legibleSobreBlanco(rgb, min = 4.5) {
+  let c = rgb;
+  for (let i = 0; i < 20 && _contraste(c, [255, 255, 255]) < min; i++) c = _mix(c, -0.08);
+  return c;
+}
+
+/**
+ * Aplica los colores elegidos en el panel admin a toda la app.
+ * Las pantallas usan la paleta --green-* (heredada) y el sidebar usa --sidebar-*;
+ * aquí se recalculan ambas desde color_primario / color_sidebar / color_acento.
+ * Los verdes de estado (pagado, activo, éxito) no dependen de la marca a propósito.
+ */
 function aplicarBranding(b) {
   if (!b) return;
   const r = document.documentElement;
+  const set = (k, v) => r.style.setProperty(k, v);
 
-  if (b.color_sidebar) {
-    r.style.setProperty('--sidebar-bg',  b.color_sidebar);
-    r.style.setProperty('--sidebar-bg2', ajustarColor(b.color_sidebar, -10));
+  const p = _rgb(b.color_primario);
+  if (p) {
+    const texto = _legibleSobreBlanco(_mix(p, -0.15));
+    set('--green-500', _hex(p));
+    set('--green-600', _hex(_legibleSobreBlanco(_mix(p, -0.12), 3)));
+    set('--green-700', _hex(texto));
+    set('--green-800', _hex(_mix(texto, -0.2)));
+    set('--green-100', _hex(_mix(p, 0.8)));
+    set('--green-50',  _hex(_mix(p, 0.92)));
+    set('--brand-rgb', p.join(','));
+    // Texto sobre botones de marca: blanco salvo que el color sea muy claro
+    set('--on-brand', _contraste(p, [255, 255, 255]) >= 2.6 ? '#ffffff' : '#111827');
   }
 
-  if (b.color_primario && b.color_primario !== '#10b981') {
-    r.style.setProperty('--brand-primary', b.color_primario);
-    r.style.setProperty('--green-500',     b.color_primario);
-    r.style.setProperty('--green-600',     ajustarColor(b.color_primario, -15));
-    r.style.setProperty('--green-50',      hexToRgba(b.color_primario, 0.08));
-  }
+  const a = _rgb(b.color_acento) || (p && _mix(p, -0.18));
+  if (a) set('--accent', _hex(a));
 
-  if (b.color_acento && b.color_acento !== '#059669') {
-    r.style.setProperty('--brand-accent', b.color_acento);
+  const s = _rgb(b.color_sidebar);
+  if (s) {
+    const claro = _lum(s) > 0.45;
+    const tinta = claro ? '17,24,39' : '255,255,255';
+    set('--green-900',      _hex(s));
+    set('--sidebar-bg',     _hex(s));
+    set('--sidebar-bg2',    _hex(_mix(s, claro ? -0.06 : -0.3)));
+    set('--sidebar-strong', claro ? '#111827' : '#ffffff');
+    set('--sidebar-text',   `rgba(${tinta},${claro ? .72 : .66})`);
+    set('--sidebar-muted',  `rgba(${tinta},${claro ? .52 : .42})`);
+    set('--sidebar-hover',  `rgba(${tinta},${claro ? .06 : .07})`);
+    set('--sidebar-line',   `rgba(${tinta},${claro ? .1 : .08})`);
+    // Ítem activo: el color de marca, aclarado sobre sidebar oscuro u oscurecido sobre uno claro
+    if (p) set('--sidebar-active', _hex(claro ? _legibleSobreBlanco(p) : _mix(p, _lum(p) < 0.2 ? 0.55 : 0.35)));
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = _hex(s);
   }
 
   if (b.nombre_clinica) {
@@ -775,3 +831,10 @@ function apiError(status, message) {
     toast(message || 'Ocurrió un error inesperado.', 'danger');
   }
 }
+
+// ── Marca guardada: se aplica al cargar shared.js (en <head>) para que la página
+//    no aparezca con el verde por defecto mientras llega /branding
+try {
+  const _bc = JSON.parse(localStorage.getItem('vet_brand_colors') || 'null');
+  if (_bc) aplicarBranding(_bc);
+} catch {}

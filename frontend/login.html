@@ -260,8 +260,24 @@
       const b = (await res.json()).data;
       if (!b) return;
 
-      // Solo nombre y logo — sin tocar colores
-      const nombre = b.nombre_clinica || 'VetClinic';
+      // Colores de la clínica (elegidos en el panel admin)
+      const css = document.documentElement.style;
+      const lum = hex => { const n = parseInt(String(hex).replace('#',''), 16);
+        return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
+      if (/^#[0-9a-f]{6}$/i.test(b.color_primario || '')) {
+        css.setProperty('--brand-primary', b.color_primario);
+        css.setProperty('--brand-dark-btn', /^#[0-9a-f]{6}$/i.test(b.color_acento || '') ? b.color_acento : ajustarColor(b.color_primario, -25));
+      }
+      // El panel izquierdo lleva texto blanco: si el color del sidebar es claro, se usa el primario oscurecido
+      const panel = /^#[0-9a-f]{6}$/i.test(b.color_sidebar || '') && lum(b.color_sidebar) < 0.5
+        ? b.color_sidebar : (b.color_primario ? ajustarColor(b.color_primario, -70) : null);
+      if (panel) {
+        css.setProperty('--brand-dark', panel);
+        css.setProperty('--brand-mid', ajustarColor(panel, 30));
+      }
+
+      const nombre = String(b.nombre_clinica || 'VetClinic');
+      const nombreHtml = nombre.replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
 
       const nameEl = document.getElementById('brand-name');
       if (nameEl) nameEl.textContent = nombre;
@@ -273,12 +289,12 @@
 
       const heroEl = document.getElementById('brand-hero');
       if (heroEl) heroEl.innerHTML =
-        `Bienvenido a<br/><span style="opacity:.8">${nombre}</span>`;
+        `Bienvenido a<br/><span style="opacity:.8">${nombreHtml}</span>`;
 
       if (b.logo_url) {
         const logoEl = document.getElementById('brand-logo');
         if (logoEl) logoEl.innerHTML =
-          `<img src="${b.logo_url}" alt="${nombre}"
+          `<img src="${b.logo_url}" alt="${nombreHtml}"
             style="width:100%;height:100%;object-fit:contain;border-radius:.65rem"
             onerror="this.parentElement.innerHTML='🐾'"/>`;
       }

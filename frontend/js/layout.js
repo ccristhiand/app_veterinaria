@@ -52,7 +52,7 @@ function renderShell({ activePage, title, subtitle }) {
   // ── NUEVO: Badge de sede para mostrar en el área del usuario ──
   const sedeBadge = user.sede_nombre
     ? `<span style="display:inline-flex;align-items:center;gap:.25rem;margin-top:.25rem;
-        font-size:.62rem;font-weight:700;color:#6ee7b7;background:rgba(255,255,255,.08);
+        font-size:.62rem;font-weight:700;color:var(--sidebar-active);background:var(--sidebar-hover);
         border:1px solid rgba(255,255,255,.15);border-radius:.5rem;
         padding:.15rem .5rem;letter-spacing:.02em;">
         🏥 ${esc(user.sede_nombre)}
@@ -91,7 +91,7 @@ function renderShell({ activePage, title, subtitle }) {
           <p class="sb-user-rol"  id="user-rol">—</p>
           <div id="user-sede-badge">${sedeBadge}</div>
           <a href="cambiar-password"
-            style="font-size:.65rem;color:#a7f3d0;text-decoration:none;font-weight:600;
+            style="font-size:.65rem;color:var(--sidebar-active);text-decoration:none;font-weight:600;
             display:inline-flex;align-items:center;gap:.25rem;margin-top:.1rem;opacity:.8"
             onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
             🔐 Cambiar contraseña
