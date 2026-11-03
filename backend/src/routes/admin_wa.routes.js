@@ -11,24 +11,11 @@
  */
 
 const { Router }      = require('express');
-const jwt             = require('jsonwebtoken');
 const { masterQuery } = require('../config/masterDB');
 
-const router       = Router();
-const ADMIN_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'admin-secret';
+const router = Router();
 
-// ── Auth admin (antes estas rutas quedaban abiertas) ─────────────
-router.use((req, res, next) => {
-  const token = req.headers.authorization?.startsWith('Bearer ')
-    ? req.headers.authorization.slice(7) : null;
-  if (!token) return res.status(401).json({ success: false, message: 'Token requerido.' });
-  try {
-    req.adminUser = jwt.verify(token, ADMIN_SECRET);
-    next();
-  } catch {
-    return res.status(401).json({ success: false, message: 'Token inválido.' });
-  }
-});
+// Auth: adminAuth se aplica en index.js a todo /admin/api
 
 // ════════════════════════════════════════════════════════════════
 //  Configuración Meta de la PLATAFORMA (una sola para todas las clínicas)

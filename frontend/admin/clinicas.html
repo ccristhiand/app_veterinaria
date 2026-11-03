@@ -887,11 +887,11 @@
         <td>
           <div style="display:flex;gap:.4rem;flex-wrap:wrap">
             <button onclick="abrirModalEditar(${c.id})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem">✏️ Editar</button>
-            <button onclick="abrirIntegraciones(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#a78bfa;border-color:#6d28d9">🔌</button>
-            <button onclick="abrirPagos(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#059669;border-color:#10b981">💳</button>
+            <button onclick="abrirIntegraciones(${c.id},${jsArg(c.nombre_clinica||c.slug)})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#a78bfa;border-color:#6d28d9">🔌</button>
+            <button onclick="abrirPagos(${c.id},${jsArg(c.nombre_clinica||c.slug)})" class="btn-ghost" style="padding:.35rem .7rem;font-size:.72rem;color:#059669;border-color:#10b981">💳</button>
             ${c.activo
-              ? `<button onclick="abrirSuspender(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-danger" style="padding:.35rem .7rem">🚫</button>`
-              : `<button onclick="reactivar(${c.id},'${esc(c.nombre_clinica||c.slug)}')" class="btn-success" style="padding:.35rem .7rem">✅</button>`}
+              ? `<button onclick="abrirSuspender(${c.id},${jsArg(c.nombre_clinica||c.slug)})" class="btn-danger" style="padding:.35rem .7rem">🚫</button>`
+              : `<button onclick="reactivar(${c.id},${jsArg(c.nombre_clinica||c.slug)})" class="btn-success" style="padding:.35rem .7rem">✅</button>`}
           </div>
         </td>
       </tr>`).join('');

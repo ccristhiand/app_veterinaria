@@ -257,7 +257,7 @@
           <td class="hide-mobile" style="color:#94a3b8">${s.total_mb ? (s.total_mb/1024).toFixed(2)+' GB' : '—'}</td>
           <td><span style="font-size:.72rem;font-weight:700;color:${estadoColor}">${estadoLabel}</span></td>
           <td>
-            <button onclick="backupClinica('${esc(s.tenant_id||'')}','${esc(s.tenant_nombre||'')}')"
+            <button onclick="backupClinica(${jsArg(s.tenant_id||'')},${jsArg(s.tenant_nombre||'')})"
               class="btn-green" style="padding:.3rem .7rem;font-size:.72rem">
               ▶️ Backup
             </button>

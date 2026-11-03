@@ -271,7 +271,7 @@
           <td class="hide-mobile" style="color:#94a3b8;font-size:.78rem">${docsIncluidos} docs/mes</td>
           <td class="hide-mobile">${t.tiene_api_key ? '<span style="font-size:.65rem;color:#4ade80">🔑 Configurado</span>' : '<span style="font-size:.65rem;color:#f87171">⚠️ Sin config</span>'}</td>
           <td>
-            <button onclick="abrirConfig(${t.id},'${esc(t.nombre_clinica||t.slug)}')" class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
+            <button onclick="abrirConfig(${t.id},${jsArg(t.nombre_clinica||t.slug)})" class="btn-primary" style="font-size:.75rem;padding:.4rem .85rem">
               ⚙️ Configurar
             </button>
           </td>

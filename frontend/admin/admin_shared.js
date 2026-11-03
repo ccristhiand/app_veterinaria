@@ -37,13 +37,16 @@ function toast(msg, tipo = 'success', ms = 3500) {
   const c = colors[tipo] || colors.info;
   const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
   el.style.background = c.bg; el.style.color = c.color; el.style.border = `1px solid ${c.border}`;
-  el.innerHTML = `${icons[tipo]} ${msg}`; el.style.opacity = '1'; el.style.pointerEvents = 'auto';
+  el.textContent = `${icons[tipo]} ${msg}`; el.style.opacity = '1'; el.style.pointerEvents = 'auto';
   clearTimeout(el._timer);
   el._timer = setTimeout(() => { el.style.opacity = '0'; el.style.pointerEvents = 'none'; }, ms);
 }
 
 function setNavActive(page) { document.querySelectorAll('.nav-item').forEach(el => { el.classList.toggle('active', el.dataset.page === page); }); }
-const esc      = s => String(s ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc      = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+// Argumento de string para handlers inline: onclick="fn(${jsArg(x)})" — esc() solo no basta,
+// el navegador decodifica &#39; a ' antes de ejecutar el JS del atributo.
+const jsArg    = s => esc(JSON.stringify(String(s ?? '')));
 const ADMIN_TZ = 'America/Lima';
 
 function parseServerDate(iso) {
@@ -86,7 +89,7 @@ function renderSidebar(paginaActiva) {
     document.head.appendChild(favicon);
   }
   const admin = getAdmin();
-  const nombre  = admin?.nombre || admin?.email || 'Admin';
+  const nombre  = esc(admin?.nombre || admin?.email || 'Admin');
   const inicial = nombre.charAt(0).toUpperCase();
 
   const navLinks = _ADMIN_NAV.map(item => `

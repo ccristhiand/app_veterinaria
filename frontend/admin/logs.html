@@ -240,7 +240,7 @@
       window._logsData = data;
 
     } catch(e) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error: ${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171">Error: ${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -281,12 +281,12 @@
       ${log.data_anterior ? `
         <div style="margin-bottom:1rem">
           <p style="font-size:.68rem;color:#fb923c;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📤 Data anterior</p>
-          <div class="json-box" style="border-color:#431407">${JSON.stringify(JSON.parse(typeof log.data_anterior === 'string' ? log.data_anterior : JSON.stringify(log.data_anterior)), null, 2)}</div>
+          <div class="json-box" style="border-color:#431407">${esc(JSON.stringify(JSON.parse(typeof log.data_anterior === 'string' ? log.data_anterior : JSON.stringify(log.data_anterior)), null, 2))}</div>
         </div>` : ''}
       ${log.data_nueva ? `
         <div>
           <p style="font-size:.68rem;color:#4ade80;margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em">📥 Data nueva</p>
-          <div class="json-box" style="border-color:#052e16">${JSON.stringify(JSON.parse(typeof log.data_nueva === 'string' ? log.data_nueva : JSON.stringify(log.data_nueva)), null, 2)}</div>
+          <div class="json-box" style="border-color:#052e16">${esc(JSON.stringify(JSON.parse(typeof log.data_nueva === 'string' ? log.data_nueva : JSON.stringify(log.data_nueva)), null, 2))}</div>
         </div>` : ''}
     `;
     document.getElementById('modal-log').classList.remove('hidden');

@@ -11,6 +11,8 @@ const logger                = require('./config/logger');
 const { testMasterConnection } = require('./config/masterDB');
 const { initSocket }        = require('./sockets');
 const { resolveTenant }     = require('./middlewares/tenant.middleware');
+const { adminAuth, ADMIN_SECRET } = require('./middlewares/admin.middleware');
+const jwt                   = require('jsonwebtoken');
 // ── Rutas ────────────────────────────────────────────────────────
 const authRoutes        = require('./routes/auth.routes');
 const tenantRoutes      = require('./routes/tenant.routes');
@@ -99,16 +101,21 @@ app.use(rateLimit({
   standardHeaders: true, legacyHeaders: false,
   message: { success: false, message: 'Demasiadas peticiones.' },
   keyGenerator: (req) => {
-    // Si hay token JWT, limitar por tenant + usuario (no por IP)
-    // Así 10 usuarios de la misma clínica en la misma red no se bloquean entre sí
-    try {
-      const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const jwt     = require('jsonwebtoken');
-        const payload = jwt.decode(auth.slice(7));
+    // Si hay token JWT válido, limitar por tenant + usuario (no por IP)
+    // Así 10 usuarios de la misma clínica en la misma red no se bloquean entre sí.
+    // Se verifica la firma: con jwt.decode bastaba inventar un id para saltarse el límite.
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      const token = auth.slice(7);
+      try {
+        const payload = jwt.verify(token, ADMIN_SECRET);
+        if (payload?.id) return `admin:${payload.id}`;
+      } catch {}
+      try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
         if (payload?.id) return `${req.hostname}:user:${payload.id}`;
-      }
-    } catch {}
+      } catch {}
+    }
     // Sin token (login, branding, etc.) → por hostname + ip
     return `${req.hostname}:${req.ip}`;
   },
@@ -137,6 +144,18 @@ app.get('/favicon.ico', async (req, res) => {
 });
 
 // ── Panel admin SaaS (sin tenant middleware) ──────────────────────
+// Login admin: límite estricto por IP (anti fuerza bruta); no se salta en development
+app.use('/admin/api/login', rateLimit({
+  windowMs: parseInt(process.env.ADMIN_LOGIN_RATE_WINDOW_MS || String(15 * 60 * 1000), 10),
+  max     : parseInt(process.env.ADMIN_LOGIN_RATE_MAX       || '10', 10),
+  standardHeaders: true,
+  legacyHeaders  : false,
+  message: { success: false, message: 'Demasiados intentos de inicio de sesión. Espera unos minutos.' },
+  keyGenerator: (req) => req.ip,
+  skipSuccessfulRequests: true,
+}));
+// adminAuth protege TODO /admin/api (salvo POST /login) antes de montar los routers
+app.use('/admin/api',         adminAuth);
 app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
 app.use('/admin/api/fe',      adminFeRoutes);

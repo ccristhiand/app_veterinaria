@@ -2,9 +2,14 @@
 
 const jwt = require('jsonwebtoken');
 
-// Acepta tanto el JWT del admin veterinario como el JWT propio de pagos
-const JWT_SECRET       = process.env.PAGOS_JWT_SECRET  || 'pagos-secret-2026';
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET  || process.env.JWT_SECRET || 'APP_NETCODIP_MASCOTAS_ADMIN';
+// Acepta tanto el JWT del admin veterinario como el JWT propio de pagos.
+// Sin fallbacks: un secreto por defecto permitiría fabricar tokens de admin.
+const JWT_SECRET       = process.env.PAGOS_JWT_SECRET;
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET;   // el mismo que usa backend/.env
+for (const [nombre, valor] of [['PAGOS_JWT_SECRET', JWT_SECRET], ['ADMIN_JWT_SECRET', ADMIN_JWT_SECRET]]) {
+  if (!valor || valor.length < 32)
+    throw new Error(`${nombre} no definido o demasiado corto (mínimo 32 caracteres).`);
+}
 
 function authCliente(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -44,4 +49,4 @@ function authAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authCliente, authAdmin };
+module.exports = { authCliente, authAdmin, JWT_SECRET };

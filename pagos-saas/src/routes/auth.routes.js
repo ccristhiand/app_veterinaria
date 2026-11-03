@@ -4,10 +4,10 @@ const { Router } = require('express');
 const bcrypt     = require('bcryptjs');
 const jwt        = require('jsonwebtoken');
 const { query, queryOne } = require('../db');
+const { JWT_SECRET }      = require('../middlewares/auth.middleware');
 
 const router = Router();
 
-const JWT_SECRET     = process.env.PAGOS_JWT_SECRET || 'pagos-secret-2026';
 const JWT_EXPIRES_IN = '7d';
 
 // ── POST /api/auth/login — cliente (clínica) ──────────────────

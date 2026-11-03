@@ -11,19 +11,18 @@ const mysql         = require('mysql2/promise');
 const path          = require('path');
 const fs            = require('fs');
 
-const router       = Router();
-const ADMIN_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'admin-secret';
+const { ADMIN_SECRET } = require('../middlewares/admin.middleware');
 
-// ── Auth admin ────────────────────────────────────────────────────
-function adminAuth(req, res, next) {
-  const token = req.headers.authorization?.slice(7);
-  if (!token) return res.status(401).json({ success: false, message: 'Token requerido.' });
-  try {
-    req.adminUser = jwt.verify(token, ADMIN_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ success: false, message: 'Token inválido.' });
-  }
+const router = Router();
+
+// Auth: adminAuth se aplica en index.js a todo /admin/api (excepto este login)
+
+// Columnas de tenants / tenant_config que nunca deben salir al navegador
+const CAMPOS_PRIVADOS = ['db_host', 'db_port', 'db_user', 'db_pass', 'apidoc_token', 'apidoc_token_exp'];
+function sinPrivados(row) {
+  const out = { ...row };
+  for (const k of CAMPOS_PRIVADOS) delete out[k];
+  return out;
 }
 
 // POST /admin/api/login
@@ -41,8 +40,6 @@ router.post('/login', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.use(adminAuth);
-
 // ── GET /admin/api/tenants ────────────────────────────────────────
 router.get('/tenants', async (req, res) => {
   try {
@@ -57,7 +54,7 @@ router.get('/tenants', async (req, res) => {
        LEFT JOIN tenant_config tc ON tc.tenant_id = t.id
        ORDER BY t.created_at DESC`
     );
-    return res.json({ success: true, data: tenants });
+    return res.json({ success: true, data: tenants.map(sinPrivados) });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
@@ -71,7 +68,7 @@ router.get('/tenants/:id', async (req, res) => {
        WHERE t.id = ?`, [req.params.id]
     );
     if (!tenant) return res.status(404).json({ success: false, message: 'No encontrado.' });
-    return res.json({ success: true, data: tenant });
+    return res.json({ success: true, data: sinPrivados(tenant) });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
