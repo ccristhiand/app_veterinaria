@@ -41,7 +41,7 @@ server {
     root /var/www/app_veterinaria/frontend/admin;
     index index.html;
 
-    location ~* \.(js|html)$ {
+    location ~* \.(js|html|css)$ {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
         add_header Pragma "no-cache";
         add_header Expires "0";
@@ -265,7 +265,7 @@ server {
     root /var/www/app_veterinaria/frontend;
     index login.html;
 
-    location ~* \.(js|html)$ {
+    location ~* \.(js|html|css)$ {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
         add_header Pragma "no-cache";
         add_header Expires "0";
