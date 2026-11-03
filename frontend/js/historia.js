@@ -245,7 +245,13 @@ async function cargarHistoria(id) {
   document.getElementById('consultas').innerHTML = '<div class="vempty"><div class="vspinner"></div><p>Cargando historial…</p></div>';
   try {
     const rm = await api('/mascotas/'+id);
-    if (!rm||!rm.ok) { toast('Mascota no encontrada.','danger'); return; }
+    if (!rm) return;   // sesión vencida: api() ya redirige al login
+    if (!rm.ok) {
+      toast('Mascota no encontrada.','danger');
+      // Sin esto el "Cargando historial…" quedaba girando para siempre
+      document.getElementById('consultas').innerHTML = errorHistoriaHTML(id, 'No se pudo cargar la mascota.');
+      return;
+    }
     const m = (await rm.json()).data;
     _mascotaHActual = m;
     document.getElementById('h-icon').innerHTML      = mascotaFotoHTML(m);
@@ -284,13 +290,20 @@ async function cargarHistoria(id) {
     }
     const rh = await api('/historia?mascota_id='+id);
     if (!rh) return;
+    // Un error del servidor no debe mostrarse como "sin consultas"
+    if (!rh.ok) throw new Error('GET /historia respondió ' + rh.status);
     const consultas = (await rh.json()).data||[];
     document.getElementById('h-total-consultas').textContent = consultas.length+' consulta'+(consultas.length!==1?'s':'')+' registrada'+(consultas.length!==1?'s':'');
     renderTimeline(consultas);
   } catch(e) {
     console.error(e);
-    document.getElementById('consultas').innerHTML='<div class="vempty"><span class="icon">😿</span><p>Error al cargar el historial.</p></div>';
+    document.getElementById('consultas').innerHTML = errorHistoriaHTML(id, 'Error al cargar el historial.');
   }
+}
+
+function errorHistoriaHTML(id, mensaje) {
+  return '<div class="vempty"><span class="icon">😿</span><p>' + esc(mensaje) + '</p>' +
+    '<button class="vbtn vbtn-ghost vbtn-sm" style="margin-top:.8rem" onclick="cargarHistoria(' + parseInt(id) + ')">↻ Reintentar</button></div>';
 }
 
 // ── Foto de la mascota desde la cabecera ─────────────────────────
