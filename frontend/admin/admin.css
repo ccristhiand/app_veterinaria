@@ -449,3 +449,40 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text-2)
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── Selector de temas de la clínica (clinicas.html) ─────────────── */
+.temas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.tema-card {
+  display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+  padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); cursor: pointer; text-align: left;
+  font-family: inherit; transition: border-color .15s, box-shadow .15s;
+}
+.tema-card:hover { border-color: var(--text-faint); }
+.tema-card.sel { border-color: var(--accent); box-shadow: var(--focus); }
+.tema-custom { cursor: default; border-style: dashed; }
+.tema-muestra { display: flex; height: 26px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.tema-muestra span { flex: 1; }
+.tema-muestra span:first-child { flex: 1.4; }
+.tema-nombre { font-size: .76rem; font-weight: 600; line-height: 1.2; }
+
+/* Vista previa del sistema de la clínica (colores siempre en tema claro, como la app real) */
+#tema-preview { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.tp-app { display: flex; min-height: 168px; background: #faf9f6; color: #1a2e28; font-size: 11px; }
+.tp-side { width: 132px; padding: 10px 8px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.tp-logo { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; min-width: 0; }
+.tp-logo span { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; }
+.tp-logo b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-item { padding: 5px 7px; border-radius: 6px; }
+.tp-act { font-weight: 700; }
+.tp-main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tp-head b { font-size: 13px; }
+.tp-btn { padding: 5px 10px; border-radius: 7px; font-weight: 700; white-space: nowrap; }
+.tp-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tp-kpis div { background: #fff; border: 1px solid #e8ede9; border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; }
+.tp-kpis small { color: #94a5a0; font-size: 9.5px; }
+.tp-kpis b { font-size: 14px; }
+.tp-tabs { display: flex; gap: 12px; border-bottom: 1px solid #e8ede9; }
+.tp-tabs span { padding-bottom: 5px; color: #94a5a0; border-bottom: 2px solid transparent; font-weight: 600; }
+@media (max-width: 640px) { .tp-side { width: 96px; } .tp-kpis { grid-template-columns: 1fr 1fr; } .tp-kpis div:last-child { display: none; } }

@@ -17,6 +17,14 @@ const API_URL    = _isLocal
 
 const SOCKET_URL = API_URL;
 
+// ── Tailwind (CDN): las clases green-* / emerald-* siguen la marca de la clínica ──
+if (window.tailwind) {
+  const _escalaMarca = {};
+  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900].forEach(n => { _escalaMarca[n] = `var(--green-${n})`; });
+  _escalaMarca[950] = "var(--green-900)";
+  window.tailwind.config = { theme: { extend: { colors: { green: _escalaMarca, emerald: _escalaMarca } } } };
+}
+
 // ── Aplicar favicon inmediatamente al cargar shared.js ────────────
 (async function aplicarFaviconInmediato() {
   try {
@@ -78,9 +86,9 @@ function showLoader() {
             <div style="background:#fff;border-radius:1.25rem;padding:1.5rem 2rem;
               box-shadow:0 20px 60px rgba(13,59,46,.15);
               display:flex;align-items:center;gap:1rem;
-              border:1px solid rgba(16,185,129,.15)">
+              border:1px solid rgba(var(--brand-rgb),.15)">
               <div style="width:28px;height:28px;border:3px solid #e8ede9;
-                border-top-color:#10b981;border-radius:50%;
+                border-top-color:var(--green-500);border-radius:50%;
                 animation:loaderSpin .7s linear infinite"></div>
               <span style="font-size:.88rem;font-weight:600;color:#1a2e28;
                 font-family:'Inter',sans-serif">Procesando…</span>
@@ -637,6 +645,9 @@ function aplicarBranding(b) {
     set('--green-600', _hex(_legibleSobreBlanco(_mix(p, -0.12), 3)));
     set('--green-700', _hex(texto));
     set('--green-800', _hex(_mix(texto, -0.2)));
+    set('--green-400', _hex(_mix(p, 0.22)));
+    set('--green-300', _hex(_mix(p, 0.45)));
+    set('--green-200', _hex(_mix(p, 0.65)));
     set('--green-100', _hex(_mix(p, 0.8)));
     set('--green-50',  _hex(_mix(p, 0.92)));
     set('--brand-rgb', p.join(','));

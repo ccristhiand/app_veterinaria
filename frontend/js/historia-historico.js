@@ -121,7 +121,7 @@ async function hhCargar(reiniciar) {
 function hhPintarContadores(t) {
   var a = t.atenciones || 0, s = t.seguimientos || 0;
   document.getElementById('hh-contadores').innerHTML =
-    '<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px">🩺 ' + a + ' atención' + (a !== 1 ? 'es' : '') + '</span>' +
+    '<span style="background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200);font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px">🩺 ' + a + ' atención' + (a !== 1 ? 'es' : '') + '</span>' +
     '<span style="background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:999px">🔄 ' + s + ' seguimiento' + (s !== 1 ? 's' : '') + '</span>';
 }
 
@@ -144,7 +144,7 @@ function hhFila(f) {
   var sinHora = esSeg && hora === '00:00'; // los seguimientos se registran solo con fecha
   var badge = esSeg
     ? '<span style="background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;white-space:nowrap">🔄 Seguimiento</span>'
-    : '<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;white-space:nowrap">🩺 Atención</span>';
+    : '<span style="background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200);font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;white-space:nowrap">🩺 Atención</span>';
   var cita = (!esSeg && f.cita_id)
     ? '<span style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;font-size:.6rem;font-weight:700;padding:.12rem .5rem;border-radius:999px">Cita #' + f.cita_id + '</span>' : '';
   var detalle = f.detalle

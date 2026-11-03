@@ -26,8 +26,8 @@
   </div>
   <!-- Banner sede activa -->
   <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:#15803d">
+    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:var(--green-700)">
     🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
   </div>
 
@@ -174,12 +174,12 @@
         </div>
         <!-- Margen calculado en tiempo real -->
         <div class="sm:col-span-2" id="margen-preview" style="display:none;
-          background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;
+          background:var(--green-50);border:1px solid var(--green-200);border-radius:.75rem;
           padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
-          <span style="font-size:.78rem;color:#15803d;font-weight:600">📊 Margen de ganancia:</span>
+          <span style="font-size:.78rem;color:var(--green-700);font-weight:600">📊 Margen de ganancia:</span>
           <div style="text-align:right">
-            <span style="font-size:.88rem;font-weight:800;color:#15803d" id="margen-monto">S/. 0.00</span>
-            <span style="font-size:.75rem;font-weight:700;color:#15803d;margin-left:.4rem"
+            <span style="font-size:.88rem;font-weight:800;color:var(--green-700)" id="margen-monto">S/. 0.00</span>
+            <span style="font-size:.75rem;font-weight:700;color:var(--green-700);margin-left:.4rem"
               id="margen-pct">(0%)</span>
           </div>
         </div>
@@ -231,7 +231,7 @@
       <input type="hidden" id="stock-id"/>
 
       <!-- Info producto -->
-      <div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.85rem;padding:.85rem 1rem">
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem 1rem">
         <p style="font-weight:700;font-size:.9rem" id="stock-nombre">—</p>
         <div style="display:flex;gap:2rem;margin-top:.5rem;font-size:.8rem">
           <span>Stock actual: <strong id="stock-actual">—</strong></span>
@@ -435,7 +435,7 @@ function renderStats(meta) {
   var vacs  = itemsActuales.filter(function(i) { return i.categoria === 'vacuna'; }).length;
 
   document.getElementById('stats-inv').innerHTML =
-    stat('📦', total, 'TOTAL ÍTEMS',  '#15803d', '#f0fdf4', '#bbf7d0') +
+    stat('📦', total, 'TOTAL ÍTEMS',  'var(--green-700)', 'var(--green-50)', 'var(--green-200)') +
     stat('⚠️', bajo,  'STOCK BAJO',   '#b45309', '#fffbeb', '#fde68a') +
     stat('💊', meds,  'MEDICAMENTOS', '#1d4ed8', '#eff6ff', '#bfdbfe') +
     stat('💉', vacs,  'VACUNAS',      '#6d28d9', '#f5f3ff', '#ddd6fe');
@@ -527,7 +527,7 @@ function renderTabla(items) {
       <td>
         ${esBajo
           ? '<span style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">⚠️ Bajo stock</span>'
-          : '<span style="background:#f0fdf4;color:#15803d;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0">✅ OK</span>'}
+          : '<span style="background:var(--green-50);color:var(--green-700);font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid var(--green-200)">✅ OK</span>'}
       </td>
       <td>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -852,9 +852,9 @@ function mostrarPreviewMasiva(validos, errores) {
   const body = document.getElementById('masiva-body');
   body.innerHTML = `
     <div style="display:flex;gap:1rem;margin-bottom:1rem">
-      <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem;text-align:center">
-        <p style="font-size:1.3rem;font-weight:800;color:#15803d">${validos.length}</p>
-        <p style="font-size:.72rem;color:#15803d;font-weight:700">Productos válidos</p>
+      <div style="flex:1;background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem;text-align:center">
+        <p style="font-size:1.3rem;font-weight:800;color:var(--green-700)">${validos.length}</p>
+        <p style="font-size:.72rem;color:var(--green-700);font-weight:700">Productos válidos</p>
       </div>
       ${errores.length ? `
       <div style="flex:1;background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.85rem;text-align:center">

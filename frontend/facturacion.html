@@ -31,7 +31,7 @@
     .ac-cat-pill { font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;white-space:nowrap; }
     .pago-fila { display:grid;grid-template-columns:1fr 120px 32px;gap:.5rem;align-items:center; }
     #pdf-preview table { width:100%;border-collapse:collapse;table-layout:fixed; }
-    #pdf-preview th { background:#166534;color:#fff;padding:.4rem .6rem;text-align:left;font-size:.72rem;word-break:break-word; }
+    #pdf-preview th { background:var(--green-800);color:#fff;padding:.4rem .6rem;text-align:left;font-size:.72rem;word-break:break-word; }
     #pdf-preview td { padding:.38rem .6rem;border-bottom:1px solid #f0f0f0;font-size:.72rem;word-break:break-word; }
     #pdf-preview .tabla-items-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
     @media (max-width:639px) {
@@ -195,8 +195,8 @@
 
   <!-- Banner sede activa -->
   <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:#15803d">
+    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:var(--green-700)">
     🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
   </div>
 
@@ -220,7 +220,7 @@
     <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.3rem">
       <div class="vcard vcard-pad">
         <p style="font-size:.68rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Ingresos del período</p>
-        <p style="font-size:1.6rem;font-weight:800;color:#15803d;margin-top:.3rem" id="stat-ingresos">S/. 0.00</p>
+        <p style="font-size:1.6rem;font-weight:800;color:var(--green-700);margin-top:.3rem" id="stat-ingresos">S/. 0.00</p>
         <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.15rem" id="stat-pagados">0 documentos pagados</p>
       </div>
       <div class="vcard vcard-pad">
@@ -396,8 +396,8 @@
           <button onclick="buscarPropFac()" class="vbtn vbtn-primary">Buscar</button>
         </div>
         <div id="nf-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:150px;overflow-y:auto"></div>
-        <div id="nf-prop-sel" style="display:none;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.75rem;margin-top:.5rem">
-          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="nf-prop-avatar">?</div>
+        <div id="nf-prop-sel" style="display:none;background:var(--green-50);border:1px solid var(--green-200);border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.75rem;margin-top:.5rem">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--green-500),var(--green-600));color:#fff;font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="nf-prop-avatar">?</div>
           <div style="flex:1">
             <p style="font-weight:700;font-size:.88rem" id="nf-prop-nombre">—</p>
             <p style="font-size:.7rem;color:var(--ink-soft)" id="nf-prop-info">—</p>
@@ -415,7 +415,7 @@
       </div>
 
       <!-- IGV -->
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600">
           <input type="checkbox" id="nf-igv" checked style="accent-color:var(--green-600);width:16px;height:16px"/>
           IGV incluido en el precio (<span id="nf-igv-pct">18</span>%)
@@ -481,7 +481,7 @@
       </div>
 
       <!-- Totales desglosados -->
-      <div id="nf-totales" style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1.1rem">
+      <div id="nf-totales" style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.85rem 1.1rem">
         <div style="display:flex;justify-content:flex-end;flex-direction:column;gap:.28rem;align-items:flex-end">
 
           <!-- Subtotal bruto -->
@@ -500,7 +500,7 @@
             <span style="font-weight:600;min-width:90px;text-align:right;color:#be123c" id="tot-desc-global">−S/. 0.00</span>
           </div>
           <!-- Base imponible -->
-          <div style="display:flex;gap:3rem;font-size:.8rem;border-top:1px dashed #a7f3d0;padding-top:.25rem;margin-top:.1rem">
+          <div style="display:flex;gap:3rem;font-size:.8rem;border-top:1px dashed var(--green-200);padding-top:.25rem;margin-top:.1rem">
             <span style="color:var(--ink-soft)">Base imponible (sin IGV):</span>
             <span style="font-weight:600;min-width:90px;text-align:right" id="tot-sub">S/. 0.00</span>
           </div>
@@ -510,7 +510,7 @@
             <span style="font-weight:600;min-width:90px;text-align:right" id="tot-igv">S/. 0.00</span>
           </div>
           <!-- TOTAL — sin comisión -->
-          <div style="display:flex;gap:3rem;font-size:.96rem;font-weight:800;color:#15803d;padding-top:.3rem;border-top:2px solid #a7f3d0;margin-top:.2rem">
+          <div style="display:flex;gap:3rem;font-size:.96rem;font-weight:800;color:var(--green-700);padding-top:.3rem;border-top:2px solid var(--green-200);margin-top:.2rem">
             <span>TOTAL:</span>
             <span style="min-width:90px;text-align:right" id="tot-total">S/. 0.00</span>
           </div>
@@ -591,11 +591,11 @@
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <input type="hidden" id="pagar-id"/>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;
         padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
         <div>
-          <p style="font-size:.68rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total a cobrar</p>
-          <p style="font-size:1.4rem;font-weight:800;color:#15803d" id="pagar-total">S/. 0.00</p>
+          <p style="font-size:.68rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total a cobrar</p>
+          <p style="font-size:1.4rem;font-weight:800;color:var(--green-700)" id="pagar-total">S/. 0.00</p>
         </div>
         <div style="text-align:right">
           <p style="font-size:.68rem;color:var(--ink-faint)">Pendiente</p>
@@ -904,7 +904,7 @@ function renderTopServicios(data) {
     var pct=((parseFloat(s.monto_total)/max)*100).toFixed(0);
     return '<div style="display:flex;align-items:center;gap:.85rem">' +
       '<div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:600;margin-bottom:.2rem">' +
-      '<span>'+esc(s.descripcion)+'</span><span style="font-size:.78rem;font-weight:700;color:#15803d">S/. '+parseFloat(s.monto_total).toFixed(2)+'</span></div>' +
+      '<span>'+esc(s.descripcion)+'</span><span style="font-size:.78rem;font-weight:700;color:var(--green-700)">S/. '+parseFloat(s.monto_total).toFixed(2)+'</span></div>' +
       '<div style="background:#f0f0f0;border-radius:999px;height:5px"><div style="background:var(--green-400);height:5px;border-radius:999px;width:'+pct+'%"></div></div>' +
       '<p style="font-size:.6rem;color:var(--ink-faint);margin-top:.1rem">'+s.cantidad_total+' unidades</p></div></div>';
   }).join('');
@@ -924,7 +924,7 @@ function badgeSUNAT(f) {
     return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f8faf8;color:var(--ink-soft);border:1px solid var(--line)">⏳ No emitido</span>';
   }
   if (f.sunat_estado === '0')
-    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Aceptado</span>';
+    return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)">✅ Aceptado</span>';
   if (f.sunat_estado === 'anulado_sunat')
     return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado</span>';
   return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
@@ -992,7 +992,7 @@ async function cargarFacturas() {
         return `<div style="background:#fff;border:1px solid var(--line);border-radius:1rem;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.6rem">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
             <div>
-              <span style="font-family:monospace;font-size:.82rem;font-weight:700;color:#166534">${esc(f.numero)}</span>
+              <span style="font-family:monospace;font-size:.82rem;font-weight:700;color:var(--green-800)">${esc(f.numero)}</span>
               <span style="font-size:.65rem;background:${f.tipo==='factura'?'#eff6ff':'#f0fdf4'};color:${f.tipo==='factura'?'#1d4ed8':'#15803d'};padding:.1rem .4rem;border-radius:999px;font-weight:700;margin-left:.3rem">${f.tipo}</span>
             </div>
             <span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:${estadoBg};color:${estadoColor};border:1px solid ${estadoBg}">${estadoLabel}</span>
@@ -1004,7 +1004,7 @@ async function cargarFacturas() {
               <p style="font-size:.72rem;color:var(--ink-faint)">${fDate(f.fecha)}</p>
             </div>
             <div style="text-align:right">
-              <p style="font-size:1.15rem;font-weight:800;color:#15803d">S/. ${parseFloat(f.total).toFixed(2)}</p>
+              <p style="font-size:1.15rem;font-weight:800;color:var(--green-700)">S/. ${parseFloat(f.total).toFixed(2)}</p>
               ${tieneDesc ? '<p style="font-size:.62rem;color:#be123c;font-weight:700">con descuento</p>' : ''}
             </div>
           </div>
@@ -1096,7 +1096,7 @@ async function buscarPropFac() {
       ? rows.map(p =>
           '<button onclick="selPropFac('+p.id+',\''+esc(p.nombre)+'\',\''+esc(p.apellido)+'\',\''+esc(p.dni||'')+'\',\''+esc(p.telefono||'')+'\')" '+
           'style="display:flex;align-items:center;gap:.7rem;padding:.6rem .85rem;background:#fff;border:1px solid var(--line);border-radius:.8rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
-          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseover="this.style.borderColor=\'var(--green-500)\';this.style.background=\'var(--green-50)\'" '+
           'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
             '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
             '<div style="flex:1"><p style="font-weight:700;font-size:.83rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.68rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+'📞 '+esc(p.telefono||'')+'</p></div>' +
@@ -1224,10 +1224,10 @@ function addItem(desc, cant, pu) {
 
 var _acTimers = {};
 var _catColors = {
-  consulta:'#f0fdf4;color:#15803d', vacunacion:'#f5f3ff;color:#6d28d9',
+  consulta:'var(--green-50);color:var(--green-700)', vacunacion:'#f5f3ff;color:#6d28d9',
   estetica:'#fdf2f8;color:#db2777', cirugia:'#fff1f2;color:#be123c',
   laboratorio:'#eff6ff;color:#1d4ed8', medicamento:'#f0f9ff;color:#0369a1',
-  servicio:'#f0fdf4;color:#15803d', inventario:'#f0f9ff;color:#0369a1',
+  servicio:'var(--green-50);color:var(--green-700)', inventario:'#f0f9ff;color:#0369a1',
   otro:'#f8faf8;color:#4b5f57',
 };
 
@@ -1574,19 +1574,19 @@ function renderPDF(f, emp) {
   var tieneDesc   = descItems > 0 || descGlobal > 0;
 
   document.getElementById('pdf-preview').innerHTML =
-    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:3px solid #166534;padding-bottom:1rem;margin-bottom:1rem">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:3px solid var(--green-800);padding-bottom:1rem;margin-bottom:1rem">' +
       '<div style="display:flex;align-items:center;gap:.75rem">' +
         (emp.logo_url
           ? '<img src="'+esc(emp.logo_url)+'" style="height:56px;object-fit:contain;border-radius:.4rem" onerror="this.style.display=\'none\'"/>'
-          : '<div style="width:56px;height:56px;background:linear-gradient(135deg,#166534,#15803d);border-radius:.8rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.3rem">V</div>') +
+          : '<div style="width:56px;height:56px;background:linear-gradient(135deg,var(--green-800),var(--green-700));border-radius:.8rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.3rem">V</div>') +
         '<div>' +
-          '<p style="font-weight:800;font-size:1rem;color:#166534">'+esc(emp.nombre||'VetClinic')+'</p>' +
+          '<p style="font-weight:800;font-size:1rem;color:var(--green-800)">'+esc(emp.nombre||'VetClinic')+'</p>' +
           (emp.razon_social?'<p style="font-size:.72rem;color:#4b5f57">'+esc(emp.razon_social)+'</p>':'') +
           (emp.ruc?'<p style="font-size:.72rem;color:#4b5f57">RUC: '+esc(emp.ruc)+'</p>':'') +
         '</div>' +
       '</div>' +
       '<div style="text-align:right">' +
-        '<div style="background:linear-gradient(135deg,'+(f.tipo==='factura'?'#1d4ed8,#2563eb':'#166534,#15803d')+');color:#fff;padding:.5rem 1rem;border-radius:.6rem;font-weight:800;font-size:.85rem">'+tipoLbl+'</div>' +
+        '<div style="background:linear-gradient(135deg,'+(f.tipo==='factura'?'#1d4ed8,#2563eb':'var(--green-800),var(--green-700)')+');color:#fff;padding:.5rem 1rem;border-radius:.6rem;font-weight:800;font-size:.85rem">'+tipoLbl+'</div>' +
         '<p style="font-size:.8rem;font-weight:700;font-family:monospace;margin-top:.35rem">'+esc(f.numero)+'</p>' +
         '<p style="font-size:.7rem;color:#4b5f57;margin-top:.1rem">Fecha: '+fDate(f.fecha)+'</p>' +
         '<span style="font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;display:inline-block;margin-top:.2rem;'+(f.estado==='pagado'?'background:#f0fdf4;color:#15803d;':f.estado==='anulado'?'background:#fff1f2;color:#be123c;':'background:#fffbeb;color:#b45309;')+'">'+f.estado.toUpperCase()+'</span>' +
@@ -1600,7 +1600,7 @@ function renderPDF(f, emp) {
       (emp.web?'<span>🌐 '+esc(emp.web)+'</span>':'') +
     '</div>' +
 
-    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.7rem;padding:.75rem 1rem;margin-bottom:1rem;font-size:.75rem">' +
+    '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.7rem;padding:.75rem 1rem;margin-bottom:1rem;font-size:.75rem">' +
       (f.tipo==='factura'
         ? '<div style="display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;align-items:start">' +
             '<span style="font-size:.6rem;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;grid-column:span 2;margin-bottom:.2rem">🏢 Empresa cliente</span>' +
@@ -1612,7 +1612,7 @@ function renderPDF(f, emp) {
           '</div>'
         : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">' +
             '<div>' +
-              '<p style="font-size:.6rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Cliente</p>' +
+              '<p style="font-size:.6rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">Cliente</p>' +
               '<p style="font-weight:700">'+esc(f.propietario_nombre)+'</p>' +
               (f.dni?'<p style="color:#4b5f57">DNI: '+esc(f.dni)+'</p>':'') +
             '</div>' +
@@ -1670,7 +1670,7 @@ function renderPDF(f, emp) {
         '<div style="display:flex;justify-content:space-between;font-size:.76rem"><span style="color:#4b5f57">IGV ('+igvPct+'%):</span><span style="font-weight:600">S/. '+parseFloat(f.igv).toFixed(2)+'</span></div>' +
         (comision>0
           ? '' : '') +
-        '<div style="display:flex;justify-content:space-between;background:#166534;color:#fff;padding:.5rem .85rem;border-radius:.5rem;font-weight:800;font-size:.92rem;margin-top:.25rem">' +
+        '<div style="display:flex;justify-content:space-between;background:var(--green-800);color:#fff;padding:.5rem .85rem;border-radius:.5rem;font-weight:800;font-size:.92rem;margin-top:.25rem">' +
           '<span>TOTAL:</span><span>S/. '+parseFloat(f.total).toFixed(2)+'</span></div>' +
         (comision>0
           ? '<div style="margin-top:.35rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.5rem;padding:.38rem .75rem;display:flex;justify-content:space-between;font-size:.72rem">' +
@@ -1678,7 +1678,7 @@ function renderPDF(f, emp) {
               '<span style="color:#6d28d9;font-weight:700">S/. '+comision.toFixed(2)+'</span>' +
             '</div>'
           : '') +
-        (f.metodo_pago?'<p style="text-align:right;font-size:.7rem;color:#15803d;font-weight:600;margin-top:.2rem">'+(metodos[f.metodo_pago]||f.metodo_pago)+'</p>':'') +
+        (f.metodo_pago?'<p style="text-align:right;font-size:.7rem;color:var(--green-700);font-weight:600;margin-top:.2rem">'+(metodos[f.metodo_pago]||f.metodo_pago)+'</p>':'') +
       '</div>' +
     '</div>' +
 
@@ -1692,7 +1692,7 @@ function renderPDF(f, emp) {
             '</div>').join('') +
         '</div>'
       : f.pagos?.length===1
-        ? '<p style="font-size:.7rem;color:#15803d;font-weight:600;text-align:right;margin-bottom:.75rem">' +
+        ? '<p style="font-size:.7rem;color:var(--green-700);font-weight:600;text-align:right;margin-bottom:.75rem">' +
             (metodos[f.pagos[0].metodo_pago]||f.pagos[0].metodo_pago) +
             (f.pagos[0].referencia?' · Ref: '+f.pagos[0].referencia:'') +
           '</p>'
@@ -1828,7 +1828,7 @@ function imprimirTicket() {
       '@media print{html{background:#fff}.no-print{display:none}}' +
       /* Botón pantalla */
       '.btn-wrap{text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #ccc}' +
-      '.btn-imp{display:inline-block;padding:6px 20px;background:#166534;color:#fff;' +
+      '.btn-imp{display:inline-block;padding:6px 20px;background:var(--green-800);color:#fff;' +
         'border:none;border-radius:4px;font-family:"Courier New",monospace;font-size:11px;cursor:pointer;font-weight:bold}' +
     '</style>' +
     '</head><body>' +
@@ -2048,10 +2048,10 @@ function descargarPDF() {
     '<meta charset="UTF-8"/>' +
     '<title>'+facActualData.numero+'</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>' +
-    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Inter\',sans-serif;padding:2rem;max-width:700px;margin:0 auto;color:#111}table{width:100%;border-collapse:collapse}th{background:#166534;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.75rem}td{padding:.4rem .7rem;border-bottom:1px solid #f0f0f0;font-size:.75rem}@media print{button{display:none}}</style>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Inter\',sans-serif;padding:2rem;max-width:700px;margin:0 auto;color:#111}table{width:100%;border-collapse:collapse}th{background:var(--green-800);color:#fff;padding:.5rem .7rem;text-align:left;font-size:.75rem}td{padding:.4rem .7rem;border-bottom:1px solid #f0f0f0;font-size:.75rem}@media print{button{display:none}}</style>' +
     '</head><body>' +
     contenido +
-    '<br/><div style="text-align:center"><button onclick="window.print()" style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>' +
+    '<br/><div style="text-align:center"><button onclick="window.print()" style="background:var(--green-800);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>' +
     '</body></html>'
   );
   ventana.document.close();
@@ -2160,12 +2160,12 @@ async function confirmarEmisionSUNAT() {
     if (res.ok && data.success) {
       document.getElementById('sunat-modal-titulo').textContent = '✅ Documento Aceptado';
       document.getElementById('sunat-modal-body').innerHTML =
-        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:1.25rem;text-align:center">' +
+        '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:1.25rem;text-align:center">' +
         '<p style="font-size:2.5rem;margin-bottom:.5rem">✅</p>' +
-        '<p style="font-weight:800;font-size:1.1rem;color:#15803d">'+esc(data.data?.numero||numero)+'</p>' +
-        '<p style="font-size:.82rem;color:#15803d;margin-top:.35rem">Aceptado por SUNAT</p>' +
+        '<p style="font-weight:800;font-size:1.1rem;color:var(--green-700)">'+esc(data.data?.numero||numero)+'</p>' +
+        '<p style="font-size:.82rem;color:var(--green-700);margin-top:.35rem">Aceptado por SUNAT</p>' +
         '</div>' +
-        (data.data?.hash?'<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.85rem 1rem"><p style="font-size:.65rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;margin-bottom:.35rem">Hash CDR</p><p style="font-family:monospace;font-size:.72rem;word-break:break-all;color:#15803d">'+esc(data.data.hash)+'</p></div>':'');
+        (data.data?.hash?'<div style="background:#f8faf8;border:1px solid var(--line);border-radius:.75rem;padding:.85rem 1rem"><p style="font-size:.65rem;color:var(--ink-faint);font-weight:700;text-transform:uppercase;margin-bottom:.35rem">Hash CDR</p><p style="font-family:monospace;font-size:.72rem;word-break:break-all;color:var(--green-700)">'+esc(data.data.hash)+'</p></div>':'');
       if (data.data?.enlace_pdf) {
         var link = document.getElementById('sunat-pdf-link');
         link.href=data.data.enlace_pdf; link.style.display='inline-flex';

@@ -39,8 +39,8 @@ function mostrarTab(tab) {
     const btn = document.getElementById('tab-'+t);
     if (!btn) return;
     const isActive = t === tab;
-    const activeColor  = { consultas:'#059669', vacunas:'#6d28d9', desparasitaciones:'#047857', estetica:'#db2777' };
-    const activeBorder = { consultas:'#10b981', vacunas:'#8b5cf6', desparasitaciones:'#10b981',  estetica:'#ec4899' };
+    const activeColor  = { consultas:'var(--green-600)', vacunas:'#6d28d9', desparasitaciones:'var(--green-700)', estetica:'#db2777' };
+    const activeBorder = { consultas:'var(--green-500)', vacunas:'#8b5cf6', desparasitaciones:'var(--green-500)',  estetica:'#ec4899' };
     btn.style.color             = isActive ? activeColor[t]  : 'var(--ink-faint)';
     btn.style.borderBottomColor = isActive ? activeBorder[t] : 'transparent';
     btn.style.fontWeight        = isActive ? '700' : '600';
@@ -118,7 +118,7 @@ function switchBuscarTab(tab) {
   bp.style.fontWeight  = isProp ? '700' : '600';
   bp.style.boxShadow   = isProp ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
   bm.style.background  = isProp ? 'none' : '#fff';
-  bm.style.color       = isProp ? 'var(--ink-soft)' : '#15803d';
+  bm.style.color       = isProp ? 'var(--ink-soft)' : 'var(--green-700)';
   bm.style.fontWeight  = isProp ? '600' : '700';
   bm.style.boxShadow   = isProp ? 'none' : '0 1px 3px rgba(0,0,0,.1)';
   document.getElementById('b-prop-resultados').innerHTML = '';
@@ -148,7 +148,7 @@ async function buscarMascotaH() {
     rows.forEach(function(m) {
       var btn = document.createElement('button');
       btn.style.cssText = 'display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s;margin-bottom:.4rem';
-      btn.onmouseover = function() { this.style.borderColor = '#10b981'; this.style.background = '#f0fdf4'; };
+      btn.onmouseover = function() { this.style.borderColor = 'var(--green-500)'; this.style.background = 'var(--green-50)'; };
       btn.onmouseout  = function() { this.style.borderColor = 'var(--line)'; this.style.background = '#fff'; };
       btn.onclick     = function() { selMascotaH(m.id); };
       btn.innerHTML =
@@ -179,14 +179,14 @@ async function buscarPropH() {
     cont.innerHTML = rows.length ? rows.map(p=>`
       <button onclick="selPropH(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}')"
         style="display:flex;align-items:center;gap:.75rem;padding:.75rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
-        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseover="this.style.borderColor='var(--green-500)';this.style.background='var(--green-50)'"
         onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
         <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.8rem;flex-shrink:0;display:flex;align-items:center;justify-content:center">${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}</div>
         <div style="flex:1;min-width:0">
           <p style="font-weight:700;font-size:.87rem">${esc(p.nombre)} ${esc(p.apellido)}</p>
           <p style="font-size:.7rem;color:var(--ink-faint)">${p.dni?'🪪 '+esc(p.dni)+' · ':''}📞 ${esc(p.telefono)}</p>
         </div>
-        <span style="background:#ecfdf5;color:#047857;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;flex-shrink:0">🐾 ${p.total_mascotas}</span>
+        <span style="background:var(--green-50);color:var(--green-700);font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;flex-shrink:0">🐾 ${p.total_mascotas}</span>
       </button>`).join('')
     : '<div style="font-size:.8rem;color:var(--ink-faint);text-align:center;padding:.75rem">No se encontraron propietarios</div>';
   } catch { cont.innerHTML = '<div style="font-size:.78rem;color:#e11d48;padding:.4rem">Error al buscar</div>'; }
@@ -206,7 +206,7 @@ async function selPropH(propId, propNombre) {
       ? mascotas.map(m=>`
           <button onclick="selMascotaH(${m.id})"
             style="display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;background:#fff;border:1px solid var(--line);border-radius:.9rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
-            onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+            onmouseover="this.style.borderColor='var(--green-500)';this.style.background='var(--green-50)'"
             onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
             <span style="width:44px;height:44px;border-radius:.9rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.6rem;overflow:hidden;flex-shrink:0">${mascotaFotoHTML(m)}</span>
             <div style="flex:1"><p style="font-weight:700;font-size:.88rem">${esc(m.nombre)}</p><p style="font-size:.7rem;color:var(--ink-faint)">${esc(m.especie)} · ${esc(m.raza||'Sin raza')} · ${esc(m.sexo)}</p></div>
@@ -395,14 +395,14 @@ async function cargarDesparasitaciones(id) {
       cont.innerHTML = `<div class="vcard" style="padding:2.5rem;text-align:center">
         <span style="font-size:2.5rem;display:block;margin-bottom:.8rem">🐛</span>
         <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Sin desparasitaciones registradas para esta mascota.</p>
-        <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Registrar Desparasitación</button>
+        <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,var(--green-600),var(--green-700));color:#fff;border:none;padding:.6rem 1.2rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Registrar Desparasitación</button>
       </div>`;
       return;
     }
     const tipoLabel = { interna:'🔵 Interna', externa:'🟢 Externa', interna_externa:'🔷 Int+Ext' };
-    const tipoColor = { interna:'#eff6ff', externa:'#f0fdf4', interna_externa:'#f0fdf4' };
+    const tipoColor = { interna:'#eff6ff', externa:'var(--green-50)', interna_externa:'var(--green-50)' };
     cont.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
-      <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;padding:.55rem 1.1rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Nueva desparasitación</button>
+      <button onclick="abrirModalDesparasitacion()" style="background:linear-gradient(135deg,var(--green-600),var(--green-700));color:#fff;border:none;padding:.55rem 1.1rem;border-radius:.75rem;font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit">🐛 Nueva desparasitación</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:.7rem">` +
     rows.map(d => {
@@ -417,7 +417,7 @@ async function cargarDesparasitaciones(id) {
             <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
               <span style="font-size:1.2rem">🐛</span>
               <h4 style="font-weight:700;font-size:.95rem">${esc(d.producto)}</h4>
-              <span style="background:${tipoColor[d.tipo]||'#f0fdf4'};color:#047857;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #a7f3d0">${tipoLabel[d.tipo]||d.tipo}</span>
+              <span style="background:${tipoColor[d.tipo]||'var(--green-50)'};color:var(--green-700);font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--green-200)">${tipoLabel[d.tipo]||d.tipo}</span>
               ${vencida ? '<span style="background:#fff1f2;color:#be123c;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fecdd3">🔴 VENCIDA</span>' : ''}
               ${prox30 && !vencida ? '<span style="background:#fffbeb;color:#b45309;font-size:.62rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;border:1px solid #fde68a">⚠️ Próxima</span>' : ''}
             </div>
@@ -507,7 +507,7 @@ function renderTimeline(consultas) {
             <div style="display:flex;gap:.6rem;align-items:center;font-size:.7rem;color:var(--ink-faint);margin-bottom:.4rem;flex-wrap:wrap">
               <span>${fDateTime(c.fecha)}</span><span>·</span>
               <span style="color:var(--green-600);font-weight:700">Dr(a). ${esc(c.veterinario_nombre||'')}</span>
-              ${c.cita_id?'<span style="background:#ecfdf5;color:#047857;font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;border:1px solid #a7f3d0">Cita #'+c.cita_id+'</span>':''}
+              ${c.cita_id?'<span style="background:var(--green-50);color:var(--green-700);font-size:.62rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;border:1px solid var(--green-200)">Cita #'+c.cita_id+'</span>':''}
             </div>
             <h4 style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700">${esc(c.motivo)}</h4>
             ${c.diagnostico?'<p style="font-size:.8rem;color:var(--ink-soft);margin-top:.4rem;line-height:1.5"><strong>Dx:</strong> '+esc(c.diagnostico.substring(0,140))+(c.diagnostico.length>140?'…':'')+'</p>':''}
@@ -614,9 +614,9 @@ async function verConsulta(id) {
         ${ib('📆 Fecha',fDateTime(c.fecha))}${ib('🩺 Veterinario',c.veterinario_nombre)}
         ${c.peso_kg?ib('⚖️ Peso',c.peso_kg+' kg'):''}
         ${c.temperatura_c?ib('🌡️ Temperatura',c.temperatura_c+' °C'):''}
-        ${c.cita_id?'<div style="background:#ecfdf5;border-radius:.9rem;padding:.7rem .9rem;border:1px solid #a7f3d0;grid-column:span 2"><p style="font-size:.6rem;color:#059669;text-transform:uppercase;letter-spacing:.1em;font-weight:700">🔗 Vinculada a</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">Cita #'+c.cita_id+'</p></div>':''}
+        ${c.cita_id?'<div style="background:var(--green-50);border-radius:.9rem;padding:.7rem .9rem;border:1px solid var(--green-200);grid-column:span 2"><p style="font-size:.6rem;color:var(--green-600);text-transform:uppercase;letter-spacing:.1em;font-weight:700">🔗 Vinculada a</p><p style="font-size:.82rem;font-weight:600;margin-top:.2rem">Cita #'+c.cita_id+'</p></div>':''}
       </div>
-      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'#047857',true)}${sec('Tratamiento',c.tratamiento)}${sec('Pruebas complementarias',c.pruebas_complementarias,'#1d4ed8')}${sec('Observaciones',c.observaciones)}
+      ${sec('Motivo',c.motivo)}${sec('Anamnesis',c.anamnesis)}${sec('Exploración Física',c.exploracion)}${sec('Diagnóstico',c.diagnostico,'var(--green-700)',true)}${sec('Tratamiento',c.tratamiento)}${sec('Pruebas complementarias',c.pruebas_complementarias,'#1d4ed8')}${sec('Observaciones',c.observaciones)}
       ${c.recetas?.length?`<div style="margin-top:1.2rem;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:1.1rem;padding:1.15rem"><h4 style="font-family:'Playfair Display',serif;font-weight:700;color:#0c4a6e;margin-bottom:.85rem;font-size:.92rem">💊 Recetas (${c.recetas.length})</h4><div style="display:flex;flex-direction:column;gap:.55rem">${c.recetas.map(r=>`<div style="background:#fff;border-radius:.85rem;padding:.85rem 1rem;font-size:.8rem"><p style="font-weight:700">${esc(r.medicamento)}</p><p style="color:var(--ink-soft);margin-top:.2rem">${esc(r.dosis)} · ${esc(r.frecuencia)}${r.duracion_dias?' · '+r.duracion_dias+' días':''}</p>${r.instrucciones?'<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.3rem">📝 '+esc(r.instrucciones)+'</p>':''}</div>`).join('')}</div></div>`:''}`;
       // Exámenes de la atención (incluye los de seguimientos)
       document.getElementById('ver-body').insertAdjacentHTML('beforeend', '<div id="ver-examenes"></div>');
@@ -764,7 +764,7 @@ async function cargarEstetica(id) {
                 <span>📅 <strong>${fDate(s.fecha)}</strong></span>
                 <span>✂️ ${esc(s.atendido_por_nombre||'—')}</span>
                 ${s.productos ? '<span>🧴 '+esc(s.productos)+'</span>' : ''}
-                ${s.cita_id   ? '<span style="background:#ecfdf5;color:#047857;padding:.1rem .45rem;border-radius:999px;border:1px solid #a7f3d0;font-weight:700">Cita #'+s.cita_id+'</span>' : ''}
+                ${s.cita_id   ? '<span style="background:var(--green-50);color:var(--green-700);padding:.1rem .45rem;border-radius:999px;border:1px solid var(--green-200);font-weight:700">Cita #'+s.cita_id+'</span>' : ''}
               </div>
               ${s.observaciones ? '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.4rem;line-height:1.5">📝 '+esc(s.observaciones)+'</p>' : ''}
             </div>
@@ -1889,7 +1889,7 @@ async function imprimirReceta() {
     if (r.duracion_dias) partes.push(r.duracion_dias + ' días');
     const detalle = partes.join(' · ');
     const notas = r.instrucciones ? ` <span style="font-style:italic;color:#6b7280">(${esc(r.instrucciones)})</span>` : '';
-    return `<div style="margin-bottom:.35rem;padding-bottom:.35rem;border-bottom:1px solid #d1fae5;font-size:11px;line-height:1.5">
+    return `<div style="margin-bottom:.35rem;padding-bottom:.35rem;border-bottom:1px solid var(--green-100);font-size:11px;line-height:1.5">
       <span style="font-weight:700">${i+1}. ${esc(r.medicamento)}</span>
       <span style="color:#374151"> — ${detalle}</span>${notas}
     </div>`;
@@ -1900,15 +1900,15 @@ async function imprimirReceta() {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;padding:20px;max-width:680px;margin:0 auto}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid #15803d}
-.clinica-nombre{font-size:16px;font-weight:800;color:#15803d}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--green-700)}
+.clinica-nombre{font-size:16px;font-weight:800;color:var(--green-700)}
 .clinica-info{font-size:9px;color:#6b7280;margin-top:2px;line-height:1.5}
 .seccion{margin-bottom:10px}
 .sec-titulo{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid #e5e7eb}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .lbl{font-size:9px;color:#9ca3af;text-transform:uppercase;margin-top:3px}
 .val{font-size:11px;font-weight:600;color:#1f2937}
-.recetas-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px;margin:10px 0}
+.recetas-box{background:var(--green-50);border:1px solid var(--green-200);border-radius:6px;padding:10px;margin:10px 0}
 .firma-area{margin-top:20px;display:flex;justify-content:flex-end}
 .footer{margin-top:12px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:center;font-size:9px;color:#9ca3af}
 @media print{
@@ -1961,7 +1961,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#1f2937;
 ${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</div><p style="font-size:11px;line-height:1.5">${esc(c.diagnostico)}</p></div>` : ''}
 
 <div class="recetas-box">
-  <p style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:8px">💊 Prescripción Médica (${c.recetas.length} medicamento${c.recetas.length > 1 ? 's' : ''})</p>
+  <p style="font-size:11px;font-weight:700;color:var(--green-700);margin-bottom:8px">💊 Prescripción Médica (${c.recetas.length} medicamento${c.recetas.length > 1 ? 's' : ''})</p>
   ${recetasHtml}
 </div>
 
@@ -1978,7 +1978,7 @@ ${c.diagnostico ? `<div class="seccion"><div class="sec-titulo">Diagnóstico</di
   ${esc(emp.nombre || 'VetClinic')} · ${esc(emp.direccion || '')} · Documento generado el ${new Date().toLocaleString('es-PE')}
 </div>
 <div style="text-align:center;margin-top:10px">
-  <button onclick="window.print()" style="background:#15803d;color:#fff;border:none;padding:.5rem 1.2rem;border-radius:.4rem;font-size:.82rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+  <button onclick="window.print()" style="background:var(--green-700);color:#fff;border:none;padding:.5rem 1.2rem;border-radius:.4rem;font-size:.82rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
 </div>
 <script>setTimeout(function(){ window.print(); }, 500);<\/script>
 </body></html>`;
@@ -2140,7 +2140,7 @@ function _crearPanelMic(campo, btn) {
         '✕ Cancelar',
       '</button>',
       // Guardar
-      '<button onclick="guardarMic()" style="display:flex;align-items:center;gap:.3rem;background:#16a34a;border:none;border-radius:8px;padding:.38rem .85rem;font-size:.74rem;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">',
+      '<button onclick="guardarMic()" style="display:flex;align-items:center;gap:.3rem;background:var(--green-600);border:none;border-radius:8px;padding:.38rem .85rem;font-size:.74rem;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">',
         '✓ Listo',
       '</button>',
     '</div>'

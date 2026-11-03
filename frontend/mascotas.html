@@ -78,8 +78,8 @@
             <button onclick="buscarPropMascota()" class="vbtn vbtn-primary">Buscar</button>
           </div>
           <div id="m-prop-resultados" style="display:flex;flex-direction:column;gap:.4rem;max-height:160px;overflow-y:auto"></div>
-          <div id="m-prop-sel" style="display:none;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.7rem">
-            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="m-prop-avatar">?</div>
+          <div id="m-prop-sel" style="display:none;background:var(--green-50);border:1px solid var(--green-200);border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.7rem">
+            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--green-500),var(--green-600));color:#fff;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="m-prop-avatar">?</div>
             <div style="flex:1">
               <p style="font-weight:700;font-size:.85rem" id="m-prop-nombre-sel">—</p>
               <p style="font-size:.7rem;color:var(--ink-soft)" id="m-prop-info-sel">—</p>
@@ -88,10 +88,10 @@
           </div>
         </div>
       </div>
-      <div id="bloque-prop-readonly" style="display:none;background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.9rem;padding:.75rem 1rem;align-items:center;gap:.75rem">
+      <div id="bloque-prop-readonly" style="display:none;background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.75rem 1rem;align-items:center;gap:.75rem">
         <span style="font-size:1.3rem">👤</span>
         <div>
-          <p style="font-size:.65rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Propietario</p>
+          <p style="font-size:.65rem;color:var(--green-600);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Propietario</p>
           <p style="font-weight:700;font-size:.88rem" id="m-prop-readonly-nombre">—</p>
         </div>
       </div>
@@ -670,7 +670,7 @@ async function buscarPropMascota() {
     cont.innerHTML = rows.length ? rows.map(p => `
       <button onclick="selPropMascota(${p.id},'${esc(p.nombre)}','${esc(p.apellido)}','${esc(p.dni||'')}','${esc(p.telefono)}')"
         style="display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;background:#fff;border:1px solid var(--line);border-radius:.8rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s"
-        onmouseover="this.style.borderColor='#10b981';this.style.background='#f0fdf4'"
+        onmouseover="this.style.borderColor='var(--green-500)';this.style.background='var(--green-50)'"
         onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
         <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.75rem;flex-shrink:0;display:flex;align-items:center;justify-content:center">
           ${esc(p.nombre.charAt(0))}${esc(p.apellido.charAt(0))}

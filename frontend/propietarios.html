@@ -44,7 +44,7 @@
     #menu-acciones button.acc-rojo:hover { background:#fff1f2; }
     #menu-acciones .acc-sep { height:1px;background:var(--line);margin:.3rem .2rem; }
     /* Fila recién guardada */
-    @keyframes filaNueva { 0%,60% { background:#ecfdf5; } 100% { background:transparent; } }
+    @keyframes filaNueva { 0%,60% { background:var(--green-50); } 100% { background:transparent; } }
     tr.fila-nueva td { animation:filaNueva 3s ease-out; }
   </style>
 </head>
@@ -149,7 +149,7 @@
               onblur="buscarDocumento()"/>
             <div id="doc-loading" style="display:none;position:absolute;right:.75rem;
               top:50%;transform:translateY(-50%);width:16px;height:16px;
-              border:2px solid #e2e8f0;border-top-color:#10b981;
+              border:2px solid #e2e8f0;border-top-color:var(--green-500);
               border-radius:50%;animation:spin .6s linear infinite"></div>
           </div>
           <div id="doc-existente" style="display:none;margin-top:.5rem;
@@ -165,7 +165,7 @@
             </button>
           </div>
           <div id="doc-autocomplete" style="display:none;margin-top:.5rem;
-            background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.75rem;
+            background:var(--green-50);border:1px solid var(--green-200);border-radius:.75rem;
             padding:.65rem .9rem;font-size:.78rem">
             <p style="color:#065f46">✅ Datos autocompletados desde RENIEC/SUNAT</p>
           </div>
@@ -1084,7 +1084,7 @@ async function verDetalle(id) {
                 padding:.2rem .5rem;border-radius:999px;font-weight:700;
                 border:1px solid #fecdd3">⚠️ Alerta</span>` : ''}
             <button onclick="irAHistoria(${m.id})"
-              style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;
+              style="background:linear-gradient(135deg,var(--green-500),var(--green-600));color:#fff;
               border:none;padding:.3rem .7rem;border-radius:.55rem;font-size:.68rem;
               font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
               📋 Historia

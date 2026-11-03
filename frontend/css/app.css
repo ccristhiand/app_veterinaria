@@ -11,6 +11,9 @@
   --green-700: #15803d;
   --green-600: #059669;
   --green-500: #10b981;
+  --green-400: #34d399;
+  --green-300: #6ee7b7;
+  --green-200: #bbf7d0;
   --green-100: #d1fae5;
   --green-50 : #ecfdf5;
   /* Marca de la clínica: aplicarBranding() (shared.js) recalcula estas variables y las --green-* */
@@ -329,7 +332,7 @@ body {
 @media (min-width: 1024px) { .lg\:table-cell  { display: table-cell !important; } }
 
 .row-new { background: var(--green-50) !important; animation: rowGlow 4s ease; }
-@keyframes rowGlow { 0%,100%{background:var(--green-50)} 50%{background:#a7f3d0} }
+@keyframes rowGlow { 0%,100%{background:var(--green-50)} 50%{background:var(--green-200)} }
 
 /* Badge estado */
 .vbadge { display: inline-flex; align-items: center; font-size: .68rem; font-weight: 700; padding: .25rem .65rem; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }

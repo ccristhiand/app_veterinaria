@@ -10,7 +10,7 @@
   <script src="js/layout.js"></script>
   <style>
     /* Badges tipo cita */
-    .tipo-medica        { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
+    .tipo-medica        { background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200); }
     .tipo-vacuna        { background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe; }
     .tipo-desparasitacion { background:#fefce8;color:#854d0e;border:1px solid #fde68a; }
     .tipo-estetica      { background:#fdf2f8;color:#be185d;border:1px solid #fbcfe8; }
@@ -21,7 +21,7 @@
                 padding:.7rem .5rem;border:2px solid var(--line);border-radius:.9rem;
                 cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;
                 background:#fff;color:var(--ink);transition:all .15s;flex:1;min-width:70px; }
-    .tipo-btn.sel-medica        { border-color:#16a34a;background:#f0fdf4;color:#15803d; }
+    .tipo-btn.sel-medica        { border-color:var(--green-600);background:var(--green-50);color:var(--green-700); }
     .tipo-btn.sel-vacuna        { border-color:#7c3aed;background:#f5f3ff;color:#6d28d9; }
     .tipo-btn.sel-desparasitacion { border-color:#ca8a04;background:#fefce8;color:#854d0e; }
     .tipo-btn.sel-estetica      { border-color:#db2777;background:#fdf2f8;color:#be185d; }
@@ -128,10 +128,10 @@
           style="margin-top:.75rem;display:flex;flex-direction:column;gap:.4rem;
           max-height:180px;overflow-y:auto"></div>
         <div id="prop-seleccionado" style="display:none;margin-top:.75rem;
-          background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;
+          background:var(--green-50);border:1px solid var(--green-200);border-radius:.8rem;
           padding:.75rem 1rem;align-items:center;gap:.75rem">
           <div style="width:36px;height:36px;border-radius:50%;
-            background:linear-gradient(135deg,#10b981,#059669);color:#fff;
+            background:linear-gradient(135deg,var(--green-500),var(--green-600));color:#fff;
             font-weight:700;font-size:.85rem;display:flex;align-items:center;
             justify-content:center;flex-shrink:0" id="prop-sel-avatar">?</div>
           <div style="flex:1">
@@ -374,7 +374,7 @@ var _tipoCitaSel    = 'medica'; // tipo seleccionado en modal nueva cita
 
 // ── Configuración de tipos ────────────────────────────────────────
 var TIPOS_CITA = {
-  medica:         { label:'Atención Médica',  icon:'🩺', tab:'consultas',        color:'#15803d', bg:'#f0fdf4', border:'#bbf7d0' },
+  medica:         { label:'Atención Médica',  icon:'🩺', tab:'consultas',        color:'var(--green-700)', bg:'var(--green-50)', border:'var(--green-200)' },
   vacuna:         { label:'Vacunación',       icon:'💉', tab:'vacunas',          color:'#6d28d9', bg:'#f5f3ff', border:'#ddd6fe' },
   desparasitacion:{ label:'Desparasitación',  icon:'🪱', tab:'desparasitaciones',color:'#854d0e', bg:'#fefce8', border:'#fde68a' },
   estetica:       { label:'Estética',         icon:'✂️', tab:'estetica',         color:'#be185d', bg:'#fdf2f8', border:'#fbcfe8' },
@@ -479,7 +479,7 @@ function rowHTML(c) {
     new Date(c.fecha_hora).toDateString() === new Date().toDateString();
   var tipo = c.tipo_cita || 'medica';
 
-  return '<tr data-id="'+c.id+'" style="'+(esHoy && puedAtender ? 'background:#f0fdf4' : '')+'">' +
+  return '<tr data-id="'+c.id+'" style="'+(esHoy && puedAtender ? 'background:var(--green-50)' : '')+'">' +
     '<td style="color:var(--ink-faint);font-size:.7rem;font-family:monospace">#'+c.id+'</td>' +
     '<td>' +
       '<p style="font-weight:600;'+(esHoy?'color:var(--green-600)':'')+'">'+fDate(c.fecha_hora)+'</p>' +
@@ -503,7 +503,7 @@ function rowHTML(c) {
         (puedAtender ?
           '<button onclick="abrirAtender('+c.id+',\''+esc(c.mascota_nombre)+'\',\''+esc(c.propietario_nombre||'')+'\',\''+esc(c.motivo)+'\',\''+esc(c.fecha_hora)+'\','+c.mascota_id+',\''+tipo+'\')" '+
           'style="display:inline-flex;align-items:center;gap:.35rem;'+
-          'background:linear-gradient(135deg,#10b981,#059669);color:#fff;'+
+          'background:linear-gradient(135deg,var(--green-500),var(--green-600));color:#fff;'+
           'border:none;padding:.35rem .8rem;border-radius:.65rem;'+
           'font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" '+
           'onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">'+
@@ -567,11 +567,11 @@ async function buscarProp() {
       'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;'+
       'background:#fff;border:1px solid var(--line);border-radius:.85rem;'+
       'cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
-      'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+      'onmouseover="this.style.borderColor=\'var(--green-500)\';this.style.background=\'var(--green-50)\'" '+
       'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
         '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
         '<div style="flex:1;min-width:0"><p style="font-weight:700;font-size:.85rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+' 📞 '+esc(p.telefono)+'</p></div>' +
-        '<span style="font-size:.7rem;background:#ecfdf5;color:#047857;padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
+        '<span style="font-size:.7rem;background:var(--green-50);color:var(--green-700);padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
       '</button>'
     ).join('')
     : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">No se encontraron propietarios</div>';
@@ -599,7 +599,7 @@ async function seleccionarProp(id, nombre, apellido, dni, telefono) {
       ? mascotas.map(m =>
           '<button onclick="seleccionarMascota('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
           'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
-          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseover="this.style.borderColor=\'var(--green-500)\';this.style.background=\'var(--green-50)\'" '+
           'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
             '<span style="width:40px;height:40px;border-radius:.8rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden;flex-shrink:0">'+mascotaFotoHTML(m)+'</span>' +
             '<div style="flex:1"><p style="font-weight:700;font-size:.85rem">'+esc(m.nombre)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'Sin raza')+' · '+esc(m.sexo)+'</p></div>' +

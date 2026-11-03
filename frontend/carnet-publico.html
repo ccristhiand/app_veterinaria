@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family:'Inter',sans-serif;background:#f0fdf4;min-height:100vh;padding:1.5rem; }
+    body { font-family:'Inter',sans-serif;background:var(--green-50);min-height:100vh;padding:1.5rem; }
     .card { background:#fff;border-radius:1.25rem;box-shadow:0 8px 32px rgba(0,0,0,.08);overflow:hidden;margin-bottom:1.2rem; }
     .badge { display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.25rem .65rem;border-radius:999px; }
     .badge-ok   { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
@@ -19,7 +19,7 @@
     th { background:#f6f8f6;padding:.55rem .85rem;text-align:left;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb; }
     td { padding:.65rem .85rem;border-bottom:1px solid #f3f4f6;color:#374151; }
     .timeline-item { display:flex;gap:.75rem;padding:.75rem 1.25rem;border-bottom:1px solid #f3f4f6; }
-    .timeline-dot { width:10px;height:10px;border-radius:50%;background:#10b981;flex-shrink:0;margin-top:.4rem; }
+    .timeline-dot { width:10px;height:10px;border-radius:50%;background:var(--green-500);flex-shrink:0;margin-top:.4rem; }
     .timeline-dot.pink { background:#ec4899; }
     .timeline-dot.gray { background:#9ca3af; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -31,7 +31,7 @@
 
     <!-- Loading -->
     <div id="loading" style="text-align:center;padding:4rem">
-      <div style="display:inline-block;width:40px;height:40px;border:3px solid #a7f3d0;border-top-color:#10b981;border-radius:50%;animation:spin .8s linear infinite"></div>
+      <div style="display:inline-block;width:40px;height:40px;border:3px solid var(--green-200);border-top-color:var(--green-500);border-radius:50%;animation:spin .8s linear infinite"></div>
       <p style="margin-top:1rem;color:#6b7280">Cargando carnet…</p>
     </div>
 
@@ -47,7 +47,7 @@
 
       <!-- Header mascota -->
       <div class="card">
-        <div id="carnet-header" style="background:linear-gradient(135deg,#166534,#15803d);padding:1.5rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.25rem">
+        <div id="carnet-header" style="background:linear-gradient(135deg,var(--green-800),var(--green-700));padding:1.5rem 1.75rem;color:#fff;display:flex;align-items:center;gap:1.25rem">
           <div style="width:64px;height:64px;background:rgba(255,255,255,.15);border-radius:1rem;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0" id="especie-icon">🐾</div>
           <div style="flex:1">
             <h1 id="mascota-nombre" style="font-family:'Playfair Display',serif;font-size:1.6rem;margin:0"></h1>
@@ -218,7 +218,7 @@
                 <p style="font-weight:600;font-size:.88rem">${esc(c.motivo)}</p>
                 <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">Dr/a. ${esc(c.veterinario)} · ${fDateTime(c.fecha_hora)}</p>
               </div>
-              <span style="font-size:.7rem;font-weight:700;background:#f0fdf4;color:#15803d;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0;flex-shrink:0">Próxima</span>
+              <span style="font-size:.7rem;font-weight:700;background:var(--green-50);color:var(--green-700);padding:.2rem .6rem;border-radius:999px;border:1px solid var(--green-200);flex-shrink:0">Próxima</span>
             </div>`).join('');
         }
 
@@ -291,7 +291,7 @@
                     <span style="font-size:.7rem;font-weight:700;background:#f0fdf4;color:#15803d;padding:.2rem .6rem;border-radius:999px;border:1px solid #bbf7d0;flex-shrink:0">✅ Completada</span>
                   </div>
                   <p style="font-size:.75rem;color:#6b7280;margin-top:.15rem">Dr/a. ${esc(c.veterinario)} · ${fDateTime(c.fecha_hora)}</p>
-                  ${c.diagnostico ? `<div style="margin-top:.5rem;padding:.5rem .75rem;background:#f0fdf4;border-radius:.65rem;font-size:.78rem"><strong style="color:#15803d">Dx:</strong> ${esc(c.diagnostico)}</div>` : ''}
+                  ${c.diagnostico ? `<div style="margin-top:.5rem;padding:.5rem .75rem;background:var(--green-50);border-radius:.65rem;font-size:.78rem"><strong style="color:var(--green-700)">Dx:</strong> ${esc(c.diagnostico)}</div>` : ''}
                   ${c.tratamiento ? `<div style="margin-top:.3rem;padding:.5rem .75rem;background:#f8fafc;border-radius:.65rem;font-size:.78rem"><strong style="color:#475569">Tto:</strong> ${esc(c.tratamiento)}</div>` : ''}
                   ${c.recetas?.length ? `
                     <div style="margin-top:.5rem">

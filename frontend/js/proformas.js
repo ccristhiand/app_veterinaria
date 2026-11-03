@@ -20,7 +20,7 @@ var _pfInit       = false;
 var PF_ESTADOS = {
   borrador : { label:'📝 Borrador',  bg:'#f8fafc', color:'#475569', bd:'#e2e8f0' },
   enviada  : { label:'📤 Enviada',   bg:'#eff6ff', color:'#1d4ed8', bd:'#bfdbfe' },
-  aceptada : { label:'👍 Aceptada',  bg:'#f0fdf4', color:'#15803d', bd:'#bbf7d0' },
+  aceptada : { label:'👍 Aceptada',  bg:'var(--green-50)', color:'var(--green-700)', bd:'var(--green-200)' },
   rechazada: { label:'👎 Rechazada', bg:'#fff1f2', color:'#be123c', bd:'#fecdd3' },
   vencida  : { label:'⌛ Vencida',   bg:'#fffbeb', color:'#b45309', bd:'#fde68a' },
   facturada: { label:'🧾 Facturada', bg:'#f5f3ff', color:'#6d28d9', bd:'#ddd6fe' },
@@ -71,7 +71,7 @@ function pfMontarUI() {
     '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.2rem">' +
       pfStat('pf-st-abiertas', 'Abiertas', '#1d4ed8', 'pf-st-abiertas-sub') +
       pfStat('pf-st-cotizado', 'Cotizado este mes', 'var(--ink)', 'pf-st-cotizado-sub') +
-      pfStat('pf-st-facturado', 'Facturado desde proformas', '#15803d', 'pf-st-facturado-sub') +
+      pfStat('pf-st-facturado', 'Facturado desde proformas', 'var(--green-700)', 'pf-st-facturado-sub') +
       pfStat('pf-st-tasa', 'Tasa de cierre', '#6d28d9', 'pf-st-tasa-sub') +
     '</div>' +
 
@@ -130,7 +130,7 @@ function pfModalesHTML() {
         '<div><label class="vlabel">Validez (días) *</label>' +
           '<input id="pf-validez" type="number" min="1" max="365" step="1" class="vinput" oninput="pfActualizarVence()"/></div>' +
         '<div><label class="vlabel">Válida hasta</label>' +
-          '<div id="pf-vence" class="vinput" style="background:#f8faf8;font-weight:700;color:#15803d">—</div></div>' +
+          '<div id="pf-vence" class="vinput" style="background:#f8faf8;font-weight:700;color:var(--green-700)">—</div></div>' +
       '</div>' +
 
       // Propietario
@@ -142,7 +142,7 @@ function pfModalesHTML() {
           '<button onclick="pfBuscarProp()" class="vbtn vbtn-primary">Buscar</button>' +
         '</div>' +
         '<div id="pf-prop-res" style="display:flex;flex-direction:column;gap:.4rem;max-height:150px;overflow-y:auto;margin-top:.5rem"></div>' +
-        '<div id="pf-prop-sel" style="display:none;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.75rem">' +
+        '<div id="pf-prop-sel" style="display:none;background:var(--green-50);border:1px solid var(--green-200);border-radius:.8rem;padding:.65rem .9rem;align-items:center;gap:.75rem">' +
           '<div style="flex:1"><p style="font-weight:700;font-size:.88rem" id="pf-prop-nombre">—</p>' +
             '<p style="font-size:.7rem;color:var(--ink-soft)" id="pf-prop-info">—</p></div>' +
           '<button onclick="pfLimpiarProp()" style="background:none;border:none;cursor:pointer;color:var(--ink-faint)">✕</button>' +
@@ -152,7 +152,7 @@ function pfModalesHTML() {
       '</div>' +
 
       // IGV
-      '<label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:.7rem 1rem">' +
+      '<label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600;background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.7rem 1rem">' +
         '<input type="checkbox" id="pf-igv" checked onchange="pfCalcular()" style="accent-color:var(--green-600);width:16px;height:16px"/>' +
         'Los precios incluyen IGV (<span id="pf-igv-pct">18</span>%)</label>' +
 
@@ -179,12 +179,12 @@ function pfModalesHTML() {
       '</div>' +
 
       // Totales
-      '<div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-end;font-size:.8rem">' +
+      '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;align-items:flex-end;font-size:.8rem">' +
         '<div style="display:flex;gap:3rem"><span style="color:var(--ink-faint)">Subtotal bruto:</span><span id="pf-t-bruto" style="min-width:90px;text-align:right;font-weight:600">S/. 0.00</span></div>' +
         '<div id="pf-row-desc" style="display:none;gap:3rem;color:#be123c"><span>− Descuentos:</span><span id="pf-t-desc" style="min-width:90px;text-align:right;font-weight:600">S/. 0.00</span></div>' +
         '<div style="display:flex;gap:3rem"><span style="color:var(--ink-soft)">Base imponible:</span><span id="pf-t-sub" style="min-width:90px;text-align:right;font-weight:600">S/. 0.00</span></div>' +
         '<div style="display:flex;gap:3rem"><span style="color:var(--ink-soft)" id="pf-t-igv-lbl">IGV (18%):</span><span id="pf-t-igv" style="min-width:90px;text-align:right;font-weight:600">S/. 0.00</span></div>' +
-        '<div style="display:flex;gap:3rem;font-size:.98rem;font-weight:800;color:#15803d;border-top:2px solid #a7f3d0;padding-top:.3rem"><span>TOTAL:</span><span id="pf-t-total" style="min-width:90px;text-align:right">S/. 0.00</span></div>' +
+        '<div style="display:flex;gap:3rem;font-size:.98rem;font-weight:800;color:var(--green-700);border-top:2px solid var(--green-200);padding-top:.3rem"><span>TOTAL:</span><span id="pf-t-total" style="min-width:90px;text-align:right">S/. 0.00</span></div>' +
       '</div>' +
 
       '<div><label class="vlabel">Notas para el cliente (opcional)</label>' +
@@ -354,7 +354,7 @@ async function cargarProformas() {
         '<td style="white-space:nowrap">' +
           '<button class="vlink" onclick="verProforma(' + p.id + ')" style="font-size:.72rem">👁️ Ver</button> ' +
           (['borrador', 'enviada', 'aceptada', 'vencida'].indexOf(p.estado) >= 0
-            ? '<button class="vlink" onclick="convertirProforma(' + p.id + ')" style="font-size:.72rem;color:#15803d">🧾 Facturar</button>' : '') +
+            ? '<button class="vlink" onclick="convertirProforma(' + p.id + ')" style="font-size:.72rem;color:var(--green-700)">🧾 Facturar</button>' : '') +
         '</td></tr>';
     }).join('');
 
@@ -563,7 +563,7 @@ function pfOnDescInput(input, id) {
       var esInv = x._tipo === 'inventario';
       var stock = esInv ? ' · 📦 ' + esc(x.cantidad) + ' ' + esc(x.unidad || '') : '';
       return '<li onmousedown="pfSelAc(event,' + id + ',' + i + ')">' +
-        '<span class="ac-cat-pill" style="background:' + (esInv ? '#f0f9ff;color:#0369a1' : '#f0fdf4;color:#15803d') + '">' +
+        '<span class="ac-cat-pill" style="background:' + (esInv ? '#f0f9ff;color:#0369a1' : 'var(--green-50);color:var(--green-700)') + '">' +
           esc(esInv ? (x.categoria || 'producto') : (x.categoria || 'servicio')) + '</span>' +
         '<span style="flex:1;font-weight:600">' + esc(x.nombre) + '</span>' +
         '<span style="font-size:.7rem;color:var(--ink-faint)">' + pfMoney(x.precio) + stock + '</span></li>';
@@ -722,7 +722,7 @@ async function verProforma(id) {
   var acc = [];
   var e = p.estado;
   if (['borrador', 'enviada', 'aceptada', 'vencida'].indexOf(e) >= 0)
-    acc.push(B('🧾 Convertir en boleta/factura', 'convertirProforma(' + p.id + ')', 'background:linear-gradient(135deg,#15803d,#166534);color:#fff;border:none'));
+    acc.push(B('🧾 Convertir en boleta/factura', 'convertirProforma(' + p.id + ')', 'background:linear-gradient(135deg,var(--green-700),var(--green-800));color:#fff;border:none'));
   if (['borrador', 'enviada', 'vencida'].indexOf(e) >= 0) acc.push(B('✏️ Editar', 'editarProforma(' + p.id + ')'));
   if (e === 'borrador')  acc.push(B('📤 Marcar enviada', 'pfCambiarEstado(\'enviada\')'));
   if (e === 'borrador' || e === 'enviada') acc.push(B('👍 Aceptada', 'pfCambiarEstado(\'aceptada\')'));
@@ -813,10 +813,10 @@ function pfDocumentoHTML(p, emp) {
 
   return '' +
     '<div style="font-family:Inter,system-ui,sans-serif;color:#111">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:3px solid #166534;padding-bottom:1rem;margin-bottom:1rem">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:3px solid var(--green-800);padding-bottom:1rem;margin-bottom:1rem">' +
       '<div style="display:flex;align-items:center;gap:.75rem">' +
         (emp.logo_url ? '<img src="' + esc(emp.logo_url) + '" crossorigin="anonymous" style="height:56px;object-fit:contain" onerror="this.style.display=\'none\'"/>' : '') +
-        '<div><p style="font-weight:800;font-size:1rem;color:#166534">' + esc(emp.nombre || 'Clínica veterinaria') + '</p>' +
+        '<div><p style="font-weight:800;font-size:1rem;color:var(--green-800)">' + esc(emp.nombre || 'Clínica veterinaria') + '</p>' +
           (emp.razon_social ? '<p style="font-size:.72rem;color:#4b5f57">' + esc(emp.razon_social) + '</p>' : '') +
           (emp.ruc ? '<p style="font-size:.72rem;color:#4b5f57">RUC: ' + esc(emp.ruc) + '</p>' : '') +
           (emp.direccion ? '<p style="font-size:.7rem;color:#4b5f57">📍 ' + esc(emp.direccion) + (emp.distrito ? ', ' + esc(emp.distrito) : '') + '</p>' : '') +
@@ -831,18 +831,18 @@ function pfDocumentoHTML(p, emp) {
       '</div>' +
     '</div>' +
 
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.7rem;padding:.75rem 1rem;margin-bottom:1rem;font-size:.75rem">' +
-      '<div><p style="font-size:.6rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Cliente</p>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;background:var(--green-50);border:1px solid var(--green-200);border-radius:.7rem;padding:.75rem 1rem;margin-bottom:1rem;font-size:.75rem">' +
+      '<div><p style="font-size:.6rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Cliente</p>' +
         '<p style="font-weight:700">' + esc(p.propietario_nombre) + '</p>' +
         (p.dni ? '<p style="color:#4b5f57">DNI: ' + esc(p.dni) + '</p>' : '') +
         (p.telefono ? '<p style="color:#4b5f57">Tel: ' + esc(p.telefono) + '</p>' : '') + '</div>' +
-      '<div><p style="font-size:.6rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Paciente</p>' +
+      '<div><p style="font-size:.6rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Paciente</p>' +
         '<p style="font-weight:700">' + esc(p.mascota_nombre || '—') + '</p>' +
         (p.mascota_especie ? '<p style="color:#4b5f57">' + esc(p.mascota_especie) + (p.mascota_raza ? ' · ' + esc(p.mascota_raza) : '') + '</p>' : '') + '</div>' +
     '</div>' +
 
     '<table style="width:100%;border-collapse:collapse;margin-bottom:1rem">' +
-      '<thead><tr style="background:#166534;color:#fff">' +
+      '<thead><tr style="background:var(--green-800);color:#fff">' +
         '<th style="padding:.5rem .6rem;text-align:left;font-size:.7rem">#</th>' +
         '<th style="padding:.5rem .6rem;text-align:left;font-size:.7rem">Descripción</th>' +
         '<th style="padding:.5rem .6rem;text-align:center;font-size:.7rem">Cant.</th>' +
@@ -854,10 +854,10 @@ function pfDocumentoHTML(p, emp) {
       (desc > 0 ? fila('Subtotal bruto', pfMoney(p.subtotal_bruto), 'color:#4b5f57') + fila('Descuentos', '−' + pfMoney(desc), 'color:#be123c') : '') +
       fila('Op. gravada', pfMoney(p.subtotal), 'color:#4b5f57') +
       fila('IGV (' + igvPct + '%)', pfMoney(p.igv), 'color:#4b5f57') +
-      fila('TOTAL', pfMoney(p.total), 'font-size:1rem;font-weight:800;color:#15803d;border-top:2px solid #bbf7d0;padding-top:.3rem;margin-top:.15rem') +
+      fila('TOTAL', pfMoney(p.total), 'font-size:1rem;font-weight:800;color:var(--green-700);border-top:2px solid var(--green-200);padding-top:.3rem;margin-top:.15rem') +
     '</div></div>' +
 
-    (p.notas ? '<div style="background:#f8faf8;border-left:3px solid #15803d;padding:.6rem .8rem;font-size:.75rem;margin-bottom:.8rem;white-space:pre-line">' +
+    (p.notas ? '<div style="background:#f8faf8;border-left:3px solid var(--green-700);padding:.6rem .8rem;font-size:.75rem;margin-bottom:.8rem;white-space:pre-line">' +
       '<b>Notas:</b> ' + esc(p.notas) + '</div>' : '') +
     (p.condiciones ? '<div style="font-size:.66rem;color:#6b7c74;border-top:1px dashed #d1d9d4;padding-top:.6rem;white-space:pre-line">' +
       '<b>Condiciones:</b> ' + esc(p.condiciones) + '</div>' : '') +
@@ -875,7 +875,7 @@ function pfImprimir() {
     '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;padding:2rem;max-width:760px;margin:0 auto}' +
     '@media print{.no-print{display:none}body{padding:0}}</style></head><body>' + html +
     '<div class="no-print" style="text-align:center;margin-top:1.5rem"><button onclick="window.print()" ' +
-    'style="background:#166534;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>' +
+    'style="background:var(--green-800);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:.5rem;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>' +
     '</body></html>');
   w.document.close();
   setTimeout(function () { w.print(); }, 700);

@@ -7,27 +7,27 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: #f0fdf4;
+    body { font-family: 'Inter', sans-serif; background: var(--green-50);
            min-height: 100vh; display: flex; align-items: center;
            justify-content: center; padding: 2rem; }
     .card { background: #fff; border-radius: 1.5rem;
             box-shadow: 0 20px 60px rgba(13,59,46,.10);
             padding: 3rem 2.5rem; text-align: center; max-width: 480px; width: 100%; }
     .logo-wrap { width: 80px; height: 80px; border-radius: 1.25rem;
-                 background: linear-gradient(135deg, #166534, #15803d);
+                 background: linear-gradient(135deg, var(--green-800), var(--green-700));
                  display: flex; align-items: center; justify-content: center;
                  margin: 0 auto 1.25rem; overflow: hidden; }
     .logo-wrap img { width: 100%; height: 100%; object-fit: contain; padding: .5rem; }
     .logo-wrap span { font-size: 2.5rem; }
-    .clinica-nombre { font-size: .8rem; font-weight: 700; color: #15803d;
+    .clinica-nombre { font-size: .8rem; font-weight: 700; color: var(--green-700);
                       text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
-    .code { font-size: 6rem; font-weight: 800; color: #dcfce7;
+    .code { font-size: 6rem; font-weight: 800; color: var(--green-100);
             font-family: 'Playfair Display', serif; line-height: 1; margin-bottom: .5rem; }
     h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem;
          color: #1a2e28; margin-bottom: .75rem; }
     p { color: #6b7280; font-size: .9rem; line-height: 1.6; margin-bottom: 2rem; }
     .btn { display: inline-flex; align-items: center; gap: .5rem;
-           background: linear-gradient(135deg, #166534, #15803d);
+           background: linear-gradient(135deg, var(--green-800), var(--green-700));
            color: #fff; padding: .85rem 2rem; border-radius: .85rem;
            text-decoration: none; font-weight: 700; font-size: .9rem;
            transition: opacity .15s; }

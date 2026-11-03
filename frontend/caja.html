@@ -10,13 +10,13 @@
   <script src="js/layout.js"></script>
   <style>
     .metodo-card { background:#fff;border:1.5px solid var(--line);border-radius:1rem;padding:.8rem 1rem;transition:all .2s; }
-    .metodo-card.efectivo { border-color:#bbf7d0;background:#f0fdf4; }
+    .metodo-card.efectivo { border-color:var(--green-200);background:var(--green-50); }
     .metodo-card.digital  { border-color:#bfdbfe;background:#eff6ff; }
     .tab-btn { padding:.5rem 1rem;border:none;background:none;cursor:pointer;
                font-family:inherit;font-size:.84rem;font-weight:600;
                color:var(--ink-faint);border-bottom:3px solid transparent;transition:all .15s; }
     .tab-btn.active { color:var(--green-600);border-bottom-color:var(--green-500); }
-    .dif-positiva { color:#15803d;background:#f0fdf4;border:1.5px solid #bbf7d0; }
+    .dif-positiva { color:var(--green-700);background:var(--green-50);border:1.5px solid var(--green-200); }
     .dif-negativa { color:#be123c;background:#fff1f2;border:1.5px solid #fecdd3; }
     .dif-cero     { color:#1d4ed8;background:#eff6ff;border:1.5px solid #bfdbfe; }
     .gasto-fila   { display:grid;grid-template-columns:1fr 130px 130px 32px;gap:.4rem;align-items:center; }
@@ -32,8 +32,8 @@
   </div>
   <!-- Banner sede activa -->
   <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:#15803d">
+    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:var(--green-700)">
     🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
   </div>
 
@@ -82,10 +82,10 @@
               <span style="font-size:1.3rem">💵</span>
               <div>
                 <p style="font-weight:700;font-size:.88rem">Efectivo</p>
-                <p style="font-size:.65rem;color:#059669;font-weight:600">📦 Se cuenta físicamente</p>
+                <p style="font-size:.65rem;color:var(--green-600);font-weight:600">📦 Se cuenta físicamente</p>
               </div>
             </div>
-            <p style="font-size:1.15rem;font-weight:800;color:#15803d" id="sis-efectivo">S/. 0.00</p>
+            <p style="font-size:1.15rem;font-weight:800;color:var(--green-700)" id="sis-efectivo">S/. 0.00</p>
           </div>
         </div>
 
@@ -123,7 +123,7 @@
         <div style="margin-top:.85rem;padding-top:.85rem;border-top:2px solid var(--line);
           display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:700">Total del día</span>
-          <span style="font-size:1.15rem;font-weight:800;color:#15803d" id="sis-total">S/. 0.00</span>
+          <span style="font-size:1.15rem;font-weight:800;color:var(--green-700)" id="sis-total">S/. 0.00</span>
         </div>
 
         <!-- Pendientes -->
@@ -174,13 +174,13 @@
           </div>
 
           <!-- Conteo físico -->
-          <div style="background:#f0fdf4;border:1.5px solid #a7f3d0;border-radius:1rem;padding:1rem">
-            <label class="vlabel" style="color:#15803d;font-weight:700">
+          <div style="background:var(--green-50);border:1.5px solid var(--green-200);border-radius:1rem;padding:1rem">
+            <label class="vlabel" style="color:var(--green-700);font-weight:700">
               💵 Efectivo contado físicamente (S/.) *
             </label>
             <input id="c-conteo" type="number" min="0" step="0.50"
               class="vinput" placeholder="0.00" oninput="calcularDiferencia()"
-              style="font-size:1.1rem;font-weight:700;border-color:#a7f3d0"/>
+              style="font-size:1.1rem;font-weight:700;border-color:var(--green-200)"/>
           </div>
 
           <!-- Diferencia -->
@@ -506,13 +506,13 @@ async function cargarHistorial() {
         <td style="font-weight:600">${fDate(c.fecha)}</td>
         <td style="font-size:.78rem;text-transform:capitalize">${c.turno.replace('_',' ')}</td>
         <td class="hidden lg:table-cell" style="font-size:.74rem;color:var(--ink-soft)">${c.sede_nombre ? '🏥 '+esc(c.sede_nombre) : '—'}</td>
-        <td style="font-weight:600;color:#15803d">S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</td>
+        <td style="font-weight:600;color:var(--green-700)">S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</td>
         <td style="font-weight:600">S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</td>
         <td style="font-weight:700;color:${difColor}">${difTxt}</td>
         <td style="color:#be123c">S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</td>
         <td style="font-size:.78rem">${esc(c.realizado_por)}</td>
         <td>${c.estado==='cerrado'
-          ? '<span style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">✅ Cerrado</span>'
+          ? '<span style="background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200);font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">✅ Cerrado</span>'
           : '<span style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px">📝 Borrador</span>'}</td>
         <td><button class="vlink" onclick="verDetalle(${c.id})" style="font-size:.74rem">Ver</button></td>
       </tr>`;
@@ -547,16 +547,16 @@ async function verDetalle(id) {
             <p style="font-weight:600;margin-top:.2rem">${c.estado==='cerrado'?'✅ Cerrado':'📝 Borrador'}</p>
           </div>
         </div>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:.9rem 1rem">
-          <p style="font-size:.62rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Ingresos del sistema</p>
+        <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:.9rem 1rem">
+          <p style="font-size:.62rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Ingresos del sistema</p>
           ${[['💵 Efectivo',c.sistema_efectivo,true],['💳 Tarjeta',c.sistema_tarjeta,false],
              ['📱 Yape',c.sistema_yape,false],['📱 Plin',c.sistema_plin,false],
              ['🏦 Transferencia',c.sistema_transferencia,false]].map(([l,v,b])=>`
-            <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid #d1fae5">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--green-100)">
               <span ${b?'style="font-weight:700"':''}>${l}</span>
-              <span ${b?'style="font-weight:700;color:#15803d"':''}>S/. ${parseFloat(v||0).toFixed(2)}</span>
+              <span ${b?'style="font-weight:700;color:var(--green-700)"':''}>S/. ${parseFloat(v||0).toFixed(2)}</span>
             </div>`).join('')}
-          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.88rem;padding-top:.5rem;color:#15803d">
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.88rem;padding-top:.5rem;color:var(--green-700)">
             <span>Total</span><span>S/. ${parseFloat(c.sistema_total||0).toFixed(2)}</span>
           </div>
         </div>
@@ -637,7 +637,7 @@ function imprimirCierre(c) {
       .tit{text-align:center;font-size:16px;font-weight:bold;margin-bottom:.4rem}
       .sub{text-align:center;font-size:11px;color:#555;border-bottom:2px dashed #333;padding-bottom:.75rem;margin-bottom:.75rem}
       .row{display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px dotted #ddd}
-      .row.b{font-weight:bold}.row.v{color:#166534}.row.r{color:#be123c}.row.a{color:#1d4ed8}
+      .row.b{font-weight:bold}.row.v{color:var(--green-800)}.row.r{color:#be123c}.row.a{color:#1d4ed8}
       .sec{margin-top:.65rem;padding-top:.5rem;border-top:1px dashed #333}
       .sec-t{font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem}
       .dif{text-align:center;border:2px solid #333;padding:.6rem;margin-top:.75rem;border-radius:4px}
@@ -678,7 +678,7 @@ function imprimirCierre(c) {
     </div><br/>
     <div style="text-align:center">
       <button onclick="window.print()"
-        style="background:#166534;color:#fff;border:none;padding:.5rem 1.5rem;
+        style="background:var(--green-800);color:#fff;border:none;padding:.5rem 1.5rem;
         border-radius:.4rem;font-weight:700;cursor:pointer;font-size:12px">
         🖨️ Imprimir
       </button>

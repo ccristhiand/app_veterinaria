@@ -16,18 +16,18 @@
 
     /* Calendario semanal */
     .cal-grid { display:grid;grid-template-columns:80px repeat(7,1fr);border-left:1px solid var(--line);border-top:1px solid var(--line); }
-    .cal-head { background:#f0fdf4;font-size:.7rem;font-weight:700;text-align:center;
+    .cal-head { background:var(--green-50);font-size:.7rem;font-weight:700;text-align:center;
                 padding:.4rem .2rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line); }
     .cal-head.hoy { background:var(--green-500);color:#fff; }
     .cal-label { font-size:.7rem;color:var(--ink-faint);padding:.4rem .5rem;text-align:right;
                  border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-weight:600; }
     .cal-cell { border-right:1px solid var(--line);border-bottom:1px solid var(--line);
                 padding:.25rem;min-height:54px;position:relative;cursor:pointer;transition:background .1s; }
-    .cal-cell:hover { background:#f0fdf4; }
+    .cal-cell:hover { background:var(--green-50); }
     .cal-evento { font-size:.65rem;border-radius:.4rem;padding:.15rem .35rem;margin-bottom:.15rem;
                   line-height:1.3;cursor:pointer;transition:opacity .15s; }
     .cal-evento:hover { opacity:.85; }
-    .ev-puntual    { background:#dcfce7;color:#15803d;border-left:3px solid #16a34a; }
+    .ev-puntual    { background:var(--green-100);color:var(--green-700);border-left:3px solid var(--green-600); }
     .ev-tarde      { background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04; }
     .ev-adelantado { background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed; }
     .ev-sin-marcar { background:#f8faf8;color:var(--ink-soft);border-left:3px solid #d1d5db; }
@@ -41,10 +41,10 @@
     .badge-sin-marcar { background:#f3f4f6;color:#6b7280;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:999px; }
 
     /* Tarjeta marcado del empleado */
-    .marcar-card { background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #86efac;
+    .marcar-card { background:linear-gradient(135deg,var(--green-50),var(--green-100));border:2px solid var(--green-300);
                    border-radius:1.2rem;padding:1.5rem;text-align:center; }
     .marcar-reloj { font-size:2.8rem;font-weight:800;font-family:'Courier New',monospace;
-                    color:#15803d;letter-spacing:.05em;margin:.5rem 0; }
+                    color:var(--green-700);letter-spacing:.05em;margin:.5rem 0; }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -68,9 +68,9 @@
 
       <!-- Reloj en tiempo real -->
       <div class="marcar-card">
-        <p style="font-size:.75rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.1em">Hora actual</p>
+        <p style="font-size:.75rem;font-weight:700;color:var(--green-700);text-transform:uppercase;letter-spacing:.1em">Hora actual</p>
         <div class="marcar-reloj" id="reloj-live">--:--:--</div>
-        <p style="font-size:.72rem;color:#15803d" id="fecha-live">—</p>
+        <p style="font-size:.72rem;color:var(--green-700)" id="fecha-live">—</p>
       </div>
 
       <!-- Info turno del día -->
@@ -429,7 +429,7 @@ async function cargarUsuariosSelect() {
     if (listEl) {
       listEl.innerHTML = _usuariosCache.map(u =>
         '<label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;cursor:pointer;padding:.2rem .3rem;border-radius:.4rem" '+
-        'onmouseover="this.style.background=\'#f0fdf4\'" onmouseout="this.style.background=\'\'">' +
+        'onmouseover="this.style.background=\'var(--green-50)\'" onmouseout="this.style.background=\'\'">' +
           '<input type="checkbox" class="lote-usr" value="'+u.id+'" style="accent-color:var(--green-600)"/>' +
           esc(u.nombre)+' <span style="font-size:.68rem;color:var(--ink-faint)">('+u.rol+')</span>' +
         '</label>'
@@ -494,11 +494,11 @@ async function cargarMiTurno() {
           '<p style="font-size:1.5rem;font-weight:800;margin:.4rem 0">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</p>' +
           (t.sede_nombre?'<p style="font-size:.78rem;color:var(--ink-soft)">🏥 '+esc(t.sede_nombre)+'</p>':'') +
         '</div>' +
-        '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:1rem;text-align:center;margin-top:.75rem">' +
-          '<p style="font-size:.72rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.1em">Asistencia registrada</p>' +
-          '<p style="font-size:1.8rem;font-weight:800;font-family:monospace;color:#15803d;margin:.3rem 0">'+esc(t.hora_marcada.substring(0,5))+'</p>' +
+        '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:1rem;text-align:center;margin-top:.75rem">' +
+          '<p style="font-size:.72rem;font-weight:700;color:var(--green-700);text-transform:uppercase;letter-spacing:.1em">Asistencia registrada</p>' +
+          '<p style="font-size:1.8rem;font-weight:800;font-family:monospace;color:var(--green-700);margin:.3rem 0">'+esc(t.hora_marcada.substring(0,5))+'</p>' +
           '<span class="'+badgeClass+'">'+estadoTxt[t.estado]+'</span>' +
-          '<p style="font-size:.72rem;color:#15803d;margin-top:.4rem">'+diffTxt+'</p>' +
+          '<p style="font-size:.72rem;color:var(--green-700);margin-top:.4rem">'+diffTxt+'</p>' +
         '</div>';
       return;
     }
@@ -507,7 +507,7 @@ async function cargarMiTurno() {
     card.innerHTML =
       '<div style="text-align:center;padding:1rem 0">' +
         '<p style="font-size:.7rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.1em">Tu turno de hoy</p>' +
-        '<p style="font-size:1.8rem;font-weight:800;margin:.4rem 0;color:#15803d">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</p>' +
+        '<p style="font-size:1.8rem;font-weight:800;margin:.4rem 0;color:var(--green-700)">'+esc(t.hora_inicio.substring(0,5))+' – '+esc(t.hora_fin.substring(0,5))+'</p>' +
         (t.sede_nombre?'<p style="font-size:.78rem;color:var(--ink-soft);margin-bottom:.5rem">🏥 '+esc(t.sede_nombre)+'</p>':'') +
         (t.notas?'<p style="font-size:.75rem;color:var(--ink-soft);font-style:italic;margin-bottom:.75rem">📝 '+esc(t.notas)+'</p>':'') +
       '</div>' +
@@ -614,7 +614,7 @@ function renderCalendario(lunes, turnos) {
       var turno = turnos.find(t => t.usuario_id == uid && t.fecha.substring(0,10) === dStr);
       var esHoy = dStr === hoyStr;
 
-      html += '<div class="cal-cell'+(esHoy?' '+' style="background:#f0fdf4"':'')+'"'+
+      html += '<div class="cal-cell'+(esHoy?' '+' style="background:var(--green-50)"':'')+'"'+
         (turno?' onclick="verTurno('+turno.id+')"':'')+'>';
 
       if (turno) {
@@ -653,13 +653,13 @@ function verTurno(turnoId) {
     var badgeClass = 'badge-'+t.estado;
     var estadoTxt  = { puntual:'✅ Puntual', tarde:'⚠️ Tarde', adelantado:'🌟 Adelantado' };
     estadoHtml =
-      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;padding:.75rem 1rem">' +
-        '<p style="font-size:.68rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Asistencia registrada</p>' +
+      '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.75rem;padding:.75rem 1rem">' +
+        '<p style="font-size:.68rem;font-weight:700;color:var(--green-700);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Asistencia registrada</p>' +
         '<div style="display:flex;align-items:center;justify-content:space-between">' +
           '<span style="font-weight:700;font-size:.88rem">🕐 '+esc(t.hora_marcada.substring(0,5))+'</span>' +
           '<span class="'+badgeClass+'">'+estadoTxt[t.estado]+'</span>' +
         '</div>' +
-        (t.minutos_diff!==0?'<p style="font-size:.72rem;color:#15803d;margin-top:.3rem">'+Math.abs(t.minutos_diff)+' min '+(t.minutos_diff>0?'tarde':'antes')+'</p>':'') +
+        (t.minutos_diff!==0?'<p style="font-size:.72rem;color:var(--green-700);margin-top:.3rem">'+Math.abs(t.minutos_diff)+' min '+(t.minutos_diff>0?'tarde':'antes')+'</p>':'') +
       '</div>';
   } else if (fechaStr < hoyStr) {
     estadoHtml = '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.75rem;padding:.75rem 1rem;text-align:center">' +
@@ -862,9 +862,9 @@ function renderKpis(k) {
   var color = pct>=90?'#15803d':pct>=70?'#b45309':'#be123c';
   document.getElementById('rep-kpis').innerHTML = [
     { label:'Total turnos',   val: k.total_turnos||0,   sub:'', color:'#1d4ed8' },
-    { label:'Asistieron',     val: k.total_marcados||0, sub: k.total_turnos>0?((k.total_marcados/k.total_turnos*100).toFixed(0)+'%'):'', color:'#15803d' },
+    { label:'Asistieron',     val: k.total_marcados||0, sub: k.total_turnos>0?((k.total_marcados/k.total_turnos*100).toFixed(0)+'%'):'', color:'var(--green-700)' },
     { label:'Ausencias',      val: k.total_ausentes||0, sub:'', color:'#be123c' },
-    { label:'Puntuales',      val: k.puntuales||0,      sub:'', color:'#15803d' },
+    { label:'Puntuales',      val: k.puntuales||0,      sub:'', color:'var(--green-700)' },
     { label:'Tardanzas',      val: k.tardanzas||0,      sub:'', color:'#b45309' },
     { label:'% Asistencia',   val: pct.toFixed(1)+'%',  sub:'', color },
   ].map(c =>
@@ -889,7 +889,7 @@ function renderTablaUsuarios(rows) {
       '<td style="font-size:.75rem;color:var(--ink-soft)">'+esc(u.rol)+'</td>' +
       '<td style="font-size:.75rem">'+esc(u.sede_nombre||'—')+'</td>' +
       '<td style="text-align:center">'+u.turnos+'</td>' +
-      '<td style="text-align:center;color:#15803d;font-weight:700">'+u.marcados+'</td>' +
+      '<td style="text-align:center;color:var(--green-700);font-weight:700">'+u.marcados+'</td>' +
       '<td style="text-align:center;color:#be123c;font-weight:700">'+u.ausentes+'</td>' +
       '<td style="text-align:center"><span class="badge-puntual">'+u.puntuales+'</span></td>' +
       '<td style="text-align:center"><span class="badge-tarde">'+u.tardanzas+'</span></td>' +

@@ -11,8 +11,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     /* ── Base ───────────────────────────────────────────── */
-    .wa-stat { background:#f0fdf4;border:1px solid #bbf7d0;border-radius:1rem;padding:1rem;text-align:center }
-    .wa-stat .val { font-size:1.5rem;font-weight:800;color:#15803d }
+    .wa-stat { background:var(--green-50);border:1px solid var(--green-200);border-radius:1rem;padding:1rem;text-align:center }
+    .wa-stat .val { font-size:1.5rem;font-weight:800;color:var(--green-700) }
     .wa-stat .lbl { font-size:.65rem;color:#4b5f57;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.2rem }
     .badge-conectado    { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0 }
     .badge-desconectado { background:#f8faf8;color:#64748b;border:1px solid #e2e8f0 }
@@ -20,7 +20,7 @@
     .badge-error        { background:#fff1f2;color:#be123c;border:1px solid #fecdd3 }
     .badge-wa { display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:700;padding:.3rem .75rem;border-radius:999px }
     .plantilla-card { background:#f8faf8;border:1px solid var(--line);border-radius:.85rem;padding:.9rem 1rem;cursor:pointer;transition:all .15s }
-    .plantilla-card:hover { border-color:#25d366;background:#f0fdf4 }
+    .plantilla-card:hover { border-color:#25d366;background:var(--green-50) }
     .wa-pulse { width:10px;height:10px;border-radius:50%;background:#25d366;display:inline-block;animation:pulse 2s infinite }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.2)} }
 
@@ -123,9 +123,9 @@
 
       <!-- Panel campañas activas -->
       <div id="panel-campanas-activas" style="display:none;margin-top:.75rem;
-        background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem">
+        background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem">
-          <p style="font-size:.78rem;font-weight:700;color:#15803d">📢 Campañas en curso</p>
+          <p style="font-size:.78rem;font-weight:700;color:var(--green-700)">📢 Campañas en curso</p>
           <button onclick="window.location.href='wa-campanas'" class="vlink" style="font-size:.72rem">
             Ver todas →
           </button>
@@ -160,7 +160,7 @@
             <button onclick="buscarPropWA()" class="vbtn vbtn-primary">Buscar</button>
           </div>
           <div id="wa-prop-resultados" style="display:flex;flex-direction:column;gap:.35rem;max-height:150px;overflow-y:auto"></div>
-          <div id="wa-prop-sel" style="display:none;background:#f0fdf4;border:1px solid #a7f3d0;border-radius:.8rem;padding:.6rem .9rem;align-items:center;gap:.7rem;margin-top:.4rem">
+          <div id="wa-prop-sel" style="display:none;background:var(--green-50);border:1px solid var(--green-200);border-radius:.8rem;padding:.6rem .9rem;align-items:center;gap:.7rem;margin-top:.4rem">
             <span style="font-size:1.2rem">👤</span>
             <div style="flex:1">
               <p style="font-weight:700;font-size:.85rem" id="wa-prop-nombre">—</p>
@@ -230,7 +230,7 @@
             <input id="cfg-codigo-pais" type="text" class="vinput" placeholder="+51" style="max-width:120px"/>
             <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.2rem">Perú: +51 · Colombia: +57 · México: +52</p>
           </div>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem 1rem">
+          <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem 1rem">
             <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.84rem;font-weight:600">
               <input type="checkbox" id="cfg-activo" style="accent-color:#25d366;width:16px;height:16px"/>
               WhatsApp activo para esta clínica
@@ -340,7 +340,7 @@
             <div id="ws-progreso-bar" style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);transition:width .5s;width:0%"></div>
           </div>
           <div class="wa-ws-stats">
-            <div><p style="font-weight:800;font-size:1.1rem;color:#15803d" id="ws-enviados">0</p><p style="color:var(--ink-faint);font-size:.72rem">Enviados</p></div>
+            <div><p style="font-weight:800;font-size:1.1rem;color:var(--green-700)" id="ws-enviados">0</p><p style="color:var(--ink-faint);font-size:.72rem">Enviados</p></div>
             <div><p style="font-weight:800;font-size:1.1rem;color:#be123c" id="ws-fallidos">0</p><p style="color:var(--ink-faint);font-size:.72rem">Fallidos</p></div>
             <div><p style="font-weight:800;font-size:1.1rem;color:#b45309" id="ws-hoy">0</p><p style="color:var(--ink-faint);font-size:.72rem">Hoy</p></div>
             <div><p style="font-weight:800;font-size:1.1rem" id="ws-total">0</p><p style="color:var(--ink-faint);font-size:.72rem">Total</p></div>
@@ -380,7 +380,7 @@
   <div class="vmodal" style="max-width:420px">
     <div class="vmodal-head"><h3>📱 Escanear QR de WhatsApp</h3><button onclick="_esperandoConexion=false; closeModal('modal-qr')" class="vmodal-close">✕</button></div>
     <div class="vmodal-body" style="text-align:center;padding:1.5rem;display:flex;flex-direction:column;align-items:center;gap:1.25rem">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem 1rem;font-size:.82rem;color:#15803d;width:100%">
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem 1rem;font-size:.82rem;color:var(--green-700);width:100%">
         📱 Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo → Escanea el QR
       </div>
       <div id="qr-container" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;border:2px solid var(--line);border-radius:1rem;background:#fff"><div class="vspinner"></div></div>
@@ -496,10 +496,10 @@ function renderCampanasActivas() {
   }
   lista.innerHTML = rows.map(function(c) {
     var pct = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0;
-    return '<div style="background:#fff;border-radius:.75rem;padding:.65rem .85rem;border:1px solid #bbf7d0">' +
+    return '<div style="background:#fff;border-radius:.75rem;padding:.65rem .85rem;border:1px solid var(--green-200)">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">' +
         '<p style="font-size:.78rem;font-weight:700">' + esc(c.nombre) + '</p>' +
-        '<span style="font-size:.72rem;font-weight:700;color:#15803d">' + pct + '%</span>' +
+        '<span style="font-size:.72rem;font-weight:700;color:var(--green-700)">' + pct + '%</span>' +
       '</div>' +
       '<div style="height:5px;border-radius:999px;background:#e5e7eb;overflow:hidden">' +
         '<div style="height:100%;border-radius:999px;background:linear-gradient(135deg,#25d366,#128c7e);' +
@@ -633,7 +633,7 @@ function renderEstadoBox(d) {
     box.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:1rem">
       <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;font-size:2rem">📱</div>
       <div style="text-align:center">
-        <p style="font-weight:800;font-size:1.1rem;color:#15803d">Conectado</p>
+        <p style="font-weight:800;font-size:1.1rem;color:var(--green-700)">Conectado</p>
         <p style="font-size:.82rem;color:var(--ink-soft);font-family:monospace;margin-top:.25rem">${esc(d.numero||'—')}</p>
         ${d.ultima_conexion ? `<p style="font-size:.7rem;color:var(--ink-faint);margin-top:.2rem">Desde: ${new Date(d.ultima_conexion).toLocaleString('es-PE')}</p>` : ''}
       </div>
@@ -664,19 +664,19 @@ async function renderRecordatoriosEstado() {
     cont.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span>📅 Recordatorio citas</span>
-        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_citas_activo?'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
+        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_citas_activo?'background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
           ${config.recordatorio_citas_activo ? `✅ ${config.recordatorio_citas_horas}h antes` : '⏸️ Desactivado'}
         </span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span>💉 Recordatorio vacunas</span>
-        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_vacunas_activo?'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
+        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_vacunas_activo?'background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
           ${config.recordatorio_vacunas_activo ? `✅ ${config.recordatorio_vacunas_dias} días antes` : '⏸️ Desactivado'}
         </span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span>🐛 Recordatorio desparasitaciones</span>
-        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_desparasitaciones_activo?'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
+        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;${config.recordatorio_desparasitaciones_activo?'background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)':'background:#f8faf8;color:#64748b;border:1px solid #e2e8f0'}">
           ${config.recordatorio_desparasitaciones_activo ? '✅ Activo' : '⏸️ Desactivado'}
         </span>
       </div>`;
@@ -697,7 +697,7 @@ async function cargarStats() {
     if (resCfg?.ok) {
       const { cuota } = (await resCfg.json()).data;
       const el = document.getElementById('stat-cuota');
-      if (cuota.ilimitado) { el.textContent = '∞'; el.style.color = '#15803d'; }
+      if (cuota.ilimitado) { el.textContent = '∞'; el.style.color = 'var(--green-700)'; }
       else {
         const rest = (cuota.msgs_incluidos || 0) - (cuota.msgs_usados || 0);
         el.textContent = rest;
@@ -785,7 +785,7 @@ async function buscarPropWA() {
     cont.innerHTML = rows.length ? rows.map(p => `
       <button onclick="selPropWA(${p.id},'${esc(p.nombre)} ${esc(p.apellido)}','${esc(p.telefono||'')}',${JSON.stringify(p.mascotas||[])})"
         style="display:flex;align-items:center;gap:.6rem;padding:.55rem .85rem;background:#fff;border:1px solid var(--line);border-radius:.75rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;font-size:.82rem"
-        onmouseover="this.style.borderColor='#25d366';this.style.background='#f0fdf4'"
+        onmouseover="this.style.borderColor='#25d366';this.style.background='var(--green-50)'"
         onmouseout="this.style.borderColor='var(--line)';this.style.background='#fff'">
         <span style="font-size:1.1rem">👤</span>
         <div>
@@ -1049,7 +1049,7 @@ async function cargarLog() {
       <td style="font-size:.8rem;font-weight:600">${esc(r.propietario_nombre||'—')}</td>
       <td style="font-size:.78rem;font-family:monospace">${esc(r.telefono)}</td>
       <td>${r.estado==='enviado'
-        ? '<span style="background:#f0fdf4;color:#15803d;font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;border:1px solid #bbf7d0">✅ Enviado</span>'
+        ? '<span style="background:var(--green-50);color:var(--green-700);font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;border:1px solid var(--green-200)">✅ Enviado</span>'
         : '<span style="background:#fff1f2;color:#be123c;font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;border:1px solid #fecdd3">❌ Fallido</span>'}</td>
       <td style="font-size:.72rem;color:var(--ink-faint);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.mensaje)}">${esc(r.mensaje)}</td>
     </tr>`).join('');
@@ -1103,7 +1103,7 @@ function actualizarBadgeLimite(val) {
   val = parseInt(val)||30;
   var badge = document.getElementById('cfg-limite-badge');
   var txt, color, bg, border;
-  if (val<=30)       { txt='🟢 Muy bajo'; color='#15803d'; bg='#f0fdf4'; border='#bbf7d0'; }
+  if (val<=30)       { txt='🟢 Muy bajo'; color='var(--green-700)'; bg='var(--green-50)'; border='var(--green-200)'; }
   else if (val<=100) { txt='🔵 Bajo';     color='#0369a1'; bg='#f0f9ff'; border='#bae6fd'; }
   else if (val<=200) { txt='🟡 Medio';    color='#b45309'; bg='#fffbeb'; border='#fde68a'; }
   else               { txt='🔴 Alto';     color='#be123c'; bg='#fff1f2'; border='#fecdd3'; }
@@ -1363,7 +1363,7 @@ async function verDetalleCampana(id) {
       html += '<p style="font-size:.68rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase">👥 Destinatarios ('+meta.total+')</p>';
       html += '<div style="display:flex;gap:.3rem">';
       html += '<button onclick="filtrarContactosDet(\'todos\')"    id="dcf-todos"    class="vbtn vbtn-primary"  style="font-size:.65rem;padding:.2rem .55rem">Todos ('+meta.total+')</button>';
-      html += '<button onclick="filtrarContactosDet(\'enviado\')"  id="dcf-enviado"  class="vbtn vbtn-ghost"    style="font-size:.65rem;padding:.2rem .55rem;color:#15803d">✅ '+(meta.enviados||0)+'</button>';
+      html += '<button onclick="filtrarContactosDet(\'enviado\')"  id="dcf-enviado"  class="vbtn vbtn-ghost"    style="font-size:.65rem;padding:.2rem .55rem;color:var(--green-700)">✅ '+(meta.enviados||0)+'</button>';
       html += '<button onclick="filtrarContactosDet(\'fallido\')"  id="dcf-fallido"  class="vbtn vbtn-ghost"    style="font-size:.65rem;padding:.2rem .55rem;color:#be123c">❌ '+(meta.fallidos||0)+'</button>';
       html += '</div></div>';
 
@@ -1413,7 +1413,7 @@ function renderContactoRows(list) {
   if (!list.length) return '<tr><td colspan="3" style="text-align:center;color:var(--ink-faint);font-size:.78rem;padding:1rem">Sin resultados</td></tr>';
   return list.map(function(r) {
     var est = r.estado === 'enviado'
-      ? '<span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Enviado</span>'
+      ? '<span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)">✅ Enviado</span>'
       : r.estado === 'fallido'
         ? '<span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3" title="'+esc(r.error||'')+'">❌ Fallido</span>'
         : '<span style="font-size:.68rem;color:var(--ink-faint)">⏳ Pendiente</span>';
@@ -1880,8 +1880,8 @@ function filtrarHistorias(estado) {
 }
 
 function renderHistoriaCard(h) {
-  var colMap={borrador:'#6b7280',programada:'#0369a1',publicada:'#15803d',fallida:'#be123c',cancelada:'#9ca3af'};
-  var bgMap ={borrador:'#f8faf8',programada:'#eff6ff',publicada:'#f0fdf4',fallida:'#fff1f2',cancelada:'#f8faf8'};
+  var colMap={borrador:'#6b7280',programada:'#0369a1',publicada:'var(--green-700)',fallida:'#be123c',cancelada:'#9ca3af'};
+  var bgMap ={borrador:'#f8faf8',programada:'#eff6ff',publicada:'var(--green-50)',fallida:'#fff1f2',cancelada:'#f8faf8'};
   var emojMap={borrador:'📝',programada:'⏰',publicada:'✅',fallida:'❌',cancelada:'—'};
   var col=colMap[h.estado]||'#6b7280';
   var bg =bgMap[h.estado] ||'#f8faf8';
@@ -1903,7 +1903,7 @@ function renderHistoriaCard(h) {
 
   var info='';
   if(h.programada_at) info+='<p style="font-size:.7rem;color:#0369a1;margin-top:.3rem">⏰ '+new Date(h.programada_at.replace?h.programada_at.replace('Z',''):h.programada_at).toLocaleString('es-PE')+'</p>';
-  if(h.publicada_at)  info+='<p style="font-size:.7rem;color:#15803d;margin-top:.3rem">✅ '+new Date(h.publicada_at.replace?h.publicada_at.replace('Z',''):h.publicada_at).toLocaleString('es-PE')+'</p>';
+  if(h.publicada_at)  info+='<p style="font-size:.7rem;color:var(--green-700);margin-top:.3rem">✅ '+new Date(h.publicada_at.replace?h.publicada_at.replace('Z',''):h.publicada_at).toLocaleString('es-PE')+'</p>';
   if(h.error_msg)     info+='<p style="font-size:.68rem;color:#be123c;margin-top:.3rem;line-height:1.4">❌ '+esc(h.error_msg.substring(0,80))+'</p>';
 
   var acciones='';
@@ -1939,7 +1939,7 @@ function selTipoHistoria(tipo) {
   ['imagen','texto'].forEach(function(t){
     var btn=document.getElementById('hist-tipo-'+t);
     if(btn) btn.style.cssText=t===tipo
-      ?'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer'
+      ?'flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:var(--green-50);color:var(--green-700);font-weight:700;font-size:.8rem;cursor:pointer'
       :'flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer';
   });
   var imgSec=document.getElementById('hist-imagen-section');
@@ -1997,7 +1997,7 @@ async function subirImagenHistoria(b64, contentType, filename) {
     var res=await api('/wa/upload',{method:'POST',body:{base64:b64,contentType,filename:filename.replace(/[^a-zA-Z0-9._-]/g,'_')}});
     var d=await res.json(); if(!res.ok) throw new Error(d.message||'Error al subir');
     _histImagenUrl=d.data.url; _histImagenBlob=d.data.blobName;
-    if(statusEl){ statusEl.textContent='✅ Imagen lista'; statusEl.style.color='#15803d'; }
+    if(statusEl){ statusEl.textContent='✅ Imagen lista'; statusEl.style.color='var(--green-700)'; }
     toast('✅ Imagen subida','success');
   } catch(err) {
     _histImagenUrl=null; _histImagenBlob=null;
@@ -2081,7 +2081,7 @@ async function editarHistoria(id) {
       if(prev){ prev.style.display=''; cargarImagenHistoria_proxy(prev, h.id); }
       if(ph) ph.style.display='none';
       var s=document.getElementById('hist-upload-status');
-      if(s){ s.textContent='✅ Imagen existente'; s.style.color='#15803d'; s.style.display=''; }
+      if(s){ s.textContent='✅ Imagen existente'; s.style.color='var(--green-700)'; s.style.display=''; }
     } else {
       limpiarImagenHistoria();
     }
@@ -2122,10 +2122,10 @@ async function eliminarHistoria(id) {
       <input type="hidden" id="camp-edit-id"/>
 
       <!-- IA Generator -->
-      <div style="background:linear-gradient(135deg,#f0fdf4,#eff6ff);border:1.5px solid #a7f3d0;border-radius:.9rem;padding:.85rem 1rem">
+      <div style="background:linear-gradient(135deg,var(--green-50),#eff6ff);border:1.5px solid var(--green-200);border-radius:.9rem;padding:.85rem 1rem">
         <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
           <span style="font-size:1rem">✨</span>
-          <p style="font-weight:800;font-size:.85rem;color:#065f46">✍️ Generar prompt para IA</p>
+          <p style="font-weight:800;font-size:.85rem;color:var(--green-800)">✍️ Generar prompt para IA</p>
         </div>
         <div style="display:flex;gap:.5rem">
           <input id="camp-ai-titulo" type="text" class="vinput" placeholder="Ej: Descuento vacunas junio, recordatorio antipulgas…" style="flex:1;font-size:.8rem"/>
@@ -2253,7 +2253,7 @@ async function eliminarHistoria(id) {
       <div>
         <label class="vlabel" style="margin-bottom:.4rem">Tipo de historia</label>
         <div style="display:flex;gap:.5rem">
-          <button onclick="selTipoHistoria('imagen')" id="hist-tipo-imagen" style="flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:#f0fdf4;color:#15803d;font-weight:700;font-size:.8rem;cursor:pointer">🖼️ Con imagen</button>
+          <button onclick="selTipoHistoria('imagen')" id="hist-tipo-imagen" style="flex:1;padding:.6rem;border:2px solid #128c7e;border-radius:.75rem;background:var(--green-50);color:var(--green-700);font-weight:700;font-size:.8rem;cursor:pointer">🖼️ Con imagen</button>
           <button onclick="selTipoHistoria('texto')"  id="hist-tipo-texto"  style="flex:1;padding:.6rem;border:2px solid var(--line);border-radius:.75rem;background:#fff;color:var(--ink);font-weight:600;font-size:.8rem;cursor:pointer">✏️ Solo texto</button>
         </div>
       </div>
@@ -2263,7 +2263,7 @@ async function eliminarHistoria(id) {
         <label class="vlabel">Imagen *</label>
         <div style="border:2px dashed var(--line);border-radius:.9rem;padding:1.25rem;text-align:center;cursor:pointer;transition:border-color .15s"
           onclick="document.getElementById('hist-img-file').click()"
-          ondragover="event.preventDefault();this.style.borderColor='#128c7e';this.style.background='#f0fdf4'"
+          ondragover="event.preventDefault();this.style.borderColor='#128c7e';this.style.background='var(--green-50)'"
           ondragleave="this.style.borderColor='';this.style.background=''"
           ondrop="soltarImagenHistoria(event)">
           <input type="file" id="hist-img-file" accept="image/*" style="display:none" onchange="onHistoriaFileChange(this)"/>
@@ -2311,14 +2311,14 @@ async function eliminarHistoria(id) {
   <div class="vcard vcard-pad" style="margin-top:1.3rem;border:2px solid #fde68a">
     <h3 style="font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.5rem">🛡️ Control anti-spam — Campañas</h3>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem;font-size:.7rem">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#15803d">1–30</p><p style="color:#15803d;font-weight:600">🟢 Muy bajo</p></div>
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:var(--green-700)">1–30</p><p style="color:var(--green-700);font-weight:600">🟢 Muy bajo</p></div>
       <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#0369a1">31–100</p><p style="color:#0369a1;font-weight:600">🔵 Bajo</p></div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#b45309">101–200</p><p style="color:#b45309;font-weight:600">🟡 Medio</p></div>
       <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.6rem;padding:.5rem;text-align:center"><p style="font-weight:800;color:#be123c">200+</p><p style="color:#be123c;font-weight:600">🔴 Alto</p></div>
     </div>
     <div class="wa-antispam-grid">
       <div>
-        <label class="vlabel">Límite diario <span id="cfg-limite-badge" style="font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">30 — 🟢</span></label>
+        <label class="vlabel">Límite diario <span id="cfg-limite-badge" style="font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200)">30 — 🟢</span></label>
         <input id="cfg-limite-dia" type="number" min="5" max="500" value="30" class="vinput" style="max-width:100px" oninput="actualizarBadgeLimite(this.value)"/>
       </div>
       <div>

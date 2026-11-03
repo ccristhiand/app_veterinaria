@@ -12,7 +12,7 @@
     .badge-estado { font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid }
     .est-borrador   { background:#f8faf8;color:#64748b;border-color:#e2e8f0 }
     .est-programada { background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe }
-    .est-enviando   { background:#f0fdf4;color:#15803d;border-color:#bbf7d0 }
+    .est-enviando   { background:var(--green-50);color:var(--green-700);border-color:var(--green-200) }
     .est-pausada    { background:#fffbeb;color:#b45309;border-color:#fde68a }
     .est-completada { background:#f0fdf4;color:#15803d;border-color:#bbf7d0 }
     .est-cancelada  { background:#fff1f2;color:#be123c;border-color:#fecdd3 }
@@ -132,8 +132,8 @@
     </div>
     <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;text-align:center">
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.85rem;padding:.85rem">
-          <p style="font-size:1.4rem;font-weight:800;color:#15803d" id="prog-enviados">0</p>
+        <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;padding:.85rem">
+          <p style="font-size:1.4rem;font-weight:800;color:var(--green-700)" id="prog-enviados">0</p>
           <p style="font-size:.65rem;color:#4b5f57;font-weight:700;text-transform:uppercase">Enviados</p>
         </div>
         <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.85rem;padding:.85rem">
@@ -293,7 +293,7 @@ async function actualizarProgreso(id) {
     const estadoMap = {
       borrador  : { bg:'#f8faf8', color:'#64748b', txt:'📝 Borrador' },
       programada: { bg:'#eff6ff', color:'#1d4ed8', txt:'🕐 Programada' },
-      enviando  : { bg:'#f0fdf4', color:'#15803d', txt:'📤 Enviando mensajes…' },
+      enviando  : { bg:'var(--green-50)', color:'var(--green-700)', txt:'📤 Enviando mensajes…' },
       pausada   : { bg:'#fffbeb', color:'#b45309', txt:'⏸️ Pausada' },
       completada: { bg:'#f0fdf4', color:'#15803d', txt:'✅ Completada' },
       cancelada : { bg:'#fff1f2', color:'#be123c', txt:'🚫 Cancelada' },

@@ -22,11 +22,11 @@
     .pv-chips { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.55rem; }
     .pv-chip { text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:.9rem; padding:.6rem .75rem;
                cursor:pointer; font-family:inherit; transition:all .12s; display:flex; flex-direction:column; gap:.15rem; min-height:64px; }
-    .pv-chip:hover { border-color:#10b981; background:#f0fdf4; }
-    .pv-chip.sel   { border-color:#059669; box-shadow:0 0 0 3px rgba(16,185,129,.18); }
+    .pv-chip:hover { border-color:var(--green-500); background:var(--green-50); }
+    .pv-chip.sel   { border-color:var(--green-600); box-shadow:0 0 0 3px rgba(var(--brand-rgb),.18); }
     .pv-chip .n { font-size:.8rem; font-weight:700; line-height:1.25; }
     .pv-chip .m { font-size:.7rem; color:var(--ink-faint); display:flex; justify-content:space-between; gap:.4rem; }
-    .pv-chip .p { font-weight:800; color:#15803d; }
+    .pv-chip .p { font-weight:800; color:var(--green-700); }
     .pv-chip.sin-stock { opacity:.55; }
 
     .pv-cart { position:sticky; top:0; display:flex; flex-direction:column; max-height:calc(100vh - 11rem); overflow-y:auto; }
@@ -51,13 +51,13 @@
               font-family:inherit; font-size:.7rem; font-weight:700; color:var(--ink-soft); display:flex; flex-direction:column;
               align-items:center; gap:.1rem; }
     .pv-met .e { font-size:1.05rem; }
-    .pv-met.on { border-color:#059669; background:#ecfdf5; color:#047857; }
+    .pv-met.on { border-color:var(--green-600); background:var(--green-50); color:var(--green-700); }
 
-    .pv-total { display:flex; justify-content:space-between; align-items:baseline; font-weight:800; color:#15803d; }
+    .pv-total { display:flex; justify-content:space-between; align-items:baseline; font-weight:800; color:var(--green-700); }
     .pv-total .v { font-size:1.9rem; letter-spacing:-.02em; }
 
     .pv-cobrar { width:100%; padding:1rem; font-size:1.05rem; font-weight:800; border:none; border-radius:1rem; cursor:pointer;
-                 color:#fff; background:linear-gradient(135deg,#10b981,#047857); font-family:inherit;
+                 color:#fff; background:linear-gradient(135deg,var(--green-500),var(--green-700)); font-family:inherit;
                  display:flex; justify-content:center; align-items:center; gap:.5rem; }
     .pv-cobrar:disabled { background:#cbd5d1; cursor:not-allowed; }
 
@@ -65,8 +65,8 @@
     .pv-aviso.warn { background:#fffbeb; border:1px solid #fde68a; color:#b45309; }
     .pv-aviso.err  { background:#fff1f2; border:1px solid #fecdd3; color:#be123c; }
 
-    .pv-vuelto { background:#ecfdf5; border:1px solid #a7f3d0; border-radius:.8rem; padding:.55rem .8rem;
-                 display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#047857; }
+    .pv-vuelto { background:var(--green-50); border:1px solid var(--green-200); border-radius:.8rem; padding:.55rem .8rem;
+                 display:flex; justify-content:space-between; align-items:center; font-weight:800; color:var(--green-700); }
     .pv-split-row { display:grid; grid-template-columns:1fr 110px 28px; gap:.4rem; align-items:center; }
   </style>
 </head>
@@ -80,7 +80,7 @@
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
       <div id="selector-sede-pv"></div>
-      <button onclick="pvToggleVentas()" class="vbtn vbtn-ghost">🧾 Ventas de hoy <span id="pv-hoy-total" style="font-weight:800;color:#15803d;margin-left:.3rem"></span></button>
+      <button onclick="pvToggleVentas()" class="vbtn vbtn-ghost">🧾 Ventas de hoy <span id="pv-hoy-total" style="font-weight:800;color:var(--green-700);margin-left:.3rem"></span></button>
     </div>
   </div>
 
@@ -245,7 +245,7 @@
       <div style="font-size:2.6rem">✅</div>
       <p style="font-weight:800;font-size:1.1rem">Venta registrada</p>
       <p id="pv-ok-numero" style="font-family:monospace;font-weight:700;color:var(--ink-soft)"></p>
-      <p id="pv-ok-total" style="font-size:1.6rem;font-weight:800;color:#15803d"></p>
+      <p id="pv-ok-total" style="font-size:1.6rem;font-weight:800;color:var(--green-700)"></p>
       <div id="pv-ok-vuelto" class="pv-vuelto" style="justify-content:center;gap:.6rem;font-size:1.05rem"></div>
     </div>
     <div class="vmodal-foot">

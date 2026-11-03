@@ -304,8 +304,8 @@ function aplicarModulosPlan(branding, activePage) {
             Este módulo no está incluido en tu plan actual.<br/>
             Contacta al administrador para actualizar tu plan.
           </p>
-          <div style="margin-top:1rem;padding:.65rem 1.1rem;background:#f0fdf4;border:1px solid #bbf7d0;
-            border-radius:.85rem;font-size:.82rem;color:#15803d;display:inline-block">
+          <div style="margin-top:1rem;padding:.65rem 1.1rem;background:var(--green-50);border:1px solid var(--green-200);
+            border-radius:.85rem;font-size:.82rem;color:var(--green-700);display:inline-block">
             Plan actual: <strong>${plan.toUpperCase()}</strong>
           </div>
           <br/>

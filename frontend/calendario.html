@@ -10,7 +10,7 @@
   <script src="js/layout.js"></script>
   <style>
     /* ── Tipos de cita ── */
-    .ev-medica        { background:#dcfce7;color:#15803d;border-left:3px solid #16a34a; }
+    .ev-medica        { background:var(--green-100);color:var(--green-700);border-left:3px solid var(--green-600); }
     .ev-vacuna        { background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed; }
     .ev-desparasitacion{ background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04; }
     .ev-estetica      { background:#fce7f3;color:#be185d;border-left:3px solid #db2777; }
@@ -20,16 +20,16 @@
     /* ── Vistas ── */
     /* MES */
     .mes-grid { display:grid;grid-template-columns:repeat(7,1fr);border-left:1px solid var(--line);border-top:1px solid var(--line); }
-    .mes-head { background:#f0fdf4;font-size:.68rem;font-weight:700;text-align:center;padding:.4rem;
-                border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:#15803d; }
+    .mes-head { background:var(--green-50);font-size:.68rem;font-weight:700;text-align:center;padding:.4rem;
+                border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--green-700); }
     .mes-cell { border-right:1px solid var(--line);border-bottom:1px solid var(--line);
                 min-height:90px;padding:.3rem;cursor:pointer;transition:background .1s;position:relative; }
     .mes-cell:hover { background:#f8fdf8; }
-    .mes-cell.hoy { background:#f0fdf4; }
+    .mes-cell.hoy { background:var(--green-50); }
     .mes-cell.otro-mes { background:#fafafa; }
     .mes-num  { font-size:.72rem;font-weight:700;color:var(--ink-faint);margin-bottom:.25rem;
                 width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%; }
-    .mes-num.hoy-num { background:#15803d;color:#fff; }
+    .mes-num.hoy-num { background:var(--green-700);color:#fff; }
     .mes-evento { font-size:.62rem;border-radius:.3rem;padding:.1rem .35rem;margin-bottom:.15rem;
                   cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                   transition:opacity .12s;line-height:1.4; }
@@ -40,15 +40,15 @@
     .sem-wrap { overflow-x:auto;overflow-y:auto;height:100%;min-height:0; }
     .sem-inner { min-width:500px; }
     .sem-grid { display:grid;grid-template-columns:48px repeat(7,1fr); }
-    .sem-head { background:#f0fdf4;font-size:.7rem;font-weight:700;text-align:center;padding:.4rem .2rem;
+    .sem-head { background:var(--green-50);font-size:.7rem;font-weight:700;text-align:center;padding:.4rem .2rem;
                 border-right:1px solid var(--line);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:10; }
-    .sem-head.hoy { background:#15803d;color:#fff; }
+    .sem-head.hoy { background:var(--green-700);color:#fff; }
     .sem-hora { font-size:.62rem;color:var(--ink-faint);text-align:right;padding:.2rem .4rem 0 0;
                 border-right:1px solid var(--line);border-bottom:1px solid #f0f0f0;height:52px;
                 position:relative;top:-8px;line-height:1; }
     .sem-cell { border-right:1px solid var(--line);border-bottom:1px solid #f0f0f0;
                 height:52px;position:relative;cursor:pointer;transition:background .1s; }
-    .sem-cell:hover { background:#f0fdf4; }
+    .sem-cell:hover { background:var(--green-50); }
     .sem-cell.hoy-col { background:#f8fffe; }
     .sem-evento { position:absolute;left:2px;right:2px;border-radius:.35rem;padding:.12rem .35rem;
                   font-size:.62rem;overflow:hidden;cursor:pointer;z-index:5;line-height:1.3;
@@ -63,7 +63,7 @@
                 border-right:2px solid var(--line);border-bottom:1px solid #f0f0f0;height:60px;
                 position:relative;top:-10px; }
     .dia-cell { border-bottom:1px solid #f0f0f0;height:60px;position:relative;cursor:pointer;transition:background .1s; }
-    .dia-cell:hover { background:#f0fdf4; }
+    .dia-cell:hover { background:var(--green-50); }
     .dia-evento { position:absolute;left:4px;right:4px;border-radius:.45rem;padding:.2rem .45rem;
                   font-size:.72rem;cursor:pointer;z-index:5;line-height:1.35;border:1px solid rgba(0,0,0,.08);
                   transition:all .12s;overflow:hidden;display:flex;flex-direction:column;justify-content:center; }
@@ -83,7 +83,7 @@
     .vista-btn { padding:.4rem .85rem;border:1.5px solid var(--line);border-radius:.7rem;
                  font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;
                  background:#fff;color:var(--ink);transition:all .15s; }
-    .vista-btn.activa { background:#15803d;color:#fff;border-color:#15803d; }
+    .vista-btn.activa { background:var(--green-700);color:#fff;border-color:var(--green-700); }
 
     /* Ocultar vistas semana/día en móvil */
     @media (max-width:639px) {
@@ -102,7 +102,7 @@
                     padding:.6rem .4rem;border:2px solid var(--line);border-radius:.8rem;
                     cursor:pointer;font-family:inherit;font-size:.7rem;font-weight:600;
                     background:#fff;color:var(--ink);transition:all .15s;flex:1;min-width:60px; }
-    .tipo-btn-cal.sel-medica        { border-color:#16a34a;background:#f0fdf4;color:#15803d; }
+    .tipo-btn-cal.sel-medica        { border-color:var(--green-600);background:var(--green-50);color:var(--green-700); }
     .tipo-btn-cal.sel-vacuna        { border-color:#7c3aed;background:#f5f3ff;color:#6d28d9; }
     .tipo-btn-cal.sel-desparasitacion { border-color:#ca8a04;background:#fefce8;color:#854d0e; }
     .tipo-btn-cal.sel-estetica      { border-color:#db2777;background:#fdf2f8;color:#be185d; }
@@ -112,7 +112,7 @@
       background:#fff;border:1.5px solid var(--green-500);border-radius:.85rem;
       box-shadow:0 8px 24px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;list-style:none;padding:.3rem; }
     .ac-list li { padding:.45rem .75rem;border-radius:.55rem;cursor:pointer;font-size:.8rem;transition:background .1s; }
-    .ac-list li:hover { background:#f0fdf4; }
+    .ac-list li:hover { background:var(--green-50); }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -144,7 +144,7 @@
 
   <!-- ── Leyenda ── -->
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;padding:.4rem 0;flex-shrink:0;font-size:.68rem">
-    <span style="background:#dcfce7;color:#15803d;border-left:3px solid #16a34a;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">🩺 Médica</span>
+    <span style="background:var(--green-100);color:var(--green-700);border-left:3px solid var(--green-600);border-radius:.3rem;padding:.1rem .5rem;font-weight:600">🩺 Médica</span>
     <span style="background:#ede9fe;color:#5b21b6;border-left:3px solid #7c3aed;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">💉 Vacuna</span>
     <span style="background:#fef9c3;color:#854d0e;border-left:3px solid #ca8a04;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">🪱 Desparasitación</span>
     <span style="background:#fce7f3;color:#be185d;border-left:3px solid #db2777;border-radius:.3rem;padding:.1rem .5rem;font-weight:600">✂️ Estética</span>
@@ -195,9 +195,9 @@
           <button onclick="buscarPropNC()" class="vbtn vbtn-primary" style="flex-shrink:0">Buscar</button>
         </div>
         <div id="nc-prop-resultados" style="margin-top:.75rem;display:flex;flex-direction:column;gap:.4rem;max-height:180px;overflow-y:auto"></div>
-        <div id="nc-prop-sel" style="display:none;margin-top:.75rem;background:#ecfdf5;border:1px solid #a7f3d0;
+        <div id="nc-prop-sel" style="display:none;margin-top:.75rem;background:var(--green-50);border:1px solid var(--green-200);
           border-radius:.8rem;padding:.75rem 1rem;align-items:center;gap:.75rem">
-          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-500),var(--green-600));
             color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"
             id="nc-prop-avatar">?</div>
           <div style="flex:1">
@@ -279,8 +279,8 @@
       <button onclick="closeModal('modal-atender-cal')" class="vmodal-close">✕</button>
     </div>
     <div class="vmodal-body">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.9rem;padding:1rem;margin-bottom:1rem">
-        <p style="font-size:.68rem;color:#15803d;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Cita a atender</p>
+      <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;padding:1rem;margin-bottom:1rem">
+        <p style="font-size:.68rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Cita a atender</p>
         <p style="font-weight:700;font-size:.92rem" id="atender-cal-paciente">—</p>
         <p style="font-size:.78rem;color:var(--ink-soft);margin-top:.2rem" id="atender-cal-motivo">—</p>
         <p style="font-size:.75rem;color:var(--ink-faint);margin-top:.15rem" id="atender-cal-fecha">—</p>
@@ -947,7 +947,7 @@ function abrirAtenderCal() {
     estetica:'Historia Clínica → pestaña <strong>Estética</strong>',
   };
   document.getElementById('atender-cal-destino').innerHTML =
-    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;color:#15803d;line-height:1.6">'+
+    '<div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;color:var(--green-700);line-height:1.6">'+
       tipo.icon+' Serás redirigido a <strong>'+tabLabel[c.tipo_cita||'medica']+'</strong>.<br/>'+
       'El modal se abrirá automáticamente con los datos precargados.<br/>'+
       'Al guardar, la cita quedará marcada como <strong>completada</strong>.'+
@@ -1054,11 +1054,11 @@ async function buscarPropNC() {
       'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;'+
       'background:#fff;border:1px solid var(--line);border-radius:.85rem;'+
       'cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
-      'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+      'onmouseover="this.style.borderColor=\'var(--green-500)\';this.style.background=\'var(--green-50)\'" '+
       'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
         '<div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9;font-weight:700;font-size:.78rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+esc(p.nombre.charAt(0))+esc(p.apellido.charAt(0))+'</div>' +
         '<div style="flex:1;min-width:0"><p style="font-weight:700;font-size:.85rem">'+esc(p.nombre)+' '+esc(p.apellido)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+(p.dni?'🪪 '+esc(p.dni)+' · ':'')+' 📞 '+esc(p.telefono||'')+'</p></div>' +
-        '<span style="font-size:.7rem;background:#ecfdf5;color:#047857;padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
+        '<span style="font-size:.7rem;background:var(--green-50);color:var(--green-700);padding:.2rem .55rem;border-radius:999px;font-weight:600;flex-shrink:0">🐾 '+p.total_mascotas+'</span>' +
       '</button>'
     ).join('')
     : '<div style="font-size:.78rem;color:var(--ink-faint);padding:.5rem;text-align:center">No se encontraron propietarios</div>';
@@ -1086,7 +1086,7 @@ async function selPropNC(id, nombre, apellido, dni, telefono) {
       ? mascotas.map(m =>
           '<button onclick="selMascotaNC('+m.id+',\''+esc(m.nombre)+'\',\''+esc(m.especie)+'\',\''+esc(m.raza||m.especie)+'\')" '+
           'style="display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;background:#fff;border:1px solid var(--line);border-radius:.85rem;cursor:pointer;text-align:left;font-family:inherit;width:100%;transition:all .15s" '+
-          'onmouseover="this.style.borderColor=\'#10b981\';this.style.background=\'#f0fdf4\'" '+
+          'onmouseover="this.style.borderColor=\'var(--green-500)\';this.style.background=\'var(--green-50)\'" '+
           'onmouseout="this.style.borderColor=\'var(--line)\';this.style.background=\'#fff\'">' +
             '<span style="width:40px;height:40px;border-radius:.8rem;background:linear-gradient(135deg,var(--green-50),#e0f2fe);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden;flex-shrink:0">'+mascotaFotoHTML(m)+'</span>' +
             '<div style="flex:1"><p style="font-weight:700;font-size:.85rem">'+esc(m.nombre)+'</p><p style="font-size:.7rem;color:var(--ink-faint)">'+esc(m.especie)+' · '+esc(m.raza||'Sin raza')+' · '+esc(m.sexo)+'</p></div>' +

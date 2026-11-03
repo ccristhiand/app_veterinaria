@@ -274,16 +274,16 @@ function actualizarPreview() {
 
   document.getElementById('preview-doc').innerHTML = `
     <!-- Header empresa -->
-    <div style="border-bottom:2px solid #166534;padding-bottom:.75rem;margin-bottom:.75rem;
+    <div style="border-bottom:2px solid var(--green-800);padding-bottom:.75rem;margin-bottom:.75rem;
       display:flex;align-items:center;gap:.75rem">
-      ${logo ? `<img src="${esc(logo)}" style="height:48px;object-fit:contain;border-radius:.4rem" onerror="this.style.display='none'"/>` : `<div style="width:48px;height:48px;background:linear-gradient(135deg,#166534,#15803d);border-radius:.6rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1rem">V</div>`}
+      ${logo ? `<img src="${esc(logo)}" style="height:48px;object-fit:contain;border-radius:.4rem" onerror="this.style.display='none'"/>` : `<div style="width:48px;height:48px;background:linear-gradient(135deg,var(--green-800),var(--green-700));border-radius:.6rem;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1rem">V</div>`}
       <div>
-        <p style="font-weight:800;font-size:.92rem;color:#166534">${esc(nombre)}</p>
+        <p style="font-weight:800;font-size:.92rem;color:var(--green-800)">${esc(nombre)}</p>
         ${razon ? `<p style="color:#4b5f57;font-size:.65rem">${esc(razon)}</p>` : ''}
         ${ruc   ? `<p style="color:#4b5f57;font-size:.65rem">RUC: ${esc(ruc)}</p>` : ''}
       </div>
       <div style="margin-left:auto;text-align:right">
-        <div style="background:linear-gradient(135deg,#166534,#15803d);color:#fff;
+        <div style="background:linear-gradient(135deg,var(--green-800),var(--green-700));color:#fff;
           padding:.4rem .8rem;border-radius:.5rem;font-weight:800;font-size:.8rem">
           BOLETA
         </div>
@@ -301,9 +301,9 @@ function actualizarPreview() {
     </div>
 
     <!-- Info cliente -->
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.5rem;
+    <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.5rem;
       padding:.5rem .7rem;margin-bottom:.75rem;font-size:.65rem">
-      <p style="font-weight:700;color:#166534;margin-bottom:.2rem">CLIENTE</p>
+      <p style="font-weight:700;color:var(--green-800);margin-bottom:.2rem">CLIENTE</p>
       <p>Juan García · DNI: 45678912</p>
       <p style="color:#4b5f57">📞 987 654 321</p>
     </div>
@@ -311,7 +311,7 @@ function actualizarPreview() {
     <!-- Items -->
     <table style="width:100%;border-collapse:collapse;font-size:.65rem;margin-bottom:.75rem">
       <thead>
-        <tr style="background:#166534;color:#fff">
+        <tr style="background:var(--green-800);color:#fff">
           <th style="padding:.3rem .5rem;text-align:left;border-radius:.3rem 0 0 0">Descripción</th>
           <th style="padding:.3rem .4rem;text-align:center">Cant.</th>
           <th style="padding:.3rem .4rem;text-align:right">P.Unit</th>
@@ -345,7 +345,7 @@ function actualizarPreview() {
         <span style="color:#4b5f57">IGV (${igv}%):</span>
         <span style="font-weight:600">${sim} ${(105*igv/100).toFixed(2)}</span>
       </div>
-      <div style="display:flex;gap:2rem;background:#166534;color:#fff;
+      <div style="display:flex;gap:2rem;background:var(--green-800);color:#fff;
         padding:.3rem .6rem;border-radius:.4rem;font-weight:800;font-size:.75rem">
         <span>TOTAL:</span>
         <span>${sim} ${(105*(1+igv/100)).toFixed(2)}</span>
