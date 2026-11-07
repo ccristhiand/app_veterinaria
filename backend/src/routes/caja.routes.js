@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { qConn, gastosParaCierre, totalesPorMetodo } = require('../services/gastos.service');
 
 const router = Router();
 router.use(authenticate);
@@ -20,6 +21,22 @@ function sedeSQL(sedeId, col) {
   col = col || 'sede_id';
   if (!sedeId) return { sql: '', params: [] };
   return { sql: 'AND ' + col + ' = ?', params: [sedeId] };
+}
+
+// Gastos vigentes ligados a cada cierre → { cierreId: [gastos] }
+async function gastosDeCierres(req, ids) {
+  if (!ids.length) return {};
+  const rows = await req.db.query(
+    `SELECT g.id, g.cierre_id, g.descripcion, g.monto, g.metodo_pago, g.proveedor, g.comprobante,
+            gc.nombre AS categoria_nombre, gc.icono AS categoria_icono
+     FROM gastos g JOIN gastos_categorias gc ON gc.id = g.categoria_id
+     WHERE g.anulado = 0 AND g.cierre_id IN (${ids.map(() => '?').join(',')})
+     ORDER BY g.created_at ASC`,
+    ids
+  );
+  const map = {};
+  for (const g of rows) (map[g.cierre_id] = map[g.cierre_id] || []).push(g);
+  return map;
 }
 
 // GET /api/v1/caja/resumen-dia
@@ -47,7 +64,7 @@ router.get('/resumen-dia', async (req, res, next) => {
     );
 
     const [cierreExistente] = await req.db.query(
-      `SELECT id, estado, conteo_fisico, diferencia, total_gastos, monto_inicial, observaciones
+      `SELECT id, estado, conteo_fisico, diferencia, total_gastos, gastos_efectivo, monto_inicial, observaciones
        FROM caja_cierres
        WHERE fecha = ? AND turno = ? ${sedeId ? 'AND sede_id = ?' : ''}
        ORDER BY created_at DESC LIMIT 1`,
@@ -60,17 +77,23 @@ router.get('/resumen-dia', async (req, res, next) => {
       [dia, ...sp]
     );
 
-    let gastos = [];
-    if (cierreExistente) {
+    // Gastos del módulo Gastos diarios que entran a este cierre
+    let gastos;
+    if (cierreExistente?.estado === 'cerrado') {
       gastos = await req.db.query(
-        'SELECT * FROM caja_gastos WHERE cierre_id = ? ORDER BY created_at ASC',
+        `SELECT g.*, gc.nombre AS categoria_nombre, gc.icono AS categoria_icono
+         FROM gastos g JOIN gastos_categorias gc ON gc.id = g.categoria_id
+         WHERE g.cierre_id = ? AND g.anulado = 0 ORDER BY g.created_at ASC`,
         [cierreExistente.id]
       );
+    } else {
+      gastos = await gastosParaCierre(req.db.query, { fecha: dia, sedeId, cierreId: cierreExistente?.id });
     }
 
     return res.json({
       success: true,
-      data: { fecha: dia, turno: turno || 'dia_completo', totales, pendientes, cierre_existente: cierreExistente || null, gastos },
+      data: { fecha: dia, turno: turno || 'dia_completo', totales, pendientes,
+              cierre_existente: cierreExistente || null, gastos, gastos_totales: totalesPorMetodo(gastos) },
     });
   } catch (err) { next(err); }
 });
@@ -96,9 +119,8 @@ router.get('/cierres', async (req, res, next) => {
 
     sql += ` ORDER BY cc.fecha DESC, cc.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     const rows = await req.db.query(sql, params);
-    for (const row of rows) {
-      row.gastos = await req.db.query('SELECT * FROM caja_gastos WHERE cierre_id=?', [row.id]);
-    }
+    const gastosPorCierre = await gastosDeCierres(req, rows.map(r => r.id));
+    for (const row of rows) row.gastos = gastosPorCierre[row.id] || [];
     return res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 });
@@ -114,9 +136,7 @@ router.get('/cierres/:id', async (req, res, next) => {
        WHERE cc.id = ?`, [req.params.id]
     );
     if (!cierre) return res.status(404).json({ success: false, message: 'No encontrado.' });
-    cierre.gastos = await req.db.query(
-      'SELECT * FROM caja_gastos WHERE cierre_id=? ORDER BY created_at ASC', [req.params.id]
-    );
+    cierre.gastos = (await gastosDeCierres(req, [cierre.id]))[cierre.id] || [];
     return res.json({ success: true, data: cierre });
   } catch (err) { next(err); }
 });
@@ -124,7 +144,8 @@ router.get('/cierres/:id', async (req, res, next) => {
 // POST /api/v1/caja/cierres
 router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res, next) => {
   try {
-    const { fecha, turno = 'dia_completo', monto_inicial = 0, conteo_fisico, observaciones, gastos = [], cerrar = false } = req.body;
+    // Los gastos ya no vienen en el body: se toman del módulo Gastos diarios
+    const { fecha, turno = 'dia_completo', monto_inicial = 0, conteo_fisico, observaciones, cerrar = false } = req.body;
     if (!fecha) return res.status(422).json({ success: false, message: 'fecha requerida.' });
     if (conteo_fisico === undefined || conteo_fisico === null)
       return res.status(422).json({ success: false, message: 'conteo_fisico requerido.' });
@@ -149,10 +170,6 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
       [fecha, ...spf]
     );
 
-    const totalGastos      = gastos.reduce((a, g) => a + parseFloat(g.monto || 0), 0);
-    const efectivoEsperado = parseFloat(monto_inicial) + parseFloat(totales.efectivo) - totalGastos;
-    const diferencia       = parseFloat((parseFloat(conteo_fisico) - efectivoEsperado).toFixed(2));
-
     const result = await req.db.withTransaction(async (conn) => {
       const [[existente]] = await conn.execute(
         `SELECT id, estado FROM caja_cierres
@@ -163,6 +180,13 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
       if (existente?.estado === 'cerrado')
         throw Object.assign(new Error('Ya existe un cierre definitivo para este día/turno.'), { status: 422 });
 
+      // Gastos del día/sede que entran a este cierre, desglosados por método de pago.
+      // Solo el efectivo sale de la caja física; el resto se descuenta de su propio método.
+      const gastos = await gastosParaCierre(qConn(conn), { fecha, sedeId, cierreId: existente?.id });
+      const gt     = totalesPorMetodo(gastos);
+      const efectivoEsperado = parseFloat(monto_inicial) + parseFloat(totales.efectivo) - gt.efectivo;
+      const diferencia       = parseFloat((parseFloat(conteo_fisico) - efectivoEsperado).toFixed(2));
+
       const estado = cerrar ? 'cerrado' : 'borrador';
       let cierreId;
 
@@ -170,37 +194,41 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
         await conn.execute(
           `UPDATE caja_cierres SET monto_inicial=?,sistema_efectivo=?,sistema_tarjeta=?,
            sistema_transferencia=?,sistema_yape=?,sistema_plin=?,sistema_total=?,
-           total_gastos=?,conteo_fisico=?,diferencia=?,estado=?,observaciones=? WHERE id=?`,
+           total_gastos=?,gastos_efectivo=?,gastos_tarjeta=?,gastos_transferencia=?,gastos_yape=?,gastos_plin=?,
+           conteo_fisico=?,diferencia=?,estado=?,observaciones=? WHERE id=?`,
           [monto_inicial, totales.efectivo, totales.tarjeta, totales.transferencia,
-           totales.yape, totales.plin, totales.total, totalGastos, conteo_fisico,
-           diferencia, estado, observaciones || null, existente.id]
+           totales.yape, totales.plin, totales.total,
+           gt.total, gt.efectivo, gt.tarjeta, gt.transferencia, gt.yape, gt.plin,
+           conteo_fisico, diferencia, estado, observaciones || null, existente.id]
         );
         cierreId = existente.id;
-        await conn.execute('DELETE FROM caja_gastos WHERE cierre_id=?', [existente.id]);
       } else {
         const [ins] = await conn.execute(
           `INSERT INTO caja_cierres
              (fecha, turno, realizado_por_id, sede_id, monto_inicial,
               sistema_efectivo, sistema_tarjeta, sistema_transferencia,
               sistema_yape, sistema_plin, sistema_total,
-              total_gastos, conteo_fisico, diferencia, estado, observaciones)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              total_gastos, gastos_efectivo, gastos_tarjeta, gastos_transferencia, gastos_yape, gastos_plin,
+              conteo_fisico, diferencia, estado, observaciones)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [fecha, turno, req.user.id, sedeId,
            monto_inicial, totales.efectivo, totales.tarjeta, totales.transferencia,
            totales.yape, totales.plin, totales.total,
-           totalGastos, conteo_fisico, diferencia, estado, observaciones || null]
+           gt.total, gt.efectivo, gt.tarjeta, gt.transferencia, gt.yape, gt.plin,
+           conteo_fisico, diferencia, estado, observaciones || null]
         );
         cierreId = ins.insertId;
       }
 
-      for (const g of gastos) {
-        if (!g.descripcion?.trim() || !g.monto) continue;
+      // Ligar los gastos a este cierre (al cerrarlo quedan bloqueados para edición)
+      if (gastos.length) {
+        const ids = gastos.map(g => g.id);
         await conn.execute(
-          'INSERT INTO caja_gastos (cierre_id, descripcion, monto, categoria) VALUES (?,?,?,?)',
-          [cierreId, g.descripcion.trim(), parseFloat(g.monto), g.categoria || 'otro']
+          `UPDATE gastos SET cierre_id = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
+          [cierreId, ...ids]
         );
       }
-      return { id: cierreId, diferencia, estado };
+      return { id: cierreId, diferencia, estado, gastos: gt };
     });
 
     return res.json({

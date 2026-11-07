@@ -30,14 +30,16 @@
     .dif-positiva { color:var(--green-700);background:var(--green-50);border:1.5px solid var(--green-200); }
     .dif-negativa { color:#be123c;background:#fff1f2;border:1.5px solid #fecdd3; }
     .dif-cero     { color:#1d4ed8;background:#eff6ff;border:1.5px solid #bfdbfe; }
-    .gasto-fila   { display:grid;grid-template-columns:1fr 130px 130px 32px;gap:.4rem;align-items:center; }
-    /* Celular: descripción en su propio renglón; monto, categoría y ✕ debajo */
-    @media (max-width:639px) {
-      .gasto-fila { grid-template-columns:1fr 1fr 40px; padding-bottom:.45rem; border-bottom:1px dashed var(--line); }
-      .gasto-fila > :first-child { grid-column:1 / -1; }
-      .gasto-fila:has(> p) { display:none; }   /* encabezados: los campos ya tienen su texto guía */
-      .gasto-fila > button { min-height:var(--touch-min); }
-    }
+    /* Gastos del día (vienen del módulo Gastos diarios, solo lectura) */
+    .gasto-item   { display:flex;align-items:center;gap:.6rem;padding:.5rem .1rem;border-bottom:1px dashed var(--line);font-size:.8rem; }
+    .gasto-item:last-child { border-bottom:none; }
+    .gasto-item .gi-desc { flex:1;min-width:0; }
+    .gasto-item .gi-desc p:first-child { font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .gasto-item .gi-meta { font-size:.66rem;color:var(--ink-faint); }
+    .met-chip { font-size:.62rem;font-weight:700;padding:.12rem .45rem;border-radius:999px;white-space:nowrap; }
+    .met-chip.efectivo { background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200); }
+    .met-chip.digital  { background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe; }
+    .gasto-metodo { font-size:.66rem;color:#be123c;font-weight:600;margin-top:.15rem;text-align:right; }
   </style>
 </head>
 <body style="display:flex;height:100vh;overflow:hidden">
@@ -103,7 +105,10 @@
                 <p style="font-size:.65rem;color:var(--green-600);font-weight:600">📦 Se cuenta físicamente</p>
               </div>
             </div>
-            <p style="font-size:1.15rem;font-weight:800;color:var(--green-700)" id="sis-efectivo">S/. 0.00</p>
+            <div>
+              <p style="font-size:1.15rem;font-weight:800;color:var(--green-700);text-align:right" id="sis-efectivo">S/. 0.00</p>
+              <p class="gasto-metodo" id="gm-efectivo" style="display:none"></p>
+            </div>
           </div>
         </div>
 
@@ -116,24 +121,28 @@
               <span style="font-size:.82rem;font-weight:600">💳 Tarjeta</span>
               <span style="font-weight:700;color:#1d4ed8" id="sis-tarjeta">S/. 0.00</span>
             </div>
+            <p class="gasto-metodo" id="gm-tarjeta" style="display:none"></p>
           </div>
           <div class="metodo-card digital" style="padding:.55rem .9rem">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-size:.82rem;font-weight:600">📱 Yape</span>
               <span style="font-weight:700;color:#1d4ed8" id="sis-yape">S/. 0.00</span>
             </div>
+            <p class="gasto-metodo" id="gm-yape" style="display:none"></p>
           </div>
           <div class="metodo-card digital" style="padding:.55rem .9rem">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-size:.82rem;font-weight:600">📱 Plin</span>
               <span style="font-weight:700;color:#1d4ed8" id="sis-plin">S/. 0.00</span>
             </div>
+            <p class="gasto-metodo" id="gm-plin" style="display:none"></p>
           </div>
           <div class="metodo-card digital" style="padding:.55rem .9rem">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-size:.82rem;font-weight:600">🏦 Transferencia</span>
               <span style="font-weight:700;color:#1d4ed8" id="sis-transferencia">S/. 0.00</span>
             </div>
+            <p class="gasto-metodo" id="gm-transferencia" style="display:none"></p>
           </div>
         </div>
 
@@ -142,6 +151,14 @@
           display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:700">Total del día</span>
           <span style="font-size:1.15rem;font-weight:800;color:var(--green-700)" id="sis-total">S/. 0.00</span>
+        </div>
+        <div id="neto-dia" style="display:none;margin-top:.4rem;font-size:.78rem">
+          <div style="display:flex;justify-content:space-between;color:#be123c">
+            <span>− Gastos del día (todos los métodos)</span><span style="font-weight:700" id="neto-gastos">S/. 0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:.2rem;font-weight:800">
+            <span>= Resultado del día</span><span id="neto-total">S/. 0.00</span>
+          </div>
         </div>
 
         <!-- Pendientes -->
@@ -169,25 +186,27 @@
             </p>
           </div>
 
-          <!-- Gastos -->
+          <!-- Gastos (registrados en el módulo Gastos diarios) -->
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-              <label class="vlabel" style="margin:0">💸 Gastos en efectivo</label>
-              <button onclick="addGasto()" class="vlink" style="font-size:.75rem;color:var(--green-600)">
-                ＋ Agregar
-              </button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+              <label class="vlabel" style="margin:0">💸 Gastos del día</label>
+              <a id="link-registrar-gasto" href="gastos.html" class="vlink" style="font-size:.75rem;color:var(--green-600)">
+                ＋ Registrar gasto
+              </a>
             </div>
-            <div class="gasto-fila" style="padding:0 .1rem;margin-bottom:.25rem">
-              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">Descripción</p>
-              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Monto</p>
-              <p style="font-size:.6rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em">Categoría</p>
-              <p></p>
-            </div>
-            <div id="gastos-lista" style="display:flex;flex-direction:column;gap:.35rem"></div>
-            <div style="display:flex;justify-content:space-between;font-size:.78rem;
-              margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line)">
-              <span style="color:var(--ink-soft)">Total gastos:</span>
-              <span style="font-weight:700;color:#be123c" id="total-gastos">S/. 0.00</span>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-bottom:.4rem">
+              Se registran en <b>Gastos diarios</b>. Solo los de efectivo se descuentan de la caja física.
+            </p>
+            <div id="gastos-lista" style="background:#fafbfa;border:1px solid var(--line);border-radius:.8rem;padding:.2rem .75rem"></div>
+            <div style="display:flex;flex-direction:column;gap:.15rem;font-size:.78rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line)">
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--ink-soft)">Gastos en efectivo:</span>
+                <span style="font-weight:700;color:#be123c" id="total-gastos">S/. 0.00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--ink-soft)">Gastos con otros métodos:</span>
+                <span style="font-weight:600;color:#1d4ed8" id="total-gastos-otros">S/. 0.00</span>
+              </div>
             </div>
           </div>
 
@@ -217,7 +236,7 @@
                 <span>+ Efectivo sistema:</span><span style="font-weight:700" id="det-sistema">S/. 0.00</span>
               </div>
               <div style="display:flex;justify-content:space-between">
-                <span>− Gastos:</span><span style="font-weight:700;color:#be123c" id="det-gastos">S/. 0.00</span>
+                <span>− Gastos en efectivo:</span><span style="font-weight:700;color:#be123c" id="det-gastos">S/. 0.00</span>
               </div>
               <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(0,0,0,.1);
                 padding-top:.35rem;margin-top:.1rem">
@@ -293,8 +312,11 @@
 </div>
 
 <script>
-let gastoN = 0;
 let resumenActual = null;
+const METODOS_GASTO = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transferencia', yape:'📱 Yape', plin:'📱 Plin' };
+const m2 = v => parseFloat(v || 0).toFixed(2);
+// Gastos en efectivo de un cierre (los cierres anteriores a v21 solo tenían total_gastos)
+const gastosEfectivoDe = c => parseFloat(c.gastos_efectivo ?? c.total_gastos ?? 0);
 let cierreDetalleActual = null;
 
 let _empresaCaja = {};
@@ -331,6 +353,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('h-desde').value =
     `${ini.getFullYear()}-${String(ini.getMonth()+1).padStart(2,'0')}-01`;
   cargarResumen();
+
+  // Un gasto nuevo/editado/anulado del día que se está viendo → recalcular
+  getSocket().on('gasto:actualizado', msg => {
+    if (msg?.payload?.fecha === document.getElementById('c-fecha').value) cargarResumen();
+  });
 });
 
 function mostrarTab(tab) {
@@ -384,38 +411,66 @@ async function cargarResumen() {
       document.getElementById('c-monto-inicial').value = ec.monto_inicial || 0;
       document.getElementById('c-conteo').value        = ec.conteo_fisico || '';
       document.getElementById('c-obs').value           = ec.observaciones || '';
-      document.getElementById('gastos-lista').innerHTML = '';
-      gastoN = 0;
-      for (const g of d.gastos||[]) addGasto(g.descripcion, g.monto, g.categoria);
     } else {
       estadoEl.style.display = 'none';
       document.getElementById('btn-cerrar').disabled = false;
       document.getElementById('btn-cerrar').textContent = '🔒 Cerrar caja';
     }
+    document.getElementById('link-registrar-gasto').href = `gastos.html?fecha=${fecha}`;
+    document.getElementById('link-registrar-gasto').style.display = ec?.estado === 'cerrado' ? 'none' : '';
+    renderGastosCaja(d);
     calcularDiferencia();
   } catch(e) { console.error(e); }
 }
 
-function addGasto(desc='', monto='', cat='otro') {
-  const id = gastoN++;
-  const div = document.createElement('div');
-  div.id = `gasto-${id}`;
-  div.className = 'gasto-fila';
-  div.innerHTML = `
-    <input type="text" class="vinput" data-f="desc" placeholder="Descripción…"
-      value="${esc(String(desc))}" style="font-size:.8rem" oninput="calcularDiferencia()"/>
-    <input type="number" class="vinput" data-f="monto" placeholder="0.00"
-      min="0" step="0.50" value="${monto}"
-      style="font-size:.8rem;text-align:right" oninput="calcularDiferencia()"/>
-    <select class="vinput" data-f="cat" style="font-size:.78rem">
-      <option value="compra"         ${cat==='compra'?'selected':''}>Compra</option>
-      <option value="servicio"       ${cat==='servicio'?'selected':''}>Servicio</option>
-      <option value="pago_proveedor" ${cat==='pago_proveedor'?'selected':''}>Proveedor</option>
-      <option value="otro"           ${cat==='otro'?'selected':''}>Otro</option>
-    </select>
-    <button onclick="document.getElementById('gasto-${id}').remove();calcularDiferencia()"
-      style="background:none;border:none;cursor:pointer;color:#e11d48;font-size:1rem;padding:0">✕</button>`;
-  document.getElementById('gastos-lista').appendChild(div);
+// Gastos del día (solo lectura) + su efecto sobre cada método de pago
+function renderGastosCaja(d) {
+  const sim    = getSim();
+  const gastos = d.gastos || [];
+  const gt     = d.gastos_totales || {};
+  const lista  = document.getElementById('gastos-lista');
+
+  lista.innerHTML = gastos.length
+    ? gastos.map(g => `
+      <div class="gasto-item">
+        <span style="font-size:1.05rem">${esc(g.categoria_icono || '📌')}</span>
+        <div class="gi-desc">
+          <p title="${esc(g.descripcion)}">${esc(g.descripcion)}</p>
+          <p class="gi-meta">${esc(g.categoria_nombre || '')}${g.proveedor ? ' · ' + esc(g.proveedor) : ''}</p>
+        </div>
+        <span class="met-chip ${g.metodo_pago === 'efectivo' ? 'efectivo' : 'digital'}">${METODOS_GASTO[g.metodo_pago] || esc(g.metodo_pago)}</span>
+        <span style="font-weight:700;color:#be123c;white-space:nowrap">−${sim} ${m2(g.monto)}</span>
+      </div>`).join('')
+    : `<p style="font-size:.75rem;color:var(--ink-faint);padding:.6rem 0;text-align:center">Sin gastos registrados este día</p>`;
+
+  const otros = (gt.total || 0) - (gt.efectivo || 0);
+  document.getElementById('total-gastos-otros').textContent = `${sim} ${m2(otros)}`;
+
+  // Debajo de cada método: cuánto se gastó con él y lo que queda
+  Object.keys(METODOS_GASTO).forEach(m => {
+    const el = document.getElementById(`gm-${m}`);
+    if (!el) return;
+    const gasto = parseFloat(gt[m] || 0);
+    if (gasto > 0) {
+      const neto = parseFloat(d.totales?.[m] || 0) - gasto;
+      el.style.display = 'block';
+      el.textContent = `− gastos ${sim} ${m2(gasto)} · neto ${sim} ${m2(neto)}`;
+    } else {
+      el.style.display = 'none';
+    }
+  });
+
+  const neto = document.getElementById('neto-dia');
+  if (gt.total > 0) {
+    neto.style.display = 'block';
+    const resultado = parseFloat(d.totales?.total || 0) - gt.total;
+    document.getElementById('neto-gastos').textContent = `${sim} ${m2(gt.total)}`;
+    const nt = document.getElementById('neto-total');
+    nt.textContent = `${sim} ${m2(resultado)}`;
+    nt.style.color = resultado < 0 ? '#be123c' : 'var(--green-700)';
+  } else {
+    neto.style.display = 'none';
+  }
 }
 
 function calcularDiferencia() {
@@ -423,10 +478,8 @@ function calcularDiferencia() {
   const inicial   = parseFloat(document.getElementById('c-monto-inicial').value) || 0;
   const sEfectivo = parseFloat(resumenActual?.totales?.efectivo || 0);
 
-  let totalGastos = 0;
-  document.querySelectorAll('#gastos-lista > div').forEach(div => {
-    totalGastos += parseFloat(div.querySelector('[data-f="monto"]')?.value || 0);
-  });
+  // Solo los gastos pagados en efectivo salen de la caja física
+  const totalGastos = parseFloat(resumenActual?.gastos_totales?.efectivo || 0);
   document.getElementById('total-gastos').textContent = `${getSim()} ${totalGastos.toFixed(2)}`;
 
   const esperado   = parseFloat((inicial + sEfectivo - totalGastos).toFixed(2));
@@ -475,21 +528,14 @@ async function guardarCierre(cerrar) {
     if (!ok) return;
   }
 
-  const gastos = [];
-  document.querySelectorAll('#gastos-lista > div').forEach(div => {
-    const desc  = div.querySelector('[data-f="desc"]')?.value.trim();
-    const monto = parseFloat(div.querySelector('[data-f="monto"]')?.value || 0);
-    const cat   = div.querySelector('[data-f="cat"]')?.value;
-    if (desc && monto > 0) gastos.push({ descripcion:desc, monto, categoria:cat });
-  });
-
+  // Los gastos los toma el servidor del módulo Gastos diarios
   const body = {
     fecha         : document.getElementById('c-fecha').value,
     turno         : document.getElementById('c-turno').value,
     monto_inicial : parseFloat(document.getElementById('c-monto-inicial').value) || 0,
     conteo_fisico : parseFloat(conteo),
     observaciones : document.getElementById('c-obs').value.trim() || null,
-    gastos, cerrar,
+    cerrar,
   };
 
   try {
@@ -581,12 +627,19 @@ async function verDetalle(id) {
         ${c.gastos?.length?`
         <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:.9rem;padding:.9rem 1rem">
           <p style="font-size:.62rem;color:#be123c;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem">Gastos del día</p>
-          ${c.gastos.map(g=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid #fecdd3">
-            <span>${esc(g.descripcion)} <span style="font-size:.65rem;color:var(--ink-faint)">(${g.categoria})</span></span>
-            <span style="font-weight:600;color:#be123c">-S/. ${parseFloat(g.monto).toFixed(2)}</span>
+          ${c.gastos.map(g=>`<div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid #fecdd3">
+            <span>${esc(g.categoria_icono||'')} ${esc(g.descripcion)}
+              <span style="font-size:.65rem;color:var(--ink-faint)">(${esc(g.categoria_nombre||g.categoria||'')} · ${METODOS_GASTO[g.metodo_pago]||'💵 Efectivo'})</span></span>
+            <span style="font-weight:600;color:#be123c;white-space:nowrap">-S/. ${m2(g.monto)}</span>
           </div>`).join('')}
-          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.85rem;padding-top:.5rem;color:#be123c">
-            <span>Total gastos</span><span>S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;padding-top:.5rem;color:#be123c">
+            <span>En efectivo (sale de caja)</span><span style="font-weight:700">S/. ${m2(gastosEfectivoDe(c))}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#1d4ed8">
+            <span>Con otros métodos</span><span style="font-weight:600">S/. ${m2(parseFloat(c.total_gastos||0) - gastosEfectivoDe(c))}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.85rem;padding-top:.3rem;color:#be123c">
+            <span>Total gastos</span><span>S/. ${m2(c.total_gastos)}</span>
           </div>
         </div>`:''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
@@ -619,13 +672,8 @@ function imprimirComprobante() {
   const t = resumenActual.totales;
   const conteo  = parseFloat(document.getElementById('c-conteo').value) || 0;
   const inicial = parseFloat(document.getElementById('c-monto-inicial').value) || 0;
-  let totalGastos = 0;
-  const gastosArr = [];
-  document.querySelectorAll('#gastos-lista > div').forEach(div => {
-    const desc  = div.querySelector('[data-f="desc"]')?.value.trim();
-    const monto = parseFloat(div.querySelector('[data-f="monto"]')?.value||0);
-    if (desc && monto>0) { gastosArr.push({descripcion:desc,monto}); totalGastos+=monto; }
-  });
+  const gt = resumenActual.gastos_totales || {};
+  const gastoEfectivo = parseFloat(gt.efectivo || 0);
   imprimirCierre({
     fecha: document.getElementById('c-fecha').value,
     turno: document.getElementById('c-turno').value,
@@ -633,8 +681,8 @@ function imprimirComprobante() {
     sistema_yape: t.yape, sistema_plin: t.plin,
     sistema_transferencia: t.transferencia, sistema_total: t.total,
     monto_inicial: inicial, conteo_fisico: conteo,
-    diferencia: conteo - (inicial + parseFloat(t.efectivo||0) - totalGastos),
-    total_gastos: totalGastos, gastos: gastosArr,
+    diferencia: conteo - (inicial + parseFloat(t.efectivo||0) - gastoEfectivo),
+    total_gastos: gt.total || 0, gastos_efectivo: gastoEfectivo, gastos: resumenActual.gastos || [],
     observaciones: document.getElementById('c-obs').value,
     estado: 'borrador',
   });
@@ -645,7 +693,8 @@ function imprimirCierre(c) {
   const difLabel = Math.abs(dif)<0.01 ? 'CUADRE PERFECTO ✅'
     : dif>0 ? `SOBRANTE: S/. +${dif.toFixed(2)}`
     : `FALTANTE: S/. -${Math.abs(dif).toFixed(2)}`;
-  const esperado = parseFloat(c.monto_inicial||0)+parseFloat(c.sistema_efectivo||0)-parseFloat(c.total_gastos||0);
+  const gEfectivo = gastosEfectivoDe(c);
+  const esperado  = parseFloat(c.monto_inicial||0)+parseFloat(c.sistema_efectivo||0)-gEfectivo;
   const v = window.open('','_blank');
   v.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
     <title>Cierre ${fDate(c.fecha)}</title>
@@ -678,14 +727,16 @@ function imprimirCierre(c) {
     ${c.gastos?.length?`
     <div class="sec">
       <div class="sec-t">GASTOS DEL DÍA</div>
-      ${c.gastos.map(g=>`<div class="row r"><span>${esc(g.descripcion)}</span><span>-S/. ${parseFloat(g.monto).toFixed(2)}</span></div>`).join('')}
-      <div class="row b r"><span>TOTAL GASTOS</span><span>-S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span></div>
+      ${c.gastos.map(g=>`<div class="row r"><span>${esc(g.descripcion)} (${esc((g.metodo_pago||'efectivo').toUpperCase())})</span><span>-S/. ${m2(g.monto)}</span></div>`).join('')}
+      <div class="row r"><span>En efectivo</span><span>-S/. ${m2(gEfectivo)}</span></div>
+      <div class="row"><span>Otros métodos</span><span>-S/. ${m2(parseFloat(c.total_gastos||0)-gEfectivo)}</span></div>
+      <div class="row b r"><span>TOTAL GASTOS</span><span>-S/. ${m2(c.total_gastos)}</span></div>
     </div>`:''}
     <div class="sec">
       <div class="sec-t">CONTEO DE CAJA</div>
       <div class="row"><span>Monto inicial</span><span>S/. ${parseFloat(c.monto_inicial||0).toFixed(2)}</span></div>
       <div class="row"><span>+ Efectivo sistema</span><span>S/. ${parseFloat(c.sistema_efectivo||0).toFixed(2)}</span></div>
-      <div class="row r"><span>− Gastos</span><span>S/. ${parseFloat(c.total_gastos||0).toFixed(2)}</span></div>
+      <div class="row r"><span>− Gastos en efectivo</span><span>S/. ${m2(gEfectivo)}</span></div>
       <div class="row b"><span>= Esperado en caja</span><span>S/. ${esperado.toFixed(2)}</span></div>
       <div class="row b a"><span>Conteo físico</span><span>S/. ${parseFloat(c.conteo_fisico||0).toFixed(2)}</span></div>
     </div>

@@ -104,6 +104,7 @@
     margin-bottom:1.3rem;flex-wrap:wrap" class="no-print rep-tabs">
     <button class="rep-tab active" id="tab-resumen" onclick="mostrarTab('resumen')">🧭 Resumen</button>
     <button class="rep-tab" id="tab-financiero"   onclick="mostrarTab('financiero')">💰 Financiero</button>
+    <button class="rep-tab" id="tab-gastos"       onclick="mostrarTab('gastos')">💸 Gastos</button>
     <button class="rep-tab" id="tab-clientes"     onclick="mostrarTab('clientes')">👥 Clientes</button>
     <button class="rep-tab" id="tab-cobranzas"    onclick="mostrarTab('cobranzas')">🧾 Cobranzas</button>
     <button class="rep-tab" id="tab-citas"        onclick="mostrarTab('citas')">📅 Citas</button>
@@ -121,6 +122,7 @@
     <div class="vempty"><div class="vspinner"></div><p>Generando reporte…</p></div>
   </div>
   <div id="contenido-financiero"   style="display:none"></div>
+  <div id="contenido-gastos"       style="display:none"></div>
   <div id="contenido-clientes"     style="display:none"></div>
   <div id="contenido-cobranzas"    style="display:none"></div>
   <div id="contenido-citas"        style="display:none"></div>
@@ -154,7 +156,7 @@
 <script>
 // Estado global de datos cargados
 const datosReporte = {};
-const TABS = ['resumen','financiero','clientes','cobranzas','citas','demanda','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'];
+const TABS = ['resumen','financiero','gastos','clientes','cobranzas','citas','demanda','mascotas','vacunas','inventario','estetica','veterinarios','rentabilidad'];
 let tabActiva = 'resumen';
 let _diasInactivo = 180;
 
@@ -306,6 +308,7 @@ async function cargarTab(tab) {
 function renderTab(tab, d, cont) {
   switch(tab) {
     case 'financiero':   cont.innerHTML = renderFinanciero(d);   break;
+    case 'gastos':       cont.innerHTML = renderGastos(d);       break;
     case 'citas':        cont.innerHTML = renderCitas(d);        break;
     case 'mascotas':     cont.innerHTML = renderMascotas(d);     break;
     case 'vacunas':      cont.innerHTML = renderVacunas(d);      break;
@@ -688,6 +691,119 @@ function renderFinanciero(d) {
     </div>` : ''}`;
 }
 
+// ── GASTOS ────────────────────────────────────────────────────────
+const MET_GASTO = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transferencia', yape:'📱 Yape', plin:'📱 Plin' };
+// 'YYYY-MM-DD' o 'YYYY-MM' sin corrimiento de zona horaria
+function fPeriodoGasto(p, mes) {
+  if (!p) return '—';
+  if (mes) { const [y, m] = p.split('-'); return new Date(Date.UTC(+y, +m - 1, 1)).toLocaleDateString('es-PE', { month:'short', year:'numeric', timeZone:'UTC' }); }
+  return new Date(`${p}T00:00:00Z`).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone:'UTC' });
+}
+
+function renderGastos(d) {
+  const r = d.resumen;
+  const varTxt = r.variacion === null ? 'nuevo' : r.variacion === 0 ? 'sin cambio' : `${r.variacion > 0 ? '▲' : '▼'} ${Math.abs(r.variacion)}%`;
+  const varColor = r.variacion > 0 ? '#be123c' : r.variacion < 0 ? '#15803d' : 'var(--ink-faint)';   // gastar más es malo
+  const maxCat = Math.max(...d.porCategoria.map(c => c.total), 1);
+  const maxPer = Math.max(...d.porPeriodo.map(x => x.total), 1);
+  const esMes  = d.agrupacion === 'mes';
+
+  return `
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" style="margin-bottom:1rem">
+      ${kpi(money(r.total), 'Total gastado', '#be123c')}
+      ${kpi(r.cantidad, 'Gastos registrados', '#1d4ed8')}
+      ${kpi(money(r.promedio_diario), 'Promedio por día', '#b45309')}
+      ${kpi(money(r.mayor), 'Gasto más alto', '#6d28d9')}
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" style="margin-bottom:1.3rem">
+      <div class="kpi">
+        <p class="kpi-val" style="color:${varColor}">${varTxt}</p>
+        <p class="kpi-label">vs período anterior (${money(r.anterior)})</p>
+      </div>
+      ${kpi(money(r.ingresos), 'Ingresos cobrados', 'var(--green-700)')}
+      <div class="kpi">
+        <p class="kpi-val" style="color:${r.utilidad < 0 ? '#be123c' : 'var(--green-700)'}">${money(r.utilidad)}</p>
+        <p class="kpi-label">Ingresos − gastos${r.margen !== null ? ` · margen ${r.margen}%` : ''}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        ${titulo('📊 ¿En qué gastamos? — por tipo')}
+        ${d.porCategoria.length ? d.porCategoria.map(c => `
+          <div style="margin-bottom:.7rem">
+            <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;margin-bottom:.22rem">
+              <span style="font-weight:600">${esc(c.icono || '')} ${esc(c.nombre)} <span style="color:var(--ink-faint);font-weight:400">· ${c.cantidad}</span></span>
+              <span style="font-weight:700">${money(c.total)} <span style="color:var(--ink-faint);font-weight:400">(${c.pct}%)</span></span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${Math.max((c.total / maxCat) * 100, 2)}%;background:${esc(c.color || '#64748b')}"></div></div>
+          </div>`).join('') : vacio('Sin gastos en el período.')}
+      </div>
+      <div class="vcard vcard-pad">
+        ${titulo('💳 Por método de pago', 'Solo el efectivo sale de la caja física')}
+        ${d.porMetodo.length ? d.porMetodo.map(m => `
+          <div style="margin-bottom:.7rem">
+            <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.22rem">
+              <span style="font-weight:600">${MET_GASTO[m.metodo_pago] || esc(m.metodo_pago)}</span>
+              <span style="font-weight:700">${money(m.total)} <span style="color:var(--ink-faint);font-weight:400">(${m.pct}%)</span></span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${m.pct}%"></div></div>
+            <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.1rem">${m.cantidad} gastos</p>
+          </div>`).join('') : vacio('Sin gastos en el período.')}
+        ${d.gastosPorSede?.length > 1 ? `
+          <div style="margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--line)">
+            <p style="font-size:.65rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Por sede</p>
+            ${d.gastosPorSede.map(s => `<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0">
+              <span>🏥 ${esc(s.sede)}</span><span style="font-weight:700">${money(s.total)}</span></div>`).join('')}
+          </div>` : ''}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" style="margin-bottom:1.3rem">
+      <div class="vcard vcard-pad">
+        ${titulo(esMes ? '📅 Gastos por mes' : '📅 Gastos por día')}
+        ${d.porPeriodo.length ? `<div style="display:flex;flex-direction:column;gap:.45rem;max-height:420px;overflow-y:auto">
+          ${d.porPeriodo.map(x => `<div>
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.18rem">
+              <span style="color:var(--ink-soft)">${fPeriodoGasto(x.periodo, esMes)}</span>
+              <span style="font-weight:700;color:#be123c">${money(x.total)}</span>
+            </div>
+            <div class="bar-h"><div class="bar-h-fill" style="width:${Math.max((x.total / maxPer) * 100, 2)}%;background:#f43f5e"></div></div>
+          </div>`).join('')}</div>` : vacio('Sin gastos en el período.')}
+      </div>
+      <div class="vcard">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line)">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:700">🔁 Conceptos con más gasto</h3>
+        </div>
+        <div style="overflow-x:auto"><table class="rep-table">
+          <thead><tr><th>Concepto</th><th>Tipo</th><th>Veces</th><th>Total</th></tr></thead>
+          <tbody>${d.topConceptos.length ? d.topConceptos.map(t => `<tr>
+            <td style="font-weight:600">${esc(t.descripcion)}</td><td style="font-size:.74rem">${esc(t.categoria)}</td>
+            <td>${t.veces}</td><td style="font-weight:700;color:#be123c">${money(t.total)}</td></tr>`).join('')
+            : '<tr><td colspan="4" style="text-align:center;color:var(--ink-faint);padding:1.2rem">Sin datos</td></tr>'}</tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="vcard">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:700">🧾 Detalle de gastos</h3>
+        <span style="font-size:.72rem;color:var(--ink-faint)">${d.detalle.length >= 500 ? 'Últimos 500' : d.detalle.length} registros${r.anulados ? ` · ${r.anulados} anulados no incluidos (${money(r.anulados_monto)})` : ''}</span>
+      </div>
+      <div style="overflow-x:auto"><table class="rep-table">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Método</th><th>Registrado por</th><th>Monto</th></tr></thead>
+        <tbody>${d.detalle.length ? d.detalle.map(g => `<tr>
+          <td>${fPeriodoGasto(g.fecha)}</td>
+          <td style="font-size:.74rem">${esc(g.categoria_icono || '')} ${esc(g.categoria)}</td>
+          <td><span style="font-weight:600">${esc(g.descripcion)}</span>${(g.proveedor || g.comprobante) ? `<br><span style="font-size:.68rem;color:var(--ink-faint)">${esc(g.proveedor || '')}${g.comprobante ? ' · N° ' + esc(g.comprobante) : ''}</span>` : ''}</td>
+          <td style="font-size:.74rem">${MET_GASTO[g.metodo_pago] || esc(g.metodo_pago)}</td>
+          <td style="font-size:.74rem">${esc(g.registrado_por)}</td>
+          <td style="font-weight:700;color:#be123c">${money(g.monto)}</td></tr>`).join('')
+          : '<tr><td colspan="6" style="text-align:center;color:var(--ink-faint);padding:1.2rem">Sin gastos en el período</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+}
+
 function renderMetodosPago(data) {
   if (!data?.length) return '<p style="color:var(--ink-faint);font-size:.8rem">Sin pagos en el período.</p>';
   const icons = { efectivo:'💵 Efectivo', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transfer.', yape:'📱 Yape', plin:'📱 Plin' };
@@ -1026,7 +1142,7 @@ function descargarExcel() {
   const desde = document.getElementById('r-desde').value;
   const hasta = document.getElementById('r-hasta').value;
   const titulos = {
-    financiero:'Financiero', citas:'Citas', mascotas:'Mascotas',
+    financiero:'Financiero', gastos:'Gastos', citas:'Citas', mascotas:'Mascotas',
     vacunas:'Vacunas', inventario:'Inventario', estetica:'Estética',
     veterinarios:'Veterinarios', resumen:'Resumen', clientes:'Clientes',
     cobranzas:'Cobranzas', demanda:'Demanda'
@@ -1440,6 +1556,36 @@ function descargarExcel() {
       break;
     }
 
+    case 'gastos': {
+      const r = d.resumen;
+      const ws = buildSheet([{
+        titulo: 'RESUMEN DE GASTOS', headers: ['Concepto','Valor'], colWidths: [30, 26, 34, 16, 24, 20, 16],
+        rows: [
+          ['Total gastado', money(r.total)], ['Gastos registrados', r.cantidad],
+          ['Promedio por día', money(r.promedio_diario)], ['Gasto más alto', money(r.mayor)],
+          ['Período anterior', money(r.anterior)], ['Variación', r.variacion === null ? 'nuevo' : r.variacion + '%'],
+          ['Ingresos cobrados', money(r.ingresos)], ['Ingresos − gastos', money(r.utilidad)],
+          ['Margen', r.margen === null ? '—' : r.margen + '%'],
+          ['Anulados (no incluidos)', `${r.anulados} · ${money(r.anulados_monto)}`],
+        ],
+      }, {
+        titulo: 'POR TIPO DE GASTO', headers: ['Tipo','Cantidad','Total','%'],
+        rows: d.porCategoria.map(c => [c.nombre, +c.cantidad, money(c.total), c.pct + '%']),
+      }, {
+        titulo: 'POR MÉTODO DE PAGO', headers: ['Método','Cantidad','Total','%'],
+        rows: d.porMetodo.map(m => [m.metodo_pago, +m.cantidad, money(m.total), m.pct + '%']),
+      }, {
+        titulo: d.agrupacion === 'mes' ? 'POR MES' : 'POR DÍA', headers: ['Período','Gastos','Total'],
+        rows: d.porPeriodo.map(x => [x.periodo, +x.cantidad, money(x.total)]),
+      }, {
+        titulo: 'DETALLE', headers: ['Fecha','Tipo','Descripción','Método','Proveedor / Comprobante','Registrado por','Monto'],
+        rows: d.detalle.map(g => [g.fecha, g.categoria, g.descripcion, g.metodo_pago,
+          [g.proveedor, g.comprobante].filter(Boolean).join(' · '), g.registrado_por, money(g.monto)]),
+      }]);
+      XS.utils.book_append_sheet(wb, ws, 'Gastos');
+      break;
+    }
+
     case 'clientes': {
       const r = d.resumen;
       const ws = buildSheet([{
@@ -1499,7 +1645,7 @@ function descargarExcel() {
 function descargarPDF() {
   const desde  = document.getElementById('r-desde').value;
   const hasta  = document.getElementById('r-hasta').value;
-  const titulo = { financiero:'Financiero', citas:'Citas', mascotas:'Mascotas',
+  const titulo = { financiero:'Financiero', gastos:'Gastos', citas:'Citas', mascotas:'Mascotas',
                    vacunas:'Vacunas', inventario:'Inventario', estetica:'Estética',
                    veterinarios:'Veterinarios' }[tabActiva] || tabActiva;
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v20
+-- VETNETCODIP SaaS — TENANT SCHEMA v21
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -22,6 +22,8 @@
 --       inventario.codigo_barras / favorito, categorias alimento y accesorio
 -- v19: + rol 'groomer' en usuarios (estética: citas de estética, baños, propietarios y mascotas)
 -- v20: + servicios_catalogo.descripcion VARCHAR(255) → TEXT (descripciones largas)
+-- v21: + Gastos diarios: gastos_categorias / gastos (tipo, método de pago, cierre)
+--       + gastos_efectivo / _tarjeta / _transferencia / _yape / _plin en caja_cierres
 -- v18: + WhatsApp Meta (API oficial): wa_meta_plantillas, wa_meta_conversaciones, wa_meta_mensajes
 --       + wa_mensajes_log.proveedor / wamid / estados entregado y leido
 --       + wa_campanas.proveedor / meta_plantilla_id
@@ -543,6 +545,11 @@ CREATE TABLE IF NOT EXISTS caja_cierres (
   sistema_plin          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   sistema_total         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   total_gastos          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  gastos_efectivo       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  gastos_tarjeta        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  gastos_transferencia  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  gastos_yape           DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  gastos_plin           DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   conteo_fisico         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   diferencia            DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   estado                ENUM('borrador','cerrado') NOT NULL DEFAULT 'borrador',
@@ -563,6 +570,59 @@ CREATE TABLE IF NOT EXISTS caja_gastos (
   categoria   ENUM('compra','servicio','pago_proveedor','otro') NOT NULL DEFAULT 'otro',
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (cierre_id) REFERENCES caja_cierres(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── Gastos diarios (v21) ──────────────────────────────────────
+-- caja_gastos queda solo como histórico; los gastos nuevos van en `gastos`.
+CREATE TABLE IF NOT EXISTS gastos_categorias (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre     VARCHAR(60)  NOT NULL,
+  icono      VARCHAR(16)  NULL,
+  color      VARCHAR(7)   NULL,
+  orden      SMALLINT     NOT NULL DEFAULT 0,
+  activo     TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_nombre (nombre)
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO gastos_categorias (nombre, icono, color, orden) VALUES
+  ('Compras e insumos',         '💊', '#0f766e', 1),
+  ('Pago a proveedores',        '📦', '#1d4ed8', 2),
+  ('Servicios básicos',         '💡', '#b45309', 3),
+  ('Alquiler',                  '🏠', '#7c3aed', 4),
+  ('Sueldos y honorarios',      '👥', '#be185d', 5),
+  ('Movilidad y delivery',      '🛵', '#0369a1', 6),
+  ('Limpieza y mantenimiento',  '🧹', '#15803d', 7),
+  ('Alimentación y refrigerio', '☕', '#a16207', 8),
+  ('Publicidad y marketing',    '📣', '#c2410c', 9),
+  ('Impuestos y trámites',      '🏛️', '#475569', 10),
+  ('Otros',                     '📌', '#64748b', 99);
+
+CREATE TABLE IF NOT EXISTS gastos (
+  id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  fecha             DATE          NOT NULL,
+  sede_id           INT UNSIGNED  NULL DEFAULT NULL,
+  categoria_id      INT UNSIGNED  NOT NULL,
+  descripcion       VARCHAR(255)  NOT NULL,
+  monto             DECIMAL(10,2) NOT NULL,
+  metodo_pago       ENUM('efectivo','tarjeta','transferencia','yape','plin') NOT NULL DEFAULT 'efectivo',
+  proveedor         VARCHAR(120)  NULL,
+  comprobante       VARCHAR(60)   NULL COMMENT 'N° de boleta/factura/recibo del proveedor',
+  registrado_por_id INT UNSIGNED  NOT NULL,
+  cierre_id         INT UNSIGNED  NULL DEFAULT NULL COMMENT 'Cierre de caja que lo incluyó',
+  anulado           TINYINT(1)    NOT NULL DEFAULT 0,
+  anulado_por_id    INT UNSIGNED  NULL,
+  anulado_motivo    VARCHAR(200)  NULL,
+  anulado_at        DATETIME      NULL,
+  created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (categoria_id)      REFERENCES gastos_categorias(id) ON DELETE RESTRICT,
+  FOREIGN KEY (registrado_por_id) REFERENCES usuarios(id)          ON DELETE RESTRICT,
+  FOREIGN KEY (cierre_id)         REFERENCES caja_cierres(id)      ON DELETE SET NULL,
+  INDEX idx_fecha     (fecha),
+  INDEX idx_sede      (sede_id),
+  INDEX idx_categoria (categoria_id),
+  INDEX idx_cierre    (cierre_id)
 ) ENGINE=InnoDB;
 
 -- ── Carnets digitales ────────────────────────────────────────

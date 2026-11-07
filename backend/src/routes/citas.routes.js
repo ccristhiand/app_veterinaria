@@ -172,4 +172,70 @@ router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async
   } catch (err) { next(err); }
 });
 
+// ── Eliminación de citas ──────────────────────────────────────────
+// Solo se elimina una cita que NO tuvo atención. Si ya se atendió (consulta, estética,
+// comprobante, o quedó en curso/completada) se rechaza: forma parte del historial.
+const ROLES_ELIMINAR_CITA = ['admin', 'recepcionista', 'veterinario', 'veterinario_recepcionista'];
+
+async function analizarEliminacion(db, id) {
+  const [cita] = await db.query(
+    `SELECT c.id, c.estado, c.tipo_cita, c.fecha_hora, c.motivo, c.mascota_id,
+            m.nombre AS mascota_nombre, m.especie,
+            CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
+            u.nombre AS veterinario_nombre
+     FROM citas c
+     JOIN mascotas m     ON m.id = c.mascota_id
+     JOIN propietarios p ON p.id = m.propietario_id
+     JOIN usuarios u     ON u.id = c.veterinario_id
+     WHERE c.id = ?`, [id]
+  );
+  if (!cita) return null;
+
+  const [[hc], [est], facturas] = await Promise.all([
+    db.query('SELECT COUNT(*) AS n FROM historia_clinica   WHERE cita_id = ?', [id]),
+    db.query('SELECT COUNT(*) AS n FROM servicios_estetica WHERE cita_id = ?', [id]),
+    db.query("SELECT numero FROM facturas WHERE cita_id = ? ORDER BY id LIMIT 5", [id]),
+  ]);
+
+  const motivos = [];
+  if (hc.n  > 0) motivos.push(`Tiene ${hc.n > 1 ? hc.n + ' consultas registradas' : 'una consulta registrada'} en la historia clínica.`);
+  if (est.n > 0) motivos.push(`Tiene ${est.n > 1 ? est.n + ' servicios' : 'un servicio'} de estética registrado.`);
+  if (facturas.length) motivos.push(`Está vinculada al comprobante ${facturas.map(f => f.numero).join(', ')}.`);
+  if (cita.estado === 'completada') motivos.push('La cita figura como completada (ya fue atendida).');
+  if (cita.estado === 'en_curso')   motivos.push('La cita está en curso de atención.');
+
+  return { cita, eliminable: motivos.length === 0, motivos };
+}
+
+// GET /api/v1/citas/:id/eliminable — verificación previa para el modal
+router.get('/:id/eliminable', authorize(...ROLES_ELIMINAR_CITA), async (req, res, next) => {
+  try {
+    const r = await analizarEliminacion(req.db, req.params.id);
+    if (!r) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    return res.json({ success: true, data: r });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/citas/:id   { motivo? }
+router.delete('/:id', authorize(...ROLES_ELIMINAR_CITA), auditMiddleware('citas:eliminado', 'citas'), async (req, res, next) => {
+  try {
+    const r = await analizarEliminacion(req.db, req.params.id);
+    if (!r) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    if (!r.eliminable) {
+      return res.status(409).json({
+        success: false,
+        code   : 'CITA_CON_ATENCION',
+        message: 'No se puede eliminar esta cita porque ya tiene una atención registrada.',
+        motivos: r.motivos,
+      });
+    }
+
+    await req.db.query('DELETE FROM citas WHERE id = ?', [req.params.id]);
+
+    const io = req.app.get('io');
+    if (io) io.emit('cita:eliminada', { type: 'cita:eliminada', payload: { id: Number(req.params.id) } });
+    return res.json({ success: true, message: 'Cita eliminada.' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

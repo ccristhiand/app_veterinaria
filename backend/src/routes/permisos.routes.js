@@ -8,7 +8,7 @@ const router = Router();
 
 const MODULOS = {
   dashboard      : ['ver'],
-  citas          : ['ver','crear','editar','cancelar','ver_todas'],
+  citas          : ['ver','crear','editar','cancelar','eliminar','ver_todas'],
   propietarios   : ['ver','crear','editar'],
   mascotas       : ['ver','crear','editar'],
   historia       : ['ver','crear','editar'],
@@ -16,6 +16,7 @@ const MODULOS = {
   facturacion    : ['ver','crear','anular','ver_reportes'],
   servicios      : ['ver','crear','editar'],
   caja           : ['ver','crear_borrador','cerrar'],
+  gastos         : ['ver','crear','editar','anular'],
   reportes       : ['ver','exportar'],
   usuarios       : ['ver','crear','editar','toggle'],
   consentimientos: ['ver','crear','firmar'],

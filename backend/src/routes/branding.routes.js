@@ -192,7 +192,7 @@ function defaultBranding() {
 function permisosDefault(rol) {
   const todos = {
     dashboard    : { ver:true },
-    citas        : { ver:true, crear:true, editar:true, cancelar:true, ver_todas:true },
+    citas        : { ver:true, crear:true, editar:true, cancelar:true, eliminar:true, ver_todas:true },
     propietarios : { ver:true, crear:true, editar:true },
     mascotas     : { ver:true, crear:true, editar:true },
     historia     : { ver:true, crear:true, editar:true },
@@ -200,6 +200,7 @@ function permisosDefault(rol) {
     facturacion  : { ver:true, crear:true, anular:true, ver_reportes:true },
     servicios    : { ver:true, crear:true, editar:true },
     caja         : { ver:true, crear_borrador:true, cerrar:true },
+    gastos       : { ver:true, crear:true, editar:true, anular:true },
     reportes     : { ver:true, exportar:true },
     usuarios     : { ver:true, crear:true, editar:true, toggle:true },
     consentimientos: { ver:true, crear:true, firmar:true },
@@ -209,6 +210,7 @@ function permisosDefault(rol) {
   if (rol === 'veterinario') {
     todos.facturacion  = { ver:false, crear:false, anular:false, ver_reportes:false };
     todos.caja         = { ver:false, crear_borrador:false, cerrar:false };
+    todos.gastos       = { ver:false, crear:false, editar:false, anular:false };
     todos.reportes     = { ver:false, exportar:false };
     todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };
     todos.configuracion= { ver:false, editar:false };
@@ -235,9 +237,11 @@ function permisosDefault(rol) {
     todos.facturacion  = { ver:false, crear:false, anular:false, ver_reportes:false };
     todos.servicios    = { ver:true, crear:false, editar:false };
     todos.caja         = { ver:false, crear_borrador:false, cerrar:false };
+    todos.gastos       = { ver:false, crear:false, editar:false, anular:false };
     todos.reportes     = { ver:false, exportar:false };
     todos.usuarios     = { ver:false, crear:false, editar:false, toggle:false };
     todos.consentimientos = { ver:false, crear:false, firmar:false };
+    todos.citas.eliminar = false;
     todos.configuracion= { ver:false, editar:false };
     todos.citas.ver_todas = false;  // solo citas de estética
   }

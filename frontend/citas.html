@@ -19,6 +19,7 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
+  <script src="js/citas-eliminar.js"></script>
   <style>
     /* Badges tipo cita */
     .tipo-medica        { background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200); }
@@ -314,6 +315,8 @@
       </div>
     </div>
     <div class="vmodal-foot">
+      <button id="edit-btn-eliminar" onclick="pedirEliminarCita(document.getElementById('edit-cita-id').value)"
+        class="vbtn vbtn-danger-ghost" style="margin-right:auto">🗑️ Eliminar</button>
       <button onclick="closeModal('modal-editar-cita')" class="vbtn vbtn-ghost">Cancelar</button>
       <button onclick="guardarEditCita()" class="vbtn vbtn-primary">💾 Guardar Cambios</button>
     </div>
@@ -398,7 +401,30 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarCitas();
   getSocket().on('cita:nueva',       msg => nuevaFilaRT(msg.payload));
   getSocket().on('cita:actualizada', msg => actualizarEstadoFila(msg.id, msg.estado));
+  getSocket().on('cita:eliminada',   msg => quitarFila(msg.payload?.id));
 });
+
+// ── Eliminar cita (solo si no tuvo atención; el modal explica si no se puede) ──
+function puedeEliminarCitas() {
+  var rol = JSON.parse(localStorage.getItem('vet_user') || '{}').rol;
+  return ['admin','recepcionista','veterinario','veterinario_recepcionista'].includes(rol);
+}
+function pedirEliminarCita(id) {
+  eliminarCita(id, { onEliminada: function(idElim) {
+    if (String(document.getElementById('edit-cita-id').value) === String(idElim)) closeModal('modal-editar-cita');
+    quitarFila(idElim);
+  }});
+}
+function quitarFila(id) {
+  var tr = document.querySelector('tr[data-id="'+id+'"]');
+  if (!tr) return;
+  tr.style.transition = 'opacity .25s'; tr.style.opacity = '0';
+  setTimeout(function() {
+    tr.remove();
+    var tbody = document.getElementById('tbody');
+    if (!tbody.querySelector('tr')) tbody.innerHTML = '<tr><td colspan="8"><div class="vempty"><span class="icon">📭</span><p>Sin citas con esos filtros</p></div></td></tr>';
+  }, 250);
+}
 
 // ── Selector de tipo de cita ──────────────────────────────────────
 function selTipo(tipo) {
@@ -524,6 +550,9 @@ function rowHTML(c) {
           '<button class="vlink" onclick="abrirEditarCita('+c.id+')" style="font-size:.7rem;color:var(--sky)">✏️ Editar</button>'
         : '') +
         '<button class="vlink" onclick="abrirEstado('+c.id+',\''+c.estado+'\')" style="font-size:.7rem">Cambiar estado</button>' +
+        (puedeEliminarCitas() ?
+          '<button class="vlink" onclick="pedirEliminarCita('+c.id+')" style="font-size:.7rem;color:#e11d48">🗑️ Eliminar</button>'
+        : '') +
       '</div>' +
     '</td>' +
   '</tr>';
@@ -753,6 +782,7 @@ function irAAtender() {
 async function abrirEditarCita(id) {
   document.getElementById('edit-cita-id-label').textContent = '#'+id;
   document.getElementById('edit-cita-id').value = id;
+  document.getElementById('edit-btn-eliminar').style.display = puedeEliminarCitas() ? '' : 'none';
   openModal('modal-editar-cita');
 
   var sel = document.getElementById('edit-cita-vet');

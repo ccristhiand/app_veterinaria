@@ -536,6 +536,94 @@ router.get('/financiero', authorize('admin'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/reportes/gastos ───────────────────────────────────
+// En qué se gasta: por tipo, método de pago, día/mes, sede y conceptos; ingresos vs gastos.
+router.get('/gastos', authorize('admin'), async (req, res, next) => {
+  try {
+    const { d, h } = periodo(req);
+    const ant = periodoAnterior(d, h);
+    const sid = sedeId(req.query.sede_id);
+    const sg  = sedeFilter(sid, 'g.sede_id');
+    const sf  = sedeFilter(sid, 'f.sede_id');
+    const base = `FROM gastos g WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ? ${sg.sql}`;
+    const p    = [d, h, ...sg.params];
+
+    const [[resumen], [anterior], [ingresos], [anulados]] = await Promise.all([
+      req.db.query(`SELECT COALESCE(SUM(g.monto),0) AS total, COUNT(*) AS cantidad,
+                           COALESCE(MAX(g.monto),0) AS mayor ${base}`, p),
+      req.db.query(`SELECT COALESCE(SUM(g.monto),0) AS total
+                    FROM gastos g WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ? ${sg.sql}`,
+                   [ant.d, ant.h, ...sg.params]),
+      req.db.query(`SELECT COALESCE(SUM(f.total),0) AS total FROM facturas f
+                    WHERE f.estado = 'pagado' AND f.fecha BETWEEN ? AND ? ${sf.sql}`, [d, h, ...sf.params]),
+      req.db.query(`SELECT COUNT(*) AS cantidad, COALESCE(SUM(g.monto),0) AS total
+                    FROM gastos g WHERE g.anulado = 1 AND g.fecha BETWEEN ? AND ? ${sg.sql}`, p),
+    ]);
+
+    const agruparMes = diasEntre(d, h) > 62;
+    const fmtPeriodo = agruparMes ? '%Y-%m' : '%Y-%m-%d';
+
+    const [porCategoria, porMetodo, porPeriodo, topConceptos, detalle] = await Promise.all([
+      req.db.query(
+        `SELECT gc.id, gc.nombre, gc.icono, gc.color, SUM(g.monto) AS total, COUNT(*) AS cantidad
+         FROM gastos g JOIN gastos_categorias gc ON gc.id = g.categoria_id
+         WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ? ${sg.sql}
+         GROUP BY gc.id, gc.nombre, gc.icono, gc.color ORDER BY total DESC`, p),
+      req.db.query(
+        `SELECT g.metodo_pago, SUM(g.monto) AS total, COUNT(*) AS cantidad ${base}
+         GROUP BY g.metodo_pago ORDER BY total DESC`, p),
+      req.db.query(
+        `SELECT DATE_FORMAT(g.fecha, '${fmtPeriodo}') AS periodo, SUM(g.monto) AS total, COUNT(*) AS cantidad ${base}
+         GROUP BY periodo ORDER BY periodo ASC`, p),
+      req.db.query(
+        `SELECT g.descripcion, gc.nombre AS categoria, SUM(g.monto) AS total, COUNT(*) AS veces
+         FROM gastos g JOIN gastos_categorias gc ON gc.id = g.categoria_id
+         WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ? ${sg.sql}
+         GROUP BY g.descripcion, gc.nombre ORDER BY total DESC LIMIT 10`, p),
+      req.db.query(
+        `SELECT g.id, DATE_FORMAT(g.fecha, '%Y-%m-%d') AS fecha, g.descripcion, g.monto, g.metodo_pago,
+                g.proveedor, g.comprobante, gc.nombre AS categoria, gc.icono AS categoria_icono,
+                u.nombre AS registrado_por, s.nombre AS sede
+         FROM gastos g
+         JOIN gastos_categorias gc ON gc.id = g.categoria_id
+         JOIN usuarios u ON u.id = g.registrado_por_id
+         LEFT JOIN sedes s ON s.id = g.sede_id
+         WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ? ${sg.sql}
+         ORDER BY g.fecha DESC, g.created_at DESC LIMIT 500`, p),
+    ]);
+
+    let gastosPorSede = [];
+    if (!sid) {
+      gastosPorSede = await req.db.query(
+        `SELECT COALESCE(s.nombre, 'Sin sede') AS sede, SUM(g.monto) AS total, COUNT(*) AS cantidad
+         FROM gastos g LEFT JOIN sedes s ON s.id = g.sede_id
+         WHERE g.anulado = 0 AND g.fecha BETWEEN ? AND ?
+         GROUP BY s.id, s.nombre ORDER BY total DESC`, [d, h]);
+    }
+
+    const total   = num(resumen.total);
+    const ingreso = num(ingresos.total);
+    const dias    = diasEntre(d, h) + 1;
+    const conPct  = rows => rows.map(r => ({ ...r, total: num(r.total), pct: total ? +((num(r.total) / total) * 100).toFixed(1) : 0 }));
+
+    return res.json({ success: true, data: {
+      resumen: {
+        total, cantidad: +resumen.cantidad || 0, mayor: num(resumen.mayor),
+        promedio_diario: +(total / dias).toFixed(2),
+        anterior: num(anterior.total), variacion: variacion(total, num(anterior.total)),
+        ingresos: ingreso, utilidad: +(ingreso - total).toFixed(2),
+        margen: ingreso > 0 ? +(((ingreso - total) / ingreso) * 100).toFixed(1) : null,
+        anulados: +anulados.cantidad || 0, anulados_monto: num(anulados.total),
+      },
+      porCategoria: conPct(porCategoria), porMetodo: conPct(porMetodo),
+      porPeriodo: porPeriodo.map(r => ({ ...r, total: num(r.total) })), agrupacion: agruparMes ? 'mes' : 'dia',
+      topConceptos: topConceptos.map(r => ({ ...r, total: num(r.total) })),
+      detalle, gastosPorSede,
+      periodo: { desde: d, hasta: h }, periodo_anterior: ant, sede_id: sid,
+    } });
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/reportes/mascotas ─────────────────────────────────
 // Mascotas no tiene sede_id — este reporte siempre es global
 router.get('/mascotas', authorize('admin'), async (req, res, next) => {

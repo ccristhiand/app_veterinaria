@@ -20,6 +20,7 @@ const MODULO_MAP = {
   '/inventario'      : 'inventario',
   '/facturas'        : 'facturacion',
   '/caja'            : 'caja',
+  '/gastos'          : 'gastos',
   '/usuarios'        : 'usuarios',
   '/estetica'        : 'estetica',
   '/consentimientos' : 'consentimientos',
@@ -41,6 +42,8 @@ const TABLA_MAP = {
   'inventario'       : 'inventario',
   'facturacion'      : 'facturas',
   'caja'             : 'caja_cierres',
+  'gastos'           : 'gastos',
+  'gastos_categorias': 'gastos_categorias',
   'usuarios'         : 'usuarios',
   'estetica'         : 'servicios_estetica',
   'consentimientos'  : 'consentimientos_plantillas',
@@ -153,8 +156,10 @@ function auditMiddleware(accionOverride = null, moduloOverride = null) {
         nuevo = data?.data || bodyOriginal;
       } else if (metodo === 'PUT' || metodo === 'PATCH') {
         nuevo = bodyOriginal;
+      } else if (metodo === 'DELETE' && bodyOriginal && Object.keys(bodyOriginal).length) {
+        nuevo = bodyOriginal;   // p. ej. motivo de la eliminación
       }
-      // DELETE: solo anterior, sin nuevo
+      // DELETE: el registro borrado queda en "anterior"
 
       auditLog(req, res, accionOverride, moduloOverride, {
         anterior, nuevo, resultado, error, duracion

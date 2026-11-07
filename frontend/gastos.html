@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <!-- PWA: app instalable (js/pwa.js cambia el manifest por el de la clínica en producción) -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#0d3b2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="VetClinic"/>
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <script src="js/pwa.js" defer></script>
+  <title>VetClinic — Gastos diarios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css?v=20261103-f4c"/>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/layout.js"></script>
+  <style>
+    .g-kpis { display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-bottom:1.2rem; }
+    @media (max-width:899px) { .g-kpis { grid-template-columns:repeat(2,1fr); } }
+    .g-kpi { background:#fff;border:1px solid var(--line);border-radius:1rem;padding:.9rem 1rem;position:relative;overflow:hidden; }
+    .g-kpi::after { content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc,#be123c); }
+    .g-kpi .v { font-size:1.3rem;font-weight:800;line-height:1.1;color:var(--acc,#be123c); }
+    .g-kpi .l { font-size:.64rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em;margin-top:.3rem;font-weight:600; }
+
+    .g-grid2 { display:grid;grid-template-columns:3fr 2fr;gap:1rem;margin-bottom:1.2rem; }
+    @media (max-width:899px) { .g-grid2 { grid-template-columns:1fr; } }
+    .g-h3 { font-family:'Playfair Display',serif;font-weight:700;font-size:.95rem;margin-bottom:.9rem; }
+    .g-bar-row { margin-bottom:.65rem; }
+    .g-bar-row .top { display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;margin-bottom:.22rem; }
+    .g-bar { height:8px;background:#f1f5f2;border-radius:999px;overflow:hidden; }
+    .g-bar > div { height:100%;border-radius:999px;transition:width .4s; }
+
+    /* Selector visual de tipo y método en el modal */
+    .chip-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.4rem; }
+    .chip-sel { display:flex;align-items:center;gap:.45rem;padding:.5rem .65rem;border:1.5px solid var(--line);
+                border-radius:.75rem;background:#fff;cursor:pointer;font-family:inherit;font-size:.76rem;
+                font-weight:600;color:var(--ink-soft);text-align:left;transition:all .15s; }
+    .chip-sel:hover { border-color:var(--green-300); }
+    .chip-sel.sel { border-color:var(--chip,var(--green-500));background:var(--chip-bg,var(--green-50));color:var(--ink); box-shadow:0 0 0 2px var(--chip-bg,var(--green-50)); }
+    .chip-sel .ico { font-size:1.05rem; }
+    .met-grid { display:flex;flex-wrap:wrap;gap:.4rem; }
+
+    .met-chip { font-size:.66rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;white-space:nowrap; }
+    .met-chip.efectivo { background:var(--green-50);color:var(--green-700);border:1px solid var(--green-200); }
+    .met-chip.digital  { background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe; }
+    .cat-pill { display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:700;padding:.18rem .55rem;
+                border-radius:999px;white-space:nowrap;border:1px solid transparent; }
+    .tag-anulado { background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-size:.65rem;font-weight:700;padding:.12rem .5rem;border-radius:999px; }
+    .tag-cerrado { background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:.65rem;font-weight:700;padding:.12rem .5rem;border-radius:999px; }
+    tr.anulado td { opacity:.55; }
+    tr.anulado td .g-monto { text-decoration:line-through; }
+    .vtable td { vertical-align:middle; }
+
+    .cat-row { display:flex;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--line); }
+    .cat-row:last-child { border-bottom:none; }
+  </style>
+</head>
+<body style="display:flex;height:100vh;overflow:hidden">
+<div id="main-content" class="page">
+
+  <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
+    <div><h2>💸 Gastos diarios</h2><p>Registra en qué se gasta, por tipo y método de pago</p></div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button id="btn-tipos" onclick="abrirTipos()" class="vbtn vbtn-ghost" style="display:none">⚙️ Tipos de gasto</button>
+      <button onclick="abrirNuevoGasto()" class="vbtn vbtn-primary">＋ Registrar gasto</button>
+    </div>
+  </div>
+
+  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
+    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
+    font-size:.8rem;font-weight:600;color:var(--green-700)">
+    🏥 Sede: <span id="banner-sede-nombre"></span>
+  </div>
+
+  <!-- Filtros -->
+  <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end">
+    <div><label class="vlabel">Desde</label><input type="date" id="f-desde" class="vinput" style="width:auto" onchange="cargarGastos()"/></div>
+    <div><label class="vlabel">Hasta</label><input type="date" id="f-hasta" class="vinput" style="width:auto" onchange="cargarGastos()"/></div>
+    <div style="display:flex;gap:.35rem">
+      <button onclick="setRango('hoy')"    class="vbtn vbtn-ghost vbtn-sm">Hoy</button>
+      <button onclick="setRango('semana')" class="vbtn vbtn-ghost vbtn-sm">Semana</button>
+      <button onclick="setRango('mes')"    class="vbtn vbtn-ghost vbtn-sm">Mes</button>
+    </div>
+    <div><label class="vlabel">Tipo de gasto</label>
+      <select id="f-cat" class="vinput" style="width:auto;min-width:170px" onchange="cargarGastos()"><option value="">Todos</option></select></div>
+    <div><label class="vlabel">Método</label>
+      <select id="f-met" class="vinput" style="width:auto" onchange="cargarGastos()">
+        <option value="">Todos</option>
+        <option value="efectivo">💵 Efectivo</option><option value="tarjeta">💳 Tarjeta</option>
+        <option value="transferencia">🏦 Transferencia</option><option value="yape">📱 Yape</option><option value="plin">📱 Plin</option>
+      </select></div>
+    <div><label class="vlabel">Estado</label>
+      <select id="f-estado" class="vinput" style="width:auto" onchange="cargarGastos()">
+        <option value="activos">Vigentes</option><option value="anulados">Anulados</option><option value="todos">Todos</option>
+      </select></div>
+    <div style="flex:1;min-width:180px"><label class="vlabel">Buscar</label>
+      <input id="f-q" class="vinput" placeholder="Descripción, proveedor o N° comprobante…" oninput="buscarDebounce()"/></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="g-kpis">
+    <div class="g-kpi" style="--acc:#be123c"><p class="v" id="k-total">S/. 0.00</p><p class="l">Total gastado</p></div>
+    <div class="g-kpi" style="--acc:#1d4ed8"><p class="v" id="k-cant">0</p><p class="l">Gastos registrados</p></div>
+    <div class="g-kpi" style="--acc:var(--green-700)"><p class="v" id="k-efectivo">S/. 0.00</p><p class="l">💵 En efectivo (sale de caja)</p></div>
+    <div class="g-kpi" style="--acc:#6d28d9"><p class="v" id="k-otros">S/. 0.00</p><p class="l">💳 Otros métodos</p></div>
+  </div>
+
+  <!-- Distribución -->
+  <div class="g-grid2">
+    <div class="vcard vcard-pad">
+      <h3 class="g-h3">📊 ¿En qué gastamos? — por tipo</h3>
+      <div id="dist-cat"></div>
+    </div>
+    <div class="vcard vcard-pad">
+      <h3 class="g-h3">💳 Por método de pago</h3>
+      <div id="dist-met"></div>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="vcard">
+    <div style="padding:.9rem 1.2rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+      <h3 class="g-h3" style="margin:0">🧾 Detalle de gastos</h3>
+      <span id="t-info" style="font-size:.72rem;color:var(--ink-faint)"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="vtable vtable-stack">
+        <thead><tr>
+          <th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Método</th>
+          <th class="hidden xl:table-cell">Registrado por</th><th style="text-align:right">Monto</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7"><div class="vempty"><div class="vspinner"></div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Registrar / Editar gasto ═══════════════════════════════ -->
+<div id="modal-gasto" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:640px">
+    <div class="vmodal-head">
+      <h3 id="mg-titulo">💸 Registrar gasto</h3>
+      <button onclick="closeModal('modal-gasto')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1rem">
+      <input type="hidden" id="g-id"/>
+      <div>
+        <label class="vlabel" style="margin-bottom:.45rem">Tipo de gasto *</label>
+        <div id="g-cats" class="chip-grid"></div>
+      </div>
+      <div>
+        <label class="vlabel">Descripción *</label>
+        <input id="g-desc" class="vinput" maxlength="255" placeholder="Ej.: Compra de jeringas y gasas, pago de luz de octubre…"/>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Monto *</label>
+          <input id="g-monto" type="number" min="0.01" step="0.01" class="vinput" placeholder="0.00"
+            style="font-size:1.05rem;font-weight:700"/>
+        </div>
+        <div>
+          <label class="vlabel">Fecha *</label>
+          <input id="g-fecha" type="date" class="vinput"/>
+        </div>
+      </div>
+      <div>
+        <label class="vlabel" style="margin-bottom:.45rem">¿Cómo se pagó? *</label>
+        <div id="g-mets" class="met-grid"></div>
+        <p id="g-met-ayuda" style="font-size:.68rem;color:var(--ink-faint);margin-top:.35rem"></p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="vlabel">Proveedor <span style="font-weight:400;color:var(--ink-faint)">(opcional)</span></label>
+          <input id="g-prov" class="vinput" maxlength="120" placeholder="Nombre del proveedor"/>
+        </div>
+        <div>
+          <label class="vlabel">N° comprobante <span style="font-weight:400;color:var(--ink-faint)">(opcional)</span></label>
+          <input id="g-comp" class="vinput" maxlength="60" placeholder="Boleta / factura / recibo"/>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-gasto')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button id="g-btn-guardar" onclick="guardarGasto()" class="vbtn vbtn-primary">💾 Guardar gasto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Anular gasto ═══════════════════════════════════════════ -->
+<div id="modal-anular" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:460px">
+    <div class="vmodal-head" style="background:#fff1f2;border-bottom:1px solid #fecdd3">
+      <h3 style="color:#9f1239">🚫 Anular gasto</h3>
+      <button onclick="closeModal('modal-anular')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:.9rem">
+      <input type="hidden" id="an-id"/>
+      <div id="an-resumen" style="background:#fafbfa;border:1px solid var(--line);border-radius:.85rem;padding:.75rem .9rem;font-size:.82rem"></div>
+      <p style="font-size:.78rem;color:var(--ink-soft);line-height:1.55">
+        El gasto dejará de contar en el cierre de caja y en los reportes. Quedará registrado como
+        <b>anulado</b> con tu nombre y el motivo, para auditoría.
+      </p>
+      <div>
+        <label class="vlabel">Motivo de la anulación *</label>
+        <textarea id="an-motivo" rows="2" class="vinput" maxlength="200" placeholder="Ej.: Registrado dos veces, monto incorrecto…"></textarea>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-anular')" class="vbtn vbtn-ghost">Volver</button>
+      <button onclick="confirmarAnular()" class="vbtn" style="background:#e11d48;color:#fff;border:none">Anular gasto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Tipos de gasto (admin) ═════════════════════════════════ -->
+<div id="modal-tipos" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:520px">
+    <div class="vmodal-head">
+      <h3>⚙️ Tipos de gasto</h3>
+      <button onclick="closeModal('modal-tipos')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body">
+      <p style="font-size:.75rem;color:var(--ink-faint);margin-bottom:.75rem">
+        Los tipos desactivados ya no aparecen al registrar, pero se conservan en los gastos y reportes anteriores.
+      </p>
+      <div id="tipos-lista"></div>
+      <div style="display:flex;gap:.4rem;margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--line)">
+        <input id="nt-icono" class="vinput" style="width:58px;text-align:center" maxlength="4" placeholder="📌"/>
+        <input id="nt-nombre" class="vinput" maxlength="60" placeholder="Nuevo tipo de gasto…" style="flex:1"/>
+        <input id="nt-color" type="color" value="#64748b" class="vinput" style="width:48px;padding:.2rem"/>
+        <button onclick="crearTipo()" class="vbtn vbtn-primary">＋</button>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-tipos')" class="vbtn vbtn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const METODOS = {
+  efectivo     : { label:'Efectivo',      icon:'💵', ayuda:'Sale de la caja física: se descuenta del efectivo esperado en el cierre.' },
+  tarjeta      : { label:'Tarjeta',       icon:'💳', ayuda:'No sale de la caja física: se muestra contra los cobros con tarjeta del día.' },
+  transferencia: { label:'Transferencia', icon:'🏦', ayuda:'No sale de la caja física: se muestra contra las transferencias del día.' },
+  yape         : { label:'Yape',          icon:'📱', ayuda:'No sale de la caja física: se muestra contra los cobros por Yape del día.' },
+  plin         : { label:'Plin',          icon:'📱', ayuda:'No sale de la caja física: se muestra contra los cobros por Plin del día.' },
+};
+let _cats = [];          // tipos activos
+let _gastos = [];
+let _catSel = null, _metSel = 'efectivo';
+let _sim = 'S/.';
+const m2   = v => (parseFloat(v) || 0).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const pad2 = n => String(n).padStart(2, '0');
+const ymd  = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+// 'YYYY-MM-DD' → '07 nov 2026' (sin corrimiento por zona horaria)
+const fDia = s => s ? new Date(`${s}T00:00:00Z`).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', timeZone:'UTC' }) : '—';
+const esAdmin = () => JSON.parse(localStorage.getItem('vet_user') || '{}').rol === 'admin';
+const hexBg = (hex, a) => { try { return hexToRgba(hex || '#64748b', a); } catch { return '#f1f5f9'; } };
+
+document.addEventListener('DOMContentLoaded', async () => {
+  initPage({ activePage:'gastos', title:'Gastos diarios', subtitle:'Control de egresos' });
+
+  const u = JSON.parse(localStorage.getItem('vet_user') || '{}');
+  if (u.sede_nombre) {
+    document.getElementById('banner-sede').style.display = 'block';
+    document.getElementById('banner-sede-nombre').textContent = u.sede_nombre;
+  }
+  if (esAdmin()) document.getElementById('btn-tipos').style.display = '';
+
+  api('/empresa').then(r => r?.ok && r.json().then(d => { _sim = d.data?.simbolo_moneda || 'S/.'; }));
+
+  // ?fecha=YYYY-MM-DD (desde Cierre de Caja) → ver ese día y abrir el registro
+  const fechaQS = new URLSearchParams(location.search).get('fecha');
+  const valida  = /^\d{4}-\d{2}-\d{2}$/.test(fechaQS || '');
+  document.getElementById('f-desde').value = valida ? fechaQS : fechaHoyInput();
+  document.getElementById('f-hasta').value = valida ? fechaQS : fechaHoyInput();
+
+  await cargarCategorias();
+  cargarGastos();
+  if (valida) abrirNuevoGasto(fechaQS);
+
+  getSocket().on('gasto:actualizado', () => cargarGastos());
+});
+
+function setRango(r) {
+  const hoy = new Date(), d = new Date();
+  if (r === 'semana') d.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
+  if (r === 'mes')    d.setDate(1);
+  document.getElementById('f-desde').value = ymd(d);
+  document.getElementById('f-hasta').value = ymd(hoy);
+  cargarGastos();
+}
+
+let _tq;
+function buscarDebounce() { clearTimeout(_tq); _tq = setTimeout(cargarGastos, 350); }
+
+// ── Tipos de gasto ────────────────────────────────────────────────
+async function cargarCategorias() {
+  try {
+    const res = await api('/gastos/categorias');
+    if (!res?.ok) return;
+    _cats = (await res.json()).data || [];
+    const sel = document.getElementById('f-cat');
+    const v = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>' +
+      _cats.map(c => `<option value="${c.id}">${esc(c.icono || '')} ${esc(c.nombre)}</option>`).join('');
+    sel.value = v;
+  } catch {}
+}
+
+// ── Listado ───────────────────────────────────────────────────────
+async function cargarGastos() {
+  const p = new URLSearchParams({
+    desde : document.getElementById('f-desde').value,
+    hasta : document.getElementById('f-hasta').value,
+    estado: document.getElementById('f-estado').value,
+  });
+  const cat = document.getElementById('f-cat').value, met = document.getElementById('f-met').value;
+  const q   = document.getElementById('f-q').value.trim();
+  if (cat) p.set('categoria_id', cat);
+  if (met) p.set('metodo_pago', met);
+  if (q)   p.set('q', q);
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="vempty"><div class="vspinner"></div></div></td></tr>';
+  try {
+    const res = await api(`/gastos?${p}`);
+    if (!res) return;
+    const json = await res.json();
+    if (!res.ok) { apiError(res.status, json.message); return; }
+    _gastos = json.data || [];
+    renderResumen(json.resumen);
+    renderTabla();
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="vempty"><span class="icon">😿</span><p>Error al cargar. <button class="vlink" onclick="cargarGastos()">Reintentar</button></p></div></td></tr>';
+  }
+}
+
+function renderResumen(r) {
+  const efectivo = r.por_metodo?.efectivo || 0;
+  document.getElementById('k-total').textContent    = `${_sim} ${m2(r.total)}`;
+  document.getElementById('k-cant').textContent     = r.cantidad;
+  document.getElementById('k-efectivo').textContent = `${_sim} ${m2(efectivo)}`;
+  document.getElementById('k-otros').textContent    = `${_sim} ${m2(r.total - efectivo)}`;
+  document.getElementById('t-info').textContent =
+    `${fDia(r.desde)}${r.hasta !== r.desde ? ' — ' + fDia(r.hasta) : ''}` + (r.anulados ? ` · ${r.anulados} anulado(s)` : '');
+
+  const cats = r.por_categoria || [];
+  const maxC = Math.max(...cats.map(c => c.total), 1);
+  document.getElementById('dist-cat').innerHTML = cats.length ? cats.map(c => `
+    <div class="g-bar-row">
+      <div class="top"><span style="font-weight:600">${esc(c.icono || '')} ${esc(c.nombre)}
+        <span style="color:var(--ink-faint);font-weight:400">· ${c.cantidad}</span></span>
+        <span style="font-weight:700">${_sim} ${m2(c.total)} <span style="color:var(--ink-faint);font-weight:500">(${c.pct}%)</span></span></div>
+      <div class="g-bar"><div style="width:${Math.max((c.total / maxC) * 100, 2)}%;background:${esc(c.color || '#64748b')}"></div></div>
+    </div>`).join('')
+    : '<p style="font-size:.8rem;color:var(--ink-faint)">Sin gastos en el período.</p>';
+
+  const mets = Object.entries(r.por_metodo || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  document.getElementById('dist-met').innerHTML = mets.length ? mets.map(([m, v]) => `
+    <div class="g-bar-row">
+      <div class="top"><span style="font-weight:600">${METODOS[m].icon} ${METODOS[m].label}</span>
+        <span style="font-weight:700">${_sim} ${m2(v)} <span style="color:var(--ink-faint);font-weight:500">(${r.total ? Math.round(v / r.total * 100) : 0}%)</span></span></div>
+      <div class="g-bar"><div style="width:${r.total ? (v / r.total) * 100 : 0}%;background:${m === 'efectivo' ? 'var(--green-500)' : '#3b82f6'}"></div></div>
+    </div>`).join('')
+    : '<p style="font-size:.8rem;color:var(--ink-faint)">Sin gastos en el período.</p>';
+}
+
+function renderTabla() {
+  const tbody = document.getElementById('tbody');
+  if (!_gastos.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="vempty"><span class="icon">🧾</span><p>No hay gastos con estos filtros</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = _gastos.map(g => {
+    const bloqueado = g.anulado || g.cierre_estado === 'cerrado';
+    const acciones = g.anulado
+      ? `<span class="tag-anulado" title="${esc(g.anulado_motivo || '')}">Anulado</span>`
+      : g.cierre_estado === 'cerrado'
+        ? '<span class="tag-cerrado" title="Forma parte de un cierre de caja cerrado">🔒 En cierre</span>'
+        : `<div style="display:flex;gap:.6rem">
+             <button class="vlink" style="font-size:.72rem" onclick="abrirEditarGasto(${g.id})">✏️ Editar</button>
+             <button class="vlink" style="font-size:.72rem;color:#e11d48" onclick="abrirAnular(${g.id})">Anular</button>
+           </div>`;
+    return `<tr class="${g.anulado ? 'anulado' : ''}">
+      <td style="white-space:nowrap;font-weight:600;font-size:.78rem">${fDia(g.fecha)}</td>
+      <td><span class="cat-pill" style="background:${hexBg(g.categoria_color, .1)};color:${esc(g.categoria_color || '#475569')};border-color:${hexBg(g.categoria_color, .3)}">
+        ${esc(g.categoria_icono || '')} ${esc(g.categoria_nombre)}</span></td>
+      <td style="min-width:200px;max-width:320px" title="Registrado por ${esc(g.registrado_por)}">
+        <p style="font-weight:600">${esc(g.descripcion)}</p>
+        ${(g.proveedor || g.comprobante) ? `<p style="font-size:.68rem;color:var(--ink-faint)">${esc(g.proveedor || '')}${g.proveedor && g.comprobante ? ' · ' : ''}${g.comprobante ? 'N° ' + esc(g.comprobante) : ''}</p>` : ''}
+        ${g.sede_nombre && isAdmin() && !getSedeActiva() ? `<p style="font-size:.66rem;color:var(--ink-faint)">🏥 ${esc(g.sede_nombre)}</p>` : ''}
+      </td>
+      <td><span class="met-chip ${g.metodo_pago === 'efectivo' ? 'efectivo' : 'digital'}">${METODOS[g.metodo_pago]?.icon || ''} ${METODOS[g.metodo_pago]?.label || esc(g.metodo_pago)}</span></td>
+      <td class="hidden xl:table-cell" style="font-size:.76rem;color:var(--ink-soft)">${esc(g.registrado_por)}</td>
+      <td style="text-align:right;white-space:nowrap"><span class="g-monto" style="font-weight:800;color:#be123c">${_sim} ${m2(g.monto)}</span></td>
+      <td>${acciones}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Modal registrar / editar ──────────────────────────────────────
+function pintarChips() {
+  document.getElementById('g-cats').innerHTML = _cats.map(c => `
+    <button type="button" class="chip-sel ${_catSel === c.id ? 'sel' : ''}" onclick="selCat(${c.id})"
+      style="--chip:${esc(c.color || '#64748b')};--chip-bg:${hexBg(c.color, .1)}">
+      <span class="ico">${esc(c.icono || '📌')}</span><span>${esc(c.nombre)}</span>
+    </button>`).join('');
+  document.getElementById('g-mets').innerHTML = Object.entries(METODOS).map(([k, m]) => `
+    <button type="button" class="chip-sel ${_metSel === k ? 'sel' : ''}" onclick="selMet('${k}')">
+      <span class="ico">${m.icon}</span><span>${m.label}</span>
+    </button>`).join('');
+  document.getElementById('g-met-ayuda').textContent = METODOS[_metSel]?.ayuda || '';
+}
+function selCat(id) { _catSel = id; pintarChips(); }
+function selMet(m)  { _metSel = m;  pintarChips(); }
+
+function abrirNuevoGasto(fecha) {
+  document.getElementById('mg-titulo').textContent = '💸 Registrar gasto';
+  document.getElementById('g-id').value    = '';
+  document.getElementById('g-desc').value  = '';
+  document.getElementById('g-monto').value = '';
+  document.getElementById('g-prov').value  = '';
+  document.getElementById('g-comp').value  = '';
+  document.getElementById('g-fecha').value = typeof fecha === 'string' ? fecha : fechaHoyInput();
+  document.getElementById('g-fecha').max   = fechaHoyInput();
+  _catSel = null; _metSel = 'efectivo';
+  pintarChips();
+  openModal('modal-gasto');
+  setTimeout(() => document.getElementById('g-desc').focus(), 50);
+}
+
+function abrirEditarGasto(id) {
+  const g = _gastos.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('mg-titulo').textContent = `✏️ Editar gasto #${g.id}`;
+  document.getElementById('g-id').value    = g.id;
+  document.getElementById('g-desc').value  = g.descripcion;
+  document.getElementById('g-monto').value = parseFloat(g.monto).toFixed(2);
+  document.getElementById('g-prov').value  = g.proveedor || '';
+  document.getElementById('g-comp').value  = g.comprobante || '';
+  document.getElementById('g-fecha').value = g.fecha;
+  document.getElementById('g-fecha').max   = fechaHoyInput();
+  _catSel = g.categoria_id; _metSel = g.metodo_pago;
+  // Si el tipo fue desactivado, se muestra igual para no perderlo al editar
+  if (!_cats.some(c => c.id === g.categoria_id))
+    _cats.push({ id:g.categoria_id, nombre:g.categoria_nombre + ' (inactivo)', icono:g.categoria_icono, color:g.categoria_color });
+  pintarChips();
+  openModal('modal-gasto');
+}
+
+async function guardarGasto() {
+  const id   = document.getElementById('g-id').value;
+  const body = {
+    categoria_id: _catSel,
+    descripcion : document.getElementById('g-desc').value.trim(),
+    monto       : parseFloat(document.getElementById('g-monto').value),
+    fecha       : document.getElementById('g-fecha').value,
+    metodo_pago : _metSel,
+    proveedor   : document.getElementById('g-prov').value.trim(),
+    comprobante : document.getElementById('g-comp').value.trim(),
+  };
+  if (!body.categoria_id)        { toast('Selecciona el tipo de gasto.', 'warning'); return; }
+  if (!body.descripcion)         { toast('Escribe una descripción.', 'warning'); document.getElementById('g-desc').focus(); return; }
+  if (!(body.monto > 0))         { toast('Ingresa un monto mayor a cero.', 'warning'); document.getElementById('g-monto').focus(); return; }
+  if (!body.fecha)               { toast('Indica la fecha.', 'warning'); return; }
+
+  const btn = document.getElementById('g-btn-guardar');
+  btn.disabled = true;
+  try {
+    const res  = await api(id ? `/gastos/${id}` : '/gastos', { method: id ? 'PUT' : 'POST', body });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message || 'No se pudo guardar.', 'danger'); return; }
+    toast(id ? '✅ Gasto actualizado' : '✅ Gasto registrado', 'success');
+    closeModal('modal-gasto');
+    cargarGastos();
+  } catch { toast('Error de conexión.', 'danger'); }
+  finally { btn.disabled = false; }
+}
+
+// ── Anular ────────────────────────────────────────────────────────
+function abrirAnular(id) {
+  const g = _gastos.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('an-id').value = id;
+  document.getElementById('an-motivo').value = '';
+  document.getElementById('an-resumen').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start">
+      <div>
+        <p style="font-weight:700">${esc(g.categoria_icono || '')} ${esc(g.descripcion)}</p>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.15rem">${esc(g.categoria_nombre)} · ${fDia(g.fecha)} · ${METODOS[g.metodo_pago]?.label || ''}</p>
+      </div>
+      <p style="font-weight:800;color:#be123c;white-space:nowrap">${_sim} ${m2(g.monto)}</p>
+    </div>`;
+  openModal('modal-anular');
+  setTimeout(() => document.getElementById('an-motivo').focus(), 50);
+}
+
+async function confirmarAnular() {
+  const id = document.getElementById('an-id').value;
+  const motivo = document.getElementById('an-motivo').value.trim();
+  if (!motivo) { toast('Indica el motivo de la anulación.', 'warning'); return; }
+  try {
+    const res  = await api(`/gastos/${id}/anular`, { method:'PATCH', body:{ motivo } });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { toast(data.message || 'No se pudo anular.', 'danger'); return; }
+    toast('Gasto anulado', 'success');
+    closeModal('modal-anular');
+    cargarGastos();
+  } catch { toast('Error de conexión.', 'danger'); }
+}
+
+// ── Tipos de gasto (admin) ────────────────────────────────────────
+async function abrirTipos() {
+  openModal('modal-tipos');
+  await pintarTipos();
+}
+
+async function pintarTipos() {
+  const cont = document.getElementById('tipos-lista');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  const res = await api('/gastos/categorias?todas=1');
+  if (!res?.ok) { cont.innerHTML = '<p style="font-size:.8rem;color:#be123c">No se pudo cargar.</p>'; return; }
+  const tipos = (await res.json()).data || [];
+  cont.innerHTML = tipos.map(t => `
+    <div class="cat-row" style="${t.activo ? '' : 'opacity:.5'}">
+      <input class="vinput" style="width:52px;text-align:center;padding:.35rem" maxlength="4" value="${esc(t.icono || '')}" id="ti-ico-${t.id}"/>
+      <input class="vinput" style="flex:1;padding:.35rem .6rem" maxlength="60" value="${esc(t.nombre)}" id="ti-nom-${t.id}"/>
+      <input type="color" class="vinput" style="width:42px;padding:.15rem" value="${esc(t.color || '#64748b')}" id="ti-col-${t.id}"/>
+      <button class="vlink" style="font-size:.72rem" onclick="guardarTipo(${t.id})">Guardar</button>
+      <button class="vlink" style="font-size:.72rem;color:${t.activo ? '#e11d48' : 'var(--green-600)'}" onclick="toggleTipo(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? 'Desactivar' : 'Activar'}</button>
+    </div>`).join('');
+}
+
+async function guardarTipo(id) {
+  const body = {
+    nombre: document.getElementById(`ti-nom-${id}`).value.trim(),
+    icono : document.getElementById(`ti-ico-${id}`).value.trim(),
+    color : document.getElementById(`ti-col-${id}`).value,
+  };
+  const res = await api(`/gastos/categorias/${id}`, { method:'PUT', body });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+  toast('Tipo de gasto actualizado', 'success');
+  await cargarCategorias(); cargarGastos();
+}
+
+async function toggleTipo(id, activo) {
+  const res = await api(`/gastos/categorias/${id}`, { method:'PUT', body:{ activo } });
+  if (!res) return;
+  if (!res.ok) { toast((await res.json()).message || 'Error.', 'danger'); return; }
+  await pintarTipos(); await cargarCategorias();
+}
+
+async function crearTipo() {
+  const body = {
+    nombre: document.getElementById('nt-nombre').value.trim(),
+    icono : document.getElementById('nt-icono').value.trim(),
+    color : document.getElementById('nt-color').value,
+  };
+  if (!body.nombre) { toast('Escribe el nombre del tipo de gasto.', 'warning'); return; }
+  const res = await api('/gastos/categorias', { method:'POST', body });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { toast(data.message || 'Error.', 'danger'); return; }
+  document.getElementById('nt-nombre').value = '';
+  document.getElementById('nt-icono').value  = '';
+  toast('Tipo de gasto creado', 'success');
+  await pintarTipos(); await cargarCategorias();
+}
+</script>
+</body>
+</html>

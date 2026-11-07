@@ -16,7 +16,7 @@ const MODULOS_POR_PLAN = {
   ],
   enterprise: [
     'dashboard','citas','calendario','propietarios','mascotas','historia',
-    'inventario','facturacion','punto_venta','caja','reportes','servicios',
+    'inventario','facturacion','punto_venta','caja','gastos','reportes','servicios',
     'consentimientos','usuarios','configuracion','asistencia','whatsapp',
   ],
 };
@@ -34,6 +34,7 @@ const TODOS_LOS_LINKS = [
   { id:'facturacion',    icon:'🧾', label:'Facturación',      href:'facturacion',    roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'punto_venta',    icon:'🛒', label:'Punto de Venta',   href:'punto-venta',    roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'caja',           icon:'🏦', label:'Cierre de Caja',   href:'caja',           roles:['admin','recepcionista','veterinario_recepcionista'] },
+  { id:'gastos',         icon:'💸', label:'Gastos diarios',   href:'gastos',         roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'servicios',      icon:'🛎️', label:'Servicios',        href:'servicios',      roles:['admin','recepcionista','veterinario_recepcionista'] },
   { id:'reportes',       icon:'📈', label:'Reportes',         href:'reportes',       roles:['admin'] },
   { id:'asistencia',     icon:'🕐', label:'Asistencia',        href:'asistencia',     roles:['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'] },
@@ -58,6 +59,7 @@ const ICONOS = {
   facturacion    : '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8M12 17.5v-11"/>',
   punto_venta    : '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2 2h2l2.7 12.4a2 2 0 002 1.6h9.7a2 2 0 002-1.6L22 7H5.1"/>',
   caja           : '<path d="M19 7V4a1 1 0 00-1-1H5a2 2 0 000 4h15a1 1 0 011 1v4h-3a2 2 0 000 4h3a1 1 0 001-1v-2a1 1 0 00-1-1"/><path d="M3 5v14a2 2 0 002 2h15a1 1 0 001-1v-4"/>',
+  gastos         : '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4M16 15h2"/>',
   servicios      : '<path d="M5 2H4a2 2 0 00-2 2v5a6 6 0 0012 0V4a2 2 0 00-2-2h-1"/><path d="M8 15v1a6 6 0 0012 0v-4"/><circle cx="20" cy="10" r="2"/>',
   reportes       : '<path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/>',
   asistencia     : '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -363,7 +365,7 @@ function aplicarModulosPlan(branding, activePage) {
 
   // Módulos desactivados manualmente por el admin SaaS
   if (!branding.modulo_facturacion) {
-    ['facturacion','punto_venta','caja'].forEach(m => {
+    ['facturacion','punto_venta','caja','gastos'].forEach(m => {
       const idx = modulosPlan.indexOf(m);
       if (idx > -1) modulosPlan.splice(idx, 1);
     });

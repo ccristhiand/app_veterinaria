@@ -19,6 +19,7 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/layout.js"></script>
+  <script src="js/citas-eliminar.js"></script>
   <style>
     /* ── Tipos de cita ── */
     .ev-medica        { background:var(--green-100);color:var(--green-700);border-left:3px solid var(--green-600); }
@@ -351,6 +352,7 @@ initPage({ activePage:'calendario', title:'Calendario de Citas', subtitle:'Vista
   // Socket tiempo real
   getSocket().on('cita:nueva',       () => cargarCitas());
   getSocket().on('cita:actualizada', () => cargarCitas());
+  getSocket().on('cita:eliminada',   () => cargarCitas());
 
   renderCalendario();
   cargarCitas();
@@ -910,7 +912,12 @@ function verCita(c) {
     '<div style="margin-top:.25rem">'+badgeEstado(c.estado)+'</div>';
 
   // Botones de acción
-  var foot = '<button onclick="closeModal(\'modal-ver-cita\')" class="vbtn vbtn-ghost">Cerrar</button>';
+  var rolCal = JSON.parse(localStorage.getItem('vet_user') || '{}').rol;
+  var foot = '';
+  if (['admin','recepcionista','veterinario','veterinario_recepcionista'].includes(rolCal)) {
+    foot += '<button onclick="eliminarCitaCal('+c.id+')" class="vbtn vbtn-danger-ghost" style="margin-right:auto">🗑️ Eliminar</button>';
+  }
+  foot += '<button onclick="closeModal(\'modal-ver-cita\')" class="vbtn vbtn-ghost">Cerrar</button>';
   if (puedAtender) {
     _citaAtender = c;  // guardar antes de generar el HTML
     foot += '<button onclick="closeModal(\'modal-ver-cita\');abrirAtenderCal()" '+
@@ -924,6 +931,13 @@ function verCita(c) {
 
   document.getElementById('ver-cita-foot').innerHTML = foot;
   openModal('modal-ver-cita');
+}
+
+function eliminarCitaCal(id) {
+  eliminarCita(id, { onEliminada: function() {
+    closeModal('modal-ver-cita');
+    cargarCitas();
+  }});
 }
 
 async function cambiarEstadoCita(id, estado) {
