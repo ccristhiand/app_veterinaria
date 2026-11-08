@@ -3,23 +3,17 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { emitirTenant } = require('../sockets/emitir');
+
+const { filtroSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 router.use(authenticate);
-
-// ── Helper: filtro de sede ────────────────────────────────────────
-function getSedeFiltro(req) {
-  const user   = req.user;
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (user.rol === 'admin') return header || null;
-  return user.sede_id || header || null;
-}
 
 // GET /api/v1/citas
 router.get('/', async (req, res, next) => {
   try {
     const { fecha, desde, hasta, estado, veterinario_id, mascota_id, tipo_cita, search } = req.query;
-    const sedeId = getSedeFiltro(req);
 
     let sql = `
       SELECT c.*, m.nombre AS mascota_nombre, m.especie,
@@ -34,7 +28,8 @@ router.get('/', async (req, res, next) => {
       WHERE 1=1`;
     const params = [];
 
-    if (sedeId)         { sql += ' AND c.sede_id = ?';        params.push(sedeId); }
+    const fs = filtroSede(req, 'c.sede_id');
+    sql += ` ${fs.sql}`; params.push(...fs.params);
     const tz = req.tzOffset || '-05:00';
     if (fecha)          { sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) = ?'; params.push(tz, fecha); }
     if (desde && !fecha){ sql += ' AND DATE(CONVERT_TZ(c.fecha_hora, \'+00:00\', ?)) >= ?'; params.push(tz, desde); }
@@ -64,6 +59,10 @@ async function citaAjenaAlGroomer(req) {
   const [c] = await req.db.query('SELECT tipo_cita FROM citas WHERE id = ?', [req.params.id]);
   return !c || c.tipo_cita !== 'estetica';
 }
+async function exigirSedeDeCita(req) {
+  const [c] = await req.db.query('SELECT sede_id FROM citas WHERE id = ?', [req.params.id]);
+  if (c) exigirAcceso(req, c.sede_id);
+}
 
 // GET /api/v1/citas/:id
 router.get('/:id', async (req, res, next) => {
@@ -82,6 +81,7 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!cita || (esGroomer(req) && cita.tipo_cita !== 'estetica'))
       return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    exigirAcceso(req, cita.sede_id);
     return res.json({ success: true, data: cita });
   } catch (err) { next(err); }
 });
@@ -98,15 +98,7 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
     const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
 
-    let sedeId = req.user.sede_id ||
-                 (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-
-    if (!sedeId && veterinario_id) {
-      const [vet] = await req.db.query(
-        'SELECT sede_id FROM usuarios WHERE id = ?', [veterinario_id]
-      );
-      if (vet?.sede_id) sedeId = vet.sede_id;
-    }
+    const sedeId = sedeEscritura(req);
 
     const result = await req.db.query(
       `INSERT INTO citas
@@ -126,7 +118,7 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
          JOIN propietarios p ON p.id = m.propietario_id
          WHERE c.id = ?`, [result.insertId]
       );
-      io.emit('cita:nueva', { type: 'cita:nueva', payload: cita });
+      emitirTenant(req, 'cita:nueva', { type: 'cita:nueva', payload: cita });
     }
 
     return res.status(201).json({ success: true, data: { id: result.insertId } });
@@ -141,6 +133,7 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
 
     if (await citaAjenaAlGroomer(req))
       return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    await exigirSedeDeCita(req);
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
     const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
 
@@ -154,7 +147,7 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
     );
 
     const io = req.app.get('io');
-    if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id } });
+    if (io) emitirTenant(req, 'cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id } });
     return res.json({ success: true, message: 'Cita actualizada.' });
   } catch (err) { next(err); }
 });
@@ -165,9 +158,10 @@ router.patch('/:id/estado', auditMiddleware('citas:actualizado', 'citas'), async
     const { estado } = req.body;
     if (await citaAjenaAlGroomer(req))
       return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    await exigirSedeDeCita(req);
     await req.db.query('UPDATE citas SET estado=? WHERE id=?', [estado, req.params.id]);
     const io = req.app.get('io');
-    if (io) io.emit('cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id, estado } });
+    if (io) emitirTenant(req, 'cita:actualizada', { type: 'cita:actualizada', payload: { id: req.params.id, estado } });
     return res.json({ success: true, message: 'Estado actualizado.' });
   } catch (err) { next(err); }
 });
@@ -179,7 +173,7 @@ const ROLES_ELIMINAR_CITA = ['admin', 'recepcionista', 'veterinario', 'veterinar
 
 async function analizarEliminacion(db, id) {
   const [cita] = await db.query(
-    `SELECT c.id, c.estado, c.tipo_cita, c.fecha_hora, c.motivo, c.mascota_id,
+    `SELECT c.id, c.estado, c.tipo_cita, c.fecha_hora, c.motivo, c.mascota_id, c.sede_id,
             m.nombre AS mascota_nombre, m.especie,
             CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
             u.nombre AS veterinario_nombre
@@ -212,6 +206,7 @@ router.get('/:id/eliminable', authorize(...ROLES_ELIMINAR_CITA), async (req, res
   try {
     const r = await analizarEliminacion(req.db, req.params.id);
     if (!r) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    exigirAcceso(req, r.cita.sede_id);
     return res.json({ success: true, data: r });
   } catch (err) { next(err); }
 });
@@ -221,6 +216,7 @@ router.delete('/:id', authorize(...ROLES_ELIMINAR_CITA), auditMiddleware('citas:
   try {
     const r = await analizarEliminacion(req.db, req.params.id);
     if (!r) return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
+    exigirAcceso(req, r.cita.sede_id);
     if (!r.eliminable) {
       return res.status(409).json({
         success: false,
@@ -233,7 +229,7 @@ router.delete('/:id', authorize(...ROLES_ELIMINAR_CITA), auditMiddleware('citas:
     await req.db.query('DELETE FROM citas WHERE id = ?', [req.params.id]);
 
     const io = req.app.get('io');
-    if (io) io.emit('cita:eliminada', { type: 'cita:eliminada', payload: { id: Number(req.params.id) } });
+    if (io) emitirTenant(req, 'cita:eliminada', { type: 'cita:eliminada', payload: { id: Number(req.params.id) } });
     return res.json({ success: true, message: 'Cita eliminada.' });
   } catch (err) { next(err); }
 });

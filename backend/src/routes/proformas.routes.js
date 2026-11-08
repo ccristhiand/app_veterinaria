@@ -17,6 +17,7 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { filtroSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 const ROLES  = ['admin', 'recepcionista', 'veterinario_recepcionista'];
@@ -65,18 +66,6 @@ function fechaValida(s) {
 }
 
 function tz(req) { return req.tenant?.zona_horaria || 'America/Lima'; }
-
-// ── Helpers de sede (mismo criterio que facturas) ─────────────────
-function getSedeFiltro(req) {
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (req.user.rol === 'admin') return header || null;
-  return req.user.sede_id || header || null;
-}
-
-function sedeSQL(sedeId, col = 'sede_id') {
-  if (!sedeId) return { sql: '', params: [] };
-  return { sql: `AND ${col} = ?`, params: [sedeId] };
-}
 
 // ── Marcar como vencidas las proformas cuyo plazo pasó ────────────
 async function marcarVencidas(db, hoy) {
@@ -259,7 +248,7 @@ router.get('/resumen', async (req, res, next) => {
 
     const desde = fechaValida(req.query.desde) ? req.query.desde : hoy.slice(0, 8) + '01';
     const hasta = fechaValida(req.query.hasta) ? req.query.hasta : hoy;
-    const { sql: sf, params: sp } = sedeSQL(getSedeFiltro(req), 'sede_id');
+    const { sql: sf, params: sp } = filtroSede(req, 'sede_id');
 
     const [r] = await req.db.query(
       `SELECT
@@ -327,7 +316,7 @@ router.get('/', async (req, res, next) => {
                       OR CONCAT(pr.nombre,' ',pr.apellido) LIKE ? OR pr.dni LIKE ? OR m.nombre LIKE ?)`;
       params.push(q, q, q, q, q, q);
     }
-    const { sql: sf, params: sp } = sedeSQL(getSedeFiltro(req), 'p.sede_id');
+    const { sql: sf, params: sp } = filtroSede(req, 'p.sede_id');
     where += ` ${sf}`; params.push(...sp);
 
     const [{ total }] = await req.db.query(
@@ -362,6 +351,7 @@ router.get('/:id', async (req, res, next) => {
     await marcarVencidas(req.db, hoyLima(tz(req)));
     const pf = await obtenerProforma(req.db, req.params.id);
     if (!pf) return res.status(404).json({ success: false, message: 'Proforma no encontrada.' });
+    exigirAcceso(req, pf.sede_id);
     return res.json({ success: true, data: pf });
   } catch (err) { next(err); }
 });
@@ -380,8 +370,7 @@ router.post('/', auditMiddleware('proformas:creado', 'proformas'), async (req, r
       notas, condiciones,
     } = req.body;
 
-    const sedeId = req.user.sede_id ||
-                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    const sedeId = sedeEscritura(req);
     const fecha  = fechaValida(req.body.fecha) ? req.body.fecha : hoyLima(tz(req));
 
     const result = await req.db.withTransaction(async (conn) => {
@@ -428,8 +417,9 @@ router.post('/', auditMiddleware('proformas:creado', 'proformas'), async (req, r
 // ══════════════════════════════════════════════════════════════════
 router.put('/:id', auditMiddleware('proformas:actualizado', 'proformas'), async (req, res, next) => {
   try {
-    const [actual] = await req.db.query('SELECT id, estado FROM proformas WHERE id = ?', [req.params.id]);
+    const [actual] = await req.db.query('SELECT id, estado, sede_id FROM proformas WHERE id = ?', [req.params.id]);
     if (!actual) return res.status(404).json({ success: false, message: 'Proforma no encontrada.' });
+    exigirAcceso(req, actual.sede_id);
     if (!['borrador', 'enviada', 'vencida'].includes(actual.estado)) {
       return res.status(422).json({
         success: false,
@@ -490,10 +480,11 @@ router.patch('/:id/estado', auditMiddleware('proformas:estado', 'proformas'), as
   try {
     const { estado, motivo_rechazo } = req.body;
     const [pf] = await req.db.query(
-      "SELECT id, numero, estado, DATE_FORMAT(validez_hasta,'%Y-%m-%d') AS validez_hasta FROM proformas WHERE id = ?",
+      "SELECT id, numero, estado, sede_id, DATE_FORMAT(validez_hasta,'%Y-%m-%d') AS validez_hasta FROM proformas WHERE id = ?",
       [req.params.id]
     );
     if (!pf) return res.status(404).json({ success: false, message: 'Proforma no encontrada.' });
+    exigirAcceso(req, pf.sede_id);
 
     const permitidos = TRANSICIONES[pf.estado] || [];
     if (!permitidos.includes(estado)) {
@@ -538,9 +529,9 @@ router.post('/:id/duplicar', auditMiddleware('proformas:duplicado', 'proformas')
   try {
     const orig = await obtenerProforma(req.db, req.params.id);
     if (!orig) return res.status(404).json({ success: false, message: 'Proforma no encontrada.' });
+    exigirAcceso(req, orig.sede_id);
 
-    const sedeId = req.user.sede_id ||
-                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null) || orig.sede_id;
+    const sedeId = req.sede.activa || orig.sede_id;
     const fecha  = hoyLima(tz(req));
 
     const result = await req.db.withTransaction(async (conn) => {
@@ -587,9 +578,10 @@ router.post('/:id/duplicar', auditMiddleware('proformas:duplicado', 'proformas')
 router.delete('/:id', auditMiddleware('proformas:eliminado', 'proformas'), async (req, res, next) => {
   try {
     const [pf] = await req.db.query(
-      'SELECT id, numero, estado, creado_por_id FROM proformas WHERE id = ?', [req.params.id]
+      'SELECT id, numero, estado, creado_por_id, sede_id FROM proformas WHERE id = ?', [req.params.id]
     );
     if (!pf) return res.status(404).json({ success: false, message: 'Proforma no encontrada.' });
+    exigirAcceso(req, pf.sede_id);
     if (pf.estado !== 'borrador') {
       return res.status(422).json({
         success: false,

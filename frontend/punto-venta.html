@@ -119,7 +119,6 @@
       <p>Ventas de mostrador<span class="pv-atajos"> · <span class="pv-kbd">F2</span> buscar · <span class="pv-kbd">F4</span> cobrar · <span class="pv-kbd">Esc</span> vaciar</span></p>
     </div>
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <div id="selector-sede-pv"></div>
       <button onclick="pvToggleVentas()" class="vbtn vbtn-ghost">🧾 Ventas de hoy <span id="pv-hoy-total" style="font-weight:800;color:var(--green-700);margin-left:.3rem"></span></button>
     </div>
   </div>
@@ -373,10 +372,8 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
     document.getElementById('pv-igv-lbl').firstChild.textContent = 'IGV (' + igv + '%) ';
   } catch (e) { toast('Error de conexión.', 'danger'); }
 
-  try {
-    initSelectorSede('selector-sede-pv', function () { pvCargarFavoritos(); pvCargarVentasHoy(); },
-      { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
-  } catch (e) {}
+  // Se vende desde una sede concreta: su stock y su caja
+  exigirSedeEnPantalla('El Punto de Venta trabaja con el stock de una sede. Elige en cuál vas a vender.');
 
   pvCargarFavoritos();
   pvCargarVentasHoy();

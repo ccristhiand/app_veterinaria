@@ -46,17 +46,15 @@
 <div id="main-content" class="page">
 
   <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
-    <div id="selector-sede-caja" style="display:none"></div>
     <div><h2>🏦 Cierre de Caja</h2><p>Control de ingresos y conteo de efectivo</p></div>
     <button onclick="imprimirComprobante()" class="vbtn vbtn-ghost">🖨️ Imprimir</button>
   </div>
-  <!-- Banner sede activa -->
-  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:var(--green-700)">
-    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
-  </div>
 
+
+  <div id="aviso-consolidado" style="display:none;margin-bottom:1rem;padding:.7rem 1.1rem;background:#fffbeb;
+    border:1px solid #fde68a;border-radius:.85rem;font-size:.8rem;font-weight:600;color:#b45309">
+    Estás viendo todas las sedes. Para guardar o cerrar la caja, elige una sede en la barra superior.
+  </div>
 
   <!-- Tabs -->
   <div style="display:flex;gap:.2rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
@@ -187,7 +185,7 @@
           </div>
 
           <!-- Gastos (registrados en el módulo Gastos diarios) -->
-          <div>
+          <div id="bloque-gastos-caja">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
               <label class="vlabel" style="margin:0">💸 Gastos del día</label>
               <a id="link-registrar-gasto" href="gastos.html" class="vlink" style="font-size:.75rem;color:var(--green-600)">
@@ -256,7 +254,7 @@
 
         <!-- Botones -->
         <div style="display:flex;gap:.6rem;margin-top:1rem">
-          <button onclick="guardarCierre(false)" class="vbtn vbtn-ghost" style="flex:1">
+          <button onclick="guardarCierre(false)" class="vbtn vbtn-ghost" style="flex:1" id="btn-borrador">
             💾 Guardar borrador
           </button>
           <button onclick="guardarCierre(true)" class="vbtn vbtn-primary" style="flex:1" id="btn-cerrar">
@@ -324,16 +322,6 @@ const getSim = () => _empresaCaja.simbolo_moneda || 'S/.';
 
 document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'caja', title:'Cierre de Caja', subtitle:'Control de efectivo' });
-
-  // ── Mostrar sede activa en el banner ──────────────────────────
-  var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
-  if (_userSede.sede_nombre) {
-    var _bannerEl = document.getElementById('banner-sede');
-    if (_bannerEl) {
-      _bannerEl.style.display = 'block';
-      document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
-    }
-  }
 
   // Cargar config de empresa para símbolo moneda
   api('/empresa').then(res => {
@@ -419,8 +407,23 @@ async function cargarResumen() {
     document.getElementById('link-registrar-gasto').href = `gastos.html?fecha=${fecha}`;
     document.getElementById('link-registrar-gasto').style.display = ec?.estado === 'cerrado' ? 'none' : '';
     renderGastosCaja(d);
+    aplicarModoCaja(d);
     calcularDiferencia();
   } catch(e) { console.error(e); }
+}
+
+// "Todas las sedes" es solo consulta; y los gastos pueden estar apagados en Configuración
+function aplicarModoCaja(d) {
+  document.getElementById('aviso-consolidado').style.display = d.consolidado ? 'block' : 'none';
+  if (d.consolidado) {
+    document.getElementById('btn-cerrar').disabled = true;
+    document.getElementById('btn-borrador').disabled = true;
+  } else {
+    document.getElementById('btn-borrador').disabled = false;
+  }
+  const afectan = d.gastos_afectan_caja !== false;
+  document.getElementById('bloque-gastos-caja').style.display = afectan ? '' : 'none';
+  document.getElementById('det-gastos').parentElement.style.display = afectan ? 'flex' : 'none';
 }
 
 // Gastos del día (solo lectura) + su efecto sobre cada método de pago

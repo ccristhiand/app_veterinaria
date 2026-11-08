@@ -3,22 +3,12 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { emitirSala } = require('../sockets/emitir');
+
+const { filtroSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 router.use(authenticate);
-
-// ── Helper: filtro de sede ────────────────────────────────────────
-function getSedeFiltro(req) {
-  const user   = req.user;
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (user.rol === 'admin') return header || null;
-  return user.sede_id || header || null;
-}
-
-function sedeSQL(sedeId, col = 'sede_id') {
-  if (!sedeId) return { sql: '', params: [] };
-  return { sql: `AND ${col} = ?`, params: [sedeId] };
-}
 
 // ── GET /api/v1/facturas/resumen ──────────────────────────────────
 router.get('/resumen', async (req, res, next) => {
@@ -26,9 +16,8 @@ router.get('/resumen', async (req, res, next) => {
     const { desde, hasta } = req.query;
     const hoy    = desde || new Date().toISOString().split('T')[0];
     const hasta_ = hasta || hoy;
-    const sedeId = getSedeFiltro(req);
-    const { sql: sf,  params: sp  } = sedeSQL(sedeId, 'sede_id');
-    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
+    const { sql: sf,  params: sp  } = filtroSede(req, 'sede_id');
+    const { sql: sff, params: spf } = filtroSede(req, 'f.sede_id');
 
     const [totales] = await req.db.query(
       `SELECT
@@ -85,7 +74,6 @@ router.get('/', async (req, res, next) => {
     const { fecha, estado, tipo, propietario_id, page = 1, limit = 30 } = req.query;
     const limitN  = Math.min(parseInt(limit) || 30, 100);
     const offsetN = (Math.max(parseInt(page) || 1, 1) - 1) * limitN;
-    const sedeId  = getSedeFiltro(req);
 
     let sql = `
       SELECT f.id, f.numero, f.tipo, f.fecha,
@@ -109,7 +97,8 @@ router.get('/', async (req, res, next) => {
       WHERE 1=1`;
     const params = [];
 
-    if (sedeId) { const _sf = sedeSQL(sedeId, 'f.sede_id'); sql += ' ' + _sf.sql; params.push(..._sf.params); }
+    const _sf = filtroSede(req, 'f.sede_id');
+    sql += ' ' + _sf.sql; params.push(..._sf.params);
     if (fecha)          { sql += ' AND f.fecha = ?';            params.push(fecha); }
     if (estado)         { sql += ' AND f.estado = ?';           params.push(estado); }
     if (tipo)           { sql += ' AND f.tipo = ?';             params.push(tipo); }
@@ -152,6 +141,7 @@ router.get('/:id', async (req, res, next) => {
       'SELECT * FROM factura_pagos WHERE factura_id = ? ORDER BY id', [req.params.id]
     );
 
+    exigirAcceso(req, factura.sede_id);
     return res.json({ success: true, data: { ...factura, items, pagos } });
   } catch (err) { next(err); }
 });
@@ -183,8 +173,7 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
         return res.status(422).json({ success: false, message: 'Para emitir una factura se requiere la razón social.' });
     }
 
-    const sedeId = req.user.sede_id ||
-                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    const sedeId = sedeEscritura(req);
 
     const result = await req.db.withTransaction(async (conn) => {
       // ── Proforma de origen: bloquear y validar ─────────────────
@@ -206,8 +195,11 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
       for (const it of items) {
         if (it.inventario_id) {
           const [[inv]] = await conn.execute(
-            'SELECT nombre, cantidad, unidad FROM inventario WHERE id = ?', [it.inventario_id]
+            'SELECT nombre, cantidad, unidad, sede_id FROM inventario WHERE id = ?', [it.inventario_id]
           );
+          if (inv && inv.sede_id && inv.sede_id !== sedeId) {
+            throw Object.assign(new Error(`"${inv.nombre}" pertenece a otra sede y no se puede vender desde la sede seleccionada.`), { status: 422 });
+          }
           if (inv && parseFloat(it.cantidad) > parseFloat(inv.cantidad)) {
             throw Object.assign(
               new Error(`Stock insuficiente para "${inv.nombre}": solicitado ${it.cantidad} ${inv.unidad||''}, disponible ${inv.cantidad} ${inv.unidad||''}.`),
@@ -389,11 +381,11 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
             const io = req.app.get('io');
             if (io) {
               const payload = { id: invId, nombre: inv.nombre, cantidad: inv.cantidad, unidad: inv.unidad };
-              io.to('sala:admin').emit('inventario:actualizado', payload);
-              io.to('sala:veterinarios').emit('inventario:actualizado', payload);
-              io.to('sala:recepcionistas').emit('inventario:actualizado', payload);
+              emitirSala(req, 'sala:admin', 'inventario:actualizado', payload);
+              emitirSala(req, 'sala:veterinarios', 'inventario:actualizado', payload);
+              emitirSala(req, 'sala:recepcionistas', 'inventario:actualizado', payload);
               if (parseFloat(inv.cantidad) < parseFloat(inv.stock_minimo)) {
-                io.to('sala:admin').emit('notif:stock_minimo', {
+                emitirSala(req, 'sala:admin', 'notif:stock_minimo', {
                   nombre: inv.nombre, cantidad: inv.cantidad,
                   stock_minimo: inv.stock_minimo, unidad: inv.unidad,
                 });
@@ -432,8 +424,9 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
 router.patch('/:id/pagar', auditMiddleware('facturacion:pago_registrado', 'facturacion'), async (req, res, next) => {
   try {
     const { pagos = [], metodo_pago } = req.body;
-    const [fac] = await req.db.query('SELECT id, estado, total FROM facturas WHERE id = ?', [req.params.id]);
+    const [fac] = await req.db.query('SELECT id, estado, total, sede_id FROM facturas WHERE id = ?', [req.params.id]);
     if (!fac)                     return res.status(404).json({ success: false, message: 'Factura no encontrada.' });
+    exigirAcceso(req, fac.sede_id);
     if (fac.estado === 'anulado') return res.status(422).json({ success: false, message: 'No se puede pagar una factura anulada.' });
     if (fac.estado === 'pagado')  return res.status(422).json({ success: false, message: 'La factura ya está pagada.' });
 
@@ -475,12 +468,13 @@ router.patch('/:id/anular', authorize('admin'), auditMiddleware('facturacion:anu
       return res.status(422).json({ success: false, message: 'El motivo de anulación es obligatorio.' });
 
     const [fac] = await req.db.query(
-      `SELECT f.id, f.estado, f.numero, f.total, f.tipo,
+      `SELECT f.id, f.estado, f.numero, f.total, f.tipo, f.sede_id,
               CONCAT(p.nombre,' ',p.apellido) AS cliente
        FROM facturas f JOIN propietarios p ON p.id = f.propietario_id
        WHERE f.id = ?`, [req.params.id]
     );
     if (!fac)                       return res.status(404).json({ success: false, message: 'Factura no encontrada.' });
+    exigirAcceso(req, fac.sede_id);
     if (fac.estado === 'anulado')   return res.status(422).json({ success: false, message: 'Ya está anulada.' });
 
     await req.db.query(
@@ -516,9 +510,9 @@ router.patch('/:id/anular', authorize('admin'), auditMiddleware('facturacion:anu
         );
         if (inv) {
           const payload = { id: item.inventario_id, nombre: inv.nombre, cantidad: inv.cantidad, unidad: inv.unidad };
-          io.to('sala:admin').emit('inventario:actualizado', payload);
-          io.to('sala:veterinarios').emit('inventario:actualizado', payload);
-          io.to('sala:recepcionistas').emit('inventario:actualizado', payload);
+          emitirSala(req, 'sala:admin', 'inventario:actualizado', payload);
+          emitirSala(req, 'sala:veterinarios', 'inventario:actualizado', payload);
+          emitirSala(req, 'sala:recepcionistas', 'inventario:actualizado', payload);
         }
       }
     }
@@ -532,7 +526,7 @@ router.patch('/:id/anular', authorize('admin'), auditMiddleware('facturacion:anu
       );
     }
     if (io) {
-      io.to('sala:admin').emit('notif:anulacion', {
+      emitirSala(req, 'sala:admin', 'notif:anulacion', {
         tipo: 'anulacion', titulo: '🚫 Documento anulado',
         mensaje, numero: fac.numero, total: fac.total,
       });

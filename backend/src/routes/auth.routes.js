@@ -4,6 +4,7 @@ const { Router }   = require('express');
 const bcrypt       = require('bcryptjs');
 const { signTokens, authenticate } = require('../middlewares/auth.middleware');
 const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.middleware');
+const { contextoSede } = require('../services/sede.service');
 
 const router = Router();
 
@@ -15,6 +16,12 @@ async function getSedeUsuario(db, sedeId) {
     [sedeId]
   ).catch(() => [null]);
   return sede || null;
+}
+
+// Sedes a las que entra el usuario, para el selector del menú
+async function datosSedes(db, user) {
+  const ctx = await contextoSede(db, user);
+  return { sedes: ctx.disponibles, sede_principal_id: ctx.principal };
 }
 
 // POST /api/v1/auth/login
@@ -59,7 +66,7 @@ router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), 
     // ── CAMBIO: buscar la sede del usuario ───────────────────────
     const sede = await getSedeUsuario(req.db, user.sede_id);
 
-    const { accessToken, refreshToken } = signTokens(user);
+    const { accessToken, refreshToken } = signTokens(user, req.tenant?.subdominio);
     auditAuth('login:exitoso', req.tenant?.id, req.tenant?.nombre_clinica, user, req.ip, req.headers['user-agent']);
 
     return res.json({
@@ -76,6 +83,7 @@ router.post('/login', auditMiddleware('autenticacion:creado', 'autenticacion'), 
           sede_id    : user.sede_id || null,
           sede_nombre: sede?.nombre || null,
           sede_ciudad: sede?.ciudad || null,
+          ...(await datosSedes(req.db, user)),
         },
       },
     });
@@ -141,7 +149,7 @@ router.post('/change-password', auditMiddleware('autenticacion:creado', 'autenti
       'SELECT id, nombre, email, rol, sede_id FROM usuarios WHERE id=?', [userId]
     );
     const sede = await getSedeUsuario(req.db, user.sede_id);
-    const { accessToken, refreshToken } = signTokens(user);
+    const { accessToken, refreshToken } = signTokens(user, req.tenant?.subdominio);
 
     return res.json({
       success: true,
@@ -157,6 +165,7 @@ router.post('/change-password', auditMiddleware('autenticacion:creado', 'autenti
           sede_id    : user.sede_id || null,
           sede_nombre: sede?.nombre || null,
           sede_ciudad: sede?.ciudad || null,
+          ...(await datosSedes(req.db, user)),
         },
       },
     });
@@ -179,7 +188,7 @@ router.post('/refresh', auditMiddleware('autenticacion:creado', 'autenticacion')
     );
     if (!user) return res.status(401).json({ success: false, message: 'Usuario no válido.' });
 
-    const tokens = signTokens(user);
+    const tokens = signTokens(user, req.tenant?.subdominio);
     return res.json({ success: true, ...tokens });
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {

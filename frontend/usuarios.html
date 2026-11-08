@@ -141,16 +141,17 @@
           </select>
         </div>
 
-        <!-- ── NUEVO: Selector de sede ── -->
-        <div>
-          <label class="vlabel">Sede *</label>
-          <select id="u-sede" class="vinput">
-            <option value="">Cargando sedes…</option>
-          </select>
+        <!-- Sedes del usuario -->
+        <div class="sm:col-span-2" id="u-sedes-wrap">
+          <label class="vlabel">Sedes con acceso *</label>
+          <div id="u-sedes" style="border:1px solid var(--line);border-radius:.8rem;padding:.25rem .8rem;max-height:190px;overflow-y:auto"></div>
           <p style="font-size:.65rem;color:var(--ink-faint);margin-top:.25rem">
-            El usuario solo verá datos de esta sede al iniciar sesión
+            Marca una o varias. La <b>principal</b> es con la que entra al iniciar sesión.
           </p>
         </div>
+        <p class="sm:col-span-2" id="u-sedes-admin" style="display:none;font-size:.76rem;color:var(--ink-soft);background:var(--green-50);border:1px solid var(--green-200);border-radius:.7rem;padding:.55rem .8rem">
+          👑 El administrador tiene acceso a todas las sedes.
+        </p>
 
         <div class="sm:col-span-2">
           <label class="vlabel" id="pass-label">Password * (mín. 8 caracteres)</label>
@@ -173,8 +174,8 @@
           text-transform:uppercase;letter-spacing:.1em">ℹ️ Permisos por rol</p>
         <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.74rem;color:var(--ink-soft)">
           <p>👑 <b>Admin</b> — Acceso total, ve todas las sedes</p>
-          <p>🩺 <b>Veterinario</b> — Citas, historia clínica, vacunas. Solo su sede</p>
-          <p>💁 <b>Recepcionista</b> — Citas, propietarios, mascotas. Solo su sede</p>
+          <p>🩺 <b>Veterinario</b> — Citas, historia clínica, vacunas. Solo sus sedes</p>
+          <p>💁 <b>Recepcionista</b> — Citas, propietarios, mascotas. Solo sus sedes</p>
         </div>
       </div>
     </div>
@@ -212,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  document.getElementById('u-rol').addEventListener('change', ajustarSedesPorRol);
   cargarSedes();
   cargarLimite();
   cargar();
@@ -224,26 +226,48 @@ async function cargarSedes() {
     var res = await api('/sedes?activo=true');
     if (!res?.ok) return;
     sedesDisponibles = (await res.json()).data || [];
-    poblarSelectSede(null);
+    pintarSedesUsuario([], null);
   } catch {}
 }
 
-function poblarSelectSede(sedeIdSeleccionada) {
-  var sel = document.getElementById('u-sede');
-  sel.innerHTML = '';
-
+// Lista de sedes del formulario: casilla de acceso + cuál es la principal
+function pintarSedesUsuario(ids, principal) {
+  var cont = document.getElementById('u-sedes');
   if (!sedesDisponibles.length) {
-    sel.innerHTML = '<option value="">Sin sedes disponibles</option>';
+    cont.innerHTML = '<p style="font-size:.78rem;color:var(--ink-faint);padding:.5rem 0">Sin sedes disponibles</p>';
     return;
   }
+  cont.innerHTML = sedesDisponibles.map(function(s) {
+    var marcada = ids.indexOf(s.id) > -1;
+    return '<div style="display:flex;align-items:center;gap:.6rem;padding:.42rem 0;border-bottom:1px dashed var(--line)">' +
+      '<label style="flex:1;display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.82rem;font-weight:600">' +
+        '<input type="checkbox" class="u-sede-check" value="' + s.id + '"' + (marcada ? ' checked' : '') +
+          ' onchange="sedeMarcada(this)" style="width:16px;height:16px;accent-color:var(--green-600)"/>' +
+        esc(s.nombre) + (s.ciudad ? ' <span style="font-weight:400;color:var(--ink-faint)">— ' + esc(s.ciudad) + '</span>' : '') +
+      '</label>' +
+      '<label style="display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:var(--ink-soft);cursor:pointer">' +
+        '<input type="radio" name="u-sede-principal" value="' + s.id + '"' + (s.id === principal ? ' checked' : '') +
+          (marcada ? '' : ' disabled') + ' style="accent-color:var(--green-600)"/>Principal' +
+      '</label>' +
+    '</div>';
+  }).join('');
+}
 
-  sedesDisponibles.forEach(function(s) {
-    var opt = document.createElement('option');
-    opt.value       = s.id;
-    opt.textContent = s.nombre + (s.ciudad ? ' — ' + s.ciudad : '') + (s.es_principal ? ' ⭐' : '');
-    if (String(s.id) === String(sedeIdSeleccionada)) opt.selected = true;
-    sel.appendChild(opt);
-  });
+function sedeMarcada(check) {
+  var radio = document.querySelector('input[name="u-sede-principal"][value="' + check.value + '"]');
+  radio.disabled = !check.checked;
+  if (!check.checked) radio.checked = false;
+  if (!document.querySelector('input[name="u-sede-principal"]:checked')) {
+    var primera = document.querySelector('input[name="u-sede-principal"]:not(:disabled)');
+    if (primera) primera.checked = true;
+  }
+}
+
+// El administrador entra a todas: no se le asignan sedes
+function ajustarSedesPorRol() {
+  var esAdminForm = document.getElementById('u-rol').value === 'admin';
+  document.getElementById('u-sedes-wrap').style.display  = esAdminForm ? 'none' : '';
+  document.getElementById('u-sedes-admin').style.display = esAdminForm ? 'block' : 'none';
 }
 
 // ── Cargar límite ─────────────────────────────────────────────────
@@ -341,10 +365,12 @@ async function cargar() {
         '</td>' +
         // ── NUEVO: columna sede ──
         '<td class="hidden md:table-cell">' +
-          (u.sede_nombre
+          (u.rol === 'admin'
+            ? '<span style="font-size:.72rem;color:var(--ink-soft)">Todas</span>'
+            : (u.sedes_nombres || u.sede_nombre)
             ? '<span style="font-size:.74rem;font-weight:600;color:var(--ink-soft);' +
                 'background:var(--green-50);border:1px solid var(--green-200);border-radius:.5rem;' +
-                'padding:.2rem .55rem;display:inline-block">🏥 ' + esc(u.sede_nombre) + '</span>'
+                'padding:.2rem .55rem;display:inline-block">🏥 ' + esc(u.sedes_nombres || u.sede_nombre) + '</span>'
             : '<span style="font-size:.72rem;color:var(--ink-faint)">—</span>') +
         '</td>' +
         '<td class="hidden sm:table-cell" style="font-size:.75rem;color:var(--ink-faint)">' +
@@ -394,8 +420,10 @@ function abrirModalNuevo() {
   document.getElementById('u-rol').value      = 'recepcionista';
   document.getElementById('pass-label').textContent   = 'Password * (mín. 8 caracteres)';
   document.getElementById('pass-hint').style.display  = 'none';
-  // Sede: seleccionar la primera por defecto (normalmente la principal)
-  poblarSelectSede(sedesDisponibles[0]?.id || null);
+  // Por defecto, la primera sede (normalmente la principal)
+  var _primera = sedesDisponibles[0]?.id || null;
+  pintarSedesUsuario(_primera ? [_primera] : [], _primera);
+  ajustarSedesPorRol();
   openModal('modal-usuario');
   setTimeout(function() { document.getElementById('u-nombre').focus(); }, 150);
 }
@@ -418,8 +446,9 @@ async function abrirModalEditar(id) {
     document.getElementById('u-nombre').value = u.nombre || '';
     document.getElementById('u-email').value  = u.email  || '';
     document.getElementById('u-rol').value    = u.rol    || 'recepcionista';
-    // ── NUEVO: cargar sede actual del usuario ──
-    poblarSelectSede(u.sede_id || null);
+    var _ids = u.sede_ids && u.sede_ids.length ? u.sede_ids : (u.sede_id ? [u.sede_id] : []);
+    pintarSedesUsuario(_ids, u.sede_id || _ids[0] || null);
+    ajustarSedesPorRol();
   } catch { toast('Error de conexión.', 'danger'); }
 }
 
@@ -429,16 +458,18 @@ async function guardarUsuario() {
   var nombre    = document.getElementById('u-nombre').value.trim();
   var email     = document.getElementById('u-email').value.trim();
   var rol       = document.getElementById('u-rol').value;
-  var sede_id   = document.getElementById('u-sede').value;
+  var sede_ids  = rol === 'admin' ? [] : Array.from(document.querySelectorAll('.u-sede-check:checked')).map(function(c) { return parseInt(c.value); });
+  var _radio    = document.querySelector('input[name="u-sede-principal"]:checked');
+  var sede_id   = rol === 'admin' ? null : (_radio ? parseInt(_radio.value) : (sede_ids[0] || null));
   var password  = document.getElementById('u-password').value;
 
   if (!nombre)   { toast('El nombre es obligatorio.', 'warning'); return; }
   if (!email)    { toast('El email es obligatorio.', 'warning'); return; }
-  if (!sede_id)  { toast('Debes seleccionar una sede.', 'warning'); return; }
+  if (rol !== 'admin' && !sede_ids.length) { toast('Selecciona al menos una sede.', 'warning'); return; }
   if (!esEdicion && !password) { toast('El password es obligatorio.', 'warning'); return; }
   if (password && password.length < 8) { toast('El password debe tener al menos 8 caracteres.', 'warning'); return; }
 
-  var body = { nombre, email, rol, sede_id: parseInt(sede_id) };
+  var body = { nombre, email, rol, sede_id, sede_ids };
   if (password) body.password = password;
 
   var url    = esEdicion ? '/usuarios/' + usuarioEditandoId : '/usuarios';

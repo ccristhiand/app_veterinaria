@@ -24,19 +24,6 @@ function hoyTenant(req) {
   }).format(new Date());
 }
 
-/** Sede con la que se registra un gasto (misma regla que el cierre de caja) */
-function sedeEscritura(req) {
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id'], 10) : null;
-  return req.user.sede_id || header || null;
-}
-
-/** Sede para consultar: el admin ve la sede elegida (o todas); el resto, la suya */
-function sedeLectura(req) {
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id'], 10) : null;
-  if (req.user.rol === 'admin') return header || null;
-  return req.user.sede_id || header || null;
-}
-
 const SELECT_GASTO = `
   SELECT g.*, DATE_FORMAT(g.fecha, '%Y-%m-%d') AS fecha,
          gc.nombre AS categoria_nombre, gc.icono AS categoria_icono, gc.color AS categoria_color,
@@ -52,13 +39,24 @@ const SELECT_GASTO = `
  * Gastos que corresponden a un cierre: del día y la sede, no anulados,
  * todavía sin cierre o ya ligados a este mismo cierre.
  */
-async function gastosParaCierre(q, { fecha, sedeId, cierreId }) {
-  const params = [fecha, cierreId || 0];
-  let sql = `${SELECT_GASTO}
-    WHERE g.fecha = ? AND g.anulado = 0 AND (g.cierre_id IS NULL OR g.cierre_id = ?)`;
-  if (sedeId) { sql += ' AND g.sede_id = ?'; params.push(sedeId); }
-  sql += ' ORDER BY g.created_at ASC';
-  return q(sql, params);
+async function gastosParaCierre(q, { fecha, filtro, cierreId }) {
+  return q(
+    `${SELECT_GASTO}
+     WHERE g.fecha = ? AND g.anulado = 0 AND (g.cierre_id IS NULL OR g.cierre_id = ?) ${filtro.sql}
+     ORDER BY g.created_at ASC`,
+    [fecha, cierreId || 0, ...filtro.params]
+  );
+}
+
+/** Configuración de la clínica: ¿los gastos se descuentan en el cierre de caja? */
+async function gastosAfectanCaja(q) {
+  try {
+    const [cfg] = await q('SELECT gastos_afectan_caja FROM empresa_config LIMIT 1');
+    return cfg ? !!cfg.gastos_afectan_caja : true;
+  } catch (e) {
+    if (e.code === 'ER_BAD_FIELD_ERROR') return true;   // clínica aún sin migración v22
+    throw e;
+  }
 }
 
 /** { efectivo, tarjeta, transferencia, yape, plin, total } con 2 decimales */
@@ -75,14 +73,14 @@ function totalesPorMetodo(gastos) {
 
 /** ¿La caja de ese día/sede ya se cerró por completo? (día completo, o mañana + tarde) */
 async function cajaCerradaDelDia(q, { fecha, sedeId }) {
-  const params = [fecha];
-  let sql = "SELECT DISTINCT turno FROM caja_cierres WHERE fecha = ? AND estado = 'cerrado'";
-  if (sedeId) { sql += ' AND sede_id = ?'; params.push(sedeId); }
-  const turnos = (await q(sql, params)).map(r => r.turno);
+  const turnos = (await q(
+    "SELECT DISTINCT turno FROM caja_cierres WHERE fecha = ? AND estado = 'cerrado' AND sede_id = ?",
+    [fecha, sedeId]
+  )).map(r => r.turno);
   return turnos.includes('dia_completo') || (turnos.includes('mañana') && turnos.includes('tarde'));
 }
 
 module.exports = {
-  METODOS_PAGO, SELECT_GASTO, qConn, hoyTenant, sedeEscritura, sedeLectura,
-  gastosParaCierre, totalesPorMetodo, cajaCerradaDelDia,
+  METODOS_PAGO, SELECT_GASTO, qConn, hoyTenant,
+  gastosParaCierre, gastosAfectanCaja, totalesPorMetodo, cajaCerradaDelDia,
 };

@@ -3,30 +3,25 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { emitirSala } = require('../sockets/emitir');
+
+const { filtroSede, sedeEscritura, sedeDestino, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 router.use(authenticate);
-
-// ── Helper: filtro de sede ────────────────────────────────────────
-function getSedeFiltro(req) {
-  const user   = req.user;
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (user.rol === 'admin') return header || null;
-  return user.sede_id || header || null;
-}
 
 // ── GET /api/v1/inventario ────────────────────────────────────────
 router.get('/', async (req, res, next) => {
   try {
     const { categoria, bajo, search, vencimiento, page = 1, limit = 50 } = req.query;
-    const sedeId  = getSedeFiltro(req);
     const limitN  = Math.min(parseInt(limit) || 50, 500);
     const offsetN = (Math.max(parseInt(page) || 1, 1) - 1) * limitN;
 
     let where  = 'WHERE 1=1';
     const params = [];
 
-    if (sedeId)       { where += ' AND (i.sede_id = ? OR i.sede_id IS NULL)'; params.push(sedeId); }
+    const fs = filtroSede(req, 'i.sede_id');
+    where += ` ${fs.sql}`; params.push(...fs.params);
     if (categoria)    { where += ' AND i.categoria = ?';             params.push(categoria); }
     if (bajo === '1') { where += ' AND i.cantidad < i.stock_minimo'; }
     if (search)       { where += ' AND i.nombre LIKE ?';             params.push(`%${search}%`); }
@@ -74,9 +69,7 @@ router.get('/', async (req, res, next) => {
 // Para el dashboard: cuántos vencidos y por vencer
 router.get('/alertas-vencimiento', async (req, res, next) => {
   try {
-    const sedeId = getSedeFiltro(req);
-    let sf = sedeId ? 'AND sede_id = ?' : '';
-    const p = sedeId ? [sedeId] : [];
+    const { sql: sf, params: p } = filtroSede(req, 'sede_id');
 
     const [vencidos] = await req.db.query(
       `SELECT COUNT(*) AS total FROM inventario
@@ -130,6 +123,7 @@ router.get('/:id', async (req, res, next) => {
        WHERE i.id = ?`, [req.params.id]
     );
     if (!row) return res.status(404).json({ success: false, message: 'Ítem no encontrado.' });
+    exigirAcceso(req, row.sede_id);
     return res.json({ success: true, data: row });
   } catch (err) { next(err); }
 });
@@ -141,7 +135,7 @@ router.post('/bulk', authorize('admin', 'veterinario', 'recepcionista'), async (
     if (!items.length)       return res.status(422).json({ success: false, message: 'No se enviaron items.' });
     if (items.length > 10000) return res.status(422).json({ success: false, message: 'Máximo 10,000 items.' });
 
-    const sedeId    = req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
+    const sedeId    = sedeEscritura(req);
     const catValidas = ['medicamento','vacuna','insumo','alimento','accesorio','otro'];
     const validos = []; const errores = [];
 
@@ -216,8 +210,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
 
-    const sedeId = parseInt(sede_id) || req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-    if (!sedeId) return res.status(422).json({ success: false, message: 'Debes seleccionar una sede.' });
+    const sedeId = sedeDestino(req, sede_id);
 
     const result = await req.db.query(
       `INSERT INTO inventario
@@ -234,7 +227,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
 
     if (parseFloat(cantidad) < parseFloat(stock_minimo)) {
       const io = req.app.get('io');
-      if (io) io.to('sala:admin').emit('notif:stock_minimo', { nombre, cantidad, stock_minimo, unidad });
+      if (io) emitirSala(req, 'sala:admin', 'notif:stock_minimo', { nombre, cantidad, stock_minimo, unidad });
     }
 
     return res.status(201).json({ success: true, data: { id: result.insertId }, message: 'Ítem creado.' });
@@ -253,8 +246,10 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
 
-    const sedeIdPut = parseInt(sede_id) || req.user.sede_id || (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-    if (!sedeIdPut) return res.status(422).json({ success: false, message: 'Debes seleccionar una sede.' });
+    const [actual] = await req.db.query('SELECT sede_id FROM inventario WHERE id=?', [req.params.id]);
+    if (!actual) return res.status(404).json({ success: false, message: 'Ítem no encontrado.' });
+    exigirAcceso(req, actual.sede_id);
+    const sedeIdPut = sede_id ? sedeDestino(req, sede_id) : (actual.sede_id || sedeEscritura(req));
 
     await req.db.query(
       `UPDATE inventario SET
@@ -275,7 +270,7 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
     const minF  = parseFloat(stock_minimo)||5;
     if (cantF < minF) {
       const io = req.app.get('io');
-      if (io) io.to('sala:admin').emit('notif:stock_minimo', { nombre, cantidad: cantF, stock_minimo: minF, unidad });
+      if (io) emitirSala(req, 'sala:admin', 'notif:stock_minimo', { nombre, cantidad: cantF, stock_minimo: minF, unidad });
     }
 
     return res.json({ success: true, message: 'Ítem actualizado.' });
@@ -294,15 +289,16 @@ router.patch('/:id', authorize('admin','veterinario','recepcionista'), auditMidd
       return res.status(422).json({ success: false, message: 'Cantidad inválida.' });
 
     const [item] = await req.db.query(
-      'SELECT nombre, stock_minimo, unidad FROM inventario WHERE id=?', [req.params.id]
+      'SELECT nombre, stock_minimo, unidad, sede_id FROM inventario WHERE id=?', [req.params.id]
     );
     if (!item) return res.status(404).json({ success: false, message: 'Ítem no encontrado.' });
+    exigirAcceso(req, item.sede_id);
 
     await req.db.query('UPDATE inventario SET cantidad=?, updated_at=NOW() WHERE id=?', [cantF, req.params.id]);
 
     if (cantF < parseFloat(item.stock_minimo)) {
       const io = req.app.get('io');
-      if (io) io.to('sala:admin').emit('notif:stock_minimo', { nombre: item.nombre, cantidad: cantF, stock_minimo: item.stock_minimo, unidad: item.unidad });
+      if (io) emitirSala(req, 'sala:admin', 'notif:stock_minimo', { nombre: item.nombre, cantidad: cantF, stock_minimo: item.stock_minimo, unidad: item.unidad });
       const admins = await req.db.query("SELECT id FROM usuarios WHERE rol='admin' AND activo=1");
       for (const admin of admins) {
         await req.db.query(
@@ -322,6 +318,8 @@ router.patch('/:id', authorize('admin','veterinario','recepcionista'), auditMidd
 // ── DELETE /api/v1/inventario/:id ────────────────────────────────
 router.delete('/:id', authorize('admin'), auditMiddleware('inventario:eliminado','inventario'), async (req, res, next) => {
   try {
+    const [item] = await req.db.query('SELECT sede_id FROM inventario WHERE id=?', [req.params.id]);
+    if (item) exigirAcceso(req, item.sede_id);
     await req.db.query('DELETE FROM inventario WHERE id=?', [req.params.id]);
     return res.json({ success: true, message: 'Ítem eliminado.' });
   } catch (err) { next(err); }

@@ -71,12 +71,6 @@
     </div>
   </div>
 
-  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:var(--green-700)">
-    🏥 Sede: <span id="banner-sede-nombre"></span>
-  </div>
-
   <!-- Filtros -->
   <div class="vcard vcard-pad" style="margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end">
     <div><label class="vlabel">Desde</label><input type="date" id="f-desde" class="vinput" style="width:auto" onchange="cargarGastos()"/></div>
@@ -265,11 +259,6 @@ const hexBg = (hex, a) => { try { return hexToRgba(hex || '#64748b', a); } catch
 document.addEventListener('DOMContentLoaded', async () => {
   initPage({ activePage:'gastos', title:'Gastos diarios', subtitle:'Control de egresos' });
 
-  const u = JSON.parse(localStorage.getItem('vet_user') || '{}');
-  if (u.sede_nombre) {
-    document.getElementById('banner-sede').style.display = 'block';
-    document.getElementById('banner-sede-nombre').textContent = u.sede_nombre;
-  }
   if (esAdmin()) document.getElementById('btn-tipos').style.display = '';
 
   api('/empresa').then(r => r?.ok && r.json().then(d => { _sim = d.data?.simbolo_moneda || 'S/.'; }));
@@ -394,7 +383,7 @@ function renderTabla() {
       <td style="min-width:200px;max-width:320px" title="Registrado por ${esc(g.registrado_por)}">
         <p style="font-weight:600">${esc(g.descripcion)}</p>
         ${(g.proveedor || g.comprobante) ? `<p style="font-size:.68rem;color:var(--ink-faint)">${esc(g.proveedor || '')}${g.proveedor && g.comprobante ? ' · ' : ''}${g.comprobante ? 'N° ' + esc(g.comprobante) : ''}</p>` : ''}
-        ${g.sede_nombre && isAdmin() && !getSedeActiva() ? `<p style="font-size:.66rem;color:var(--ink-faint)">🏥 ${esc(g.sede_nombre)}</p>` : ''}
+        ${g.sede_nombre && !getSedeActiva() ? `<p style="font-size:.66rem;color:var(--ink-faint)">🏥 ${esc(g.sede_nombre)}</p>` : ''}
       </td>
       <td><span class="met-chip ${g.metodo_pago === 'efectivo' ? 'efectivo' : 'digital'}">${METODOS[g.metodo_pago]?.icon || ''} ${METODOS[g.metodo_pago]?.label || esc(g.metodo_pago)}</span></td>
       <td class="hidden xl:table-cell" style="font-size:.76rem;color:var(--ink-soft)">${esc(g.registrado_por)}</td>

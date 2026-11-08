@@ -13,9 +13,11 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { emitirTenant } = require('../sockets/emitir');
 const {
-  METODOS_PAGO, SELECT_GASTO, hoyTenant, sedeEscritura, sedeLectura, cajaCerradaDelDia,
+  METODOS_PAGO, SELECT_GASTO, hoyTenant, cajaCerradaDelDia, gastosAfectanCaja,
 } = require('../services/gastos.service');
+const { filtroSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 router.use(authenticate);
@@ -30,7 +32,7 @@ const limpiar = (v, max) => (v === undefined || v === null ? null : String(v).tr
 
 function notificar(req, payload) {
   const io = req.app.get('io');
-  if (io) io.emit('gasto:actualizado', { type: 'gasto:actualizado', payload });
+  if (io) emitirTenant(req, 'gasto:actualizado', { type: 'gasto:actualizado', payload });
 }
 
 /** Valida y normaliza el cuerpo de un gasto. Lanza 422 si algo no cuadra. */
@@ -143,12 +145,12 @@ router.get('/', async (req, res, next) => {
     let desde   = FECHA_RE.test(req.query.desde || '') ? req.query.desde : hoy;
     let hasta   = FECHA_RE.test(req.query.hasta || '') ? req.query.hasta : desde;
     if (desde > hasta) [desde, hasta] = [hasta, desde];
-    const sedeId = sedeLectura(req);
     const estado = ['activos', 'anulados', 'todos'].includes(req.query.estado) ? req.query.estado : 'activos';
 
     let where = 'WHERE g.fecha BETWEEN ? AND ?';
     const params = [desde, hasta];
-    if (sedeId)                 { where += ' AND g.sede_id = ?';      params.push(sedeId); }
+    const fs = filtroSede(req, 'g.sede_id');
+    where += ` ${fs.sql}`; params.push(...fs.params);
     if (req.query.categoria_id) { where += ' AND g.categoria_id = ?'; params.push(parseInt(req.query.categoria_id, 10) || 0); }
     if (METODOS_PAGO.includes(req.query.metodo_pago)) { where += ' AND g.metodo_pago = ?'; params.push(req.query.metodo_pago); }
     if (estado === 'activos')  where += ' AND g.anulado = 0';
@@ -193,6 +195,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const g = await obtenerGasto(req, req.params.id);
     if (!g) return res.status(404).json({ success: false, message: 'Gasto no encontrado.' });
+    exigirAcceso(req, g.sede_id);
     return res.json({ success: true, data: g });
   } catch (err) { next(err); }
 });
@@ -203,7 +206,8 @@ router.post('/', auditMiddleware('gastos:creado', 'gastos'), async (req, res, ne
     const d      = await validarGasto(req, req.body);
     const sedeId = sedeEscritura(req);
 
-    if (await cajaCerradaDelDia(req.db.query, { fecha: d.fecha, sedeId }))
+    // Si los gastos no afectan a la caja, un día cerrado no impide registrarlos
+    if (await gastosAfectanCaja(req.db.query) && await cajaCerradaDelDia(req.db.query, { fecha: d.fecha, sedeId }))
       return res.status(422).json({ success: false, message: `La caja del ${d.fecha.split('-').reverse().join('/')} ya está cerrada. No se pueden agregar gastos a ese día.` });
 
     const r = await req.db.query(
@@ -223,11 +227,12 @@ router.put('/:id', auditMiddleware('gastos:actualizado', 'gastos'), async (req, 
   try {
     const g = await obtenerGasto(req, req.params.id);
     if (!g) return res.status(404).json({ success: false, message: 'Gasto no encontrado.' });
+    exigirAcceso(req, g.sede_id);
     const bloqueo = bloqueoEdicion(g);
     if (bloqueo) return res.status(422).json({ success: false, message: bloqueo });
 
     const d = await validarGasto(req, req.body);
-    if (d.fecha !== g.fecha && await cajaCerradaDelDia(req.db.query, { fecha: d.fecha, sedeId: g.sede_id }))
+    if (d.fecha !== g.fecha && await gastosAfectanCaja(req.db.query) && await cajaCerradaDelDia(req.db.query, { fecha: d.fecha, sedeId: g.sede_id }))
       return res.status(422).json({ success: false, message: 'La caja de la nueva fecha ya está cerrada.' });
 
     // Si estaba en un borrador de cierre se desliga: el próximo guardado del cierre lo vuelve a tomar
@@ -247,6 +252,7 @@ router.patch('/:id/anular', auditMiddleware('gastos:anulado', 'gastos'), async (
   try {
     const g = await obtenerGasto(req, req.params.id);
     if (!g) return res.status(404).json({ success: false, message: 'Gasto no encontrado.' });
+    exigirAcceso(req, g.sede_id);
     const bloqueo = bloqueoEdicion(g);
     if (bloqueo) return res.status(422).json({ success: false, message: bloqueo });
 

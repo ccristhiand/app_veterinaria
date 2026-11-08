@@ -95,8 +95,6 @@
     <button onclick="setPeriodo('semana')" class="vbtn vbtn-ghost">Esta semana</button>
     <button onclick="setPeriodo('mes')"    class="vbtn vbtn-ghost">Este mes</button>
     <button onclick="setPeriodo('anio')"   class="vbtn vbtn-ghost">Este año</button>
-    <!-- Selector sede admin — aparece solo si hay varias sedes -->
-    <div id="selector-sede-reportes" style="display:none;margin-left:auto"></div>
   </div>
 
   <!-- Tabs (en celular se deslizan con el dedo: .vtabs anula el flex-wrap) -->
@@ -234,11 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hoy = new Date();
   document.getElementById('r-desde').value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01`;
   document.getElementById('r-hasta').value = fechaHoyInput();
-  // Selector de sede para admin
-  initSelectorSede('selector-sede-reportes', function(sedeId) {
-    _reporteSedeActiva = sedeId;
-    cargarReporte();
-  }, { label: 'Sede:', labelTodas: '🏥 Todas las sedes', size: 'small', inline: true });
+  _reporteSedeActiva = getSedeActiva();   // la sede elegida en la barra superior
   cargarReporte();
 });
 

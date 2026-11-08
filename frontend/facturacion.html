@@ -204,12 +204,6 @@
     </div>
   </div>
 
-  <!-- Banner sede activa -->
-  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:var(--green-700)">
-    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
-  </div>
 
   <!-- Tabs -->
   <div style="display:flex;gap:.3rem;border-bottom:2px solid var(--line);margin-bottom:1.3rem">
@@ -725,15 +719,6 @@ var _subTabActual = 'todos';
 // ── Init ──────────────────────────────────────────────────────────
 initPage({ activePage:'facturacion', title:'Facturación', subtitle:'Caja y documentos' });
 
-var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
-if (_userSede.sede_nombre) {
-  var _bannerEl = document.getElementById('banner-sede');
-  if (_bannerEl) {
-    _bannerEl.style.display = 'block';
-    document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
-  }
-}
-
 (async () => {
   try {
     var res = await api('/empresa');
@@ -770,10 +755,6 @@ if (_userSede.sede_nombre) {
     }
   } catch {}
 
-  initSelectorSede('selector-sede-fact', function(sedeId) {
-    cargarResumen();
-    cargarFacturas();
-  }, { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
   cargarResumen();
 })();
 
@@ -854,8 +835,7 @@ async function cargarResumen() {
   var desde = document.getElementById('d-desde').value;
   var hasta = document.getElementById('d-hasta').value;
   try {
-    var sedeParam = getSedeActiva() ? '&sede_id='+getSedeActiva() : '';
-    var res = await api('/facturas/resumen?desde='+desde+'&hasta='+hasta+sedeParam);
+    var res = await api('/facturas/resumen?desde='+desde+'&hasta='+hasta);
     if (!res||!res.ok) return;
     var d = (await res.json()).data;
     document.getElementById('stat-ingresos').textContent    = 'S/. '+parseFloat(d.totales.ingresos||0).toFixed(2);
@@ -951,7 +931,6 @@ async function cargarFacturas() {
     var tipo   = document.getElementById('f-tipo').value;
     var estado = _subTabActual !== 'todos' && _subTabActual !== 'emitido' && _subTabActual !== 'nota' ? _subTabActual : '';
     var url    = '/facturas?fecha='+fecha+(tipo?'&tipo='+tipo:'')+(estado?'&estado='+estado:'');
-    if (getSedeActiva()) url += '&sede_id='+getSedeActiva();
     var res = await api(url);
     if (!res||!res.ok) { tbody.innerHTML='<tr><td colspan="9"><div class="vempty">Error al cargar</div></td></tr>'; return; }
     var rows = (await res.json()).data || [];

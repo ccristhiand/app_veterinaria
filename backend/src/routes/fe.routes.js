@@ -8,6 +8,8 @@
 const { Router }  = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
+const { emitirSala } = require('../sockets/emitir');
+const { exigirAcceso } = require('../services/sede.service');
 const { emitirComprobante, anularComprobante } = require('../services/nubefact.service');
 const { generarPayload, generarPayloadNotaCredito, generarPayloadBaja } = require('../services/sunat.service');
 const { masterQuery } = require('../config/masterDB');
@@ -140,6 +142,7 @@ router.post('/emitir/:facturaId',
        WHERE f.id = ?`, [req.params.facturaId]
     );
     if (!factura)                    return res.status(404).json({ success: false, message: 'Factura no encontrada.' });
+    exigirAcceso(req, factura.sede_id);
     if (factura.estado === 'anulado') return res.status(422).json({ success: false, message: 'No se puede emitir una factura anulada.' });
     if (factura.sunat_estado === '0') return res.status(422).json({ success: false, message: 'Este documento ya fue aceptado por SUNAT.' });
 
@@ -298,7 +301,7 @@ router.post('/anular/:facturaId',
       }
 
       const io = req.app.get('io');
-      if (io) io.to('sala:admin').emit('notif:anulacion', { titulo: '🚫 Anulado en SUNAT', mensaje: msg });
+      if (io) emitirSala(req, 'sala:admin', 'notif:anulacion', { titulo: '🚫 Anulado en SUNAT', mensaje: msg });
 
       return res.json({
         success: true,

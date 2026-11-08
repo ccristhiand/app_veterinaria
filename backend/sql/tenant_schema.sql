@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v21
+-- VETNETCODIP SaaS — TENANT SCHEMA v22
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -24,6 +24,7 @@
 -- v20: + servicios_catalogo.descripcion VARCHAR(255) → TEXT (descripciones largas)
 -- v21: + Gastos diarios: gastos_categorias / gastos (tipo, método de pago, cierre)
 --       + gastos_efectivo / _tarjeta / _transferencia / _yape / _plin en caja_cierres
+-- v22: + usuario_sedes (un usuario con varias sedes) + empresa_config.gastos_afectan_caja
 -- v18: + WhatsApp Meta (API oficial): wa_meta_plantillas, wa_meta_conversaciones, wa_meta_mensajes
 --       + wa_mensajes_log.proveedor / wamid / estados entregado y leido
 --       + wa_campanas.proveedor / meta_plantilla_id
@@ -60,6 +61,17 @@ CREATE TABLE IF NOT EXISTS usuarios (
   last_password_change TIMESTAMP    NULL DEFAULT NULL,
   created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_sede (sede_id)
+) ENGINE=InnoDB;
+
+-- Sedes a las que entra cada usuario (usuarios.sede_id es su sede principal)
+CREATE TABLE IF NOT EXISTS usuario_sedes (
+  usuario_id INT UNSIGNED NOT NULL,
+  sede_id    INT UNSIGNED NOT NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (usuario_id, sede_id),
+  INDEX idx_sede (sede_id),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+  FOREIGN KEY (sede_id)    REFERENCES sedes(id)    ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ── Propietarios ─────────────────────────────────────────────
@@ -376,6 +388,7 @@ CREATE TABLE IF NOT EXISTS empresa_config (
   correlativo_p         INT UNSIGNED      NOT NULL DEFAULT 1      COMMENT 'Siguiente numero de proforma',
   proforma_validez_dias SMALLINT UNSIGNED NOT NULL DEFAULT 30     COMMENT 'Validez por defecto (dias)',
   proforma_condiciones  TEXT              NULL                    COMMENT 'Condiciones al pie (NULL = texto por defecto)',
+  gastos_afectan_caja   TINYINT(1)        NOT NULL DEFAULT 1      COMMENT '1 = los gastos se descuentan en el cierre de caja',
   updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

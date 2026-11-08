@@ -109,14 +109,20 @@ router.post('/', auditMiddleware('estetica:creado', 'estetica'), async (req, res
             incluye_dental, productos, precio, observaciones } = req.body;
     if (!mascota_id || !fecha)
       return res.status(422).json({ success: false, message: 'mascota_id y fecha requeridos.' });
+    // Sede del servicio: la de su cita o, sin cita, la activa o la principal del usuario
+    let sedeServicio = req.sede.activa || req.sede.principal;
+    if (cita_id) {
+      const [cita] = await req.db.query('SELECT sede_id FROM citas WHERE id = ?', [cita_id]);
+      if (cita?.sede_id) sedeServicio = cita.sede_id;
+    }
     const result = await req.db.query(
       `INSERT INTO servicios_estetica
          (mascota_id, atendido_por_id, cita_id, fecha, tipo_bano,
-          incluye_corte, incluye_unas, incluye_dental, productos, precio, observaciones)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          incluye_corte, incluye_unas, incluye_dental, productos, precio, observaciones, sede_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [mascota_id, req.user.id, cita_id||null, fecha, tipo_bano||'basico',
        incluye_corte?1:0, incluye_unas?1:0, incluye_dental?1:0,
-       productos||null, precio||null, observaciones||null]
+       productos||null, precio||null, observaciones||null, sedeServicio]
     );
     if (cita_id) {
       await req.db.query("UPDATE citas SET estado='completada' WHERE id=?", [cita_id]);

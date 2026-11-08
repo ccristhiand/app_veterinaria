@@ -3,6 +3,7 @@
 const { verifySocketToken } = require('../middlewares/auth.middleware');
 const { query }             = require('../config/database');
 const logger                = require('../config/logger');
+const { salaDe }            = require('./emitir');
 
 // ── Nombres de eventos (contrato frontend ↔ backend) ────────────────────────
 const EVENTS = {
@@ -35,6 +36,11 @@ function initSocket(io) {
 
       const user = await verifySocketToken(token);
       socket.user = user;  // disponible en todos los handlers de este socket
+
+      // Clínica del usuario: del token; las sesiones anteriores a este cambio usan el Origin
+      let origen = null;
+      try { origen = new URL(socket.handshake.headers.origin).hostname.toLowerCase(); } catch { /* sin Origin */ }
+      socket.tenantKey = user.tk || origen;
       next();
     } catch (err) {
       logger.warn(`Socket rechazado (auth fallida): ${err.message}`);
@@ -52,8 +58,13 @@ function initSocket(io) {
       admin          : [EVENTS.ROOM_ADMIN, EVENTS.ROOM_VETS, EVENTS.ROOM_RECEP],
       veterinario    : [EVENTS.ROOM_VETS],
       recepcionista  : [EVENTS.ROOM_RECEP],
+      veterinario_recepcionista: [EVENTS.ROOM_VETS, EVENTS.ROOM_RECEP],
     };
-    (roomByRol[rol] || []).forEach((room) => socket.join(room));
+    // Las salas van dentro de la clínica: los eventos de una no llegan a otra
+    if (socket.tenantKey) {
+      socket.join(socket.tenantKey);
+      (roomByRol[rol] || []).forEach((room) => socket.join(salaDe(socket.tenantKey, room)));
+    }
 
     // Sala personal (para notificaciones privadas)
     socket.join(`user:${userId}`);

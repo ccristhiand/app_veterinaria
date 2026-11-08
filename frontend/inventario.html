@@ -26,7 +26,6 @@
 <div id="main-content" class="page">
 
   <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
-    <div id="selector-sede-inv" style="display:none"></div>
     <div><h2>📦 Inventario</h2><p>Medicamentos, vacunas e insumos con alertas en tiempo real</p></div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
       <button onclick="descargarTemplate()" class="vbtn vbtn-ghost">📥 Template Excel</button>
@@ -34,12 +33,6 @@
       <input type="file" id="input-excel" accept=".xlsx,.xls" style="display:none" onchange="procesarExcel(this)"/>
       <button onclick="abrirNuevo()" class="vbtn vbtn-primary">＋ Nuevo Ítem</button>
     </div>
-  </div>
-  <!-- Banner sede activa -->
-  <div id="banner-sede" style="display:none;margin-bottom:1rem;padding:.65rem 1.1rem;
-    background:var(--green-50);border:1px solid var(--green-200);border-radius:.85rem;
-    font-size:.8rem;font-weight:600;color:var(--green-700)">
-    🏥 Mostrando datos de: <span id="banner-sede-nombre"></span>
   </div>
 
 
@@ -327,40 +320,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'inventario', title:'Inventario', subtitle:'Control de stock' });
   cargarAlertasVencimiento();
 
-  // ── Mostrar sede activa en el banner ──────────────────────────
-  var _userSede = JSON.parse(localStorage.getItem('vet_user') || '{}');
-  if (_userSede.sede_nombre) {
-    var _bannerEl = document.getElementById('banner-sede');
-    if (_bannerEl) {
-      _bannerEl.style.display = 'block';
-      document.getElementById('banner-sede-nombre').textContent = _userSede.sede_nombre;
-    }
-  }
+  // Sedes del formulario: las del usuario. Con una sola no hay nada que elegir.
+  var _sel = document.getElementById('i-sede');
+  getSedesUsuario().forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = (s.es_principal ? '⭐ ' : '🏥 ') + s.nombre;
+    _sel.appendChild(opt);
+  });
+  if (getSedesUsuario().length <= 1) document.getElementById('i-sede-wrap').style.display = 'none';
 
-  // Cargar sedes en el selector del modal
-  (async function() {
-    var resSedes = await api('/sedes');
-    if (resSedes?.ok) {
-      var sedes = (await resSedes.json()).data || [];
-      var sel = document.getElementById('i-sede');
-      sedes.forEach(function(s) {
-        var opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = (s.es_principal ? '⭐ ' : '🏥 ') + s.nombre;
-        sel.appendChild(opt);
-      });
-      // Si el usuario tiene sede asignada, preseleccionarla y ocultar el selector
-      var _u = getUser();
-      if (_u.sede_id) {
-        sel.value = _u.sede_id;
-        document.getElementById('i-sede-wrap').style.display = 'none';
-      }
-    }
-  })();
-
-  initSelectorSede('selector-sede-inv', function() {
-    cargar(true);
-  }, { label: '', labelTodas: '🏥 Todas las sedes', size: 'small' });
     cargar();
 
   const socket = getSocket();
@@ -567,10 +536,8 @@ function abrirNuevo() {
   document.getElementById('i-venc').value     = '';
   document.getElementById('i-codigo').value   = '';
   document.getElementById('i-favorito').checked = false;
-  // Preseleccionar sede del usuario si tiene una asignada
-  var _u = getUser();
-  if (_u.sede_id) document.getElementById('i-sede').value = _u.sede_id;
-  else document.getElementById('i-sede').value = '';
+  // La sede que se está viendo; en "Todas", hay que elegirla
+  document.getElementById('i-sede').value = getSedeActiva() || '';
   openModal('modal-item');
 }
 

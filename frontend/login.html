@@ -431,6 +431,7 @@
       localStorage.setItem('vet_access',  accessToken);
       localStorage.setItem('vet_refresh', refreshToken);
       localStorage.setItem('vet_user',    JSON.stringify(user));
+      localStorage.removeItem('vet_sede_activa');   // cada inicio de sesión parte de la sede principal
 
       btnText.textContent = '✅ Accediendo…';
       setTimeout(() => window.location.href = user?.rol === 'groomer' ? 'citas' : 'dashboard', 400);

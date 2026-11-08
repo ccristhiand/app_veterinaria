@@ -120,73 +120,6 @@ function hideLoader() {
 }
 
 
-// ── Selector de sede reutilizable (solo para admin) ──────────────
-// containerId: id del div donde insertar el selector
-// onChange: callback(sedeId) cuando cambia la selección
-async function initSelectorSede(containerId, onChange, opciones = {}) {
-  var user = getUser();
-  if (user.rol !== 'admin') return; // solo admin ve el selector
-
-  var cont = document.getElementById(containerId);
-  if (!cont) return;
-
-  // Cargar sedes disponibles
-  try {
-    var res   = await api('/reportes/sedes');
-    if (!res?.ok) return;
-    var sedes = (await res.json()).data || [];
-    if (sedes.length <= 1) return; // con 1 sede no tiene sentido el selector
-
-    var label  = opciones.label !== undefined ? opciones.label : 'Sede:';
-    var all    = opciones.labelTodas !== undefined ? opciones.labelTodas : '🏥 Todas las sedes';
-    var size   = opciones.size || 'normal';
-    var inline = opciones.inline !== false;
-
-    var wrap = document.createElement('div');
-    wrap.style.cssText = inline
-      ? 'display:flex;align-items:center;gap:.5rem'
-      : 'display:flex;flex-direction:column;gap:.25rem';
-
-    if (label) {
-      var lbl = document.createElement('label');
-      lbl.textContent = label;
-      lbl.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--ink-soft);white-space:nowrap';
-      wrap.appendChild(lbl);
-    }
-
-    var sel = document.createElement('select');
-    sel.className = 'vinput';
-    sel.style.cssText = size === 'small'
-      ? 'font-size:.78rem;padding:.3rem .6rem;width:auto;min-width:160px'
-      : 'width:auto;min-width:180px';
-    sel.id = containerId + '-select';
-
-    sel.innerHTML = '<option value="">' + all + '</option>' +
-      sedes.map(function(s) {
-        return '<option value="' + s.id + '">' + (s.nombre) + '</option>';
-      }).join('');
-
-    // Restaurar sede guardada en sessionStorage
-    var guardada = sessionStorage.getItem('sede_activa_admin');
-    if (guardada) {
-      sel.value = guardada;
-      setSedeActiva(guardada || null);
-    }
-
-    sel.onchange = function() {
-      var val = sel.value || null;
-      setSedeActiva(val);
-      sessionStorage.setItem('sede_activa_admin', val || '');
-      if (onChange) onChange(val);
-    };
-
-    wrap.appendChild(sel);
-    cont.innerHTML = '';
-    cont.appendChild(wrap);
-    cont.style.display = 'block';
-  } catch(e) { console.warn('Error cargando selector sede:', e); }
-}
-
 // ── Badge de sede para mostrar en cards/tablas ───────────────────
 function badgeSede(sedeNombre, opts) {
   if (!sedeNombre) return '';
@@ -199,19 +132,98 @@ function badgeSede(sedeNombre, opts) {
     '🏥 ' + sedeNombre + '</span>';
 }
 
-// ── Sede seleccionada globalmente (admin puede cambiar) ──────────
-var _sedeSeleccionadaGlobal = null; // null = todas las sedes (solo admin)
+// ── Sede activa ───────────────────────────────────────────────────
+// Se elige en la barra superior (layout.js) y vale para todas las pantallas.
+// null = "Todas": sirve para consultar; al registrar algo se pide una sede.
+const SEDE_KEY = 'vet_sede_activa';
+
+function getSedesUsuario() { return getUser().sedes || []; }
 
 function getSedeActiva() {
-  var user = JSON.parse(localStorage.getItem('vet_user') || '{}');
-  // No-admin: siempre su sede del JWT
-  if (user.rol !== 'admin') return user.sede_id || null;
-  // Admin: la sede seleccionada en el selector (null = todas)
-  return _sedeSeleccionadaGlobal;
+  const user  = getUser();
+  const sedes = user.sedes;
+  if (!sedes) return user.rol === 'admin' ? null : (user.sede_id || null);   // sesión iniciada antes de multi-sede
+  if (sedes.length === 1) return sedes[0].id;
+  const guardada = localStorage.getItem(SEDE_KEY);
+  if (guardada === 'all') return null;
+  const id = parseInt(guardada, 10);
+  if (sedes.some(s => s.id === id)) return id;
+  return user.sede_principal_id || sedes[0]?.id || null;
 }
 
-function setSedeActiva(sedeId) {
-  _sedeSeleccionadaGlobal = sedeId ? parseInt(sedeId) : null;
+function setSedeActiva(sedeId) { localStorage.setItem(SEDE_KEY, sedeId ? String(sedeId) : 'all'); }
+
+function getSedeActivaNombre() {
+  const id = getSedeActiva();
+  return id ? (getSedesUsuario().find(s => s.id === id)?.nombre || null) : null;
+}
+
+// ¿Un registro de esa sede corresponde a lo que se está viendo? (eventos en tiempo real)
+function sedeVisible(sedeId) {
+  const activa = getSedeActiva();
+  if (activa) return Number(sedeId) === activa;
+  const sedes = getSedesUsuario();
+  return !sedes.length || sedes.some(s => s.id === Number(sedeId));
+}
+
+// Refresca las sedes del usuario. No manda X-Sede-Id: debe funcionar aunque la guardada ya no valga.
+async function actualizarSedesUsuario() {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sedes/mias`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('vet_access')}`, 'X-Tenant-Host': window.location.hostname },
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()).data;
+    const user = getUser();
+    const antes = user.sedes;
+    user.sedes = d.sedes;
+    user.sede_principal_id = d.sede_principal_id;
+    localStorage.setItem('vet_user', JSON.stringify(user));
+    return { primeraVez: !antes, cambio: JSON.stringify(antes) !== JSON.stringify(d.sedes) };
+  } catch { return null; }
+}
+
+// Modal para elegir sede. Devuelve el id elegido o null si se cancela.
+function pedirSede(mensaje) {
+  return new Promise(resolve => {
+    document.getElementById('__pedir-sede')?.remove();
+    const sedes = getSedesUsuario();
+    const ov = document.createElement('div');
+    ov.id = '__pedir-sede';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,20,.5);display:flex;align-items:center;justify-content:center;padding:1rem';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:1.25rem;width:100%;max-width:400px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.18)">
+        <div style="padding:1.3rem 1.5rem .6rem">
+          <p style="font-weight:700;font-size:1rem;color:#1a2e28;margin:0">🏥 ¿En qué sede vas a registrar?</p>
+          <p style="font-size:.78rem;color:#6b7c76;margin:.3rem 0 0;line-height:1.45">${esc(mensaje || 'Estás viendo todas las sedes. Para guardar, elige una.')}</p>
+        </div>
+        <div style="padding:.5rem 1.5rem 1.2rem;display:flex;flex-direction:column;gap:.4rem;max-height:50vh;overflow-y:auto">
+          ${sedes.map(s => `<button type="button" data-sede="${s.id}" style="text-align:left;padding:.7rem .9rem;border:1.5px solid #e5ebe8;border-radius:.8rem;background:#fff;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:600;color:#1a2e28">
+            ${s.es_principal ? '⭐' : '🏥'} ${esc(s.nombre)}${s.ciudad ? ` <span style="font-weight:400;color:#94a5a0">· ${esc(s.ciudad)}</span>` : ''}</button>`).join('')}
+        </div>
+        <div style="padding:.8rem 1.5rem;border-top:1px solid #f1f4f2;display:flex;justify-content:flex-end">
+          <button type="button" data-cancelar style="padding:.55rem 1.2rem;border:1.5px solid #e5e7eb;background:#fff;border-radius:.75rem;font-size:.84rem;font-weight:600;cursor:pointer;font-family:inherit;color:#374151">Cancelar</button>
+        </div>
+      </div>`;
+    const cerrar = valor => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(valor); };
+    const onKey  = e => { if (e.key === 'Escape') cerrar(null); };
+    ov.addEventListener('click', e => {
+      const btn = e.target.closest('[data-sede]');
+      if (btn) cerrar(parseInt(btn.dataset.sede, 10));
+      else if (e.target === ov || e.target.closest('[data-cancelar]')) cerrar(null);
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+  });
+}
+
+// Para pantallas que solo tienen sentido en una sede concreta (Punto de Venta)
+async function exigirSedeEnPantalla(mensaje) {
+  if (getSedeActiva() || getSedesUsuario().length <= 1) return;
+  const id = await pedirSede(mensaje);
+  if (id) { setSedeActiva(id); location.reload(); }
 }
 
 function getUser() {
@@ -223,7 +235,28 @@ function isAdmin() {
 }
 
 // ── API Helper ───────────────────────────────────────────────────
-async function api(path, { method = 'GET', body } = {}) {
+async function api(path, opciones = {}) {
+  let res = await _apiLlamada(path, opciones);
+  if (res && (res.status === 422 || res.status === 403)) {
+    const code = await res.clone().json().then(d => d.code).catch(() => null);
+    if (code === 'SEDE_NO_PERMITIDA') {          // la sede guardada ya no está disponible
+      localStorage.removeItem(SEDE_KEY);
+      await actualizarSedesUsuario();
+      location.reload();
+      return null;
+    }
+    if (code === 'SEDE_REQUERIDA') {             // está en "Todas" e intenta registrar
+      const id = await pedirSede();
+      if (!id) return null;
+      setSedeActiva(id);
+      window.pintarSelectorSede?.();
+      res = await _apiLlamada(path, opciones);
+    }
+  }
+  return res;
+}
+
+async function _apiLlamada(path, { method = 'GET', body } = {}) {
   const token   = localStorage.getItem('vet_access');
   const headers = {
     'Content-Type'  : 'application/json',

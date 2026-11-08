@@ -164,18 +164,43 @@ new MutationObserver(() => {
   requestAnimationFrame(() => { _etiquetarPendiente = false; etiquetarTablas(); });
 }).observe(document.documentElement, { childList: true, subtree: true });
 
+function textoSedeActiva(user) {
+  return getSedeActivaNombre() || (getSedesUsuario().length > 1 ? 'Todas las sedes' : user.sede_nombre) || '';
+}
+
+// Selector de sede de la barra superior: define a qué sede apunta toda la app
+function pintarSelectorSede() {
+  const cont = document.getElementById('topbar-sede');
+  if (!cont) return;
+  const sedes = getSedesUsuario();
+  if (sedes.length <= 1) { cont.innerHTML = ''; return; }
+
+  const activa = getSedeActiva();
+  const todas  = getUser().rol === 'admin' ? 'Todas las sedes' : 'Todas mis sedes';
+  cont.innerHTML = `
+    <select id="topbar-sede-select" aria-label="Sede activa" title="${activa ? 'Sede activa' : 'Vista de consulta: al registrar se pedirá una sede'}"
+      style="max-width:170px;padding:.42rem .55rem;border-radius:.7rem;font-size:.76rem;font-weight:700;font-family:inherit;cursor:pointer;outline:none;
+             border:1.5px solid ${activa ? 'var(--green-200)' : '#fde68a'};background:${activa ? 'var(--green-50)' : '#fffbeb'};color:${activa ? 'var(--green-700)' : '#b45309'}">
+      <option value="">🏥 ${todas}</option>
+      ${sedes.map(s => `<option value="${s.id}" ${s.id === activa ? 'selected' : ''}>${s.es_principal ? '⭐' : '🏥'} ${esc(s.nombre)}</option>`).join('')}
+    </select>`;
+  cont.querySelector('select').onchange = e => { setSedeActiva(e.target.value || null); location.reload(); };
+}
+window.pintarSelectorSede = pintarSelectorSede;
+
 function renderShell({ activePage, title, subtitle }) {
   _paginaActiva = activePage;
   const user = JSON.parse(localStorage.getItem('vet_user') || '{}');
   const rol  = user.rol || 'recepcionista';
 
   // ── NUEVO: Badge de sede para mostrar en el área del usuario ──
-  const sedeBadge = user.sede_nombre
+  const nombreSede = textoSedeActiva(user);
+  const sedeBadge = nombreSede
     ? `<span style="display:inline-flex;align-items:center;gap:.25rem;margin-top:.25rem;
         font-size:.62rem;font-weight:700;color:var(--sidebar-active);background:var(--sidebar-hover);
         border:1px solid rgba(255,255,255,.15);border-radius:.5rem;
         padding:.15rem .5rem;letter-spacing:.02em;">
-        🏥 ${esc(user.sede_nombre)}
+        🏥 ${esc(nombreSede)}
       </span>`
     : '';
 
@@ -264,6 +289,7 @@ function renderShell({ activePage, title, subtitle }) {
         <h1 class="topbar-title" id="page-title">${title||''}</h1>
         ${subtitle ? `<p class="topbar-sub">${subtitle}</p>` : ''}
       </div>
+      <div id="topbar-sede"></div>
       <button type="button" class="pwa-install-btn" data-pwa-install hidden onclick="pwaInstalar()"
         title="Instalar la app en este dispositivo">
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
@@ -320,6 +346,13 @@ function initPage({ activePage, title, subtitle }) {
 
   renderShell({ activePage, title, subtitle });
   renderUserInfo(user);
+  pintarSelectorSede();
+
+  // Sedes al día (el admin pudo cambiarlas). La primera vez, recarga para partir de la sede correcta.
+  actualizarSedesUsuario().then(r => {
+    if (r?.primeraVez) location.reload();
+    else if (r?.cambio) pintarSelectorSede();
+  });
 
   // Cargar branding → aplica colores + módulos del plan
   cargarBranding().then(branding => {
@@ -332,6 +365,7 @@ function initPage({ activePage, title, subtitle }) {
   // Sockets
   const socket = getSocket();
   socket.on('cita:nueva', msg => {
+    if (!sedeVisible(msg.payload?.sede_id)) return;
     addNotif({ tipo:'cita_nueva', titulo:`Nueva cita: ${msg.payload?.mascota_nombre||''}`, mensaje:msg.payload?.motivo||'' });
     toast(`📅 Nueva cita: ${msg.payload?.mascota_nombre}`, 'info');
   });
@@ -408,9 +442,8 @@ function aplicarModulosPlan(branding, activePage) {
     const subEl = document.getElementById('sidebar-clinica-sub');
     if (subEl) {
       const user2 = JSON.parse(localStorage.getItem('vet_user') || '{}');
-      subEl.textContent = user2.sede_nombre
-        ? `🏥 ${user2.sede_nombre}`
-        : 'Gestión Veterinaria';
+      const nombreSede2 = textoSedeActiva(user2);
+      subEl.textContent = nombreSede2 ? `🏥 ${nombreSede2}` : 'Gestión Veterinaria';
     }
   }
 

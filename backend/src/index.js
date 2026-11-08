@@ -221,7 +221,7 @@ app.use((err, _req, res, _next) => {
   const status  = err.status || err.statusCode || 500;
   const message = process.env.NODE_ENV === 'production' && status === 500
     ? 'Error interno del servidor.' : err.message;
-  res.status(status).json({ success: false, message });
+  res.status(status).json({ success: false, message, ...(err.code && String(err.code).startsWith('SEDE') ? { code: err.code } : {}) });
 });
 
 // ── Boot ──────────────────────────────────────────────────────────

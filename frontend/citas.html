@@ -44,7 +44,6 @@
 <div id="main-content" class="page">
 
   <div class="page-head" style="flex-wrap:wrap;gap:.75rem">
-    <div id="selector-sede-citas" style="display:none"></div>
     <div>
       <h2>Gestión de Citas</h2>
       <p>Panel en tiempo real · Usa <strong>🩺 Atender</strong> para registrar la atención</p>
@@ -399,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPage({ activePage:'citas', title:'Citas', subtitle:'Agenda y programación' });
   document.getElementById('f-fecha').value = fechaHoyInput();
   cargarCitas();
-  getSocket().on('cita:nueva',       msg => nuevaFilaRT(msg.payload));
+  getSocket().on('cita:nueva',       msg => { if (sedeVisible(msg.payload?.sede_id)) nuevaFilaRT(msg.payload); });
   getSocket().on('cita:actualizada', msg => actualizarEstadoFila(msg.id, msg.estado));
   getSocket().on('cita:eliminada',   msg => quitarFila(msg.payload?.id));
 });

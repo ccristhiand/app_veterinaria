@@ -29,6 +29,11 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/sedes/mias — sedes del usuario, para el selector ──
+router.get('/mias', async (req, res) => {
+  return res.json({ success: true, data: { sedes: req.sede.disponibles, sede_principal_id: req.sede.principal } });
+});
+
 // ── GET /api/v1/sedes/:id ─────────────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
@@ -137,6 +142,23 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
       return res.status(422).json({
         success: false,
         message: `No puedes eliminar esta sede porque tiene ${uso.total} usuario(s) asignado(s). Reasígnalos primero.`,
+      });
+    }
+
+    // Una sede con historial no se borra: sus registros quedarían huérfanos
+    const tablas = { inventario: 'inventario', citas: 'citas', facturas: 'facturas',
+                     proformas: 'proformas', 'cierres de caja': 'caja_cierres', gastos: 'gastos' };
+    const conDatos = [];
+    for (const [nombre, tabla] of Object.entries(tablas)) {
+      const [{ n }] = await req.db.query(`SELECT COUNT(*) AS n FROM ${tabla} WHERE sede_id = ?`, [req.params.id]);
+      if (n > 0) conDatos.push(`${n} en ${nombre}`);
+    }
+    const [{ n: asignados }] = await req.db.query('SELECT COUNT(*) AS n FROM usuario_sedes WHERE sede_id = ?', [req.params.id]);
+    if (asignados > 0) conDatos.push(`${asignados} usuario(s) con acceso`);
+    if (conDatos.length) {
+      return res.status(422).json({
+        success: false,
+        message: `No puedes eliminar esta sede porque tiene registros: ${conDatos.join(', ')}. Puedes desactivarla.`,
       });
     }
 

@@ -10,6 +10,33 @@ const { masterQuery } = require('../config/masterDB');
 const router = Router();
 router.use(authenticate);
 
+// Valida las sedes de un usuario. sede_id = principal; sede_ids = todas las que puede usar.
+// El admin entra a todas las sedes activas: las suyas son opcionales.
+async function normalizarSedes(db, rol, sede_id, sede_ids) {
+  const principal = parseInt(sede_id, 10) || null;
+  const ids = [...new Set([...(Array.isArray(sede_ids) ? sede_ids : []), principal].map(n => parseInt(n, 10)).filter(Boolean))];
+
+  if (!ids.length) {
+    if (rol === 'admin') return { principal: null, ids: [] };
+    throw Object.assign(new Error('Selecciona al menos una sede.'), { status: 422 });
+  }
+  const activas = await db.query(
+    `SELECT id FROM sedes WHERE activo = 1 AND id IN (${ids.map(() => '?').join(',')})`, ids
+  );
+  if (activas.length !== ids.length)
+    throw Object.assign(new Error('Alguna de las sedes seleccionadas no existe o está inactiva.'), { status: 422 });
+  return { principal: principal || ids[0], ids };
+}
+
+async function guardarSedesUsuario(db, usuarioId, ids) {
+  await db.withTransaction(async (conn) => {
+    await conn.execute('DELETE FROM usuario_sedes WHERE usuario_id = ?', [usuarioId]);
+    for (const id of ids) {
+      await conn.execute('INSERT INTO usuario_sedes (usuario_id, sede_id) VALUES (?,?)', [usuarioId, id]);
+    }
+  });
+}
+
 
 // ── GET /api/v1/usuarios/me — perfil del usuario autenticado ──────
 router.get('/me', async (req, res, next) => {
@@ -33,20 +60,31 @@ router.get('/', async (req, res, next) => {
   try {
     const { rol, activo } = req.query;
     const user    = req.user;
-    const header  = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
 
-    // Admin ve todos los usuarios; otros roles solo ven los de su sede
-    const sedeId = user.rol === 'admin' ? null : (user.sede_id || header || null);
+    // El admin gestiona todos los usuarios. Las listas por rol (veterinarios de una cita…)
+    // se limitan a la sede activa; los demás roles solo ven usuarios de sus sedes.
+    const sedesFiltro = user.rol === 'admin'
+      ? (rol !== undefined && req.sede.activa ? [req.sede.activa] : null)
+      : (req.sede.activa ? [req.sede.activa] : req.sede.permitidas);
 
     let sql = `SELECT u.id, u.nombre, u.email, u.rol, u.activo, u.created_at,
-                      u.sede_id, s.nombre AS sede_nombre
+                      u.sede_id, s.nombre AS sede_nombre,
+                      (SELECT GROUP_CONCAT(s2.nombre ORDER BY s2.nombre SEPARATOR ', ')
+                       FROM usuario_sedes us2 JOIN sedes s2 ON s2.id = us2.sede_id
+                       WHERE us2.usuario_id = u.id) AS sedes_nombres
                FROM usuarios u
                LEFT JOIN sedes s ON s.id = u.sede_id
                WHERE 1=1`;
     const params = [];
 
-    // Filtrar por sede solo para no-admins
-    if (sedeId)               { sql += ' AND u.sede_id = ?';  params.push(sedeId); }
+    if (sedesFiltro) {
+      if (!sedesFiltro.length) sql += ' AND 1 = 0';
+      else {
+        sql += ` AND EXISTS (SELECT 1 FROM usuario_sedes us WHERE us.usuario_id = u.id
+                             AND us.sede_id IN (${sedesFiltro.map(() => '?').join(',')}))`;
+        params.push(...sedesFiltro);
+      }
+    }
     if (rol !== undefined) {
       // Soporta ?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer (múltiples roles)
       const roles = [rol, req.query.rol2, req.query.rol3].filter(Boolean);
@@ -97,6 +135,8 @@ router.get('/:id', async (req, res, next) => {
       [req.params.id]
     );
     if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+    const filas = await req.db.query('SELECT sede_id FROM usuario_sedes WHERE usuario_id = ?', [req.params.id]);
+    user.sede_ids = filas.map(f => f.sede_id);
     return res.json({ success: true, data: user });
   } catch (err) { next(err); }
 });
@@ -105,7 +145,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuarios'), async (req, res, next) => {
   try {
     // CAMBIO: recibir sede_id
-    const { nombre, email, password, rol = 'recepcionista', sede_id = null } = req.body;
+    const { nombre, email, password, rol = 'recepcionista', sede_id = null, sede_ids } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
@@ -115,13 +155,7 @@ router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuario
     const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'];
     if (!rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
-    // Validar que la sede existe (si se proporciona)
-    if (sede_id) {
-      const [sedeExiste] = await req.db.query(
-        'SELECT id FROM sedes WHERE id = ? AND activo = 1', [sede_id]
-      );
-      if (!sedeExiste) return res.status(422).json({ success:false, message:'La sede seleccionada no existe o está inactiva.' });
-    }
+    const sedes = await normalizarSedes(req.db, rol, sede_id, sede_ids);
 
     // ── Verificar límite de usuarios ──────────────────────────────
     const [conteo] = await req.db.query(
@@ -151,8 +185,9 @@ router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuario
     // CAMBIO: insertar sede_id
     const result = await req.db.query(
       'INSERT INTO usuarios (nombre, email, password, rol, sede_id, activo, must_change_password) VALUES (?,?,?,?,?,1,1)',
-      [nombre.trim(), email.trim().toLowerCase(), hash, rol, sede_id || null]
+      [nombre.trim(), email.trim().toLowerCase(), hash, rol, sedes.principal]
     );
+    await guardarSedesUsuario(req.db, result.insertId, sedes.ids);
 
     const [nuevoUsuario] = await req.db.query(
       `SELECT id, nombre, email, rol, sede_id, activo, must_change_password, created_at
@@ -171,7 +206,7 @@ router.post('/', authorize('admin'), auditMiddleware('usuarios:creado', 'usuario
 router.put('/:id', authorize('admin'), auditMiddleware('usuarios:actualizado', 'usuarios'), async (req, res, next) => {
   try {
     // CAMBIO: recibir sede_id
-    const { nombre, email, rol, password, sede_id = null } = req.body;
+    const { nombre, email, rol, password, sede_id = null, sede_ids } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success:false, message:'Nombre obligatorio.' });
     if (!email?.trim())  return res.status(422).json({ success:false, message:'Email obligatorio.' });
@@ -179,13 +214,7 @@ router.put('/:id', authorize('admin'), auditMiddleware('usuarios:actualizado', '
     const rolesValidos = ['admin','veterinario','recepcionista','veterinario_recepcionista','groomer'];
     if (rol && !rolesValidos.includes(rol)) return res.status(422).json({ success:false, message:'Rol inválido.' });
 
-    // Validar que la sede existe (si se proporciona)
-    if (sede_id) {
-      const [sedeExiste] = await req.db.query(
-        'SELECT id FROM sedes WHERE id = ? AND activo = 1', [sede_id]
-      );
-      if (!sedeExiste) return res.status(422).json({ success:false, message:'La sede seleccionada no existe o está inactiva.' });
-    }
+    const sedes = await normalizarSedes(req.db, rol, sede_id, sede_ids);
 
     // Verificar email duplicado (excluyendo el propio)
     const [existe] = await req.db.query(
@@ -199,15 +228,16 @@ router.put('/:id', authorize('admin'), auditMiddleware('usuarios:actualizado', '
       // CAMBIO: actualizar sede_id
       await req.db.query(
         'UPDATE usuarios SET nombre=?, email=?, rol=?, sede_id=?, password=? WHERE id=?',
-        [nombre.trim(), email.trim().toLowerCase(), rol, sede_id || null, hash, req.params.id]
+        [nombre.trim(), email.trim().toLowerCase(), rol, sedes.principal, hash, req.params.id]
       );
     } else {
       // CAMBIO: actualizar sede_id
       await req.db.query(
         'UPDATE usuarios SET nombre=?, email=?, rol=?, sede_id=? WHERE id=?',
-        [nombre.trim(), email.trim().toLowerCase(), rol, sede_id || null, req.params.id]
+        [nombre.trim(), email.trim().toLowerCase(), rol, sedes.principal, req.params.id]
       );
     }
+    await guardarSedesUsuario(req.db, req.params.id, sedes.ids);
 
     return res.json({ success:true, message:'Usuario actualizado.' });
   } catch (err) { next(err); }

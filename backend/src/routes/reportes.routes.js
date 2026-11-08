@@ -13,6 +13,8 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
+const { filtroSede } = require('../services/sede.service');
+
 const router = Router();
 router.use(authenticate);
 
@@ -845,11 +847,10 @@ router.get('/dashboard-stats', async (req, res, next) => {
     const hoy  = hoyTenant(req);
     const user = req.user;
 
-    // Admin sin sede_id en query → todas las sedes; con sede_id → filtra
-    // Otros roles → siempre su sede del JWT (req.user.sede_id)
-    const sid = user.rol === 'admin' ? sedeId(req.query.sede_id) : (req.user.sede_id || null);
-    const sf  = sedeFilter(sid, 'sede_id');
-    const sc  = sedeFilter(sid, SEDE_CITA);
+    // Sede elegida en el selector; en "Todas", las sedes permitidas del usuario
+    const sid = req.sede.activa;
+    const sf  = filtroSede(req, 'sede_id');
+    const sc  = filtroSede(req, SEDE_CITA);
     const [ini, fin] = limitesUtc(hoy, sumarDias(hoy, 1), tz);
 
     const [citas] = await req.db.query(

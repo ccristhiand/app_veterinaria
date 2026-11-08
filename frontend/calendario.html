@@ -144,7 +144,6 @@
       <select id="f-vet" class="vinput" style="flex:1;min-width:140px;font-size:.78rem" onchange="cargarCitas()">
         <option value="">Todos los veterinarios</option>
       </select>
-      <div id="f-sede-wrap" style="flex:1;min-width:120px"></div>
       <div style="display:flex;gap:.25rem;flex-shrink:0">
         <button class="vista-btn activa" id="vbtn-mes"    onclick="cambiarVista('mes')"    style="font-size:.75rem;padding:.35rem .7rem">Mes</button>
         <button class="vista-btn"        id="vbtn-semana" onclick="cambiarVista('semana')" style="font-size:.75rem;padding:.35rem .7rem">Semana</button>
@@ -333,11 +332,6 @@ initPage({ activePage:'calendario', title:'Calendario de Citas', subtitle:'Vista
 
 (async () => {
   try { var u = JSON.parse(localStorage.getItem('vet_user')||'{}'); _userRol = u.rol||''; } catch {}
-
-  // Selector de sede solo para admin
-  if (_userRol === 'admin') {
-    initSelectorSede('f-sede-wrap', () => cargarCitas(), { label:'', labelTodas:'Todas las sedes', size:'small' });
-  }
 
   // Cargar veterinarios para filtro y modal
   await cargarVets();

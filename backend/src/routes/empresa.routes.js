@@ -8,11 +8,19 @@ const { auditLog, auditMiddleware, auditAuth } = require('../middlewares/audit.m
 const router = Router();
 router.use(authenticate);
 
+// Credenciales de facturación electrónica: nunca salen por esta API
+const CAMPOS_SECRETOS = ['ose_api_key', 'sunat_usuario_sol', 'sunat_clave_sol', 'nubefact_token'];
+function sinSecretos(config) {
+  const copia = { ...config };
+  CAMPOS_SECRETOS.forEach(c => delete copia[c]);
+  return copia;
+}
+
 // GET /api/v1/empresa
 router.get('/', async (req, res, next) => {
   try {
     const [config] = await req.db.query('SELECT * FROM empresa_config LIMIT 1');
-    return res.json({ success: true, data: config || {} });
+    return res.json({ success: true, data: sinSecretos(config || {}) });
   } catch (err) { next(err); }
 });
 
@@ -26,6 +34,7 @@ router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado',
       igv_porcentaje, serie_boleta, serie_factura, pie_documento,
       // ── Proformas (opcionales) ──
       serie_proforma, proforma_validez_dias, proforma_condiciones,
+      gastos_afectan_caja,
     } = req.body;
 
     if (proforma_validez_dias !== undefined && proforma_validez_dias !== null && proforma_validez_dias !== '') {
@@ -99,8 +108,16 @@ router.put('/', authorize('admin'), auditMiddleware('configuracion:actualizado',
       }
     }
 
+    if (gastos_afectan_caja !== undefined) {
+      try {
+        await req.db.query('UPDATE empresa_config SET gastos_afectan_caja=?', [gastos_afectan_caja ? 1 : 0]);
+      } catch (e) {
+        if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;   // clínica aún sin migración v22
+      }
+    }
+
     const [updated] = await req.db.query('SELECT * FROM empresa_config LIMIT 1');
-    return res.json({ success: true, data: updated, message: 'Configuración guardada.' });
+    return res.json({ success: true, data: sinSecretos(updated), message: 'Configuración guardada.' });
   } catch (err) { next(err); }
 });
 

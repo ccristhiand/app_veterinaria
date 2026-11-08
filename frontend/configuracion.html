@@ -191,6 +191,24 @@
         </div>
       </div>
 
+      <!-- Caja y gastos -->
+      <div class="vcard vcard-pad">
+        <h3 style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;margin-bottom:1rem">
+          🏦 Caja y gastos
+        </h3>
+        <label style="display:flex;align-items:flex-start;gap:.7rem;cursor:pointer">
+          <input id="c-gastos-caja" type="checkbox" checked style="width:18px;height:18px;margin-top:.1rem;accent-color:var(--green-600)"/>
+          <span>
+            <span style="display:block;font-weight:600;font-size:.86rem">Los gastos diarios afectan al cierre de caja</span>
+            <span style="display:block;font-size:.74rem;color:var(--ink-soft);margin-top:.2rem;line-height:1.5">
+              Activado: los gastos en efectivo se restan del efectivo esperado y los demás se muestran contra su método de pago.
+              Desactivado: los gastos se siguen registrando y salen en reportes, pero el cierre no los toma en cuenta.
+              Los cierres ya cerrados no cambian.
+            </span>
+          </span>
+        </label>
+      </div>
+
     </div>
 
     <!-- Preview del documento -->
@@ -241,6 +259,7 @@ initPage({ activePage:'configuracion', title:'Configuración', subtitle:'Datos d
     document.getElementById('c-serie-p').value         = d.serie_proforma        || 'P001';
     document.getElementById('c-pf-validez').value      = d.proforma_validez_dias || 30;
     document.getElementById('c-pf-condiciones').value  = d.proforma_condiciones  || '';
+    document.getElementById('c-gastos-caja').checked   = d.gastos_afectan_caja !== 0;
     // Moneda
     const moneda = d.moneda || 'PEN';
     const selectMoneda = document.getElementById('c-moneda');
@@ -398,6 +417,8 @@ async function guardar() {
     serie_proforma       : document.getElementById('c-serie-p').value.trim().toUpperCase() || 'P001',
     proforma_validez_dias: parseInt(document.getElementById('c-pf-validez').value) || 30,
     proforma_condiciones : document.getElementById('c-pf-condiciones').value.trim(),
+    // Caja
+    gastos_afectan_caja  : document.getElementById('c-gastos-caja').checked,
   };
 
   if (!body.nombre) { toast('El nombre es obligatorio.','warning'); return; }

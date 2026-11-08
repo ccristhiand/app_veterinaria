@@ -31,15 +31,6 @@
       <p id="fecha-hoy"></p>
     </div>
     <div style="display:flex;align-items:center;gap:.75rem">
-      <!-- Selector de sede — visible solo para admin, se inyecta por JS -->
-      <div id="sede-selector-wrap" style="display:none">
-        <select id="sede-selector" onchange="cambiarSede(this.value)"
-          style="padding:.45rem .9rem;border:1.5px solid var(--line);border-radius:.75rem;
-                 font-size:.82rem;font-weight:600;background:var(--card);color:var(--ink);
-                 cursor:pointer;outline:none">
-          <option value="all">🏥 Todas las sedes</option>
-        </select>
-      </div>
       <a href="citas.html" class="vbtn vbtn-primary">📅 Nueva Cita</a>
     </div>
   </div>
@@ -151,39 +142,8 @@
   document.getElementById('fecha-hoy').textContent =
     new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
-  // ── Selector de sede para admin ───────────────────────────────
-  var sedeSeleccionada = esAdmin ? 'all' : (user.sede_id || null);
-  // Sincronizar con sede global de shared.js
-  if (esAdmin && typeof _sedeSeleccionadaGlobal !== 'undefined' && _sedeSeleccionadaGlobal) {
-    sedeSeleccionada = String(_sedeSeleccionadaGlobal);
-    setSedeActiva(_sedeSeleccionadaGlobal);
-  }
-
-  async function iniciarSelectorSede() {
-    if (!esAdmin) return;
-    document.getElementById('sede-selector-wrap').style.display = 'block';
-    try {
-      const res = await api('/reportes/sedes');
-      if (!res) return;
-      const sedes = (await res.json()).data || [];
-      const sel = document.getElementById('sede-selector');
-      sedes.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = `🏥 ${s.nombre}${s.ciudad ? ' · '+s.ciudad : ''}`;
-        sel.appendChild(opt);
-      });
-    } catch {}
-  }
-
-  function cambiarSede(valor) {
-    sedeSeleccionada = valor;
-    // Actualizar subtítulo de la agenda
-    const sel = document.getElementById('sede-selector');
-    const label = sel.options[sel.selectedIndex]?.text || 'Todas las sedes';
-    document.getElementById('agenda-sub').textContent = valor === 'all' ? 'Todas las sedes — tiempo real' : label + ' — tiempo real';
-    load();
-  }
+  const _nombreSede = getSedeActivaNombre();
+  if (_nombreSede) document.getElementById('agenda-sub').textContent = _nombreSede + ' — tiempo real';
 
   // ── Carga de datos ────────────────────────────────────────────
   async function load() {
@@ -193,12 +153,8 @@
       timeZone: _tz, year:'numeric', month:'2-digit', day:'2-digit'
     }).format(new Date());
 
-    // Para admin: llama dashboard-stats con sede_id
-    // Para otros roles: el header X-Sede-Id se manda automáticamente desde shared.js
-    const sedeParam = esAdmin && sedeSeleccionada !== 'all' ? `?sede_id=${sedeSeleccionada}` : (esAdmin ? '?sede_id=all' : '');
-
     try {
-      const res = await api(`/reportes/dashboard-stats${sedeParam}`);
+      const res = await api('/reportes/dashboard-stats');
       if (!res) return;
       const d = (await res.json()).data || {};
 
@@ -220,8 +176,7 @@
 
     // Citas de hoy filtradas por sede
     try {
-      const sedeQ = esAdmin && sedeSeleccionada !== 'all' ? `&sede_id=${sedeSeleccionada}` : '';
-      const res = await api(`/citas?fecha=${hoy}&limit=50${sedeQ}`);
+      const res = await api(`/citas?fecha=${hoy}&limit=50`);
       if (!res) return;
       const citas = (await res.json()).data || [];
       renderCitas(citas);
@@ -232,8 +187,7 @@
 
     // Stock bajo
     try {
-      const sedeQ = esAdmin && sedeSeleccionada !== 'all' ? `?sede_id=${sedeSeleccionada}` : '';
-      const res = await api(`/inventario${sedeQ}`);
+      const res = await api('/inventario');
       if (!res) return;
       const items = ((await res.json()).data || []).filter(i => i.bajo_stock);
       document.getElementById('stock-list').innerHTML = items.length
@@ -279,9 +233,8 @@
   }
 
   function filtrarPorSede(sedeId) {
-    const sel = document.getElementById('sede-selector');
-    if (sel) sel.value = sedeId;
-    cambiarSede(sedeId);
+    setSedeActiva(sedeId);
+    location.reload();
   }
 
   function renderCitas(citas) {
@@ -308,10 +261,7 @@
 
   // Tiempo real — solo agregar citas de la sede filtrada
   getSocket().on('cita:nueva', msg => {
-    const citaSede = msg.payload?.sede_id;
-    const sedeOk = !sedeSeleccionada || sedeSeleccionada === 'all' ||
-                   String(citaSede) === String(sedeSeleccionada);
-    if (!sedeOk) return;
+    if (!sedeVisible(msg.payload?.sede_id)) return;
 
     const tbody = document.getElementById('citas-hoy');
     const empty = tbody.querySelector('.vempty');
@@ -326,7 +276,7 @@
   });
 
   // Iniciar
-  iniciarSelectorSede().then(() => load());
+  load();
 </script>
 </body>
 </html>

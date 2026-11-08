@@ -3,25 +3,12 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
-const { qConn, gastosParaCierre, totalesPorMetodo } = require('../services/gastos.service');
+const { qConn, gastosParaCierre, gastosAfectanCaja, totalesPorMetodo } = require('../services/gastos.service');
+const { filtroSede, filtroUnaSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
 
 const router = Router();
 router.use(authenticate);
 router.use(authorize('admin', 'recepcionista'));
-
-// ── Helper: filtro de sede ────────────────────────────────────────
-function getSedeFiltro(req) {
-  const user   = req.user;
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (user.rol === 'admin') return header || null;
-  return user.sede_id || header || null;
-}
-
-function sedeSQL(sedeId, col) {
-  col = col || 'sede_id';
-  if (!sedeId) return { sql: '', params: [] };
-  return { sql: 'AND ' + col + ' = ?', params: [sedeId] };
-}
 
 // Gastos vigentes ligados a cada cierre → { cierreId: [gastos] }
 async function gastosDeCierres(req, ids) {
@@ -44,9 +31,10 @@ router.get('/resumen-dia', async (req, res, next) => {
   try {
     const { fecha, turno } = req.query;
     const dia    = fecha || new Date().toISOString().split('T')[0];
-    const sedeId = getSedeFiltro(req);
-    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
-    const { sql: sf,  params: sp  } = sedeSQL(sedeId, 'sede_id');
+    // En "Todas" se ve el consolidado; cerrar caja exige una sede concreta
+    const sedeId = req.sede.activa;
+    const { sql: sff, params: spf } = filtroSede(req, 'f.sede_id');
+    const { sql: sf,  params: sp  } = filtroSede(req, 'sede_id');
 
     const [totales] = await req.db.query(
       `SELECT
@@ -63,13 +51,16 @@ router.get('/resumen-dia', async (req, res, next) => {
       [dia, ...spf]
     );
 
-    const [cierreExistente] = await req.db.query(
-      `SELECT id, estado, conteo_fisico, diferencia, total_gastos, gastos_efectivo, monto_inicial, observaciones
-       FROM caja_cierres
-       WHERE fecha = ? AND turno = ? ${sedeId ? 'AND sede_id = ?' : ''}
-       ORDER BY created_at DESC LIMIT 1`,
-      [dia, turno || 'dia_completo', ...(sedeId ? [sedeId] : [])]
-    );
+    let cierreExistente = null;
+    if (sedeId) {
+      [cierreExistente] = await req.db.query(
+        `SELECT id, estado, conteo_fisico, diferencia, total_gastos, gastos_efectivo, monto_inicial, observaciones
+         FROM caja_cierres
+         WHERE fecha = ? AND turno = ? AND sede_id = ?
+         ORDER BY created_at DESC LIMIT 1`,
+        [dia, turno || 'dia_completo', sedeId]
+      );
+    }
 
     const [pendientes] = await req.db.query(
       `SELECT COUNT(*) AS total, COALESCE(SUM(total),0) AS monto
@@ -78,6 +69,7 @@ router.get('/resumen-dia', async (req, res, next) => {
     );
 
     // Gastos del módulo Gastos diarios que entran a este cierre
+    const afectan = await gastosAfectanCaja(req.db.query);
     let gastos;
     if (cierreExistente?.estado === 'cerrado') {
       gastos = await req.db.query(
@@ -86,14 +78,19 @@ router.get('/resumen-dia', async (req, res, next) => {
          WHERE g.cierre_id = ? AND g.anulado = 0 ORDER BY g.created_at ASC`,
         [cierreExistente.id]
       );
+    } else if (afectan) {
+      gastos = await gastosParaCierre(req.db.query, { fecha: dia, filtro: filtroSede(req, 'g.sede_id'), cierreId: cierreExistente?.id });
     } else {
-      gastos = await gastosParaCierre(req.db.query, { fecha: dia, sedeId, cierreId: cierreExistente?.id });
+      gastos = [];
     }
 
     return res.json({
       success: true,
       data: { fecha: dia, turno: turno || 'dia_completo', totales, pendientes,
-              cierre_existente: cierreExistente || null, gastos, gastos_totales: totalesPorMetodo(gastos) },
+              cierre_existente: cierreExistente || null, gastos, gastos_totales: totalesPorMetodo(gastos),
+              // Un cierre ya cerrado conserva los gastos con los que se cerró
+              gastos_afectan_caja: afectan || gastos.length > 0,
+              consolidado: !sedeId },
     });
   } catch (err) { next(err); }
 });
@@ -104,7 +101,6 @@ router.get('/cierres', async (req, res, next) => {
     const { desde, hasta, page = 1 } = req.query;
     const limit   = 20;
     const offset  = (parseInt(page) - 1) * limit;
-    const sedeId  = getSedeFiltro(req);
 
     let sql = `SELECT cc.*, u.nombre AS realizado_por, s.nombre AS sede_nombre
                FROM caja_cierres cc
@@ -113,7 +109,8 @@ router.get('/cierres', async (req, res, next) => {
                WHERE 1=1`;
     const params = [];
 
-    if (sedeId) { sql += ' AND cc.sede_id = ?'; params.push(sedeId); }
+    const fs = filtroSede(req, 'cc.sede_id');
+    sql += ` ${fs.sql}`; params.push(...fs.params);
     if (desde)  { sql += ' AND cc.fecha >= ?';  params.push(desde); }
     if (hasta)  { sql += ' AND cc.fecha <= ?';  params.push(hasta); }
 
@@ -136,6 +133,7 @@ router.get('/cierres/:id', async (req, res, next) => {
        WHERE cc.id = ?`, [req.params.id]
     );
     if (!cierre) return res.status(404).json({ success: false, message: 'No encontrado.' });
+    exigirAcceso(req, cierre.sede_id);
     cierre.gastos = (await gastosDeCierres(req, [cierre.id]))[cierre.id] || [];
     return res.json({ success: true, data: cierre });
   } catch (err) { next(err); }
@@ -150,11 +148,9 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
     if (conteo_fisico === undefined || conteo_fisico === null)
       return res.status(422).json({ success: false, message: 'conteo_fisico requerido.' });
 
-    // Sede del usuario que cierra caja
-    const sedeId = req.user.sede_id ||
-                   (req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null);
-    const { sql: sff, params: spf } = sedeSQL(sedeId, 'f.sede_id');
-    const sp = sedeId ? [sedeId] : [];
+    // Cada cierre es de una sede concreta: la seleccionada
+    const sedeId = sedeEscritura(req);
+    const { sql: sff, params: spf } = filtroUnaSede(sedeId, 'f.sede_id');
 
     const [totales] = await req.db.query(
       `SELECT
@@ -173,16 +169,20 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
     const result = await req.db.withTransaction(async (conn) => {
       const [[existente]] = await conn.execute(
         `SELECT id, estado FROM caja_cierres
-         WHERE fecha=? AND turno=? ${sedeId ? 'AND sede_id=?' : ''}
+         WHERE fecha=? AND turno=? AND sede_id=?
          ORDER BY created_at DESC LIMIT 1`,
-        [fecha, turno, ...sp]
+        [fecha, turno, sedeId]
       );
       if (existente?.estado === 'cerrado')
         throw Object.assign(new Error('Ya existe un cierre definitivo para este día/turno.'), { status: 422 });
 
       // Gastos del día/sede que entran a este cierre, desglosados por método de pago.
       // Solo el efectivo sale de la caja física; el resto se descuenta de su propio método.
-      const gastos = await gastosParaCierre(qConn(conn), { fecha, sedeId, cierreId: existente?.id });
+      // Con la opción apagada en Configuración, los gastos no entran al cierre.
+      const afectan = await gastosAfectanCaja(qConn(conn));
+      const gastos  = afectan
+        ? await gastosParaCierre(qConn(conn), { fecha, filtro: filtroUnaSede(sedeId, 'g.sede_id'), cierreId: existente?.id })
+        : [];
       const gt     = totalesPorMetodo(gastos);
       const efectivoEsperado = parseFloat(monto_inicial) + parseFloat(totales.efectivo) - gt.efectivo;
       const diferencia       = parseFloat((parseFloat(conteo_fisico) - efectivoEsperado).toFixed(2));
@@ -202,6 +202,7 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
            conteo_fisico, diferencia, estado, observaciones || null, existente.id]
         );
         cierreId = existente.id;
+        if (!afectan) await conn.execute('UPDATE gastos SET cierre_id = NULL WHERE cierre_id = ?', [cierreId]);
       } else {
         const [ins] = await conn.execute(
           `INSERT INTO caja_cierres
@@ -242,8 +243,9 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
 // PATCH /api/v1/caja/cierres/:id/cerrar
 router.patch('/cierres/:id/cerrar', authorize('admin'), auditMiddleware('caja:actualizado', 'caja'), async (req, res, next) => {
   try {
-    const [c] = await req.db.query('SELECT id, estado FROM caja_cierres WHERE id=?', [req.params.id]);
+    const [c] = await req.db.query('SELECT id, estado, sede_id FROM caja_cierres WHERE id=?', [req.params.id]);
     if (!c) return res.status(404).json({ success: false, message: 'No encontrado.' });
+    exigirAcceso(req, c.sede_id);
     if (c.estado === 'cerrado') return res.status(422).json({ success: false, message: 'Ya está cerrado.' });
     await req.db.query("UPDATE caja_cierres SET estado='cerrado' WHERE id=?", [req.params.id]);
     return res.json({ success: true, message: 'Caja cerrada definitivamente.' });

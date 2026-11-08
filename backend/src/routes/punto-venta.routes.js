@@ -18,6 +18,8 @@
 const { Router } = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
+const { filtroSede } = require('../services/sede.service');
+
 const router = Router();
 router.use(authenticate);
 router.use(authorize('admin', 'recepcionista', 'veterinario_recepcionista'));
@@ -28,13 +30,6 @@ function hoyLima(tz) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: tz || 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
-}
-
-// Misma regla de sede que inventario: el usuario con sede ve su sede + ítems sin sede
-function getSedeFiltro(req) {
-  const header = req.headers['x-sede-id'] ? parseInt(req.headers['x-sede-id']) : null;
-  if (req.user.rol === 'admin') return header || null;
-  return req.user.sede_id || header || null;
 }
 
 function migracionFaltante(err) {
@@ -130,9 +125,7 @@ router.get('/buscar', async (req, res, next) => {
     const q = String(req.query.q || '').trim().slice(0, 60);
     if (!q) return res.json({ success: true, data: { exacto: null, resultados: [] } });
 
-    const sedeId   = getSedeFiltro(req);
-    const sedeSql  = sedeId ? ' AND (sede_id = ? OR sede_id IS NULL)' : '';
-    const sedePar  = sedeId ? [sedeId] : [];
+    const { sql: sedeSql, params: sedePar } = filtroSede(req, 'sede_id');
 
     // 1) Código de barras exacto
     let exacto = null;
@@ -175,13 +168,12 @@ router.get('/buscar', async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════
 router.get('/favoritos', async (req, res, next) => {
   try {
-    const sedeId  = getSedeFiltro(req);
-    const sedeSql = sedeId ? ' AND (sede_id = ? OR sede_id IS NULL)' : '';
+    const { sql: sedeSql, params: sedePar } = filtroSede(req, 'sede_id');
     let rows;
     try {
       rows = await req.db.query(
         `SELECT * FROM inventario WHERE favorito = 1 ${sedeSql} ORDER BY nombre LIMIT 24`,
-        sedeId ? [sedeId] : []
+        sedePar
       );
     } catch (e) { if (migracionFaltante(e)) return errorMigracion(res); throw e; }
     return res.json({ success: true, data: rows.map(mapProducto) });
@@ -193,7 +185,7 @@ router.get('/favoritos', async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════
 router.get('/ventas-hoy', async (req, res, next) => {
   try {
-    const sedeId = getSedeFiltro(req);
+    const fs = filtroSede(req, 'f.sede_id');
     let rows;
     try {
       rows = await req.db.query(
@@ -203,9 +195,9 @@ router.get('/ventas-hoy', async (req, res, next) => {
          FROM facturas f
          JOIN propietarios p ON p.id = f.propietario_id
          LEFT JOIN usuarios u ON u.id = f.emitido_por_id
-         WHERE f.origen = 'punto_venta' AND f.fecha = ? ${sedeId ? 'AND f.sede_id = ?' : ''}
+         WHERE f.origen = 'punto_venta' AND f.fecha = ? ${fs.sql}
          ORDER BY f.id DESC LIMIT 20`,
-        [hoyLima(req.tenant?.zona_horaria), ...(sedeId ? [sedeId] : [])]
+        [hoyLima(req.tenant?.zona_horaria), ...fs.params]
       );
     } catch (e) { if (migracionFaltante(e)) return errorMigracion(res); throw e; }
 

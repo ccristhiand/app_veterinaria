@@ -2,6 +2,7 @@
 
 const jwt    = require('jsonwebtoken');
 const logger = require('../config/logger');
+const { contextoSede } = require('../services/sede.service');
 
 const ACCESS_SECRET  = process.env.JWT_SECRET         || 'vetclinic-secret-key';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'vetclinic-refresh-key';
@@ -53,6 +54,11 @@ async function authenticate(req, res, next) {
     if (user.rol === 'groomer' && !groomerPuede(req)) {
       return res.status(403).json({ success: false, message: 'Tu rol (Groomer) no tiene acceso a esta sección.' });
     }
+
+    req.sede = await contextoSede(req.db, user, req.headers['x-sede-id']);
+    if (req.sede.headerInvalido) {
+      return res.status(403).json({ success: false, code: 'SEDE_NO_PERMITIDA', message: 'No tienes acceso a la sede seleccionada.' });
+    }
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -90,8 +96,9 @@ async function verifySocketToken(token) {
   return decoded;
 }
 
-function signTokens(user) {
-  const payload = { id: user.id, rol: user.rol, nombre: user.nombre, sede_id: user.sede_id || null };
+// tenantKey: clínica del usuario; separa los eventos en tiempo real por clínica
+function signTokens(user, tenantKey = null) {
+  const payload = { id: user.id, rol: user.rol, nombre: user.nombre, sede_id: user.sede_id || null, tk: tenantKey };
   return {
     accessToken : jwt.sign(payload, ACCESS_SECRET,  { expiresIn: '8h' }),
     refreshToken: jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' }),
