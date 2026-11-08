@@ -64,6 +64,17 @@ async function exigirSedeDeCita(req) {
   if (c) exigirAcceso(req, c.sede_id);
 }
 
+// Un veterinario inactivo no recibe citas nuevas; al editar se permite conservar el que ya tenía la cita
+async function veterinarioInactivo(req, veterinarioId, citaId = null) {
+  const [u] = await req.db.query(
+    `SELECT 1 AS inactivo FROM usuarios u
+     WHERE u.id = ? AND u.activo = 0
+       AND NOT EXISTS (SELECT 1 FROM citas c WHERE c.id = ? AND c.veterinario_id = u.id)`,
+    [veterinarioId, citaId]
+  );
+  return !!u;
+}
+
 // GET /api/v1/citas/:id
 router.get('/:id', async (req, res, next) => {
   try {
@@ -94,6 +105,8 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
 
     if (!mascota_id || !veterinario_id || !fecha_hora || !motivo)
       return res.status(422).json({ success: false, message: 'Campos obligatorios faltantes.' });
+    if (await veterinarioInactivo(req, veterinario_id))
+      return res.status(422).json({ success: false, message: 'El veterinario seleccionado está inactivo.' });
 
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
     const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
@@ -134,6 +147,8 @@ router.put('/:id', auditMiddleware('citas:actualizado', 'citas'), async (req, re
     if (await citaAjenaAlGroomer(req))
       return res.status(404).json({ success: false, message: 'Cita no encontrada.' });
     await exigirSedeDeCita(req);
+    if (await veterinarioInactivo(req, veterinario_id, req.params.id))
+      return res.status(422).json({ success: false, message: 'El veterinario seleccionado está inactivo.' });
     const tiposValidos = ['medica','vacuna','desparasitacion','estetica'];
     const tipoCitaFinal = esGroomer(req) ? 'estetica' : (tiposValidos.includes(tipo_cita) ? tipo_cita : 'medica');
 

@@ -459,7 +459,7 @@ async function cargarVets() {
   if (!sel) return;
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
+    var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer&activo=true');
     if (!res) return;
     var vets = (await res.json()).data || [];
     sel.innerHTML = vets.length
@@ -787,7 +787,7 @@ async function abrirEditarCita(id) {
   var sel = document.getElementById('edit-cita-vet');
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
-    var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
+    var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer&activo=true');
     var vets = rv ? (await rv.json()).data || [] : [];
     sel.innerHTML = '<option value="">Seleccionar…</option>' +
       vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
@@ -804,6 +804,9 @@ async function abrirEditarCita(id) {
     var fLocal = new Date(c.fecha_hora);
     var pad    = n => String(n).padStart(2,'0');
     document.getElementById('edit-cita-fecha').value    = fLocal.getFullYear()+'-'+pad(fLocal.getMonth()+1)+'-'+pad(fLocal.getDate())+'T'+pad(fLocal.getHours())+':'+pad(fLocal.getMinutes());
+    // Si la cita ya tiene un veterinario que no está en la lista (p. ej. inactivo), se conserva
+    if (c.veterinario_id && !sel.querySelector('option[value="'+c.veterinario_id+'"]'))
+      sel.insertAdjacentHTML('beforeend', '<option value="'+c.veterinario_id+'">🩺 '+esc(c.veterinario_nombre||'')+' (actual)</option>');
     document.getElementById('edit-cita-vet').value      = c.veterinario_id;
     document.getElementById('edit-cita-duracion').value = c.duracion_min || 30;
     document.getElementById('edit-cita-motivo').value   = c.motivo || '';

@@ -1026,7 +1026,7 @@ function abrirNuevaCita(fecha, hora) {
   // Llenar vets en el select del modal
   var sel = document.getElementById('nc-vet');
   sel.innerHTML = '<option value="">Seleccionar veterinario…</option>'+
-    _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+    _vets.filter(v=>v.activo).map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
 
   document.getElementById('ncita-titulo').textContent = fecha
     ? '📅 Nueva Cita — '+new Date(fecha+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',day:'numeric',month:'short'})
