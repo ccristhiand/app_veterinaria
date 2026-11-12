@@ -5,6 +5,7 @@
 --
 -- · Crea usuario_sedes y copia ahí la sede actual de cada usuario.
 -- · Agrega empresa_config.gastos_afectan_caja (activado por defecto).
+-- · Agrega servicios_estetica.sede_id si la clínica no la tiene.
 -- · Los usuarios no-admin sin sede pasan a la sede principal.
 -- · Los registros sin sede pasan a la sede de su cita/veterinario o a la principal.
 -- · Se puede ejecutar varias veces.
@@ -12,6 +13,7 @@
 -- ============================================================
 
 USE vet_mascotilandia;          -- ← clínica a migrar
+SET SQL_SAFE_UPDATES = 0;       -- Workbench bloquea UPDATE sin clave en el WHERE (Error 1175)
 
 -- ── 1. Sedes por usuario ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS usuario_sedes (
@@ -31,6 +33,14 @@ SET @sql := IF(
     WHERE TABLE_SCHEMA=@db AND TABLE_NAME='empresa_config' AND COLUMN_NAME='gastos_afectan_caja') = 0,
   'ALTER TABLE empresa_config ADD COLUMN gastos_afectan_caja TINYINT(1) NOT NULL DEFAULT 1',
   'SELECT ''gastos_afectan_caja ya existe'' AS info');
+PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- ── 2b. servicios_estetica.sede_id (clínicas creadas con el schema v7 no la tienen) ──
+SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='servicios_estetica' AND COLUMN_NAME='sede_id') = 0,
+  'ALTER TABLE servicios_estetica ADD COLUMN sede_id INT UNSIGNED NULL DEFAULT NULL AFTER observaciones, ADD INDEX idx_sede (sede_id)',
+  'SELECT ''servicios_estetica.sede_id ya existe'' AS info');
 PREPARE st FROM @sql; EXECUTE st; DEALLOCATE PREPARE st;
 
 -- ── 3. Sede principal de la clínica ───────────────────────────
@@ -83,3 +93,5 @@ SELECT 'despues' AS momento,
        (SELECT COUNT(*) FROM gastos             WHERE sede_id IS NULL) AS gastos,
        (SELECT COUNT(*) FROM servicios_estetica WHERE sede_id IS NULL) AS estetica,
        (SELECT COUNT(DISTINCT usuario_id) FROM usuario_sedes)          AS usuarios_con_sedes;
+
+SET SQL_SAFE_UPDATES = 1;

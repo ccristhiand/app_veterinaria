@@ -71,13 +71,18 @@ async function authenticate(req, res, next) {
 /**
  * Middleware de autorización por rol.
  * Uso: authorize('admin', 'veterinario')
+ * veterinario_recepcionista entra a todo lo que permite 'veterinario' o 'recepcionista'.
  */
 function authorize(...roles) {
+  const permitidos = new Set(roles);
+  if (permitidos.has('veterinario') || permitidos.has('recepcionista')) {
+    permitidos.add('veterinario_recepcionista');
+  }
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'No autenticado.' });
     }
-    if (!roles.includes(req.user.rol)) {
+    if (!permitidos.has(req.user.rol)) {
       return res.status(403).json({
         success: false,
         message: `Acceso denegado. Se requiere rol: ${roles.join(' o ')}.`,
