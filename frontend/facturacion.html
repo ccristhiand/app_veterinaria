@@ -1445,6 +1445,21 @@ function actualizarPagoRestante(totalOverride) {
   el.style.color = Math.abs(restante) < 0.01 ? '#15803d' : restante < 0 ? '#be123c' : '#b45309';
 }
 
+// Resumen de montos para los avisos de pago parcial (filas + saldo destacado)
+function resumenSaldoHtml(filas, saldo, nota) {
+  var fila = (label, monto) =>
+    '<div style="display:flex;justify-content:space-between;padding:.3rem 0">' +
+      '<span>'+label+'</span><span style="font-weight:600;color:#1a2e28">S/. '+monto.toFixed(2)+'</span></div>';
+  return '<div style="border:1px solid #e5e7eb;border-radius:.85rem;padding:.6rem .9rem;margin-bottom:.8rem">' +
+      filas.map(f => fila(f[0], f[1])).join('') +
+      '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #e5e7eb;margin-top:.35rem;padding-top:.55rem">' +
+        '<span style="font-weight:700;color:#b45309">Saldo pendiente</span>' +
+        '<span style="font-weight:800;font-size:1.05rem;color:#b45309">S/. '+saldo.toFixed(2)+'</span>' +
+      '</div>' +
+    '</div>' +
+    '<p style="margin:0;font-size:.8rem;color:#6b7280">'+nota+'</p>';
+}
+
 // ── Emitir factura ────────────────────────────────────────────────
 async function emitirFactura() {
   if (!propFacSel) { toast('Selecciona un propietario.','warning'); return; }
@@ -1490,8 +1505,19 @@ async function emitirFactura() {
   if (sumaPagos > totalDoc + 0.01) {
     toast('Los pagos (S/. '+sumaPagos.toFixed(2)+') superan el total (S/. '+totalDoc.toFixed(2)+'). Corrige los montos.','warning'); return;
   }
-  if (sumaPagos > 0 && sumaPagos < totalDoc - 0.01 &&
-      !confirm('El pago es menor al total. Quedará con saldo pendiente de S/. '+(totalDoc-sumaPagos).toFixed(2)+' para cobrar después. ¿Continuar?')) return;
+  if (sumaPagos > 0 && sumaPagos < totalDoc - 0.01) {
+    var okAdelanto = await vconfirm({
+      titulo  : 'Emitir con pago parcial',
+      mensaje : resumenSaldoHtml([
+                  ['Total del comprobante', totalDoc],
+                  ['Pago recibido ahora',   sumaPagos],
+                ], totalDoc - sumaPagos,
+                'El comprobante quedará como <b>Parcial</b> y podrás cobrar el saldo después con <b>Cobrar saldo</b>.'),
+      labelOk : 'Emitir con saldo',
+      tipo    : 'info',
+    });
+    if (!okAdelanto) return;
+  }
 
   var descGlobalPct  = parseFloat(document.getElementById('nf-desc-global')?.value)||0;
   var comisionPct    = parseFloat(document.getElementById('nf-comision-pct')?.value)||0;
@@ -2164,8 +2190,19 @@ async function confirmarPago() {
   if (totalPagado > pagarTotalActual + 0.01) {
     toast('El pago (S/. '+totalPagado.toFixed(2)+') supera el saldo pendiente (S/. '+pagarTotalActual.toFixed(2)+').','warning'); return;
   }
-  if (totalPagado < pagarTotalActual - 0.01 &&
-      !confirm('Es un pago parcial. Quedará un saldo pendiente de S/. '+(pagarTotalActual-totalPagado).toFixed(2)+'. ¿Continuar?')) return;
+  if (totalPagado < pagarTotalActual - 0.01) {
+    var okAbono = await vconfirm({
+      titulo  : 'Registrar abono parcial',
+      mensaje : resumenSaldoHtml([
+                  ['Saldo actual',       pagarTotalActual],
+                  ['Abono de este pago', totalPagado],
+                ], pagarTotalActual - totalPagado,
+                'El comprobante seguirá como <b>Parcial</b> hasta cobrar el saldo restante.'),
+      labelOk : 'Registrar abono',
+      tipo    : 'info',
+    });
+    if (!okAbono) return;
+  }
   try {
     var res = await api('/facturas/'+id+'/pagar',{method:'PATCH',body:{pagos}});
     if (!res) return;
