@@ -993,7 +993,7 @@ async function cargarVets() {
     var res = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer');
     _vets   = res?.ok ? (await res.json()).data || [] : [];
     var opts = '<option value="">Todos los veterinarios</option>' +
-      _vets.map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+      opcionesProfesionales(_vets, 'estetica');   // filtro: todos, cada uno con su rol
     var fvet = document.getElementById('f-vet');
     if (fvet) fvet.innerHTML = opts;
   } catch {}
@@ -1024,9 +1024,8 @@ function abrirNuevaCita(fecha, hora) {
   document.getElementById('nc-fecha').value = fh;
 
   // Llenar vets en el select del modal
-  var sel = document.getElementById('nc-vet');
-  sel.innerHTML = '<option value="">Seleccionar veterinario…</option>'+
-    _vets.filter(v=>v.activo).map(v=>'<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+  document.getElementById('nc-vet').value = '';
+  pintarProfesionalesNC(document.getElementById('nc-tipo').value || 'medica');
 
   document.getElementById('ncita-titulo').textContent = fecha
     ? '📅 Nueva Cita — '+new Date(fecha+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short',day:'numeric',month:'short'})
@@ -1044,6 +1043,17 @@ function selTipoNC(tipo) {
     var btn = document.getElementById('nc-tipo-'+t);
     if (btn) btn.className = 'tipo-btn-cal'+(t===tipo?' sel-'+t:'');
   });
+  pintarProfesionalesNC(tipo);
+}
+
+// Selector de profesional de la nueva cita: en estética aparecen los groomers, marcados con su rol
+function pintarProfesionalesNC(tipo) {
+  var sel = document.getElementById('nc-vet');
+  if (!sel) return;
+  var actual = sel.value;
+  sel.innerHTML = '<option value="">' + (tipo === 'estetica' ? 'Seleccionar groomer o doctor…' : 'Seleccionar veterinario…') + '</option>' +
+    opcionesProfesionales(_vets.filter(v => v.activo), tipo, actual);
+  sel.value = sel.querySelector('option[value="'+actual+'"]') ? actual : '';
 }
 
 // Buscar propietario (igual que citas no calendarizadas)

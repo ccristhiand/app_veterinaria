@@ -218,7 +218,9 @@
 
       tbody.innerHTML = data.map((log, i) => {
         const fechaStr = fDate(log.created_at);
-        const horaStr  = new Date(log.created_at).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        // created_at ya viene en hora Lima (con 'Z' falsa): parseServerDate evita restarle 5 h otra vez
+        const fechaSrv = parseServerDate(log.created_at);
+        const horaStr  = fechaSrv ? fechaSrv.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: ADMIN_TZ }) : '—';
         const moduloIcons = {
           autenticacion:'lock', mascotas:'paw', propietarios:'users', citas:'calendar',
           historia_clinica:'logs', facturacion:'money', inventario:'box', vacunas:'plus',

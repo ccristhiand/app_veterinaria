@@ -599,8 +599,9 @@
       <div style="background:var(--green-50);border:1px solid var(--green-200);border-radius:.9rem;
         padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
         <div>
-          <p style="font-size:.68rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Total a cobrar</p>
+          <p style="font-size:.68rem;color:var(--green-700);font-weight:700;text-transform:uppercase;letter-spacing:.08em">Saldo a cobrar</p>
           <p style="font-size:1.4rem;font-weight:800;color:var(--green-700)" id="pagar-total">S/. 0.00</p>
+          <p id="pagar-info-adelanto" style="display:none;font-size:.7rem;color:var(--ink-soft);margin-top:.15rem"></p>
         </div>
         <div style="text-align:right">
           <p style="font-size:.68rem;color:var(--ink-faint)">Pendiente</p>
@@ -921,6 +922,14 @@ function badgeSUNAT(f) {
   return '<span style="font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Error</span>';
 }
 
+// ── Pagos parciales (adelantos) ───────────────────────────────────
+function saldoDe(f) {
+  return Math.max(Math.round((parseFloat(f.total) - (parseFloat(f.pagado)||0)) * 100) / 100, 0);
+}
+function esPagoParcial(f) {
+  return f.estado === 'pendiente' && (parseFloat(f.pagado)||0) > 0;
+}
+
 async function cargarFacturas() {
   var tbody = document.getElementById('tbody-facturas');
   var cardsEl = document.getElementById('cards-facturas');
@@ -943,14 +952,17 @@ async function cargarFacturas() {
       return;
     }
     tbody.innerHTML = rows.map(f=>{
+      var esParcial = esPagoParcial(f);
       var estadoBadge =
         f.estado==='pagado'   ? '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">✅ Pagado</span>' :
+        esParcial             ? '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">🌓 Parcial</span>' :
         f.estado==='pendiente'? '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:#fffbeb;color:#b45309;border:1px solid #fde68a">⏳ Pendiente</span>' :
                                 '<span style="font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;background:#fff1f2;color:#be123c;border:1px solid #fecdd3">❌ Anulado</span>';
       // Badge de descuento si tiene
       var tieneDesc = (parseFloat(f.descuento_items||0)+parseFloat(f.descuento_global||0)) > 0;
       var totalFmt  = 'S/. '+parseFloat(f.total).toFixed(2) +
-        (tieneDesc ? ' <span class="desc-badge">desc.</span>' : '');
+        (tieneDesc ? ' <span class="desc-badge">desc.</span>' : '') +
+        (esParcial ? '<div style="font-size:.65rem;font-weight:600;color:#b45309;margin-top:.15rem">Pagado S/. '+parseFloat(f.pagado).toFixed(2)+' · Saldo S/. '+saldoDe(f).toFixed(2)+'</div>' : '');
       return '<tr>' +
         '<td><span style="font-family:monospace;font-size:.78rem;font-weight:700">'+esc(f.numero)+'</span>' +
         ' <span style="font-size:.65rem;background:'+(f.tipo==='factura'?'#eff6ff':'#f0fdf4')+';color:'+(f.tipo==='factura'?'#1d4ed8':'#15803d')+';padding:.1rem .4rem;border-radius:999px;font-weight:700">'+f.tipo+'</span></td>' +
@@ -963,7 +975,7 @@ async function cargarFacturas() {
         '<td>'+badgeSUNAT(f)+'</td>' +
         '<td style="display:flex;gap:.3rem;flex-wrap:wrap">' +
           '<button class="vlink" onclick="verFactura('+f.id+')" style="font-size:.72rem">👁️ Ver</button>' +
-          (f.estado==='pendiente'?'<button class="vlink" onclick="abrirPagar('+f.id+','+parseFloat(f.total)+')" style="font-size:.72rem;color:#15803d">💳 Cobrar</button>':'') +
+          (f.estado==='pendiente'?'<button class="vlink" onclick="abrirPagar('+f.id+','+parseFloat(f.total)+','+(parseFloat(f.pagado)||0)+')" style="font-size:.72rem;color:#15803d">💳 '+(esParcial?'Cobrar saldo':'Cobrar')+'</button>':'') +
           (f.estado!=='anulado' && f.sunat_estado==='0'?'<button class="vlink" onclick="emitirSUNAT('+f.id+',\''+esc(f.numero)+'\')" style="font-size:.72rem;color:#d97706">📤 SUNAT</button>':'') +
           (f.estado!=='anulado' && !f.sunat_estado?'<button class="vlink" onclick="abrirAnular('+f.id+',\''+esc(f.numero)+'\',\''+esc(f.propietario_nombre)+'\','+parseFloat(f.total)+',false)" style="font-size:.72rem;color:#be123c">🚫 Anular</button>':'') +
           (f.sunat_estado==='0'?'<button class="vlink" onclick="abrirAnular('+f.id+',\''+esc(f.numero)+'\',\''+esc(f.propietario_nombre)+'\','+parseFloat(f.total)+',true)" style="font-size:.72rem;color:#6d28d9">📋 N.Créd.</button>':'') +
@@ -975,9 +987,10 @@ async function cargarFacturas() {
     var cardsEl = document.getElementById('cards-facturas');
     if (cardsEl) {
       cardsEl.innerHTML = rows.map(f => {
-        var estadoColor = f.estado==='pagado' ? '#15803d' : f.estado==='pendiente' ? '#b45309' : '#be123c';
-        var estadoBg    = f.estado==='pagado' ? '#f0fdf4' : f.estado==='pendiente' ? '#fffbeb' : '#fff1f2';
-        var estadoLabel = f.estado==='pagado' ? '✅ Pagado' : f.estado==='pendiente' ? '⏳ Pendiente' : '❌ Anulado';
+        var esParcial   = esPagoParcial(f);
+        var estadoColor = f.estado==='pagado' ? '#15803d' : esParcial ? '#1d4ed8' : f.estado==='pendiente' ? '#b45309' : '#be123c';
+        var estadoBg    = f.estado==='pagado' ? '#f0fdf4' : esParcial ? '#eff6ff' : f.estado==='pendiente' ? '#fffbeb' : '#fff1f2';
+        var estadoLabel = f.estado==='pagado' ? '✅ Pagado' : esParcial ? '🌓 Parcial' : f.estado==='pendiente' ? '⏳ Pendiente' : '❌ Anulado';
         var tieneDesc   = (parseFloat(f.descuento_items||0)+parseFloat(f.descuento_global||0)) > 0;
         return `<div style="background:#fff;border:1px solid var(--line);border-radius:1rem;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.6rem">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
@@ -996,11 +1009,12 @@ async function cargarFacturas() {
             <div style="text-align:right">
               <p style="font-size:1.15rem;font-weight:800;color:var(--green-700)">S/. ${parseFloat(f.total).toFixed(2)}</p>
               ${tieneDesc ? '<p style="font-size:.62rem;color:#be123c;font-weight:700">con descuento</p>' : ''}
+              ${esParcial ? `<p style="font-size:.65rem;color:#b45309;font-weight:600">Pagado S/. ${parseFloat(f.pagado).toFixed(2)} · Saldo S/. ${saldoDe(f).toFixed(2)}</p>` : ''}
             </div>
           </div>
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;padding-top:.5rem;border-top:1px solid var(--line)">
             <button class="vbtn vbtn-ghost" onclick="verFactura(${f.id})" style="font-size:.75rem;padding:.38rem .75rem;flex:1">👁️ Ver</button>
-            ${f.estado==='pendiente' ? `<button class="vbtn vbtn-primary" onclick="abrirPagar(${f.id},${parseFloat(f.total)})" style="font-size:.75rem;padding:.38rem .75rem;flex:1">💳 Cobrar</button>` : ''}
+            ${f.estado==='pendiente' ? `<button class="vbtn vbtn-primary" onclick="abrirPagar(${f.id},${parseFloat(f.total)},${parseFloat(f.pagado)||0})" style="font-size:.75rem;padding:.38rem .75rem;flex:1">💳 ${esParcial?'Cobrar saldo':'Cobrar'}</button>` : ''}
             ${f.estado!=='anulado' && !f.sunat_estado ? `<button class="vbtn" onclick="abrirAnular(${f.id},'${esc(f.numero)}','${esc(f.propietario_nombre)}',${parseFloat(f.total)},false)" style="font-size:.75rem;padding:.38rem .75rem;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;flex:1">🚫 Anular</button>` : ''}
           </div>
         </div>`;
@@ -1470,6 +1484,15 @@ async function emitirFactura() {
     if (metodo && monto>0) pagos.push({ metodo_pago:metodo, monto });
   });
 
+  // Pagos vs total: nunca más del total; menos = adelanto con saldo pendiente
+  var totalDoc   = parseFloat((document.getElementById('tot-total')?.textContent||'0').replace('S/.','').replace(/[^\d.]/g,''))||0;
+  var sumaPagos  = Math.round(pagos.reduce((a,p)=>a+p.monto,0)*100)/100;
+  if (sumaPagos > totalDoc + 0.01) {
+    toast('Los pagos (S/. '+sumaPagos.toFixed(2)+') superan el total (S/. '+totalDoc.toFixed(2)+'). Corrige los montos.','warning'); return;
+  }
+  if (sumaPagos > 0 && sumaPagos < totalDoc - 0.01 &&
+      !confirm('El pago es menor al total. Quedará con saldo pendiente de S/. '+(totalDoc-sumaPagos).toFixed(2)+' para cobrar después. ¿Continuar?')) return;
+
   var descGlobalPct  = parseFloat(document.getElementById('nf-desc-global')?.value)||0;
   var comisionPct    = parseFloat(document.getElementById('nf-comision-pct')?.value)||0;
 
@@ -1522,8 +1545,12 @@ async function verFactura(id) {
     facActualData = f;
     document.getElementById('ver-fac-titulo').textContent = '🧾 '+f.numero;
     if (f.estado==='pendiente') {
+      var pagadoF = parseFloat(f.pagado)||0;
       document.getElementById('ver-fac-acciones').innerHTML =
-        '<button onclick="closeModal(\'modal-ver-fac\');abrirPagar('+f.id+','+parseFloat(f.total)+')" class="vbtn vbtn-primary" style="font-size:.78rem">💳 Registrar Pago</button>';
+        (pagadoF > 0
+          ? '<span style="font-size:.75rem;font-weight:600;color:#b45309;align-self:center">Pagado S/. '+pagadoF.toFixed(2)+' · Saldo S/. '+saldoDe(f).toFixed(2)+'</span>'
+          : '') +
+        '<button onclick="closeModal(\'modal-ver-fac\');abrirPagar('+f.id+','+parseFloat(f.total)+','+pagadoF+')" class="vbtn vbtn-primary" style="font-size:.78rem">💳 '+(pagadoF>0?'Cobrar saldo':'Registrar Pago')+'</button>';
     }
     renderPDF(f, empresa);
 
@@ -1687,6 +1714,13 @@ function renderPDF(f, emp) {
             (f.pagos[0].referencia?' · Ref: '+f.pagos[0].referencia:'') +
           '</p>'
         : '') +
+
+    (esPagoParcial(f)
+      ? '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:.7rem;padding:.6rem 1rem;margin-bottom:1rem;font-size:.75rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">' +
+          '<span>A cuenta: <b>S/. '+parseFloat(f.pagado).toFixed(2)+'</b></span>' +
+          '<span style="color:#b45309">Saldo pendiente: <b>S/. '+saldoDe(f).toFixed(2)+'</b></span>' +
+        '</div>'
+      : '') +
 
     '<div style="border-top:1px solid #e5e7eb;padding-top:.75rem;display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap">' +
       '<div style="text-align:center;font-size:.68rem;color:#9ca3af;line-height:1.6;flex:1">' +
@@ -1869,7 +1903,11 @@ function imprimirTicket() {
     (f.estado==='pagado'
       ? '<div style="text-align:center;margin:4px 0"><span class="estado">✓ PAGADO</span></div>'
       : f.estado==='pendiente'
-        ? '<div style="text-align:center;margin:4px 0"><span class="estado" style="border-style:dashed">PENDIENTE</span></div>'
+        ? '<div style="text-align:center;margin:4px 0"><span class="estado" style="border-style:dashed">PENDIENTE</span></div>' +
+          ((parseFloat(f.pagado)||0) > 0
+            ? '<div class="pago-valor">'+esc(fila2('A cuenta:', 'S/.'+parseFloat(f.pagado).toFixed(2), 32))+'</div>' +
+              '<div class="pago-valor">'+esc(fila2('Saldo:', 'S/.'+saldoDe(f).toFixed(2), 32))+'</div>'
+            : '')
         : '') +
 
     '<span class="sep-double">'+linea('═',38)+'</span>' +
@@ -2052,10 +2090,18 @@ function descargarPDF() {
 var pagarFilaN = 0;
 var pagarTotalActual = 0;
 
-function abrirPagar(id, total) {
-  pagarFilaN=0; pagarTotalActual=parseFloat(total)||0;
+// pagarTotalActual = saldo por cobrar (total − lo ya pagado como adelanto)
+function abrirPagar(id, total, pagado) {
+  var totalDoc = parseFloat(total)||0;
+  var yaPagado = parseFloat(pagado)||0;
+  pagarFilaN=0; pagarTotalActual=Math.max(Math.round((totalDoc - yaPagado)*100)/100, 0);
   document.getElementById('pagar-id').value          = id;
   document.getElementById('pagar-total').textContent = 'S/. '+pagarTotalActual.toFixed(2);
+  var info = document.getElementById('pagar-info-adelanto');
+  if (info) {
+    info.style.display = yaPagado > 0 ? 'block' : 'none';
+    info.textContent   = 'Total del comprobante S/. '+totalDoc.toFixed(2)+' · Ya pagado S/. '+yaPagado.toFixed(2);
+  }
   document.getElementById('pagar-filas').innerHTML   = '';
   document.getElementById('pagar-referencia').value  = '';
   addPagarFila();
@@ -2097,8 +2143,8 @@ function actualizarPagarRestante() {
   });
   var restante = parseFloat((pagarTotalActual - asignado).toFixed(2));
   var el = document.getElementById('pagar-restante-label');
-  el.textContent = 'S/. '+Math.max(restante,0).toFixed(2);
-  el.style.color = Math.abs(restante)<0.01?'#15803d':'#b45309';
+  el.textContent = restante < -0.01 ? 'Excede S/. '+Math.abs(restante).toFixed(2) : 'S/. '+Math.max(restante,0).toFixed(2);
+  el.style.color = restante < -0.01 ? '#be123c' : Math.abs(restante)<0.01?'#15803d':'#b45309';
 }
 
 async function confirmarPago() {
@@ -2113,18 +2159,24 @@ async function confirmarPago() {
     totalPagado += monto;
   });
   if (!valido||!pagos.length) { toast('Selecciona el método y monto de cada pago.','warning'); return; }
-  if (Math.abs(totalPagado-pagarTotalActual)>0.10) {
-    toast('El total pagado (S/. '+totalPagado.toFixed(2)+') no coincide con el total de la factura (S/. '+pagarTotalActual.toFixed(2)+').','warning'); return;
+  totalPagado = Math.round(totalPagado*100)/100;
+  // Se permite abonar menos que el saldo (queda pendiente), nunca más
+  if (totalPagado > pagarTotalActual + 0.01) {
+    toast('El pago (S/. '+totalPagado.toFixed(2)+') supera el saldo pendiente (S/. '+pagarTotalActual.toFixed(2)+').','warning'); return;
   }
+  if (totalPagado < pagarTotalActual - 0.01 &&
+      !confirm('Es un pago parcial. Quedará un saldo pendiente de S/. '+(pagarTotalActual-totalPagado).toFixed(2)+'. ¿Continuar?')) return;
   try {
     var res = await api('/facturas/'+id+'/pagar',{method:'PATCH',body:{pagos}});
     if (!res) return;
     var d = await res.json();
     if (!res.ok) { toast(d.message||'Error.','danger'); return; }
-    toast('✅ Pago registrado correctamente','success');
+    toast('✅ '+(d.message||'Pago registrado correctamente'),'success',5000);
     closeModal('modal-pagar');
     cargarResumen();
     if (document.getElementById('contenido-lista').style.display!=='none') cargarFacturas();
+    if (typeof facActualData!=='undefined' && facActualData && String(facActualData.id)===String(id) &&
+        !document.getElementById('modal-ver-fac').classList.contains('hidden')) verFactura(id);
   } catch { toast('Error de conexión.','danger'); }
 }
 

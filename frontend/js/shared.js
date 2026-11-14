@@ -480,6 +480,22 @@ function fTime(iso) {
   });
 }
 
+/**
+ * <option>s del selector de profesional de una cita, con su rol al costado.
+ * Estética: groomers primero y luego los doctores. Otros tipos: solo doctores
+ * (se conserva `seleccionado` aunque sea groomer, p. ej. al editar una cita).
+ */
+function opcionesProfesionales(lista, tipo, seleccionado) {
+  var esGroomer = function(u) { return u.rol === 'groomer'; };
+  var items = tipo === 'estetica'
+    ? lista.filter(esGroomer).concat(lista.filter(function(u) { return !esGroomer(u); }))
+    : lista.filter(function(u) { return !esGroomer(u) || String(u.id) === String(seleccionado); });
+  return items.map(function(u) {
+    var etiqueta = esGroomer(u) ? '✂️ ' + esc(u.nombre) + ' — Groomer' : '🩺 ' + esc(u.nombre) + ' — Doc';
+    return '<option value="' + u.id + '"' + (String(u.id) === String(seleccionado) ? ' selected' : '') + '>' + etiqueta + '</option>';
+  }).join('');
+}
+
 function badgeEstado(estado) {
   const map = { pendiente:'badge-pendiente', confirmada:'badge-confirmada', en_curso:'badge-encurso', completada:'badge-completada', cancelada:'badge-cancelada' };
   return `<span class="vbadge ${map[estado]||''}">${(estado||'').replace('_',' ')}</span>`;

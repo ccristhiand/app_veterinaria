@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
 const { qConn, gastosParaCierre, gastosAfectanCaja, totalesPorMetodo } = require('../services/gastos.service');
 const { filtroSede, filtroUnaSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
+const { diaPagoSql, PAGADO_SQL } = require('../services/pagos.service');
 
 const router = Router();
 router.use(authenticate);
@@ -47,7 +48,7 @@ router.get('/resumen-dia', async (req, res, next) => {
          COUNT(DISTINCT f.id)         AS total_documentos
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha = ? AND f.estado = 'pagado' ${sff}`,
+       WHERE ${diaPagoSql(req)} = ? AND f.estado != 'anulado' ${sff}`,
       [dia, ...spf]
     );
 
@@ -63,9 +64,9 @@ router.get('/resumen-dia', async (req, res, next) => {
     }
 
     const [pendientes] = await req.db.query(
-      `SELECT COUNT(*) AS total, COALESCE(SUM(total),0) AS monto
-       FROM facturas WHERE fecha = ? AND estado = 'pendiente' ${sf}`,
-      [dia, ...sp]
+      `SELECT COUNT(*) AS total, COALESCE(SUM(f.total - ${PAGADO_SQL}),0) AS monto
+       FROM facturas f WHERE f.fecha = ? AND f.estado = 'pendiente' ${sff}`,
+      [dia, ...spf]
     );
 
     // Gastos del módulo Gastos diarios que entran a este cierre
@@ -162,7 +163,7 @@ router.post('/cierres', auditMiddleware('caja:creado', 'caja'), async (req, res,
          COALESCE(SUM(fp.monto), 0) AS total
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha = ? AND f.estado = 'pagado' ${sff}`,
+       WHERE ${diaPagoSql(req)} = ? AND f.estado != 'anulado' ${sff}`,
       [fecha, ...spf]
     );
 

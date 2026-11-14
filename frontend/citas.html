@@ -435,6 +435,7 @@ function selTipo(tipo) {
     if (!btn) return;
     btn.className = 'tipo-btn' + (t===tipo ? ' sel-'+t : '');
   });
+  pintarProfesionales('c-vet', tipo);
 }
 
 function selTipoEdit(tipo) {
@@ -444,14 +445,31 @@ function selTipoEdit(tipo) {
     if (!btn) return;
     btn.className = 'tipo-btn' + (t===tipo ? ' sel-'+t : '');
   });
+  pintarProfesionales('edit-cita-vet', tipo);
+}
+
+// Profesionales (doctores + groomers) cargados para los selectores de cita
+var _profesionales = [];
+
+// Repinta el selector según el tipo: en estética aparecen los groomers, marcados con su rol
+function pintarProfesionales(selId, tipo) {
+  var sel = document.getElementById(selId);
+  if (!sel || !_profesionales.length) return;
+  var actual = sel.value;
+  var previa = actual ? sel.selectedOptions[0]?.outerHTML : '';
+  sel.innerHTML = '<option value="">' + (tipo === 'estetica' ? 'Seleccionar groomer o doctor…' : 'Seleccionar veterinario…') + '</option>' +
+    opcionesProfesionales(_profesionales, tipo, actual);
+  // Conserva el profesional ya elegido aunque no esté en la lista (p. ej. inactivo)
+  if (actual && !sel.querySelector('option[value="'+actual+'"]') && previa) sel.insertAdjacentHTML('beforeend', previa);
+  sel.value = actual;
 }
 
 // ── Abrir modal nueva cita ────────────────────────────────────────
 async function abrirModalCita() {
   openModal('modal-cita');
   document.getElementById('c-fecha').value = fechaHoraAhoraInput();
-  selTipo('medica'); // tipo por defecto
   await cargarVets();
+  selTipo('medica'); // tipo por defecto (pinta el selector según el tipo)
 }
 
 async function cargarVets() {
@@ -461,11 +479,9 @@ async function cargarVets() {
   try {
     var res  = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer&activo=true');
     if (!res) return;
-    var vets = (await res.json()).data || [];
-    sel.innerHTML = vets.length
-      ? '<option value="">Seleccionar veterinario…</option>' +
-        vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('')
-      : '<option value="">Sin veterinarios registrados</option>';
+    _profesionales = (await res.json()).data || [];
+    if (_profesionales.length) pintarProfesionales('c-vet', document.getElementById('c-tipo').value || 'medica');
+    else sel.innerHTML = '<option value="">Sin veterinarios registrados</option>';
   } catch { sel.innerHTML = '<option value="">Error al cargar</option>'; }
 }
 
@@ -788,9 +804,7 @@ async function abrirEditarCita(id) {
   sel.innerHTML = '<option value="">Cargando…</option>';
   try {
     var rv   = await api('/usuarios?rol=veterinario&rol2=veterinario_recepcionista&rol3=groomer&activo=true');
-    var vets = rv ? (await rv.json()).data || [] : [];
-    sel.innerHTML = '<option value="">Seleccionar…</option>' +
-      vets.map(v => '<option value="'+v.id+'">🩺 '+esc(v.nombre)+'</option>').join('');
+    _profesionales = rv ? (await rv.json()).data || [] : [];
   } catch { sel.innerHTML = '<option value="">Error</option>'; }
 
   try {
@@ -804,6 +818,9 @@ async function abrirEditarCita(id) {
     var fLocal = new Date(c.fecha_hora);
     var pad    = n => String(n).padStart(2,'0');
     document.getElementById('edit-cita-fecha').value    = fLocal.getFullYear()+'-'+pad(fLocal.getMonth()+1)+'-'+pad(fLocal.getDate())+'T'+pad(fLocal.getHours())+':'+pad(fLocal.getMinutes());
+    // Pinta el selector según el tipo de la cita y deja marcado su profesional
+    sel.innerHTML = '<option value="">Seleccionar…</option>' +
+      opcionesProfesionales(_profesionales, c.tipo_cita || 'medica', c.veterinario_id);
     // Si la cita ya tiene un veterinario que no está en la lista (p. ej. inactivo), se conserva
     if (c.veterinario_id && !sel.querySelector('option[value="'+c.veterinario_id+'"]'))
       sel.insertAdjacentHTML('beforeend', '<option value="'+c.veterinario_id+'">🩺 '+esc(c.veterinario_nombre||'')+' (actual)</option>');

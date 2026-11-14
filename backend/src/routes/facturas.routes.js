@@ -6,6 +6,7 @@ const { auditMiddleware } = require('../middlewares/audit.middleware');
 const { emitirSala } = require('../sockets/emitir');
 
 const { filtroSede, sedeEscritura, exigirAcceso } = require('../services/sede.service');
+const { TOLERANCIA, diaPagoSql, PAGADO_SQL, redondear } = require('../services/pagos.service');
 
 const router = Router();
 router.use(authenticate);
@@ -16,38 +17,41 @@ router.get('/resumen', async (req, res, next) => {
     const { desde, hasta } = req.query;
     const hoy    = desde || new Date().toISOString().split('T')[0];
     const hasta_ = hasta || hoy;
-    const { sql: sf,  params: sp  } = filtroSede(req, 'sede_id');
     const { sql: sff, params: spf } = filtroSede(req, 'f.sede_id');
+    const diaPago = diaPagoSql(req);
 
+    // Documentos emitidos en el periodo; "pendiente" = saldo por cobrar de esos documentos
     const [totales] = await req.db.query(
       `SELECT
          COUNT(*)                                                                        AS total_docs,
-         COALESCE(SUM(CASE WHEN estado='pagado'    THEN total ELSE 0 END),0)            AS ingresos,
-         COALESCE(SUM(CASE WHEN estado='pendiente' THEN total ELSE 0 END),0)            AS pendiente,
-         COALESCE(SUM(CASE WHEN estado='pagado'    THEN comision_tarjeta ELSE 0 END),0) AS total_comisiones,
-         COUNT(CASE WHEN estado='pagado'    THEN 1 END) AS docs_pagados,
-         COUNT(CASE WHEN estado='pendiente' THEN 1 END) AS docs_pendientes,
-         COUNT(CASE WHEN estado='anulado'   THEN 1 END) AS docs_anulados
-       FROM facturas
-       WHERE fecha BETWEEN ? AND ? AND estado != 'anulado' ${sf}`,
-      [hoy, hasta_, ...sp]
+         COALESCE(SUM(CASE WHEN f.estado='pendiente' THEN f.total - ${PAGADO_SQL} ELSE 0 END),0) AS pendiente,
+         COALESCE(SUM(CASE WHEN f.estado='pagado'    THEN f.comision_tarjeta ELSE 0 END),0)      AS total_comisiones,
+         COUNT(CASE WHEN f.estado='pagado'    THEN 1 END) AS docs_pagados,
+         COUNT(CASE WHEN f.estado='pendiente' THEN 1 END) AS docs_pendientes,
+         COUNT(CASE WHEN f.estado='anulado'   THEN 1 END) AS docs_anulados
+       FROM facturas f
+       WHERE f.fecha BETWEEN ? AND ? AND f.estado != 'anulado' ${sff}`,
+      [hoy, hasta_, ...spf]
     );
 
+    // Ingresos = lo cobrado en el periodo (adelantos y abonos el día que entraron)
     const porMetodo = await req.db.query(
       `SELECT fp.metodo_pago, SUM(fp.monto) AS monto, COUNT(*) AS cantidad
        FROM factura_pagos fp
        JOIN facturas f ON f.id = fp.factura_id
-       WHERE f.fecha BETWEEN ? AND ? AND f.estado = 'pagado' ${sff}
+       WHERE ${diaPago} BETWEEN ? AND ? AND f.estado != 'anulado' ${sff}
        GROUP BY fp.metodo_pago ORDER BY monto DESC`,
       [hoy, hasta_, ...spf]
     );
+    totales.ingresos = redondear(porMetodo.reduce((a, r) => a + parseFloat(r.monto), 0));
 
     const por7dias = await req.db.query(
-      `SELECT DATE(fecha) AS dia, SUM(total) AS monto, COUNT(*) AS cantidad
-       FROM facturas
-       WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND estado = 'pagado' ${sf}
-       GROUP BY DATE(fecha) ORDER BY dia ASC`,
-      [...sp]
+      `SELECT ${diaPago} AS dia, SUM(fp.monto) AS monto, COUNT(DISTINCT f.id) AS cantidad
+       FROM factura_pagos fp
+       JOIN facturas f ON f.id = fp.factura_id
+       WHERE ${diaPago} >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND f.estado != 'anulado' ${sff}
+       GROUP BY dia ORDER BY dia ASC`,
+      [...spf]
     );
 
     const topServicios = await req.db.query(
@@ -81,6 +85,7 @@ router.get('/', async (req, res, next) => {
              f.comision_tarjeta, f.comision_tarjeta_pct,
              f.subtotal, f.igv, f.total,
              f.estado, f.metodo_pago, f.created_at, f.updated_at,
+             ${PAGADO_SQL} AS pagado,
              f.observaciones, f.anulado_por,
              f.sunat_estado, f.sunat_mensaje, f.enlace_pdf, f.enlace_xml, f.sunat_enviado_at,
              CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre,
@@ -142,7 +147,9 @@ router.get('/:id', async (req, res, next) => {
     );
 
     exigirAcceso(req, factura.sede_id);
-    return res.json({ success: true, data: { ...factura, items, pagos } });
+    const pagado = redondear(pagos.reduce((a, p) => a + parseFloat(p.monto), 0));
+    const saldo  = factura.estado === 'anulado' ? 0 : Math.max(redondear(factura.total - pagado), 0);
+    return res.json({ success: true, data: { ...factura, items, pagos, pagado, saldo } });
   } catch (err) { next(err); }
 });
 
@@ -300,8 +307,15 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
 
       // ── Estado de pago ────────────────────────────────────────
       const pagosValidos    = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);
-      const totalPagado     = pagosValidos.reduce((a, p) => a + parseFloat(p.monto), 0);
-      const estado          = totalPagado >= total || pagosValidos.length > 0 ? 'pagado' : 'pendiente';
+      const totalPagado     = redondear(pagosValidos.reduce((a, p) => a + parseFloat(p.monto), 0));
+      if (totalPagado > total + TOLERANCIA) {
+        throw Object.assign(
+          new Error(`Los pagos (S/ ${totalPagado.toFixed(2)}) superan el total del comprobante (S/ ${total.toFixed(2)}).`),
+          { status: 422, code: 'PAGO_EXCEDE_TOTAL' }
+        );
+      }
+      // Con pago menor al total (adelanto) queda pendiente con saldo por cobrar
+      const estado          = totalPagado >= total - TOLERANCIA ? 'pagado' : 'pendiente';
       const metodoPrincipal = pagosValidos.length > 0
         ? pagosValidos.reduce((a, b) => parseFloat(b.monto) > parseFloat(a.monto) ? b : a).metodo_pago
         : null;
@@ -420,43 +434,72 @@ router.post('/', auditMiddleware('facturacion:emitido', 'facturacion'), async (r
   } catch (err) { next(err); }
 });
 
-// ── PATCH /api/v1/facturas/:id/pagar ─────────────────────────────
+// ── PATCH /api/v1/facturas/:id/pagar — registrar un abono ────────
+// Suma pagos a los ya registrados (adelantos). Cuando el saldo llega a 0 pasa a 'pagado'.
 router.patch('/:id/pagar', auditMiddleware('facturacion:pago_registrado', 'facturacion'), async (req, res, next) => {
   try {
     const { pagos = [], metodo_pago } = req.body;
-    const [fac] = await req.db.query('SELECT id, estado, total, sede_id FROM facturas WHERE id = ?', [req.params.id]);
-    if (!fac)                     return res.status(404).json({ success: false, message: 'Factura no encontrada.' });
-    exigirAcceso(req, fac.sede_id);
-    if (fac.estado === 'anulado') return res.status(422).json({ success: false, message: 'No se puede pagar una factura anulada.' });
-    if (fac.estado === 'pagado')  return res.status(422).json({ success: false, message: 'La factura ya está pagada.' });
 
-    await req.db.withTransaction(async (conn) => {
-      await conn.execute('DELETE FROM factura_pagos WHERE factura_id = ?', [req.params.id]);
+    const result = await req.db.withTransaction(async (conn) => {
+      // FOR UPDATE: dos cobros simultáneos no pueden pasarse del saldo
+      const [[fac]] = await conn.execute(
+        'SELECT id, estado, total, sede_id FROM facturas WHERE id = ? FOR UPDATE', [req.params.id]
+      );
+      if (!fac) throw Object.assign(new Error('Factura no encontrada.'), { status: 404 });
+      exigirAcceso(req, fac.sede_id);
+      if (fac.estado === 'anulado') throw Object.assign(new Error('No se puede pagar una factura anulada.'), { status: 422 });
+      if (fac.estado === 'pagado')  throw Object.assign(new Error('La factura ya está pagada.'), { status: 422 });
+
+      const [[{ pagado: yaPagado }]] = await conn.execute(
+        'SELECT COALESCE(SUM(monto),0) AS pagado FROM factura_pagos WHERE factura_id = ?', [fac.id]
+      );
+      const saldo = redondear(parseFloat(fac.total) - parseFloat(yaPagado));
 
       let pagosValidos = [];
       if (pagos.length > 0) {
         pagosValidos = pagos.filter(p => p.metodo_pago && parseFloat(p.monto) > 0);
       } else if (metodo_pago) {
-        pagosValidos = [{ metodo_pago, monto: fac.total, referencia: null }];
+        pagosValidos = [{ metodo_pago, monto: saldo, referencia: null }];
       }
       if (!pagosValidos.length)
         throw Object.assign(new Error('Debes ingresar al menos un método de pago con monto.'), { status: 422 });
 
-      for (const pago of pagosValidos) {
-        await conn.execute(
-          'INSERT INTO factura_pagos (factura_id, metodo_pago, monto, referencia) VALUES (?,?,?,?)',
-          [req.params.id, pago.metodo_pago, parseFloat(pago.monto), pago.referencia?.trim() || null]
+      const abono = redondear(pagosValidos.reduce((a, p) => a + parseFloat(p.monto), 0));
+      if (abono > saldo + TOLERANCIA) {
+        throw Object.assign(
+          new Error(`El pago (S/ ${abono.toFixed(2)}) supera el saldo pendiente (S/ ${saldo.toFixed(2)}).`),
+          { status: 422, code: 'PAGO_EXCEDE_SALDO' }
         );
       }
 
-      const metodoPrincipal = pagosValidos.reduce((a, b) => parseFloat(b.monto) > parseFloat(a.monto) ? b : a).metodo_pago;
-      await conn.execute(
-        "UPDATE facturas SET estado = 'pagado', metodo_pago = ? WHERE id = ?",
-        [metodoPrincipal, req.params.id]
+      for (const pago of pagosValidos) {
+        await conn.execute(
+          'INSERT INTO factura_pagos (factura_id, metodo_pago, monto, referencia) VALUES (?,?,?,?)',
+          [fac.id, pago.metodo_pago, redondear(pago.monto), pago.referencia?.trim() || null]
+        );
+      }
+
+      // Método principal = el de mayor monto acumulado
+      const [[principal]] = await conn.execute(
+        `SELECT metodo_pago FROM factura_pagos WHERE factura_id = ?
+         GROUP BY metodo_pago ORDER BY SUM(monto) DESC LIMIT 1`, [fac.id]
       );
+      const nuevoSaldo = Math.max(redondear(saldo - abono), 0);
+      const estado     = nuevoSaldo <= TOLERANCIA ? 'pagado' : 'pendiente';
+      await conn.execute(
+        'UPDATE facturas SET estado = ?, metodo_pago = ? WHERE id = ?',
+        [estado, principal?.metodo_pago || null, fac.id]
+      );
+      return { estado, abono, pagado: redondear(parseFloat(yaPagado) + abono), saldo: nuevoSaldo };
     });
 
-    return res.json({ success: true, message: 'Pago registrado correctamente.' });
+    return res.json({
+      success: true,
+      message: result.estado === 'pagado'
+        ? 'Pago registrado. Comprobante cancelado por completo.'
+        : `Abono registrado. Saldo pendiente: S/ ${result.saldo.toFixed(2)}.`,
+      data: result,
+    });
   } catch (err) { next(err); }
 });
 
