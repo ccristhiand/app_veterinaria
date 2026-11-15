@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Servidor — VetClinic SaaS Admin</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--inset);color:var(--text);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+    .head h1{font-size:1.4rem;color:var(--text-strong)}
+    .sub{font-size:.8rem;color:var(--text-faint);margin-top:2px}
+    .acciones-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .auto{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text-muted);cursor:pointer;user-select:none}
+
+    .banner{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:var(--radius-lg);border:1px solid;margin-bottom:16px}
+    .banner .ico{width:26px;height:26px;flex:none;margin-top:1px}
+    .banner h2{font-size:1rem;color:inherit}
+    .banner p{font-size:.84rem;margin-top:3px;line-height:1.5;opacity:.95}
+    .banner ul{margin:8px 0 0 18px;font-size:.84rem;line-height:1.6}
+    .b-ok{background:var(--ok-bg);border-color:var(--ok-border);color:var(--ok-text)}
+    .b-aviso{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn-text)}
+    .b-critico{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-text)}
+
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+    .kpi .stat-val{font-size:1.55rem}
+    .kpi .det{font-size:.75rem;color:var(--text-faint);margin-top:4px;line-height:1.4}
+    .barra{height:6px;border-radius:999px;background:var(--inset);overflow:hidden;margin-top:10px}
+    .barra span{display:block;height:100%;border-radius:999px;transition:width .4s}
+    .e-ok{color:var(--ok-text)} .e-aviso{color:var(--warn-text)} .e-critico{color:var(--danger-text)}
+    .f-ok{background:var(--ok-text)} .f-aviso{background:var(--warn-text)} .f-critico{background:var(--danger-text)}
+
+    .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+    .card-head h3{font-size:.95rem;color:var(--text-strong)}
+    .card-head p{font-size:.76rem;color:var(--text-faint);margin-top:2px}
+    .rangos{display:flex;gap:4px;background:var(--inset);padding:3px;border-radius:var(--radius-sm)}
+    .rangos button{border:none;background:transparent;color:var(--text-muted);font:inherit;font-size:.8rem;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer}
+    .rangos button.on{background:var(--surface);color:var(--text-strong);box-shadow:var(--shadow-sm)}
+    .graficas{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .graf h4{font-size:.82rem;color:var(--text-2);font-weight:600;margin-bottom:2px}
+    .graf p{font-size:.72rem;color:var(--text-faint);margin-bottom:8px}
+    .graf .lienzo{position:relative;height:210px}
+    .vacio{text-align:center;padding:2rem 1rem;color:var(--text-faint);font-size:.84rem}
+
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .seccion{margin-bottom:16px}
+    .tabla-wrap{overflow-x:auto}
+    th{padding:8px 10px;text-align:left;font-size:.72rem;font-weight:600;color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap}
+    td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:.84rem;vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;color:var(--text-muted)}
+    .btns{display:flex;gap:6px;flex-wrap:wrap}
+    .btn-sm{min-height:30px !important;padding:4px 10px !important;font-size:.78rem !important}
+
+    .mant{display:flex;flex-direction:column;gap:10px}
+    .mant-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius)}
+    .mant-item b{font-size:.86rem;color:var(--text-strong)}
+    .mant-item p{font-size:.76rem;color:var(--text-faint);margin-top:2px;line-height:1.45}
+    .datos{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.82rem;margin-top:14px}
+    .datos dt{color:var(--text-faint)} .datos dd{color:var(--text-strong);font-weight:500;text-align:right}
+
+    .evento{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+    .evento:last-child{border-bottom:none}
+    .evento .ico{width:18px;height:18px;flex:none;margin-top:2px}
+    .evento b{font-size:.86rem;color:var(--text-strong)}
+    .evento p{font-size:.76rem;color:var(--text-faint);margin-top:2px;line-height:1.45}
+
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+    .campo label{display:block;font-size:.76rem;font-weight:600;color:var(--text-2);margin-bottom:5px}
+    .campo input{width:100%;min-height:36px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font:inherit;font-size:.86rem}
+    .campo small{display:block;font-size:.72rem;color:var(--text-faint);margin-top:4px;line-height:1.4}
+    .campo .err{color:var(--danger-text)}
+    .switch{display:flex;align-items:center;gap:10px;font-size:.86rem;font-weight:600;color:var(--text-strong);cursor:pointer}
+    .switch input{width:18px;height:18px;accent-color:var(--accent)}
+
+    .modal-body p{font-size:.88rem;line-height:1.55;color:var(--text-2)}
+    @media (max-width: 900px){ .graficas,.grid-2{grid-template-columns:1fr} }
+  </style>
+  <link rel="stylesheet" href="admin.css?v=20261103b"/>
+  <link rel="icon" href="logo.jpg" type="image/jpeg"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <script>try{var t=localStorage.getItem('admin_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+</head>
+<body>
+<aside class="sidebar" id="sidebar"></aside>
+<main class="main">
+  <div class="head">
+    <div>
+      <h1>Servidor</h1>
+      <p class="sub" id="sub">Cargando…</p>
+    </div>
+    <div class="acciones-head">
+      <label class="auto"><input type="checkbox" id="auto" checked> Actualizar cada 30 s</label>
+      <button class="btn-ghost" onclick="cargarTodo()" id="btn-actualizar"></button>
+    </div>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="kpis" id="kpis">
+    <div class="stat-card"><div class="spinner"></div></div>
+  </div>
+
+  <div class="card seccion">
+    <div class="card-head">
+      <div><h3>Historial</h3><p>Se guarda una muestra cada minuto durante 30 días. La línea punteada es el límite de alerta.</p></div>
+      <div class="rangos" id="rangos">
+        <button data-r="1h">1 h</button><button data-r="6h">6 h</button><button data-r="24h" class="on">24 h</button><button data-r="7d">7 días</button><button data-r="30d">30 días</button>
+      </div>
+    </div>
+    <div class="graficas" id="graficas">
+      <div class="graf"><h4>CPU y RAM en uso</h4><p>Porcentaje promedio de cada intervalo</p><div class="lienzo"><canvas id="g-cpu"></canvas></div></div>
+      <div class="graf"><h4>RAM disponible</h4><p>Lo mínimo que quedó libre en cada intervalo (MB)</p><div class="lienzo"><canvas id="g-ram"></canvas></div></div>
+      <div class="graf"><h4>Disco y swap</h4><p>Porcentaje usado</p><div class="lienzo"><canvas id="g-disco"></canvas></div></div>
+      <div class="graf"><h4>Carga y conexiones MySQL</h4><p>Carga del procesador y conexiones abiertas a la base de datos</p><div class="lienzo"><canvas id="g-mysql"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card seccion">
+    <div class="card-head">
+      <div><h3>Apps en PM2</h3><p>Los procesos de Node que atienden a las clínicas. La CPU y la RAM son del momento.</p></div>
+    </div>
+    <div class="tabla-wrap" id="pm2"><div class="vacio"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="grid-2 seccion">
+    <div class="card">
+      <div class="card-head"><div><h3>Mantenimiento</h3><p>Acciones seguras. Cada una pide confirmación y queda registrada.</p></div></div>
+      <div class="mant" id="mant"></div>
+      <dl class="datos" id="datos"></dl>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Procesos que más memoria usan</h3><p>Todos los procesos del servidor, no solo PM2</p></div></div>
+      <div class="tabla-wrap" id="procesos"><div class="vacio"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+
+  <div class="grid-2 seccion">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Eventos</h3><p>Alertas detectadas y acciones hechas desde este panel</p></div>
+        <div style="display:flex;border-bottom:1px solid var(--border)">
+          <button class="ptab active" data-tipo="alerta">Alertas</button><button class="ptab" data-tipo="accion">Acciones</button>
+        </div>
+      </div>
+      <div id="eventos"><div class="vacio"><div class="spinner"></div></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h3>Alertas por correo</h3><p>Se envía un correo cuando algo crítico empieza y otro cuando se resuelve.</p></div></div>
+      <form id="form-config" onsubmit="guardarConfig(event)">
+        <label class="switch" style="margin-bottom:14px"><input type="checkbox" id="c-activo"> Enviar alertas</label>
+        <div class="campo" style="margin-bottom:12px">
+          <label for="c-email">Correo de destino</label>
+          <input id="c-email" type="email" required autocomplete="email">
+        </div>
+        <div class="form-grid">
+          <div class="campo"><label for="c-cpu">CPU (%)</label><input id="c-cpu" type="number" min="50" max="100" required><small>Durante 5 minutos seguidos</small></div>
+          <div class="campo"><label for="c-ram">RAM en uso (%)</label><input id="c-ram" type="number" min="50" max="99" required><small>Durante 3 minutos seguidos</small></div>
+          <div class="campo"><label for="c-swap">Swap en uso (%)</label><input id="c-swap" type="number" min="10" max="100" required><small>Indica falta de RAM</small></div>
+          <div class="campo"><label for="c-disco">Disco usado (%)</label><input id="c-disco" type="number" min="50" max="99" required><small>Avisa antes de llenarse</small></div>
+          <div class="campo"><label for="c-con">Conexiones MySQL (%)</label><input id="c-con" type="number" min="50" max="100" required><small>Del máximo permitido</small></div>
+        </div>
+        <p class="campo"><small style="margin-top:12px">Siempre se avisa además si Nginx o MySQL se detienen, si una app de PM2 se cae o si se reinicia 3 veces en 15 minutos.</small></p>
+        <p class="campo"><small class="err" id="c-error"></small></p>
+        <div class="btns" style="margin-top:14px">
+          <button type="submit" class="btn-primary">Guardar</button>
+          <button type="button" class="btn-ghost" onclick="probarCorreo(this)">Enviar correo de prueba</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+
+<div id="modal" class="modal-bg hidden" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal" style="max-width:460px" role="dialog" aria-modal="true" aria-labelledby="m-titulo">
+    <div class="modal-head"><h3 id="m-titulo"></h3></div>
+    <div class="modal-body"><p id="m-texto"></p></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-primary" id="m-ok"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="admin_shared.js"></script>
+<script>
+  if (!isLoggedIn()) window.location.replace('login.html');
+  renderSidebar('servidor');
+  document.getElementById('btn-actualizar').innerHTML = adminIcon('refresh') + '<span>Actualizar</span>';
+
+  let estado = null, rango = '24h', tipoEvento = 'alerta', timer = null;
+  const graficas = {};
+
+  // ── Utilidades ────────────────────────────────────────────────
+  const nivel = (v, lim, aviso = .8) => v == null ? 'ok' : v >= lim ? 'critico' : v >= lim * aviso ? 'aviso' : 'ok';
+  const gb = mb => (mb / 1024).toFixed(1) + ' GB';
+  function duracion(seg) {
+    if (seg == null) return '—';
+    const d = Math.floor(seg / 86400), h = Math.floor(seg % 86400 / 3600), m = Math.floor(seg % 3600 / 60);
+    return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
+  }
+  const desde = ms => ms ? duracion(Math.round((Date.now() - ms) / 1000)) : '—';
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  // ── Carga ─────────────────────────────────────────────────────
+  async function cargarEstado() {
+    const res = await adminFetch('/servidor/estado');
+    if (!res) return;
+    const j = await res.json();
+    if (!res.ok) { toast(j.message || 'No se pudo leer el servidor.', 'error'); return; }
+    estado = j.data;
+    pintarBanner(); pintarKpis(); pintarPm2(); pintarMantenimiento(); pintarProcesos();
+    const s = estado.servidor;
+    document.getElementById('sub').textContent =
+      `${s.host} · encendido hace ${duracion(s.uptime_s)} · actualizado ${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` +
+      (estado.monitor_encendido ? '' : ' · el monitor no está corriendo en este entorno');
+  }
+
+  async function cargarTodo() {
+    await Promise.all([cargarEstado(), cargarHistorial(), cargarEventos()]);
+  }
+
+  // ── Banner de estado general ──────────────────────────────────
+  function problemas() {
+    const e = estado, u = e.umbrales, m = e.memoria, out = [];
+    const add = (nivelP, txt) => out.push({ nivel: nivelP, txt });
+    if (nivel(e.cpu_pct, u.cpu) !== 'ok') add(nivel(e.cpu_pct, u.cpu), `CPU al ${e.cpu_pct} %`);
+    if (nivel(m.usada_pct, u.ram) !== 'ok') add(nivel(m.usada_pct, u.ram), `RAM al ${m.usada_pct} % (quedan ${gb(m.disponible_mb)})`);
+    if (!m.swap_total_mb) add('aviso', 'El servidor no tiene swap');
+    else if (nivel(m.swap_pct, u.swap) !== 'ok') add(nivel(m.swap_pct, u.swap), `Swap al ${m.swap_pct} %`);
+    if (e.disco && nivel(e.disco.usado_pct, u.disco) !== 'ok') add(nivel(e.disco.usado_pct, u.disco), `Disco al ${e.disco.usado_pct} %`);
+    if (e.mysql?.error) add('critico', 'No se puede consultar MySQL');
+    else if (nivel(e.mysql?.conexiones_pct, u.conexiones) !== 'ok') add(nivel(e.mysql.conexiones_pct, u.conexiones), `MySQL con ${e.mysql.conexiones} de ${e.mysql.max_conexiones} conexiones`);
+    Object.entries(e.servicios || {}).forEach(([n, s]) => { if (s && s !== 'active') add('critico', `${n} no está activo (${s})`); });
+    (e.pm2 || []).filter(a => !a.modulo && a.estado !== 'online').forEach(a => add('critico', `La app ${a.nombre} está ${a.estado}`));
+    if (e.procesos?.vscode?.procesos) add('aviso', `VS Code tiene ${e.procesos.vscode.procesos} procesos abiertos (${e.procesos.vscode.ram_mb} MB)`);
+    return out;
+  }
+
+  function pintarBanner() {
+    const p = problemas();
+    const peor = p.some(x => x.nivel === 'critico') ? 'critico' : p.length ? 'aviso' : 'ok';
+    const textos = {
+      ok:      ['checkc', 'El servidor está saludable', 'CPU, memoria, disco, base de datos y apps dentro de lo normal.'],
+      aviso:   ['alert',  'Hay puntos a revisar', 'Nada está caído, pero conviene atender esto antes de que se vuelva un problema:'],
+      critico: ['xc',     'Hay un problema crítico', 'Esto puede estar afectando a las clínicas ahora mismo:'],
+    }[peor];
+    const alertas = estado.alertas || [];
+    document.getElementById('banner').innerHTML = `
+      <div class="banner b-${peor}" role="status">
+        ${adminIcon(textos[0])}
+        <div>
+          <h2>${textos[1]}</h2>
+          <p>${textos[2]}</p>
+          ${p.length ? `<ul>${p.map(x => `<li>${esc(x.txt)}</li>`).join('')}</ul>` : ''}
+          ${alertas.length ? `<p style="margin-top:8px"><b>${alertas.length} alerta(s) abierta(s)</b> desde ${fDateTime(alertas[alertas.length - 1].created_at)}. Se cierran solas cuando el valor se normaliza.</p>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // ── Tarjetas ──────────────────────────────────────────────────
+  function kpi(lbl, valor, det, pct, niv) {
+    return `<div class="stat-card kpi">
+      <div class="stat-lbl">${lbl}</div>
+      <div class="stat-val e-${niv}">${valor}</div>
+      ${pct != null ? `<div class="barra" role="img" aria-label="${lbl}: ${Math.round(pct)} %"><span class="f-${niv}" style="width:${Math.min(100, Math.max(2, pct))}%"></span></div>` : ''}
+      <div class="det">${det}</div>
+    </div>`;
+  }
+  function pintarKpis() {
+    const e = estado, u = e.umbrales, m = e.memoria, d = e.disco, my = e.mysql || {};
+    const cargaPct = e.carga ? e.carga[1] / e.nucleos * 100 : null;
+    document.getElementById('kpis').innerHTML = [
+      kpi('CPU', e.cpu_pct != null ? `${e.cpu_pct} %` : '—', `${e.nucleos} núcleos · alerta desde ${u.cpu} %`, e.cpu_pct, nivel(e.cpu_pct, u.cpu)),
+      kpi('RAM disponible', gb(m.disponible_mb), `${m.usada_pct} % en uso de ${gb(m.total_mb)} · alerta desde ${u.ram} %`, m.usada_pct, nivel(m.usada_pct, u.ram)),
+      kpi('Swap', m.swap_total_mb ? `${m.swap_pct} %` : 'Sin swap', m.swap_total_mb ? `${m.swap_usada_mb} MB de ${gb(m.swap_total_mb)} · alerta desde ${u.swap} %` : 'Recomendado: 2 GB de reserva', m.swap_total_mb ? m.swap_pct : null, m.swap_total_mb ? nivel(m.swap_pct, u.swap) : 'aviso'),
+      kpi('Disco', d ? `${d.usado_pct} %` : '—', d ? `${d.usado_gb} GB de ${d.total_gb} GB · libres ${d.libre_gb} GB` : 'Sin datos', d?.usado_pct, nivel(d?.usado_pct, u.disco)),
+      kpi('Carga (5 min)', e.carga ? e.carga[1] : '—', e.carga ? `1 min: ${e.carga[0]} · 15 min: ${e.carga[2]} · ideal menos de ${e.nucleos}` : '', cargaPct, nivel(cargaPct, 100)),
+      kpi('Conexiones MySQL', my.error ? 'Error' : `${my.conexiones} / ${my.max_conexiones}`, my.error ? esc(my.error) : `Máximo usado: ${my.max_usadas} · alerta desde ${u.conexiones} %`, my.conexiones_pct, my.error ? 'critico' : nivel(my.conexiones_pct, u.conexiones)),
+    ].join('');
+  }
+
+  // ── PM2 ───────────────────────────────────────────────────────
+  function pintarPm2() {
+    const el = document.getElementById('pm2');
+    const apps = estado.pm2;
+    if (!apps) { el.innerHTML = '<div class="vacio">No se pudo leer PM2 (solo disponible en el servidor).</div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th>App</th><th>Estado</th><th>CPU</th><th>RAM</th><th>Activa hace</th><th>Reinicios</th><th>Acciones</th></tr></thead>
+      <tbody>${apps.map(a => {
+        const ok = a.estado === 'online';
+        return `<tr>
+          <td><b style="color:var(--text-strong)">${esc(a.nombre)}</b>${a.modulo ? ' <span class="badge" style="background:var(--inset);color:var(--text-muted)">módulo</span>' : ''}</td>
+          <td><span class="badge" style="background:var(--${ok ? 'ok' : 'danger'}-bg);color:var(--${ok ? 'ok' : 'danger'}-text)"><span class="dot"></span>${ok ? 'En línea' : esc(a.estado)}</span></td>
+          <td class="${a.cpu_pct >= 50 ? 'e-aviso' : ''}">${a.cpu_pct} %</td>
+          <td>${a.ram_mb} MB</td>
+          <td>${ok ? desde(a.desde) : '—'}</td>
+          <td title="Cada despliegue con pm2 restart también suma 1">${a.reinicios}${a.inestables ? ` <span class="e-critico">(${a.inestables} inestables)</span>` : ''}</td>
+          <td>${a.modulo ? '' : `<div class="btns">
+            <button class="btn-ghost btn-sm" onclick="accion('pm2_reiniciar', ${jsArg(a.nombre)})">Reiniciar</button>
+            <button class="btn-ghost btn-sm" onclick="accion('pm2_vaciar_logs', ${jsArg(a.nombre)})">Vaciar logs</button>
+            <button class="btn-ghost btn-sm" onclick="accion('pm2_reiniciar_contador', ${jsArg(a.nombre)})" title="Pone en cero el contador de reinicios">Contador a 0</button>
+          </div>`}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  // ── Mantenimiento ─────────────────────────────────────────────
+  function pintarMantenimiento() {
+    const e = estado, l = e.logs || {}, vs = e.procesos?.vscode || {}, my = e.mysql || {};
+    const item = (titulo, texto, accionId, boton) => `<div class="mant-item">
+      <div><b>${titulo}</b><p>${texto}</p></div>
+      <button class="btn-ghost btn-sm" onclick="accion('${accionId}')">${boton}</button>
+    </div>`;
+    document.getElementById('mant').innerHTML = [
+      item('Logs del sistema (journal)', l.journal_mb != null ? `Ocupan ${l.journal_mb} MB. Se recortan a 200 MB.` : 'Sin datos en este entorno.', 'limpiar_journal', 'Recortar'),
+      item('VS Code en el servidor', vs.procesos ? `<span class="e-aviso">${vs.procesos} procesos abiertos usando ${vs.procesos ? vs.ram_mb : 0} MB.</span> Ciérralos si no estás conectado.` : 'No hay procesos abiertos.', 'cerrar_vscode', 'Cerrar VS Code'),
+      item('Nginx', `Estado: ${esc(e.servicios?.nginx || '—')}. Recarga la configuración sin cortar conexiones (antes la verifica).`, 'recargar_nginx', 'Recargar'),
+    ].join('');
+    const fila = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+    document.getElementById('datos').innerHTML = [
+      fila('MySQL', esc(e.servicios?.mysql || (my.error ? 'error' : '—'))),
+      fila('MySQL encendido hace', duracion(my.uptime_s)),
+      fila('performance_schema', my.performance_schema == null ? '—' : my.performance_schema ? '<span class="e-aviso">Encendido</span>' : 'Apagado'),
+      fila('Memoria de MySQL (buffer)', my.buffer_mb != null ? `${my.buffer_mb} MB` : '—'),
+      fila('Consultas lentas', my.lentas ?? '—'),
+      fila('Logs de PM2', l.pm2_mb != null ? `${l.pm2_mb} MB` : '—'),
+      fila('Sistema', esc(e.servidor.sistema)),
+    ].join('');
+  }
+
+  function pintarProcesos() {
+    const el = document.getElementById('procesos');
+    const top = estado.procesos?.top || [];
+    if (!top.length) { el.innerHTML = '<div class="vacio">Solo disponible en el servidor Linux.</div>'; return; }
+    el.innerHTML = `<table><thead><tr><th>Proceso</th><th>RAM</th><th>Activo hace</th></tr></thead><tbody>${top.map(p => `<tr>
+      <td><b style="color:var(--text-strong)">${esc(p.nombre)}</b><div class="mono">${esc(p.comando)}</div></td>
+      <td style="white-space:nowrap">${p.ram_mb} MB</td>
+      <td style="white-space:nowrap">${duracion(p.segundos)}</td>
+    </tr>`).join('')}</tbody></table>`;
+  }
+
+  // ── Gráficas ──────────────────────────────────────────────────
+  function etiqueta(t) {
+    const d = parseServerDate(t);
+    return ['7d', '30d'].includes(rango)
+      ? d.toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+  }
+  function serie(label, data, color, extra = {}) {
+    return { label, data, borderColor: color, backgroundColor: color + '22', borderWidth: 2, pointRadius: 0, tension: .3, spanGaps: true, ...extra };
+  }
+  function limite(label, valor, n, color) {
+    return { label, data: Array(n).fill(valor), borderColor: color, borderWidth: 1.5, borderDash: [6, 5], pointRadius: 0, fill: false };
+  }
+  function dibujar(id, labels, datasets, opcionesY = {}) {
+    const texto = css('--text-faint'), linea = css('--border');
+    if (graficas[id]) graficas[id].destroy();
+    graficas[id] = new Chart(document.getElementById(id), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: texto, boxWidth: 12, boxHeight: 2, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.formattedValue}${opcionesY.sufijo || ''}` } },
+        },
+        scales: {
+          x: { ticks: { color: texto, maxTicksLimit: 7, maxRotation: 0, font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: true, ...(opcionesY.max ? { max: opcionesY.max } : {}), ticks: { color: texto, font: { size: 11 } }, grid: { color: linea } },
+          ...(opcionesY.y2 ? { y2: { position: 'right', beginAtZero: true, ticks: { color: texto, font: { size: 11 } }, grid: { display: false } } } : {}),
+        },
+      },
+    });
+  }
+
+  async function cargarHistorial() {
+    const res = await adminFetch('/servidor/historial?rango=' + rango);
+    if (!res) return;
+    const j = await res.json();
+    const filas = j.data || [];
+    const cont = document.getElementById('graficas');
+    if (!filas.length) {
+      Object.values(graficas).forEach(g => g.destroy());
+      Object.keys(graficas).forEach(k => delete graficas[k]);
+      cont.dataset.vacio = '1';
+      cont.querySelectorAll('.lienzo').forEach(l => l.innerHTML = '<div class="vacio">Todavía no hay muestras en este rango. El monitor guarda una cada minuto.</div>');
+      return;
+    }
+    if (cont.dataset.vacio) {
+      cont.querySelectorAll('.lienzo').forEach((l, i) => l.innerHTML = `<canvas id="${['g-cpu', 'g-ram', 'g-disco', 'g-mysql'][i]}"></canvas>`);
+      delete cont.dataset.vacio;
+    }
+    const u = estado?.umbrales || { cpu: 90, ram: 90, swap: 60, disco: 90 };
+    const L = filas.map(f => etiqueta(f.t)), n = L.length;
+    const azul = '#1d5fc0', violeta = '#7c3aed', verde = '#15803d', ambar = '#c27803', rojo = '#dc2626', cian = '#0e7490';
+    dibujar('g-cpu', L, [
+      serie('CPU', filas.map(f => f.cpu), azul),
+      serie('RAM', filas.map(f => f.ram), violeta),
+      limite(`Límite CPU (${u.cpu} %)`, u.cpu, n, rojo),
+    ], { max: 100, sufijo: ' %' });
+    dibujar('g-ram', L, [serie('RAM disponible', filas.map(f => f.ram_disp_min), verde, { fill: true })], { sufijo: ' MB' });
+    dibujar('g-disco', L, [
+      serie('Disco', filas.map(f => f.disco), cian),
+      serie('Swap', filas.map(f => f.swap), ambar),
+      limite(`Límite disco (${u.disco} %)`, u.disco, n, rojo),
+    ], { max: 100, sufijo: ' %' });
+    dibujar('g-mysql', L, [
+      serie('Carga', filas.map(f => f.carga), azul),
+      serie('Conexiones MySQL', filas.map(f => f.conexiones), violeta, { yAxisID: 'y2' }),
+    ], { y2: true });
+  }
+
+  document.getElementById('rangos').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    rango = b.dataset.r;
+    document.querySelectorAll('#rangos button').forEach(x => x.classList.toggle('on', x === b));
+    cargarHistorial();
+  });
+
+  // ── Eventos ───────────────────────────────────────────────────
+  async function cargarEventos() {
+    const res = await adminFetch('/servidor/eventos?limit=30&tipo=' + tipoEvento);
+    if (!res) return;
+    const filas = (await res.json()).data || [];
+    const el = document.getElementById('eventos');
+    if (!filas.length) {
+      el.innerHTML = `<div class="vacio">${tipoEvento === 'alerta' ? 'Sin alertas registradas. Buena señal.' : 'Todavía no se hizo ninguna acción desde el panel.'}</div>`;
+      return;
+    }
+    el.innerHTML = filas.map(ev => {
+      let icono, color, estadoTxt;
+      if (ev.tipo === 'alerta') {
+        const activa = ev.estado === 'activa';
+        icono = activa ? 'xc' : 'checkc'; color = activa ? 'danger' : 'ok';
+        estadoTxt = activa ? '<b class="e-critico">Abierta</b>' : `Resuelta ${fDateTime(ev.resuelta_at)}`;
+        estadoTxt += ev.correo_enviado ? ' · correo enviado' : ' · <span class="e-aviso">sin correo</span>';
+      } else {
+        const ok = ev.estado === 'ok';
+        icono = ok ? 'checkc' : 'xc'; color = ok ? 'ok' : 'danger';
+        estadoTxt = `${esc(ev.admin || '')} · ${esc(ev.detalle || '')}`;
+      }
+      return `<div class="evento">
+        <span style="color:var(--${color}-text)">${adminIcon(icono)}</span>
+        <div><b>${esc(ev.titulo)}</b><p>${fDateTime(ev.created_at)} · ${estadoTxt}</p></div>
+      </div>`;
+    }).join('');
+  }
+  document.querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => {
+    tipoEvento = b.dataset.tipo;
+    document.querySelectorAll('[data-tipo]').forEach(x => x.classList.toggle('active', x === b));
+    cargarEventos();
+  }));
+
+  // ── Acciones con confirmación ─────────────────────────────────
+  const DESCRIPCION = {
+    pm2_reiniciar:          n => [`¿Reiniciar ${n}?`, `La app se detiene y vuelve a arrancar. Puede quedar sin responder unos segundos.${n === 'vetclinic-api' ? ' Esta es la API de las clínicas y de este panel: la página volverá a cargar sola.' : ''}`, 'Reiniciar'],
+    pm2_vaciar_logs:        n => [`¿Vaciar los logs de ${n}?`, 'Se borra el contenido de sus archivos de log. Si estás investigando un error, revísalo antes.', 'Vaciar logs'],
+    pm2_reiniciar_contador: n => [`¿Poner en cero los reinicios de ${n}?`, 'No afecta a la app. Sirve para empezar a contar caídas reales desde ahora.', 'Poner en cero'],
+    limpiar_journal:        () => ['¿Recortar los logs del sistema?', 'Se borran los registros más antiguos del journal hasta dejarlo en 200 MB.', 'Recortar'],
+    cerrar_vscode:          () => ['¿Cerrar los procesos de VS Code?', 'Si estás conectado ahora con VS Code al servidor, se desconectará.', 'Cerrar VS Code'],
+    recargar_nginx:         () => ['¿Recargar Nginx?', 'Primero se verifica la configuración. Si tiene errores, no se recarga y no pasa nada.', 'Recargar'],
+  };
+  function cerrarModal() { document.getElementById('modal').classList.add('hidden'); }
+  function accion(id, nombre) {
+    const [titulo, texto, boton] = DESCRIPCION[id](nombre);
+    document.getElementById('m-titulo').textContent = titulo;
+    document.getElementById('m-texto').textContent = texto;
+    const ok = document.getElementById('m-ok');
+    ok.textContent = boton;
+    ok.onclick = async () => {
+      ok.disabled = true; ok.textContent = 'Procesando…';
+      try {
+        const res = await adminFetch('/servidor/acciones/' + id, { method: 'POST', body: nombre ? { nombre } : {} });
+        if (!res) return;
+        const j = await res.json();
+        toast(j.message, res.ok ? 'success' : 'error', 5000);
+        cerrarModal();
+        if (id === 'pm2_reiniciar' && nombre === 'vetclinic-api' && res.ok) setTimeout(() => location.reload(), 8000);
+        else setTimeout(cargarTodo, 1500);
+      } catch { toast('No se pudo conectar con el servidor.', 'error'); }
+      finally { ok.disabled = false; }
+    };
+    document.getElementById('modal').classList.remove('hidden');
+    ok.focus();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+  // ── Configuración de alertas ──────────────────────────────────
+  const CAMPOS = { 'c-cpu': 'monitor_cpu_pct', 'c-ram': 'monitor_ram_pct', 'c-swap': 'monitor_swap_pct', 'c-disco': 'monitor_disco_pct', 'c-con': 'monitor_conexiones_pct' };
+  async function cargarConfig() {
+    const res = await adminFetch('/servidor/config');
+    if (!res?.ok) return;
+    const c = (await res.json()).data;
+    document.getElementById('c-activo').checked = c.monitor_activo !== '0';
+    document.getElementById('c-email').value = c.monitor_email || '';
+    Object.entries(CAMPOS).forEach(([id, k]) => document.getElementById(id).value = c[k]);
+  }
+  async function guardarConfig(ev) {
+    ev.preventDefault();
+    const err = document.getElementById('c-error');
+    err.textContent = '';
+    const body = {
+      monitor_activo: document.getElementById('c-activo').checked,
+      monitor_email: document.getElementById('c-email').value.trim(),
+      // El botón de los correos abre esta misma página
+      monitor_panel_url: location.origin.startsWith('http') ? location.origin + location.pathname : '',
+    };
+    Object.entries(CAMPOS).forEach(([id, k]) => body[k] = document.getElementById(id).value);
+    const res = await adminFetch('/servidor/config', { method: 'PUT', body });
+    if (!res) return;
+    const j = await res.json();
+    if (!res.ok) { err.textContent = j.message; return; }
+    toast('Configuración guardada.');
+    cargarEstado();
+  }
+  async function probarCorreo(btn) {
+    btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Enviando…';
+    try {
+      const res = await adminFetch('/servidor/probar-correo', { method: 'POST' });
+      if (!res) return;
+      const j = await res.json();
+      toast(res.ok ? `Correo de prueba enviado a ${document.getElementById('c-email').value}.` : j.message, res.ok ? 'success' : 'error', 6000);
+    } finally { btn.disabled = false; btn.textContent = txt; }
+  }
+
+  // ── Actualización automática ──────────────────────────────────
+  function programar() {
+    clearInterval(timer);
+    if (document.getElementById('auto').checked) timer = setInterval(() => { if (!document.hidden) cargarEstado(); }, 30000);
+  }
+  document.getElementById('auto').addEventListener('change', programar);
+
+  (async () => {
+    await cargarEstado();
+    await Promise.all([cargarHistorial(), cargarEventos(), cargarConfig()]);
+    programar();
+  })();
+</script>
+</body>
+</html>

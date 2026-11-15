@@ -486,6 +486,38 @@ CREATE TABLE IF NOT EXISTS saas_auditoria (
   INDEX idx_accion (accion)
 ) ENGINE=InnoDB;
 
+-- ── Monitor del servidor (muestras cada minuto, 30 días) ─────
+-- El backend también las crea al iniciar (jobs/servidor.monitor.js)
+CREATE TABLE IF NOT EXISTS servidor_metricas (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fecha       DATETIME      NOT NULL,
+  cpu_pct     DECIMAL(5,1)  NULL,
+  carga1      DECIMAL(6,2)  NULL,
+  ram_pct     DECIMAL(5,1)  NULL,
+  ram_disp_mb INT UNSIGNED  NULL,
+  swap_pct    DECIMAL(5,1)  NULL,
+  disco_pct   DECIMAL(5,1)  NULL,
+  mysql_conn  SMALLINT UNSIGNED NULL,
+  INDEX idx_fecha (fecha)
+) ENGINE=InnoDB;
+
+-- ── Alertas del servidor y acciones hechas desde el panel ────
+CREATE TABLE IF NOT EXISTS servidor_eventos (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo           ENUM('alerta','accion') NOT NULL,
+  nivel          ENUM('info','aviso','critico') NOT NULL DEFAULT 'info',
+  codigo         VARCHAR(80)  NOT NULL,
+  titulo         VARCHAR(200) NOT NULL,
+  detalle        TEXT         NULL,
+  estado         ENUM('activa','resuelta','ok','error') NOT NULL,
+  correo_enviado TINYINT(1)   NOT NULL DEFAULT 0,
+  admin          VARCHAR(150) NULL,
+  created_at     DATETIME     NOT NULL,
+  resuelta_at    DATETIME     NULL,
+  INDEX idx_tipo_estado (tipo, estado),
+  INDEX idx_created (created_at)
+) ENGINE=InnoDB;
+
 -- ════════════════════════════════════════════════════════════
 -- TRIGGER — inicialización automática al crear tenant
 -- ════════════════════════════════════════════════════════════

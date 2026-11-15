@@ -76,6 +76,8 @@ const _ADMIN_ICONS = {
   box      : '<path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>',
   palette  : '<path d="M12 3a9 9 0 0 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.1-.9-1.5-.9-2.6 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
   globe    : '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  server   : '<rect x="3.5" y="4" width="17" height="7" rx="1.5"/><rect x="3.5" y="13" width="17" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/>',
+  pulse    : '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
   wrench   : '<path d="M14.5 6.5a4 4 0 0 0 5 5L12 19a2.1 2.1 0 0 1-3-3z"/><path d="M14.5 6.5L17 4l3 3-2.5 2.5"/>',
 };
 
@@ -179,6 +181,7 @@ const _ADMIN_NAV = [
   { href: 'wa.html',       page: 'wa',        icon: 'chat',      label: 'WhatsApp',           corto: 'WhatsApp', tab: true },
   { href: 'logs.html',     page: 'logs',      icon: 'logs',      label: 'Logs de auditoría',  corto: 'Logs'   },
   { href: 'backup.html',   page: 'backup',    icon: 'backup',    label: 'Backups',            corto: 'Backups' },
+  { href: 'servidor.html', page: 'servidor',  icon: 'server',    label: 'Servidor',           corto: 'Servidor' },
 ];
 
 /**

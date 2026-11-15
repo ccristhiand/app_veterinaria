@@ -52,6 +52,7 @@ const adminLogsRoutes    = require('./routes/admin_logs.routes');
 const adminBackupRoutes  = require('./routes/admin_backup.routes');
 const adminFeRoutes      = require('./routes/admin_fe.routes');
 const adminWaRoutes      = require('./routes/admin_wa.routes');
+const adminServidorRoutes = require('./routes/admin_servidor.routes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -161,6 +162,7 @@ app.use('/admin/api/logs',    adminLogsRoutes);
 app.use('/admin/api/backups', adminBackupRoutes);
 app.use('/admin/api/fe',      adminFeRoutes);
 app.use('/admin/api/wa',      adminWaRoutes);
+app.use('/admin/api/servidor', adminServidorRoutes);
 app.use('/admin/api',         adminRoutes);
 
 // ── Rate limit estricto para login (anti fuerza bruta) ───────────
@@ -238,6 +240,8 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
       } catch (e) {
         logger.warn('⚠️  Backup scheduler no disponible: ' + e.message);
       }
+      require('./jobs/servidor.monitor').iniciarMonitorServidor()
+        .catch(e => logger.warn('⚠️  Monitor del servidor no disponible: ' + e.message));
     });
   } catch (err) {
     logger.error('Error al iniciar:', err);
