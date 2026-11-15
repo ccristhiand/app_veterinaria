@@ -12,7 +12,7 @@ async function getTransporter() {
   return nodemailer.createTransport({
     host  : cfg.smtp_host || 'smtp.gmail.com',
     port  : parseInt(cfg.smtp_port) || 587,
-    secure: false,
+    secure: parseInt(cfg.smtp_port) === 465,   // 465 usa SSL directo; 587 usa STARTTLS
     auth  : { user: cfg.smtp_user, pass: cfg.smtp_pass },
   });
 }

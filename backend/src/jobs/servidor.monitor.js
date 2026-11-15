@@ -261,15 +261,22 @@ async function cerrarAlerta(codigo, est) {
   });
 }
 
-async function enviarSiActivo(datos) {
-  if (!config.monitor_email) return false;
+// lanzar: true devuelve el motivo del fallo (para el correo de prueba del panel)
+async function enviarSiActivo(datos, { lanzar = false } = {}) {
+  if (!config.monitor_email) {
+    if (lanzar) throw new Error('No hay un correo de destino configurado.');
+    return false;
+  }
   try {
     await correo.enviar({
       ...datos, para: config.monitor_email, servidor: os.hostname(),
       umbrales: umbrales(), panelUrl: config.monitor_panel_url || null,
     });
     return true;
-  } catch { return false; }
+  } catch (e) {
+    if (lanzar) throw e;
+    return false;
+  }
 }
 
 async function revisarAlertas(est) {

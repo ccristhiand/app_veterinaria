@@ -37,13 +37,13 @@
     .rangos{display:flex;gap:4px;background:var(--inset);padding:3px;border-radius:var(--radius-sm)}
     .rangos button{border:none;background:transparent;color:var(--text-muted);font:inherit;font-size:.8rem;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer}
     .rangos button.on{background:var(--surface);color:var(--text-strong);box-shadow:var(--shadow-sm)}
-    .graficas{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .graficas{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
     .graf h4{font-size:.82rem;color:var(--text-2);font-weight:600;margin-bottom:2px}
     .graf p{font-size:.72rem;color:var(--text-faint);margin-bottom:8px}
     .graf .lienzo{position:relative;height:210px}
     .vacio{text-align:center;padding:2rem 1rem;color:var(--text-faint);font-size:.84rem}
 
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .grid-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
     .seccion{margin-bottom:16px}
     .tabla-wrap{overflow-x:auto}
     th{padding:8px 10px;text-align:left;font-size:.72rem;font-weight:600;color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap}
@@ -75,7 +75,46 @@
     .switch input{width:18px;height:18px;accent-color:var(--accent)}
 
     .modal-body p{font-size:.88rem;line-height:1.55;color:var(--text-2)}
-    @media (max-width: 900px){ .graficas,.grid-2{grid-template-columns:1fr} }
+    .mono{word-break:break-all}
+    @media (max-width: 1100px){ .graficas{grid-template-columns:minmax(0,1fr)} }
+    @media (max-width: 900px){ .grid-2{grid-template-columns:minmax(0,1fr)} }
+
+    /* ── Celular ─────────────────────────────────────────────── */
+    @media (max-width: 640px){
+      .head{margin-bottom:12px}
+      .head h1{font-size:1.2rem}
+      .acciones-head{width:100%;justify-content:space-between}
+      .banner{padding:12px 14px;gap:10px}
+      .banner .ico{width:22px;height:22px}
+      .kpis{grid-template-columns:1fr 1fr;gap:8px}
+      .kpi{padding:12px !important}
+      .kpi .stat-val{font-size:1.2rem}
+      .kpi .det{font-size:.7rem}
+      .card{padding:14px !important}
+      .card-head{margin-bottom:10px}
+      .rangos{width:100%}
+      .rangos button{flex:1;padding:6px 4px}
+      .graf .lienzo{height:180px}
+      .mant-item{flex-wrap:wrap}
+      .mant-item > button{width:100%}
+      #form-config .form-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+      #form-smtp .form-grid{grid-template-columns:minmax(0,1fr)}
+      .datos{font-size:.78rem}
+      .btns > .btn-primary,.btns > .btn-ghost{flex:1}
+
+      /* Tablas como fichas: cada fila es una tarjeta con etiquetas */
+      table.fichas thead{display:none}
+      table.fichas, table.fichas tbody, table.fichas tr, table.fichas td{display:block;width:100%}
+      table.fichas tr{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px}
+      table.fichas td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:12px;text-align:right}
+      table.fichas td::before{content:attr(data-label);color:var(--text-faint);font-size:.76rem;text-align:left;flex:none}
+      table.fichas td.titulo{display:block;text-align:left;padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--border)}
+      table.fichas td.titulo::before{content:none}
+      table.fichas td.botones{display:block;padding-top:8px}
+      table.fichas td.botones::before{content:none}
+      table.fichas td.botones:empty{display:none}
+      table.fichas td.botones .btns > *{flex:1}
+    }
   </style>
   <link rel="stylesheet" href="admin.css?v=20261103b"/>
   <link rel="icon" href="logo.jpg" type="image/jpeg"/>
@@ -172,6 +211,28 @@
       </form>
     </div>
   </div>
+
+  <div class="card seccion">
+    <div class="card-head">
+      <div><h3>Correo de envío (SMTP)</h3><p>La cuenta desde la que salen las alertas del servidor y los correos del sistema de pagos.</p></div>
+      <span id="s-estado"></span>
+    </div>
+    <form id="form-smtp" onsubmit="guardarSmtp(event)" autocomplete="off">
+      <div class="form-grid">
+        <div class="campo"><label for="s-host">Servidor</label><input id="s-host" required placeholder="smtp.gmail.com"></div>
+        <div class="campo"><label for="s-port">Puerto</label><input id="s-port" type="number" required placeholder="587"><small>587 (recomendado) o 465</small></div>
+        <div class="campo"><label for="s-user">Usuario (correo)</label><input id="s-user" type="email" required placeholder="tucuenta@gmail.com" autocomplete="off"></div>
+        <div class="campo"><label for="s-from">Remitente</label><input id="s-from" type="email" placeholder="Igual que el usuario"><small id="s-from-aviso"></small></div>
+        <div class="campo"><label for="s-pass">Contraseña de aplicación</label><input id="s-pass" type="password" autocomplete="new-password"><small id="s-pass-ayuda"></small></div>
+      </div>
+      <p class="campo"><small style="margin-top:12px">Con Gmail no sirve tu contraseña normal: crea una <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" style="color:var(--accent-text);text-decoration:underline">contraseña de aplicación</a> (requiere la verificación en dos pasos) y pega los 16 caracteres. La contraseña nunca se vuelve a mostrar.</small></p>
+      <p class="campo"><small class="err" id="s-error"></small></p>
+      <div class="btns" style="margin-top:14px">
+        <button type="submit" class="btn-primary">Guardar correo de envío</button>
+        <button type="button" class="btn-ghost" onclick="probarCorreo(this)">Enviar correo de prueba</button>
+      </div>
+    </form>
+  </div>
 </main>
 
 <div id="modal" class="modal-bg hidden" onclick="if(event.target===this)cerrarModal()">
@@ -236,7 +297,7 @@
     if (e.mysql?.error) add('critico', 'No se puede consultar MySQL');
     else if (nivel(e.mysql?.conexiones_pct, u.conexiones) !== 'ok') add(nivel(e.mysql.conexiones_pct, u.conexiones), `MySQL con ${e.mysql.conexiones} de ${e.mysql.max_conexiones} conexiones`);
     Object.entries(e.servicios || {}).forEach(([n, s]) => { if (s && s !== 'active') add('critico', `${n} no está activo (${s})`); });
-    (e.pm2 || []).filter(a => !a.modulo && a.estado !== 'online').forEach(a => add('critico', `La app ${a.nombre} está ${a.estado}`));
+    (e.pm2 || []).filter(a => !a.modulo && a.estado !== 'online').forEach(a => add('critico', `La app ${a.nombre} está ${(ESTADO_PM2[a.estado] || a.estado).toLowerCase()}`));
     if (e.procesos?.vscode?.procesos) add('aviso', `VS Code tiene ${e.procesos.vscode.procesos} procesos abiertos (${e.procesos.vscode.ram_mb} MB)`);
     return out;
   }
@@ -285,22 +346,23 @@
   }
 
   // ── PM2 ───────────────────────────────────────────────────────
+  const ESTADO_PM2 = { online: 'En línea', stopped: 'Detenida', errored: 'Con error', launching: 'Arrancando', stopping: 'Deteniéndose' };
   function pintarPm2() {
     const el = document.getElementById('pm2');
     const apps = estado.pm2;
     if (!apps) { el.innerHTML = '<div class="vacio">No se pudo leer PM2 (solo disponible en el servidor).</div>'; return; }
-    el.innerHTML = `<table>
+    el.innerHTML = `<table class="fichas">
       <thead><tr><th>App</th><th>Estado</th><th>CPU</th><th>RAM</th><th>Activa hace</th><th>Reinicios</th><th>Acciones</th></tr></thead>
       <tbody>${apps.map(a => {
         const ok = a.estado === 'online';
         return `<tr>
-          <td><b style="color:var(--text-strong)">${esc(a.nombre)}</b>${a.modulo ? ' <span class="badge" style="background:var(--inset);color:var(--text-muted)">módulo</span>' : ''}</td>
-          <td><span class="badge" style="background:var(--${ok ? 'ok' : 'danger'}-bg);color:var(--${ok ? 'ok' : 'danger'}-text)"><span class="dot"></span>${ok ? 'En línea' : esc(a.estado)}</span></td>
-          <td class="${a.cpu_pct >= 50 ? 'e-aviso' : ''}">${a.cpu_pct} %</td>
-          <td>${a.ram_mb} MB</td>
-          <td>${ok ? desde(a.desde) : '—'}</td>
-          <td title="Cada despliegue con pm2 restart también suma 1">${a.reinicios}${a.inestables ? ` <span class="e-critico">(${a.inestables} inestables)</span>` : ''}</td>
-          <td>${a.modulo ? '' : `<div class="btns">
+          <td class="titulo"><b style="color:var(--text-strong)">${esc(a.nombre)}</b>${a.modulo ? ' <span class="badge" style="background:var(--inset);color:var(--text-muted)">módulo</span>' : ''}</td>
+          <td data-label="Estado"><span class="badge" style="background:var(--${ok ? 'ok' : 'danger'}-bg);color:var(--${ok ? 'ok' : 'danger'}-text)"><span class="dot"></span>${ESTADO_PM2[a.estado] || esc(a.estado)}</span></td>
+          <td data-label="CPU" class="${a.cpu_pct >= 50 ? 'e-aviso' : ''}">${a.cpu_pct} %</td>
+          <td data-label="RAM">${a.ram_mb} MB</td>
+          <td data-label="Activa hace">${ok ? desde(a.desde) : '—'}</td>
+          <td data-label="Reinicios" title="Cada despliegue con pm2 restart también suma 1">${a.reinicios}${a.inestables ? ` <span class="e-critico">(${a.inestables} inestables)</span>` : ''}</td>
+          <td class="botones">${a.modulo ? '' : `<div class="btns">
             <button class="btn-ghost btn-sm" onclick="accion('pm2_reiniciar', ${jsArg(a.nombre)})">Reiniciar</button>
             <button class="btn-ghost btn-sm" onclick="accion('pm2_vaciar_logs', ${jsArg(a.nombre)})">Vaciar logs</button>
             <button class="btn-ghost btn-sm" onclick="accion('pm2_reiniciar_contador', ${jsArg(a.nombre)})" title="Pone en cero el contador de reinicios">Contador a 0</button>
@@ -337,10 +399,10 @@
     const el = document.getElementById('procesos');
     const top = estado.procesos?.top || [];
     if (!top.length) { el.innerHTML = '<div class="vacio">Solo disponible en el servidor Linux.</div>'; return; }
-    el.innerHTML = `<table><thead><tr><th>Proceso</th><th>RAM</th><th>Activo hace</th></tr></thead><tbody>${top.map(p => `<tr>
-      <td><b style="color:var(--text-strong)">${esc(p.nombre)}</b><div class="mono">${esc(p.comando)}</div></td>
-      <td style="white-space:nowrap">${p.ram_mb} MB</td>
-      <td style="white-space:nowrap">${duracion(p.segundos)}</td>
+    el.innerHTML = `<table class="fichas"><thead><tr><th>Proceso</th><th>RAM</th><th>Activo hace</th></tr></thead><tbody>${top.map(p => `<tr>
+      <td class="titulo"><b style="color:var(--text-strong)">${esc(p.nombre)}</b><div class="mono">${esc(p.comando)}</div></td>
+      <td data-label="RAM" style="white-space:nowrap">${p.ram_mb} MB</td>
+      <td data-label="Activo hace" style="white-space:nowrap">${duracion(p.segundos)}</td>
     </tr>`).join('')}</tbody></table>`;
   }
 
@@ -525,8 +587,63 @@
       const res = await adminFetch('/servidor/probar-correo', { method: 'POST' });
       if (!res) return;
       const j = await res.json();
-      toast(res.ok ? `Correo de prueba enviado a ${document.getElementById('c-email').value}.` : j.message, res.ok ? 'success' : 'error', 6000);
+      toast(res.ok ? `Correo de prueba enviado a ${document.getElementById('c-email').value}. Revisa también la carpeta de spam.` : j.message, res.ok ? 'success' : 'error', 8000);
     } finally { btn.disabled = false; btn.textContent = txt; }
+  }
+
+  // ── Correo de envío (SMTP) ────────────────────────────────────
+  function pintarEstadoSmtp(configurada) {
+    document.getElementById('s-estado').innerHTML = configurada
+      ? '<span class="badge" style="background:var(--ok-bg);color:var(--ok-text)"><span class="dot"></span>Configurado</span>'
+      : '<span class="badge" style="background:var(--danger-bg);color:var(--danger-text)"><span class="dot"></span>Sin configurar: no salen correos</span>';
+    const pass = document.getElementById('s-pass');
+    pass.value = '';
+    pass.required = !configurada;
+    pass.placeholder = configurada ? '•••••••••••••••• (guardada)' : '16 caracteres';
+    document.getElementById('s-pass-ayuda').textContent = configurada ? 'Déjala vacía para mantener la actual.' : 'Obligatoria para enviar correos.';
+  }
+  function avisoRemitente() {
+    const host = document.getElementById('s-host').value.trim().toLowerCase();
+    const user = document.getElementById('s-user').value.trim().toLowerCase();
+    const from = document.getElementById('s-from').value.trim().toLowerCase();
+    const el = document.getElementById('s-from-aviso');
+    const distinto = host.includes('gmail') && from && user && from !== user;
+    el.className = distinto ? 'e-aviso' : '';
+    el.textContent = distinto
+      ? 'Gmail enviará como el usuario salvo que este remitente sea un alias verificado en esa cuenta; si no, puede llegar a spam.'
+      : 'Vacío = se usa el usuario.';
+  }
+  ['s-host', 's-user', 's-from'].forEach(id => document.getElementById(id).addEventListener('input', avisoRemitente));
+
+  async function cargarSmtp() {
+    const res = await adminFetch('/servidor/smtp');
+    if (!res?.ok) return;
+    const s = (await res.json()).data;
+    document.getElementById('s-host').value = s.smtp_host;
+    document.getElementById('s-port').value = s.smtp_port;
+    document.getElementById('s-user').value = s.smtp_user;
+    document.getElementById('s-from').value = s.smtp_from;
+    pintarEstadoSmtp(s.pass_configurada);
+    avisoRemitente();
+  }
+  async function guardarSmtp(ev) {
+    ev.preventDefault();
+    const err = document.getElementById('s-error');
+    err.textContent = '';
+    const body = {
+      smtp_host: document.getElementById('s-host').value.trim(),
+      smtp_port: document.getElementById('s-port').value,
+      smtp_user: document.getElementById('s-user').value.trim(),
+      smtp_from: document.getElementById('s-from').value.trim(),
+      smtp_pass: document.getElementById('s-pass').value,
+    };
+    const res = await adminFetch('/servidor/smtp', { method: 'PUT', body });
+    if (!res) return;
+    const j = await res.json();
+    if (!res.ok) { err.textContent = j.message; return; }
+    pintarEstadoSmtp(j.data.pass_configurada);
+    toast('Correo de envío guardado. Ahora envía un correo de prueba.');
+    if (tipoEvento === 'accion') cargarEventos();
   }
 
   // ── Actualización automática ──────────────────────────────────
@@ -538,7 +655,7 @@
 
   (async () => {
     await cargarEstado();
-    await Promise.all([cargarHistorial(), cargarEventos(), cargarConfig()]);
+    await Promise.all([cargarHistorial(), cargarEventos(), cargarConfig(), cargarSmtp()]);
     programar();
   })();
 </script>

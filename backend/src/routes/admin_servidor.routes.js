@@ -131,20 +131,61 @@ router.post('/acciones/:accion', async (req, res) => {
   }
 });
 
+// GET /admin/api/servidor/smtp — cuenta de envío de correos (la contraseña nunca se devuelve)
+router.get('/smtp', async (_req, res) => {
+  try {
+    const filas = await masterQuery("SELECT clave, valor FROM saas_config WHERE clave LIKE 'smtp\\_%'");
+    const c = Object.fromEntries(filas.map(f => [f.clave, f.valor]));
+    res.json({ success: true, data: {
+      smtp_host: c.smtp_host || 'smtp.gmail.com', smtp_port: c.smtp_port || '587',
+      smtp_user: c.smtp_user || '', smtp_from: c.smtp_from || '', pass_configurada: !!c.smtp_pass,
+    } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// PUT /admin/api/servidor/smtp — la contraseña solo se cambia si viene con valor
+router.put('/smtp', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const host = String(b.smtp_host || '').trim();
+    const port = parseInt(b.smtp_port, 10);
+    const user = String(b.smtp_user || '').trim();
+    const from = String(b.smtp_from || '').trim() || user;
+    const pass = String(b.smtp_pass || '').replace(/\s+/g, '');
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!/^[a-z0-9.-]+$/i.test(host)) throw new Error('El servidor SMTP no es válido.');
+    if (![25, 465, 587, 2525].includes(port)) throw new Error('El puerto debe ser 587, 465, 25 o 2525.');
+    if (!email.test(user)) throw new Error('El usuario debe ser un correo válido.');
+    if (!email.test(from)) throw new Error('El remitente debe ser un correo válido.');
+    const valores = { smtp_host: host, smtp_port: String(port), smtp_user: user, smtp_from: from };
+    if (pass) valores.smtp_pass = pass;
+    for (const [clave, valor] of Object.entries(valores)) {
+      await masterQuery(
+        'INSERT INTO saas_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [clave, valor]
+      );
+    }
+    const [p] = await masterQuery("SELECT valor <> '' AS ok FROM saas_config WHERE clave = 'smtp_pass'");
+    await masterQuery(
+      "INSERT INTO servidor_eventos (tipo, nivel, codigo, titulo, detalle, estado, admin, created_at) VALUES ('accion','info','smtp','Correo de envío actualizado',?,'ok',?,NOW())",
+      [`${user} vía ${host}:${port}${pass ? ' · contraseña cambiada' : ''}`, quien(req)]
+    ).catch(() => {});
+    res.json({ success: true, message: 'Correo de envío guardado.', data: { pass_configurada: !!p?.ok } });
+  } catch (e) { res.status(422).json({ success: false, message: e.message }); }
+});
+
 // POST /admin/api/servidor/probar-correo — envía un correo de prueba con el estado actual
 router.post('/probar-correo', async (_req, res) => {
   try {
     await monitor.leerConfig();
     const estado = await srv.lecturaBasica();
-    const enviado = await monitor.enviarSiActivo({
+    await monitor.enviarSiActivo({
       tipo: 'prueba',
       asunto: '🔔 [VetNetcodip] Correo de prueba del monitor del servidor',
       titulo: 'Las alertas del servidor llegan a este correo',
       explicacion: 'Este es un correo de prueba. Cuando el servidor tenga un problema crítico (CPU, RAM, disco, MySQL o una app caída) recibirás un aviso como este, con lo que está pasando y qué hacer. Cuando se normalice, te llegará otro avisando que se resolvió.',
       pasos: ['Agrega la dirección del remitente a tus contactos para que las alertas no lleguen a spam.'],
       estado,
-    });
-    if (!enviado) throw new Error('No se pudo enviar. Revisa el SMTP en saas_config y el correo de alertas.');
+    }, { lanzar: true });
     res.json({ success: true, message: 'Correo de prueba enviado.' });
   } catch (e) { res.status(422).json({ success: false, message: e.message }); }
 });

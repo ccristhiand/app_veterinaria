@@ -144,7 +144,14 @@ const sinHtml = s => String(s || '').replace(/<[^>]+>/g, '');
  */
 async function enviar(datos) {
   const smtp = await leerSmtp();
-  if (!smtp) throw new Error('SMTP no configurado (saas_config.smtp_user / smtp_pass).');
+  if (!smtp) {
+    const msg = 'El SMTP no está configurado: faltan smtp_user y smtp_pass en saas_config.';
+    await masterQuery(
+      'INSERT INTO saas_emails_log (tenant_id, tipo, destinatario, asunto, estado, error) VALUES (NULL, ?, ?, ?, ?, ?)',
+      ['monitor_servidor', datos.para, datos.asunto.slice(0, 255), 'fallido', msg]
+    ).catch(() => {});
+    throw new Error(msg);
+  }
   const transporter = nodemailer.createTransport({
     host: smtp.smtp_host || 'smtp.gmail.com',
     port: parseInt(smtp.smtp_port, 10) || 587,

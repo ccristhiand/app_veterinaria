@@ -411,12 +411,18 @@ router.get('/reportes/ingresos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Claves secretas (contraseña SMTP, secretos de Meta…): nunca se devuelven
+const esSecreta = clave => /pass|secret|token/i.test(clave);
+
 // ── GET /api/admin/config ─────────────────────────────────────
 router.get('/config', async (req, res, next) => {
   try {
     const rows = await query('SELECT clave, valor, descripcion FROM saas_config ORDER BY clave');
     const cfg  = {};
-    rows.forEach(r => { cfg[r.clave] = r.valor; });
+    rows.forEach(r => {
+      if (esSecreta(r.clave)) { cfg[r.clave] = ''; cfg[`${r.clave}_configurada`] = !!r.valor; }
+      else cfg[r.clave] = r.valor;
+    });
     return res.json({ success: true, data: cfg });
   } catch (err) { next(err); }
 });
@@ -426,6 +432,9 @@ router.put('/config', async (req, res, next) => {
   try {
     const { cambios } = req.body; // { clave: valor, ... }
     for (const [clave, valor] of Object.entries(cambios || {})) {
+      // Un secreto vacío significa "mantener el actual" (el GET lo devuelve vacío)
+      if (esSecreta(clave) && !valor) continue;
+      if (clave.endsWith('_configurada')) continue;
       await query(
         'INSERT INTO saas_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=?',
         [clave, valor, valor]
