@@ -169,15 +169,14 @@ async function resumenDiarioAdmin() {
 function iniciar() {
   const ahora = new Date();
 
-  // Día 1 del mes a las 8am
-  function msHastaDia1() {
-    const prox = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1, 8, 0, 0);
-    return prox - ahora;
-  }
+  // Cobros mensuales: se revisa cada día a las 8am y solo se generan el día 1.
+  // Node no admite esperas de más de ~24,8 días (2^31 ms): con 30 días el timer
+  // se desborda y se ejecuta cada 1 ms, por eso no se programa con setInterval mensual.
   setTimeout(() => {
-    generarCobrosMensuales();
-    setInterval(generarCobrosMensuales, 30 * 24 * 60 * 60 * 1000); // cada 30 días
-  }, msHastaDia1());
+    const revisarDia1 = () => { if (new Date().getDate() === 1) generarCobrosMensuales(); };
+    revisarDia1();
+    setInterval(revisarDia1, 24 * 60 * 60 * 1000);
+  }, msHastaHora(8));
 
   // Recordatorios diarios a las 9am
   function msHastaHora(h, m = 0) {
