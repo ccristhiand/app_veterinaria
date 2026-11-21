@@ -544,6 +544,10 @@ function rowHTML(c) {
         '<div>' +
           '<p style="font-weight:700;font-size:.85rem">'+esc(c.mascota_nombre)+'</p>' +
           '<p style="font-size:.7rem;color:var(--ink-faint)">'+esc(c.propietario_nombre||'')+'</p>' +
+          (c.telefono
+            ? '<a href="tel:'+esc(String(c.telefono).replace(/[^\d+]/g,''))+'" title="Llamar al propietario" '+
+              'style="display:inline-flex;align-items:center;gap:.25rem;font-size:.72rem;font-weight:600;color:var(--sky);text-decoration:none;margin-top:.1rem">📞 '+esc(c.telefono)+'</a>'
+            : '<p style="font-size:.7rem;color:var(--ink-faint);font-style:italic">Sin teléfono</p>') +
         '</div>' +
       '</div>' +
     '</td>' +

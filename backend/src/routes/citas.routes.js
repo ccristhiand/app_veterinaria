@@ -124,8 +124,8 @@ router.post('/', auditMiddleware('citas:creado', 'citas'), async (req, res, next
     const io = req.app.get('io');
     if (io) {
       const [cita] = await req.db.query(
-        `SELECT c.*, m.nombre AS mascota_nombre,
-                CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre
+        `SELECT c.*, m.nombre AS mascota_nombre, m.especie,
+                CONCAT(p.nombre,' ',p.apellido) AS propietario_nombre, p.telefono
          FROM citas c
          JOIN mascotas m ON m.id = c.mascota_id
          JOIN propietarios p ON p.id = m.propietario_id

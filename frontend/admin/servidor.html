@@ -23,7 +23,8 @@
     .b-aviso{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn-text)}
     .b-critico{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-text)}
 
-    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+    .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}
+    @media (max-width: 1280px){ .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
     .kpi .stat-val{font-size:1.55rem}
     .kpi .det{font-size:.75rem;color:var(--text-faint);margin-top:4px;line-height:1.4}
     .barra{height:6px;border-radius:999px;background:var(--inset);overflow:hidden;margin-top:10px}
@@ -269,7 +270,13 @@
 
   // ── Carga ─────────────────────────────────────────────────────
   async function cargarEstado() {
-    const res = await adminFetch('/servidor/estado');
+    let res;
+    try { res = await adminFetch('/servidor/estado'); }
+    catch {
+      // La API no responde (caída o reiniciándose): se avisa sin borrar lo último que se vio
+      document.getElementById('sub').innerHTML = `<span class="e-critico">No se pudo conectar con la API (${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}). Se reintentará sola.</span>`;
+      return;
+    }
     if (!res) return;
     const j = await res.json();
     if (!res.ok) { toast(j.message || 'No se pudo leer el servidor.', 'error'); return; }
@@ -282,7 +289,7 @@
   }
 
   async function cargarTodo() {
-    await Promise.all([cargarEstado(), cargarHistorial(), cargarEventos()]);
+    await Promise.all([cargarEstado(), cargarHistorial().catch(() => {}), cargarEventos().catch(() => {})]);
   }
 
   // ── Banner de estado general ──────────────────────────────────
@@ -655,7 +662,7 @@
 
   (async () => {
     await cargarEstado();
-    await Promise.all([cargarHistorial(), cargarEventos(), cargarConfig(), cargarSmtp()]);
+    await Promise.all([cargarHistorial(), cargarEventos(), cargarConfig(), cargarSmtp()].map(p => p.catch(() => {})));
     programar();
   })();
 </script>
