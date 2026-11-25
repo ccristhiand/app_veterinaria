@@ -1,5 +1,5 @@
 -- ============================================================
--- VETNETCODIP SaaS — TENANT SCHEMA v22
+-- VETNETCODIP SaaS — TENANT SCHEMA v23
 -- v6:  + sedes (multi-sedes) + sede_id en tablas operativas
 -- v7:  + tipo_documento en propietarios + historia_seguimientos + estetica_fotos
 -- v8:  + pruebas_complementarias + eutanasia/internamiento en catalogo
@@ -25,6 +25,7 @@
 -- v21: + Gastos diarios: gastos_categorias / gastos (tipo, método de pago, cierre)
 --       + gastos_efectivo / _tarjeta / _transferencia / _yape / _plin en caja_cierres
 -- v22: + usuario_sedes (un usuario con varias sedes) + empresa_config.gastos_afectan_caja
+-- v23: + compras / compras_detalle (compras de inventario con costo promedio ponderado) + inventario.lote
 -- v18: + WhatsApp Meta (API oficial): wa_meta_plantillas, wa_meta_conversaciones, wa_meta_mensajes
 --       + wa_mensajes_log.proveedor / wamid / estados entregado y leido
 --       + wa_campanas.proveedor / meta_plantilla_id
@@ -244,6 +245,7 @@ CREATE TABLE IF NOT EXISTS inventario (
   proveedor         VARCHAR(150)  NULL,
   stock_minimo      DECIMAL(10,2) NOT NULL DEFAULT 5,
   fecha_vencimiento DATE          NULL,
+  lote              VARCHAR(50)   NULL DEFAULT NULL COMMENT 'Lote vigente (medicamentos)',
   sede_id           INT UNSIGNED  NULL DEFAULT NULL,
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -636,6 +638,49 @@ CREATE TABLE IF NOT EXISTS gastos (
   INDEX idx_sede      (sede_id),
   INDEX idx_categoria (categoria_id),
   INDEX idx_cierre    (cierre_id)
+) ENGINE=InnoDB;
+
+-- ── Compras de inventario (v23) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS compras (
+  id                 INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  sede_id            INT UNSIGNED  NULL DEFAULT NULL,
+  tipo_comprobante   ENUM('factura','boleta','nota_venta','guia','otro') NOT NULL DEFAULT 'factura',
+  serie              VARCHAR(10)   NULL,
+  numero             VARCHAR(20)   NOT NULL,
+  fecha_emision      DATE          NOT NULL,
+  proveedor_ruc      VARCHAR(11)   NULL,
+  proveedor_nombre   VARCHAR(200)  NOT NULL,
+  modo_igv           ENUM('sin_igv','con_igv','no_afecto') NOT NULL DEFAULT 'sin_igv'
+                     COMMENT 'Cómo vienen los precios del comprobante',
+  igv_porcentaje     DECIMAL(5,2)  NOT NULL DEFAULT 18.00,
+  subtotal           DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Valor de compra sin IGV',
+  igv                DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total              DECIMAL(12,2) NOT NULL DEFAULT 0,
+  observaciones      VARCHAR(255)  NULL,
+  registrado_por_id  INT UNSIGNED  NOT NULL,
+  created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_compras_fecha (fecha_emision),
+  INDEX idx_compras_sede  (sede_id),
+  INDEX idx_compras_doc   (proveedor_ruc, serie, numero),
+  FOREIGN KEY (registrado_por_id) REFERENCES usuarios(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS compras_detalle (
+  id                 INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  compra_id          INT UNSIGNED  NOT NULL,
+  inventario_id      INT UNSIGNED  NOT NULL,
+  descripcion        VARCHAR(200)  NOT NULL COMMENT 'Nombre del producto al momento de la compra',
+  cantidad           DECIMAL(10,2) NOT NULL,
+  precio_unitario    DECIMAL(12,4) NOT NULL COMMENT 'Precio unitario tal como figura en el comprobante',
+  costo_unitario     DECIMAL(12,4) NOT NULL COMMENT 'Costo unitario que entra al inventario (con IGV)',
+  subtotal           DECIMAL(12,2) NOT NULL COMMENT 'cantidad × precio_unitario',
+  lote               VARCHAR(50)   NULL,
+  fecha_vencimiento  DATE          NULL,
+  stock_anterior     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  costo_anterior     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  costo_promedio     DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT 'Nuevo precio_compra del producto',
+  INDEX idx_cd_inventario (inventario_id),
+  FOREIGN KEY (compra_id) REFERENCES compras(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ── Carnets digitales ────────────────────────────────────────

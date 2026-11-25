@@ -139,6 +139,33 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/v1/propietarios/exportar ─────────────────────────────
+// Todos los propietarios con sus mascotas, una fila por mascota (sin paginar),
+// para el Excel con filtros. Los propietarios sin mascotas salen con una fila vacía.
+router.get('/exportar', async (req, res, next) => {
+  try {
+    const sql = (where) =>
+      `SELECT p.id AS propietario_id, p.tipo_documento, p.dni, p.ruc, p.nombre, p.apellido,
+              p.razon_social, p.telefono, p.email, p.direccion, p.direccion_fiscal,
+              DATE_FORMAT(p.created_at, '%Y-%m-%d') AS propietario_registro,
+              m.id AS mascota_id, m.nombre AS mascota_nombre, m.especie, m.raza, m.sexo,
+              DATE_FORMAT(m.fecha_nacimiento, '%Y-%m-%d') AS fecha_nacimiento,
+              m.peso_kg, m.color, m.microchip, m.alergias, m.alertas_medicas,
+              DATE_FORMAT(m.created_at, '%Y-%m-%d') AS mascota_registro
+       FROM propietarios p
+       LEFT JOIN mascotas m ON m.propietario_id = p.id
+       ${where}
+       ORDER BY p.apellido, p.nombre, p.id, m.nombre`;
+
+    // Se excluye el cliente "Público General" del Punto de Venta (migración v17)
+    const rows = await req.db.query(sql('WHERE p.es_generico = 0')).catch((e) => {
+      if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+      return req.db.query(sql(''));
+    });
+    return res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/v1/propietarios/buscar-documento ─────────────────────
 router.get('/buscar-documento', async (req, res, next) => {
   try {

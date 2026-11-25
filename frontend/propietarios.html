@@ -21,6 +21,7 @@
   <script src="js/layout.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="js/export-propietarios.js?v=20261124"></script>
   <style>
     /* Botón "Acciones" de cada fila */
     .acc-btn {
@@ -68,9 +69,10 @@
       <p>Busca por DNI, nombre o teléfono</p>
     </div>
     <div style="display:flex;gap:.6rem;align-items:center">
-      <button onclick="descargarExcelMasivo()" class="vbtn vbtn-ghost"
+      <button id="btn-excel-masivo" onclick="descargarExcelMasivo()" class="vbtn vbtn-ghost"
+        title="Descarga todos los propietarios con sus mascotas (Excel con filtros)"
         style="display:inline-flex;align-items:center;gap:.4rem">
-        📊 Exportar clientes
+        📊 Descargar Excel
       </button>
       <button onclick="abrirModalNuevo()" class="vbtn vbtn-primary">＋ Nuevo Propietario</button>
     </div>
@@ -152,16 +154,25 @@
         </div>
         <div id="campo-documento">
           <label class="vlabel" id="lbl-documento">Número de documento</label>
-          <div style="position:relative">
-            <input id="p-documento" type="text" class="vinput"
-              placeholder="12345678"
-              oninput="this.value=this.value.replace(/\D/g,'')"
-              onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();buscarDocumento()}"
-              onblur="buscarDocumento()"/>
-            <div id="doc-loading" style="display:none;position:absolute;right:.75rem;
-              top:50%;transform:translateY(-50%);width:16px;height:16px;
-              border:2px solid #e2e8f0;border-top-color:var(--green-500);
-              border-radius:50%;animation:spin .6s linear infinite"></div>
+          <div style="display:flex;gap:.45rem;align-items:stretch">
+            <div style="position:relative;flex:1;min-width:0">
+              <input id="p-documento" type="text" class="vinput"
+                placeholder="12345678"
+                oninput="this.value=this.value.replace(/\D/g,'')"
+                onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();buscarDocumento()}"
+                onblur="buscarDocumento()"/>
+              <div id="doc-loading" style="display:none;position:absolute;right:.75rem;
+                top:50%;transform:translateY(-50%);width:16px;height:16px;
+                border:2px solid #e2e8f0;border-top-color:var(--green-500);
+                border-radius:50%;animation:spin .6s linear infinite"></div>
+            </div>
+            <!-- Solo visible si la clínica tiene activa la integración (SUNAT para RUC, RENIEC para DNI).
+                 Fuerza la consulta aunque se esté editando, para corregir datos mal ingresados. -->
+            <button type="button" id="btn-forzar-doc" onclick="forzarConsultaDocumento()"
+              class="vbtn vbtn-ghost" style="display:none;white-space:nowrap;padding:.45rem .75rem;font-size:.76rem"
+              title="Volver a consultar el documento y reemplazar los datos con los oficiales">
+              🔄 SUNAT
+            </button>
           </div>
           <div id="doc-existente" style="display:none;margin-top:.5rem;
             background:#fff7ed;border:1px solid #fed7aa;border-radius:.75rem;
@@ -609,6 +620,7 @@ async function cargarEstadoIntegraciones() {
       _integraciones = (await res.json()).data;
     }
   } catch { _integraciones = { reniec: false, sunat: false }; }
+  actualizarBotonForzar();
 }
 
 // ── Tipo de documento ────────────────────────────────────────────
@@ -632,6 +644,36 @@ function onTipoDocChange() {
     input.oninput = null;
   }
   ocultarBannersDoc();
+  actualizarBotonForzar();
+}
+
+// ── Forzar consulta SUNAT / RENIEC ───────────────────────────────
+// Solo se muestra si la clínica tiene activa la integración del tipo de documento.
+function actualizarBotonForzar() {
+  var btn  = document.getElementById('btn-forzar-doc');
+  if (!btn) return;
+  var tipo = document.getElementById('p-tipo-doc').value;
+  var ok   = (tipo === 'RUC' && _integraciones?.sunat) || (tipo === 'DNI' && _integraciones?.reniec);
+  btn.style.display = ok ? '' : 'none';
+  btn.textContent   = tipo === 'RUC' ? '🔄 SUNAT' : '🔄 RENIEC';
+}
+
+async function forzarConsultaDocumento() {
+  var tipo   = document.getElementById('p-tipo-doc').value;
+  var numero = document.getElementById('p-documento').value.trim();
+  if (tipo === 'DNI' && numero.length !== 8)  { toast('Ingresa un DNI de 8 dígitos.', 'warning');  return; }
+  if (tipo === 'RUC' && numero.length !== 11) { toast('Ingresa un RUC de 11 dígitos.', 'warning'); return; }
+
+  var btn = document.getElementById('btn-forzar-doc');
+  var txt = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳';
+  ocultarBannersDoc();
+  try {
+    var ok = await autocompletarDocumento(tipo, numero, { forzar: true });
+    if (ok) toast('✅ Datos actualizados desde ' + (tipo === 'RUC' ? 'SUNAT' : 'RENIEC') + '. Revisa y guarda.', 'success');
+  } finally {
+    btn.disabled = false; btn.textContent = txt;
+  }
 }
 
 function ocultarBannersDoc() {
@@ -678,17 +720,32 @@ async function buscarDocumento() {
   loading.style.display = 'none';
 }
 
-async function autocompletarDocumento(tipo, numero) {
+/**
+ * Completa el formulario con los datos de RENIEC (DNI) o SUNAT (RUC).
+ * opts.forzar: se pidió con el botón 🔄 → muestra los errores y, en RUC, conserva el
+ * apellido que ya tenía (el formulario lo exige). Devuelve true si se encontraron datos.
+ */
+async function autocompletarDocumento(tipo, numero, opts) {
+  var forzar = !!(opts && opts.forzar);
   if (!_integraciones) await cargarEstadoIntegraciones();
   var loading = document.getElementById('doc-loading');
+  var encontrado = false;
+  var avisarError = async function(r, fuente) {
+    if (!forzar) return;
+    var msg = 'No se pudo consultar ' + fuente + '.';
+    try { if (r) msg = (await r.json()).message || msg; } catch {}
+    toast(msg, 'warning');
+  };
 
   if (tipo === 'DNI' && _integraciones?.reniec) {
     loading.style.display = 'block';
     try {
       var res = await api('/integracion/dni/' + numero);
+      if (!res || !res.ok) await avisarError(res, 'RENIEC');
       if (res && res.ok) {
         var data = (await res.json()).data;
         if (data) {
+          encontrado = true;
           var nombres   = (data.nombres || '').trim();
           var apPaterno = (data.apellido_paterno || '').trim();
           var apMaterno = (data.apellido_materno || '').trim();
@@ -699,7 +756,7 @@ async function autocompletarDocumento(tipo, numero) {
           setTimeout(function() { document.getElementById('p-telefono').focus(); }, 100);
         }
       }
-    } catch(e) { console.error('Error RENIEC:', e); }
+    } catch(e) { console.error('Error RENIEC:', e); await avisarError(null, 'RENIEC'); }
     loading.style.display = 'none';
   }
 
@@ -707,12 +764,14 @@ async function autocompletarDocumento(tipo, numero) {
     loading.style.display = 'block';
     try {
       var res2 = await api('/integracion/ruc/' + numero);
+      if (!res2 || !res2.ok) await avisarError(res2, 'SUNAT');
       if (res2 && res2.ok) {
         var data2 = (await res2.json()).data;
         if (data2) {
+          encontrado = true;
           var razon = data2.razon_social || '';
           document.getElementById('p-nombre').value    = razon;
-          document.getElementById('p-apellido').value  = '';
+          if (!forzar) document.getElementById('p-apellido').value = '';
           document.getElementById('p-razon').value     = razon;
           document.getElementById('p-ruc').value       = numero;
           if (data2.direccion) {
@@ -723,9 +782,10 @@ async function autocompletarDocumento(tipo, numero) {
           setTimeout(function() { document.getElementById('p-telefono').focus(); }, 100);
         }
       }
-    } catch(e) { console.error('Error SUNAT:', e); }
+    } catch(e) { console.error('Error SUNAT:', e); await avisarError(null, 'SUNAT'); }
     loading.style.display = 'none';
   }
+  return encontrado;
 }
 
 // ── Mascotas dentro del formulario del propietario ───────────────
@@ -1403,61 +1463,23 @@ async function descargarExcelPropietario(id) {
   finally { btn.textContent = '📊 Excel'; btn.disabled = false; }
 }
 
-// ── Excel masivo (todos los propietarios) ─────────────────────────
+// ── Excel masivo: todos los propietarios con sus mascotas ─────────
+// El armado del libro está en js/export-propietarios.js (hojas, estilos y filtros).
 async function descargarExcelMasivo() {
-  const btn = document.querySelector('[onclick="descargarExcelMasivo()"]');
+  const btn = document.getElementById('btn-excel-masivo');
   if (btn) { btn.textContent = '⏳ Generando…'; btn.disabled = true; }
   try {
-    const res  = await api('/propietarios?limit=1000&page=1');
+    const res = await api('/propietarios/exportar');
     if (!res || !res.ok) { toast('Error al obtener datos.', 'danger'); return; }
-    const { data: props } = await res.json();
+    const { data: filas } = await res.json();
 
     const XS = window.XLSXStyle || window.XLSX;
-    const VD = '166534', VC = 'ECFDF5', BL = 'FFFFFF', NG = '1A2E28';
-    const borde = (c) => ({ top:{style:'thin',color:{rgb:c}}, bottom:{style:'thin',color:{rgb:c}},
-                             left:{style:'thin',color:{rgb:c}}, right:{style:'thin',color:{rgb:c}} });
-    const sTit = { font:{bold:true,sz:13,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}}, alignment:{horizontal:'left'}, border:borde(BL) };
-    const sHdr = { font:{bold:true,sz:9,color:{rgb:BL}}, fill:{fgColor:{rgb:VD}}, alignment:{horizontal:'center',wrapText:true}, border:borde(BL) };
-    const sD   = (par) => ({ font:{sz:9,color:{rgb:NG}}, fill:{fgColor:{rgb:par?'F6F8F6':BL}}, alignment:{horizontal:'left'}, border:borde('E8EDE9') });
-
-    const rows = [];
-    rows.push([{ v:`LISTADO DE CLIENTES — ${new Date().toLocaleDateString('es-PE')}`, s:sTit },'','','','','','','','']);
-    rows.push([
-      { v:'#',             s:sHdr }, { v:'Nombre',        s:sHdr }, { v:'Apellido',   s:sHdr },
-      { v:'Tipo Doc',      s:sHdr }, { v:'DNI/Doc',       s:sHdr }, { v:'Teléfono',   s:sHdr },
-      { v:'Email',         s:sHdr }, { v:'Dirección',     s:sHdr },
-      { v:'N° Mascotas',   s:sHdr },
-    ]);
-
-    props.forEach((p, i) => rows.push([
-      { v:i+1,                    s:sD(i%2===0) },
-      { v:p.nombre||'—',          s:sD(i%2===0) },
-      { v:p.apellido||'—',        s:sD(i%2===0) },
-      { v:p.tipo_documento||'DNI',s:sD(i%2===0) },
-      { v:p.dni||p.ruc||'—',     s:sD(i%2===0) },
-      { v:p.telefono||'—',        s:sD(i%2===0) },
-      { v:p.email||'—',           s:sD(i%2===0) },
-      { v:p.direccion||'—',       s:sD(i%2===0) },
-      { v:p.total_mascotas||0,    s:sD(i%2===0) },
-    ]));
-
-    const ws = XS.utils.aoa_to_sheet(rows.map(r => r.map(c => c.v !== undefined ? c : { v:c })));
-    rows.forEach((row, ri) => row.forEach((cell, ci) => {
-      if (cell && cell.s) {
-        const addr = XS.utils.encode_cell({ r:ri, c:ci });
-        if (!ws[addr]) ws[addr] = { v: cell.v };
-        ws[addr].s = cell.s;
-      }
-    }));
-    ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:8} }];
-    ws['!cols']   = [{ wch:5 },{ wch:18 },{ wch:18 },{ wch:10 },{ wch:14 },{ wch:14 },{ wch:24 },{ wch:28 },{ wch:10 }];
-
-    const wb = XS.utils.book_new();
-    XS.utils.book_append_sheet(wb, ws, 'Clientes');
-    XS.writeFile(wb, `Clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast(`📊 Excel de ${props.length} clientes descargado`, 'success');
+    const clinica = (document.title.split(' — ')[0] || '').replace(/^VetClinic$/, '');
+    const r = construirExcelPropietarios(XS, filas || [], { clinica });
+    XS.writeFile(r.wb, `Propietarios_y_mascotas_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast(`📊 Excel descargado: ${r.propietarios} propietarios y ${r.mascotas} mascotas`, 'success');
   } catch(e) { console.error(e); toast('Error al generar Excel.', 'danger'); }
-  finally { if (btn) { btn.textContent = '📊 Exportar clientes'; btn.disabled = false; } }
+  finally { if (btn) { btn.textContent = '📊 Descargar Excel'; btn.disabled = false; } }
 }
 </script>
 </body>

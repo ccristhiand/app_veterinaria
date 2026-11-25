@@ -198,6 +198,17 @@ async function guardarCamposPV(db, id, codigo_barras, favorito) {
   }
 }
 
+// ── Lote (migración v23) ──────────────────────────────────────────
+// UPDATE aparte por la misma razón: sin la columna, el resto del ítem se guarda igual.
+async function guardarLote(db, id, lote) {
+  if (lote === undefined) return;
+  try {
+    await db.query('UPDATE inventario SET lote = ? WHERE id = ?', [String(lote || '').trim().slice(0, 50) || null, id]);
+  } catch (e) {
+    if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+  }
+}
+
 router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddleware('inventario:creado','inventario'), async (req, res, next) => {
   try {
     const {
@@ -206,6 +217,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
       proveedor = null, fecha_vencimiento = null, descripcion = null,
       sede_id = null,
       codigo_barras, favorito,          // ← NUEVO: Punto de Venta
+      lote,                             // ← v23: lote vigente
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
@@ -224,6 +236,7 @@ router.post('/', authorize('admin','veterinario','recepcionista'), auditMiddlewa
     );
 
     await guardarCamposPV(req.db, result.insertId, codigo_barras, favorito);
+    await guardarLote(req.db, result.insertId, lote);
 
     if (parseFloat(cantidad) < parseFloat(stock_minimo)) {
       const io = req.app.get('io');
@@ -242,6 +255,7 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
       stock_minimo, precio_unitario, precio_compra = 0,
       proveedor, fecha_vencimiento, descripcion, sede_id = null,
       codigo_barras, favorito,          // ← NUEVO: Punto de Venta
+      lote,                             // ← v23: lote vigente
     } = req.body;
 
     if (!nombre?.trim()) return res.status(422).json({ success: false, message: 'Nombre obligatorio.' });
@@ -265,6 +279,7 @@ router.put('/:id', authorize('admin','veterinario','recepcionista'), auditMiddle
     );
 
     await guardarCamposPV(req.db, req.params.id, codigo_barras, favorito);
+    await guardarLote(req.db, req.params.id, lote);
 
     const cantF = parseFloat(cantidad)||0;
     const minF  = parseFloat(stock_minimo)||5;

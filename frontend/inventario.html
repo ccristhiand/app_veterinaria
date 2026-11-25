@@ -31,6 +31,9 @@
       <button onclick="descargarTemplate()" class="vbtn vbtn-ghost">📥 Template Excel</button>
       <button onclick="document.getElementById('input-excel').click()" class="vbtn vbtn-ghost">📤 Carga masiva</button>
       <input type="file" id="input-excel" accept=".xlsx,.xls" style="display:none" onchange="procesarExcel(this)"/>
+      <button onclick="abrirHistorialCompras()" class="vbtn vbtn-ghost">📚 Compras</button>
+      <button onclick="abrirCompra()" class="vbtn vbtn-ghost" id="btn-registrar-compra"
+        style="border-color:#bfdbfe;color:#1d4ed8;background:#eff6ff">🧾 Registrar compra</button>
       <button onclick="abrirNuevo()" class="vbtn vbtn-primary">＋ Nuevo Ítem</button>
     </div>
   </div>
@@ -211,9 +214,13 @@
             <option value="">— Selecciona una sede —</option>
           </select>
         </div>
-        <div class="sm:col-span-2">
+        <div>
           <label class="vlabel">Fecha de vencimiento</label>
-          <input id="i-venc" type="date" class="vinput" style="width:auto"/>
+          <input id="i-venc" type="date" class="vinput"/>
+        </div>
+        <div>
+          <label class="vlabel">Lote</label>
+          <input id="i-lote" type="text" maxlength="50" class="vinput" placeholder="Ej. L2405A (medicamentos)"/>
         </div>
       </div>
     </div>
@@ -304,6 +311,142 @@
       <button onclick="confirmarCargaMasiva()" class="vbtn vbtn-primary" id="btn-confirmar-masiva">
         ✅ Confirmar e importar
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Registrar Compra ════════════════════════════════════ -->
+<div id="modal-compra" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:980px">
+    <div class="vmodal-head">
+      <h3>🧾 Registrar compra</h3>
+      <button onclick="closeModal('modal-compra')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" style="display:flex;flex-direction:column;gap:1.1rem">
+      <!-- Comprobante -->
+      <div>
+        <p style="font-weight:700;font-size:.8rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem">
+          Datos del comprobante
+        </p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label class="vlabel">Tipo *</label>
+            <select id="c-tipo" class="vinput">
+              <option value="factura">Factura</option>
+              <option value="boleta">Boleta</option>
+              <option value="nota_venta">Nota de venta</option>
+              <option value="guia">Guía de remisión</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label class="vlabel">Serie</label>
+            <input id="c-serie" type="text" maxlength="10" class="vinput" placeholder="F001"
+              oninput="this.value=this.value.toUpperCase()"/>
+          </div>
+          <div>
+            <label class="vlabel">Número *</label>
+            <input id="c-numero" type="text" maxlength="20" class="vinput" placeholder="000123"/>
+          </div>
+          <div>
+            <label class="vlabel">Fecha de emisión *</label>
+            <input id="c-fecha" type="date" class="vinput"/>
+          </div>
+          <div>
+            <label class="vlabel">RUC proveedor</label>
+            <div style="display:flex;gap:.4rem">
+              <input id="c-ruc" type="text" maxlength="11" class="vinput" placeholder="20XXXXXXXXX"
+                style="min-width:0" oninput="this.value=this.value.replace(/\D/g,'')"
+                onblur="if(this.value.length===11)consultarRucProveedor(false)"/>
+              <button type="button" id="c-ruc-btn" onclick="consultarRucProveedor(true)" class="vbtn vbtn-ghost"
+                style="display:none;padding:.4rem .6rem;font-size:.75rem" title="Consultar en SUNAT">🔎</button>
+            </div>
+          </div>
+          <div class="col-span-2 sm:col-span-2">
+            <label class="vlabel">Proveedor (razón social) *</label>
+            <input id="c-proveedor" type="text" maxlength="200" class="vinput" placeholder="Distribuidora Vet S.A.C."/>
+          </div>
+          <div>
+            <label class="vlabel">Precios del comprobante</label>
+            <select id="c-modo-igv" class="vinput" onchange="recalcularCompra()">
+              <option value="sin_igv">Sin IGV (valor unitario)</option>
+              <option value="con_igv">Con IGV incluido</option>
+              <option value="no_afecto">No afecto / exonerado</option>
+            </select>
+          </div>
+          <div class="col-span-2 sm:col-span-4">
+            <label class="vlabel">Observaciones</label>
+            <input id="c-obs" type="text" maxlength="255" class="vinput" placeholder="Opcional"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ítems -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.5rem;flex-wrap:wrap">
+          <p style="font-weight:700;font-size:.8rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em">
+            Productos <span id="c-contador" style="font-weight:600;color:var(--ink-faint)"></span>
+          </p>
+          <button type="button" onclick="agregarFilaCompra()" class="vbtn vbtn-ghost" style="padding:.35rem .8rem;font-size:.78rem">
+            ＋ Agregar producto
+          </button>
+        </div>
+        <div style="overflow-x:auto;border:1px solid var(--line);border-radius:.9rem">
+          <table class="vtable" style="min-width:920px">
+            <thead>
+              <tr>
+                <th style="width:28%">Producto (del inventario)</th>
+                <th style="width:9%">Cantidad</th>
+                <th style="width:11%">P. unitario</th>
+                <th style="width:11%">Lote</th>
+                <th style="width:13%">Vencimiento</th>
+                <th style="width:10%;text-align:right">Subtotal</th>
+                <th style="width:15%">Costo → promedio</th>
+                <th style="width:3%"></th>
+              </tr>
+            </thead>
+            <tbody id="c-items"></tbody>
+          </table>
+        </div>
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.45rem">
+          Solo se pueden elegir productos ya registrados. Si falta alguno, créalo con “＋ Nuevo Ítem” y vuelve aquí.
+          El costo del producto se recalcula con promedio ponderado y se guarda <b>con IGV</b>.
+        </p>
+      </div>
+
+      <!-- Totales -->
+      <div style="display:flex;justify-content:flex-end">
+        <div style="min-width:260px;background:#f8faf8;border:1px solid var(--line);border-radius:.9rem;padding:.8rem 1rem;font-size:.84rem">
+          <div style="display:flex;justify-content:space-between"><span>Subtotal (sin IGV)</span><b id="c-subtotal">S/ 0.00</b></div>
+          <div style="display:flex;justify-content:space-between;margin-top:.25rem"><span id="c-igv-lbl">IGV</span><b id="c-igv">S/ 0.00</b></div>
+          <div style="display:flex;justify-content:space-between;margin-top:.45rem;padding-top:.45rem;border-top:1px solid var(--line);font-size:.95rem">
+            <span style="font-weight:700">Total</span><b id="c-total" style="color:var(--green-700)">S/ 0.00</b>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="vmodal-foot">
+      <button onclick="closeModal('modal-compra')" class="vbtn vbtn-ghost">Cancelar</button>
+      <button onclick="guardarCompra()" class="vbtn vbtn-primary" id="btn-guardar-compra">💾 Guardar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sugerencias de productos (una sola lista, se reposiciona bajo el campo activo) -->
+<div id="c-sugerencias" style="display:none;position:fixed;z-index:80;background:#fff;border:1px solid var(--line);
+  border-radius:.8rem;box-shadow:0 12px 32px rgba(15,40,30,.16);max-height:280px;overflow-y:auto;padding:.3rem"></div>
+
+<!-- ══ Modal Historial de Compras ════════════════════════════════ -->
+<div id="modal-historial-compras" class="hidden vmodal-backdrop">
+  <div class="vmodal" style="max-width:920px">
+    <div class="vmodal-head">
+      <h3 id="hc-titulo">📚 Compras registradas</h3>
+      <button onclick="closeModal('modal-historial-compras')" class="vmodal-close">✕</button>
+    </div>
+    <div class="vmodal-body" id="hc-body"></div>
+    <div class="vmodal-foot">
+      <button id="hc-volver" onclick="abrirHistorialCompras()" class="vbtn vbtn-ghost" style="display:none">← Volver</button>
+      <button onclick="closeModal('modal-historial-compras')" class="vbtn vbtn-ghost">Cerrar</button>
     </div>
   </div>
 </div>
@@ -474,6 +617,7 @@ function renderTabla(items) {
         <p style="font-weight:700;font-size:.9rem">${esc(i.nombre)}</p>
         ${i.fecha_vencimiento ? `<p style="font-size:.68rem;color:${new Date(i.fecha_vencimiento)<new Date()?'#e11d48':'var(--ink-faint)'}">
           Vence: ${fDate(i.fecha_vencimiento)}</p>` : ''}
+        ${i.lote ? `<p style="font-size:.68rem;color:var(--ink-faint)">Lote: ${esc(i.lote)}</p>` : ''}
       </td>
       <td>
         <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;
@@ -534,6 +678,7 @@ function abrirNuevo() {
   document.getElementById('i-precio').value   = '';
   document.getElementById('i-proveedor').value= '';
   document.getElementById('i-venc').value     = '';
+  document.getElementById('i-lote').value     = '';
   document.getElementById('i-codigo').value   = '';
   document.getElementById('i-favorito').checked = false;
   // La sede que se está viendo; en "Todas", hay que elegirla
@@ -561,6 +706,7 @@ async function abrirEditar(id) {
     document.getElementById('i-codigo').value    = item.codigo_barras || '';
     document.getElementById('i-favorito').checked = !!item.favorito;
     document.getElementById('i-venc').value      = item.fecha_vencimiento?.split('T')[0] || '';
+    document.getElementById('i-lote').value      = item.lote || '';
     document.getElementById('i-sede').value      = item.sede_id || '';
   }
 }
@@ -635,6 +781,7 @@ async function guardarItem() {
     precio_compra   : parseFloat(document.getElementById('i-precio-compra').value) || 0,
     proveedor       : document.getElementById('i-proveedor').value.trim() || null,
     fecha_vencimiento: document.getElementById('i-venc').value || null,
+    lote            : document.getElementById('i-lote').value.trim() || null,
     sede_id         : sedeId,
     codigo_barras   : document.getElementById('i-codigo').value.trim() || null,
     favorito        : document.getElementById('i-favorito').checked,
@@ -906,6 +1053,367 @@ async function confirmarCargaMasiva() {
   closeModal('modal-masiva');
   itemsMasiva = [];
   cargar();
+}
+
+// ══ Compras ═══════════════════════════════════════════════════════
+// Cada fila guarda el producto elegido en _compraProds[uid] = { id, nombre, cantidad, precio_compra, unidad, sede_id }
+var _compraSeq   = 0;
+var _compraProds = {};
+var _igvPct      = null;     // % IGV de la clínica (empresa_config)
+var _sunatActiva = null;
+var _sugTimer    = null;
+var _sugInput    = null;
+
+var s2 = function(n) { return 'S/ ' + (Number(n) || 0).toFixed(2); };
+// 'YYYY-MM-DD' → 'DD/MM/YYYY' sin pasar por Date (evita el corrimiento de un día por zona horaria)
+var fYmd = function(s) { return s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; };
+
+function hoyISO() {
+  var d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+async function abrirCompra() {
+  ['c-serie','c-numero','c-ruc','c-proveedor','c-obs'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('c-tipo').value     = 'factura';
+  document.getElementById('c-modo-igv').value = 'sin_igv';
+  document.getElementById('c-fecha').value    = hoyISO();
+  document.getElementById('c-items').innerHTML = '';
+  _compraProds = {};
+  agregarFilaCompra(true);
+  openModal('modal-compra');
+
+  if (_igvPct === null) {
+    _igvPct = 18;
+    try {
+      var r = await api('/empresa');
+      if (r && r.ok) { var d = (await r.json()).data; if (d && d.igv_porcentaje != null) _igvPct = parseFloat(d.igv_porcentaje); }
+    } catch {}
+  }
+  if (_sunatActiva === null) {
+    _sunatActiva = false;
+    try {
+      var r2 = await api('/integracion/estado');
+      if (r2 && r2.ok) _sunatActiva = !!(await r2.json()).data.sunat;
+    } catch {}
+  }
+  document.getElementById('c-ruc-btn').style.display = _sunatActiva ? '' : 'none';
+  recalcularCompra();
+}
+
+async function consultarRucProveedor(manual) {
+  var ruc = document.getElementById('c-ruc').value.trim();
+  if (!_sunatActiva) return;
+  if (ruc.length !== 11) { if (manual) toast('El RUC debe tener 11 dígitos.', 'warning'); return; }
+  var prov = document.getElementById('c-proveedor');
+  if (!manual && prov.value.trim()) return;   // al salir del campo no pisa lo ya escrito
+  try {
+    var r = await api('/integracion/ruc/' + ruc);
+    if (r && r.ok) {
+      var d = (await r.json()).data;
+      if (d && d.razon_social) prov.value = d.razon_social;
+    } else if (manual) {
+      var msg = 'No se encontró el RUC en SUNAT.';
+      try { msg = (await r.json()).message || msg; } catch {}
+      toast(msg, 'warning');
+    }
+  } catch { if (manual) toast('Error consultando SUNAT.', 'danger'); }
+}
+
+function agregarFilaCompra(sinFoco) {
+  var uid = 'cf' + (++_compraSeq);
+  var tr  = document.createElement('tr');
+  tr.dataset.uid = uid;
+  tr.innerHTML =
+    '<td style="position:relative">' +
+      '<input type="text" class="vinput c-prod" placeholder="Busca por nombre o código…" autocomplete="off"/>' +
+      '<p class="c-prod-info" style="font-size:.68rem;color:var(--ink-faint);margin-top:.2rem"></p>' +
+    '</td>' +
+    '<td><input type="number" class="vinput c-cant" min="0" step="0.01" placeholder="0"/></td>' +
+    '<td><input type="number" class="vinput c-pu" min="0" step="0.0001" placeholder="0.00"/></td>' +
+    '<td><input type="text" class="vinput c-lote" maxlength="50" placeholder="Lote" style="min-width:96px"/></td>' +
+    '<td><input type="date" class="vinput c-venc"/></td>' +
+    '<td class="c-sub" style="text-align:right;font-weight:700;white-space:nowrap">S/ 0.00</td>' +
+    '<td class="c-costo" style="font-size:.74rem;white-space:nowrap;color:var(--ink-soft)">—</td>' +
+    '<td><button type="button" class="vlink c-quitar" title="Quitar" style="color:#e11d48;font-size:.9rem">✕</button></td>';
+
+  var inp = tr.querySelector('.c-prod');
+  inp.addEventListener('input', function() {
+    delete _compraProds[uid];               // al escribir se pierde la selección anterior
+    pintarInfoProducto(tr);
+    recalcularCompra();
+    clearTimeout(_sugTimer);
+    _sugTimer = setTimeout(function() { buscarProductosCompra(inp, uid); }, 250);
+  });
+  inp.addEventListener('focus', function() { if (!_compraProds[uid]) buscarProductosCompra(inp, uid); });
+  inp.addEventListener('keydown', navegarSugerencias);
+  tr.querySelector('.c-cant').addEventListener('input', recalcularCompra);
+  tr.querySelector('.c-pu').addEventListener('input', recalcularCompra);
+  tr.querySelector('.c-quitar').onclick = function() {
+    delete _compraProds[uid];
+    tr.remove();
+    if (!document.querySelector('#c-items tr')) agregarFilaCompra(true);
+    recalcularCompra();
+  };
+
+  document.getElementById('c-items').appendChild(tr);
+  recalcularCompra();
+  if (!sinFoco) setTimeout(function() { inp.focus(); }, 30);
+}
+
+async function buscarProductosCompra(inp, uid) {
+  var q = inp.value.trim();
+  _sugInput = inp;
+  try {
+    var r = await api('/inventario?limit=15&search=' + encodeURIComponent(q));
+    if (!r || !r.ok || _sugInput !== inp) return;
+    var lista = (await r.json()).data || [];
+    mostrarSugerencias(inp, uid, lista);
+  } catch {}
+}
+
+function mostrarSugerencias(inp, uid, lista) {
+  var box = document.getElementById('c-sugerencias');
+  if (document.activeElement !== inp) { box.style.display = 'none'; return; }
+  var variasSedes = getSedesUsuario().length > 1;
+  box.innerHTML = lista.length
+    ? lista.map(function(p, i) {
+        return '<button type="button" data-i="' + i + '" class="c-sug" style="display:block;width:100%;text-align:left;' +
+          'padding:.5rem .65rem;border:none;background:none;border-radius:.5rem;cursor:pointer;font-family:inherit">' +
+          '<span style="font-weight:700;font-size:.82rem">' + esc(p.nombre) + '</span>' +
+          '<span style="display:block;font-size:.68rem;color:var(--ink-faint)">Stock ' + parseFloat(p.cantidad || 0).toFixed(2) +
+          ' ' + esc(p.unidad || '') + ' · Costo ' + s2(p.precio_compra) +
+          (variasSedes && p.sede_nombre ? ' · 🏥 ' + esc(p.sede_nombre) : '') + '</span></button>';
+      }).join('')
+    : '<p style="padding:.6rem .7rem;font-size:.78rem;color:var(--ink-faint)">Sin productos con ese nombre. Créalo primero con “＋ Nuevo Ítem”.</p>';
+
+  box.querySelectorAll('.c-sug').forEach(function(b) {
+    b.onmouseenter = function() { marcarSugerencia(parseInt(b.dataset.i, 10)); };
+    b.onmousedown  = function(e) { e.preventDefault(); elegirProducto(inp, uid, lista[parseInt(b.dataset.i, 10)]); };
+  });
+  box._lista = lista; box._uid = uid; box._sel = -1;
+
+  var rc = inp.getBoundingClientRect();
+  box.style.display = 'block';
+  box.style.left  = rc.left + 'px';
+  box.style.width = Math.max(rc.width, 300) + 'px';
+  var alto = box.offsetHeight;
+  box.style.top = (rc.bottom + alto + 8 > window.innerHeight ? rc.top - alto - 4 : rc.bottom + 4) + 'px';
+}
+
+function marcarSugerencia(i) {
+  var box = document.getElementById('c-sugerencias');
+  box._sel = i;
+  box.querySelectorAll('.c-sug').forEach(function(b, j) { b.style.background = j === i ? 'var(--green-50)' : 'none'; });
+}
+
+function navegarSugerencias(e) {
+  var box = document.getElementById('c-sugerencias');
+  if (box.style.display !== 'block' || !box._lista || !box._lista.length) return;
+  var n = box._lista.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); marcarSugerencia((box._sel + 1) % n); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); marcarSugerencia((box._sel - 1 + n) % n); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    elegirProducto(e.target, box._uid, box._lista[box._sel >= 0 ? box._sel : 0]);
+  } else if (e.key === 'Escape') { box.style.display = 'none'; }
+}
+
+function elegirProducto(inp, uid, p) {
+  if (!p) return;
+  _compraProds[uid] = p;
+  inp.value = p.nombre;
+  document.getElementById('c-sugerencias').style.display = 'none';
+  var tr = inp.closest('tr');
+  pintarInfoProducto(tr);
+  recalcularCompra();
+  tr.querySelector('.c-cant').focus();
+}
+
+function pintarInfoProducto(tr) {
+  var p = _compraProds[tr.dataset.uid];
+  tr.querySelector('.c-prod-info').textContent = p
+    ? 'Stock actual: ' + parseFloat(p.cantidad || 0).toFixed(2) + ' ' + (p.unidad || '') + ' · Costo actual: ' + s2(p.precio_compra) +
+      (p.lote ? ' · Lote actual: ' + p.lote : '')
+    : '';
+}
+
+document.addEventListener('mousedown', function(e) {
+  var box = document.getElementById('c-sugerencias');
+  if (box && !box.contains(e.target) && !(e.target.classList && e.target.classList.contains('c-prod'))) box.style.display = 'none';
+});
+document.addEventListener('scroll', function(e) {
+  var box = document.getElementById('c-sugerencias');
+  if (box && box.style.display === 'block' && !box.contains(e.target)) box.style.display = 'none';
+}, true);
+
+/**
+ * Totales y vista previa del costo promedio (el cálculo definitivo lo hace el servidor).
+ * Costo con IGV: precio sin IGV × (1 + IGV); con IGV incluido o no afecto, el mismo precio.
+ */
+function recalcularCompra() {
+  var modo   = document.getElementById('c-modo-igv').value;
+  var factor = 1 + (_igvPct == null ? 18 : _igvPct) / 100;
+  var filas  = document.querySelectorAll('#c-items tr');
+  var bruto  = 0;
+  var acumulado = {};   // mismo producto en varias filas: el promedio se encadena
+
+  filas.forEach(function(tr) {
+    var cant = parseFloat(tr.querySelector('.c-cant').value) || 0;
+    var pu   = parseFloat(tr.querySelector('.c-pu').value)   || 0;
+    var sub  = cant * pu;
+    bruto += sub;
+    tr.querySelector('.c-sub').textContent = s2(sub);
+
+    var p = _compraProds[tr.dataset.uid];
+    var celda = tr.querySelector('.c-costo');
+    if (!p || cant <= 0) { celda.textContent = '—'; return; }
+    var prev  = acumulado[p.id] || { stock: parseFloat(p.cantidad) || 0, costo: parseFloat(p.precio_compra) || 0 };
+    var costoU = modo === 'sin_igv' ? pu * factor : pu;
+    var base  = Math.max(prev.stock, 0);
+    var prom  = (base > 0 && prev.costo > 0) ? (base * prev.costo + cant * costoU) / (base + cant) : costoU;
+    acumulado[p.id] = { stock: prev.stock + cant, costo: Math.round(prom * 100) / 100 };
+    celda.innerHTML = s2(prev.costo) + ' → <b style="color:var(--green-700)">' + s2(prom) + '</b>';
+  });
+
+  var subtotal, igv, total;
+  if (modo === 'sin_igv')      { subtotal = bruto; igv = bruto * (factor - 1); total = subtotal + igv; }
+  else if (modo === 'con_igv') { total = bruto; subtotal = bruto / factor; igv = total - subtotal; }
+  else                         { subtotal = bruto; igv = 0; total = bruto; }
+
+  document.getElementById('c-subtotal').textContent = s2(subtotal);
+  document.getElementById('c-igv').textContent      = s2(igv);
+  document.getElementById('c-total').textContent    = s2(total);
+  document.getElementById('c-igv-lbl').textContent  = modo === 'no_afecto' ? 'IGV (no afecto)' : 'IGV (' + (_igvPct == null ? 18 : _igvPct) + '%)';
+  document.getElementById('c-contador').textContent = filas.length ? '(' + filas.length + ')' : '';
+}
+
+async function guardarCompra() {
+  var get = function(id) { return document.getElementById(id).value.trim(); };
+  var body = {
+    tipo_comprobante: get('c-tipo'),
+    serie           : get('c-serie') || null,
+    numero          : get('c-numero'),
+    fecha_emision   : get('c-fecha'),
+    proveedor_ruc   : get('c-ruc') || null,
+    proveedor_nombre: get('c-proveedor'),
+    modo_igv        : get('c-modo-igv'),
+    observaciones   : get('c-obs') || null,
+    items           : [],
+  };
+  if (!body.numero)           { toast('Ingresa el número del comprobante.', 'warning'); return; }
+  if (!body.fecha_emision)    { toast('Ingresa la fecha de emisión.', 'warning'); return; }
+  if (!body.proveedor_nombre) { toast('Ingresa el proveedor.', 'warning'); return; }
+  if (body.tipo_comprobante === 'factura' && !/^\d{11}$/.test(body.proveedor_ruc || '')) {
+    toast('Para una factura ingresa el RUC del proveedor (11 dígitos).', 'warning'); return;
+  }
+
+  var filas = document.querySelectorAll('#c-items tr');
+  for (var i = 0; i < filas.length; i++) {
+    var tr   = filas[i];
+    var p    = _compraProds[tr.dataset.uid];
+    var txt  = tr.querySelector('.c-prod').value.trim();
+    var cant = parseFloat(tr.querySelector('.c-cant').value);
+    var pu   = parseFloat(tr.querySelector('.c-pu').value);
+    var vacia = !txt && !tr.querySelector('.c-cant').value && !tr.querySelector('.c-pu').value;
+    if (!p && vacia) continue;
+    if (!p)                  { toast('Fila ' + (i + 1) + ': elige un producto de la lista.', 'warning'); tr.querySelector('.c-prod').focus(); return; }
+    if (!(cant > 0))         { toast('Fila ' + (i + 1) + ': la cantidad debe ser mayor a 0.', 'warning'); tr.querySelector('.c-cant').focus(); return; }
+    if (isNaN(pu) || pu < 0) { toast('Fila ' + (i + 1) + ': ingresa el precio unitario.', 'warning'); tr.querySelector('.c-pu').focus(); return; }
+    body.items.push({ inventario_id: p.id, cantidad: cant, precio_unitario: pu,
+                      lote: tr.querySelector('.c-lote').value.trim() || null,
+                      fecha_vencimiento: tr.querySelector('.c-venc').value || null });
+  }
+  if (!body.items.length) { toast('Agrega al menos un producto.', 'warning'); return; }
+
+  var btn = document.getElementById('btn-guardar-compra');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    var r = await api('/inventario/compras', { method: 'POST', body: body });
+    if (!r) return;
+    var d = await r.json();
+    if (!r.ok) { toast(d.message || 'Error al guardar la compra.', 'danger', 6000); return; }
+    toast(d.message || '✅ Compra registrada', 'success', 5000);
+    closeModal('modal-compra');
+    cargar();
+  } catch { toast('Error de conexión.', 'danger'); }
+  finally { btn.disabled = false; btn.textContent = '💾 Guardar compra'; }
+}
+
+// ── Historial de compras ──────────────────────────────────────────
+var TIPO_COMP = { factura: 'Factura', boleta: 'Boleta', nota_venta: 'Nota de venta', guia: 'Guía', otro: 'Otro' };
+var MODO_IGV  = { sin_igv: 'Precios sin IGV', con_igv: 'Precios con IGV', no_afecto: 'No afecto a IGV' };
+
+async function abrirHistorialCompras() {
+  var body = document.getElementById('hc-body');
+  document.getElementById('hc-titulo').textContent = '📚 Compras registradas';
+  document.getElementById('hc-volver').style.display = 'none';
+  body.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  openModal('modal-historial-compras');
+  try {
+    var r = await api('/inventario/compras?limit=100');
+    var d = r ? await r.json() : null;
+    if (!r || !r.ok) { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">' + esc((d && d.message) || 'Error al cargar.') + '</p>'; return; }
+    var rows = d.data || [];
+    if (!rows.length) { body.innerHTML = '<div class="vempty"><span class="icon">🧾</span><p>Aún no hay compras registradas.</p></div>'; return; }
+    body.innerHTML =
+      '<div style="overflow-x:auto"><table class="vtable"><thead><tr>' +
+        '<th>Fecha</th><th>Comprobante</th><th>Proveedor</th><th style="text-align:right">Ítems</th>' +
+        '<th style="text-align:right">Total</th><th>Registró</th><th></th></tr></thead><tbody>' +
+      rows.map(function(c) {
+        return '<tr><td style="white-space:nowrap">' + esc(fYmd(c.fecha_emision)) + '</td>' +
+          '<td style="white-space:nowrap">' + esc(TIPO_COMP[c.tipo_comprobante] || c.tipo_comprobante) + ' ' +
+            '<span style="font-family:monospace">' + esc((c.serie ? c.serie + '-' : '') + c.numero) + '</span></td>' +
+          '<td><p style="font-weight:600">' + esc(c.proveedor_nombre) + '</p>' +
+            (c.proveedor_ruc ? '<p style="font-size:.68rem;color:var(--ink-faint)">RUC ' + esc(c.proveedor_ruc) + '</p>' : '') + '</td>' +
+          '<td style="text-align:right">' + c.total_items + '</td>' +
+          '<td style="text-align:right;font-weight:700;white-space:nowrap">' + s2(c.total) + '</td>' +
+          '<td style="font-size:.76rem;color:var(--ink-soft)">' + esc(c.registrado_por || '—') + '</td>' +
+          '<td><button class="vlink" style="font-size:.76rem;color:var(--sky)" onclick="verCompra(' + c.id + ')">Ver</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  } catch { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error de conexión.</p>'; }
+}
+
+async function verCompra(id) {
+  var body = document.getElementById('hc-body');
+  body.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  document.getElementById('hc-volver').style.display = '';
+  try {
+    var r = await api('/inventario/compras/' + id);
+    if (!r || !r.ok) { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; return; }
+    var c = (await r.json()).data;
+    document.getElementById('hc-titulo').textContent = '🧾 ' + (TIPO_COMP[c.tipo_comprobante] || '') + ' ' + (c.serie ? c.serie + '-' : '') + c.numero;
+    body.innerHTML =
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3" style="margin-bottom:1rem;font-size:.8rem">' +
+        '<div><p class="vlabel">Proveedor</p><p style="font-weight:600">' + esc(c.proveedor_nombre) + '</p>' +
+          (c.proveedor_ruc ? '<p style="font-size:.7rem;color:var(--ink-faint)">RUC ' + esc(c.proveedor_ruc) + '</p>' : '') + '</div>' +
+        '<div><p class="vlabel">Fecha emisión</p><p style="font-weight:600">' + esc(fYmd(c.fecha_emision)) + '</p></div>' +
+        '<div><p class="vlabel">Registrado por</p><p style="font-weight:600">' + esc(c.registrado_por || '—') + '</p>' +
+          '<p style="font-size:.7rem;color:var(--ink-faint)">' + esc(fDateTime(c.created_at)) + '</p></div>' +
+        '<div><p class="vlabel">Precios</p><p style="font-weight:600">' + esc(MODO_IGV[c.modo_igv] || c.modo_igv) + '</p>' +
+          (c.sede_nombre ? '<p style="font-size:.7rem;color:var(--ink-faint)">🏥 ' + esc(c.sede_nombre) + '</p>' : '') + '</div>' +
+      '</div>' +
+      (c.observaciones ? '<p style="font-size:.78rem;color:var(--ink-soft);margin-bottom:.8rem">📝 ' + esc(c.observaciones) + '</p>' : '') +
+      '<div style="overflow-x:auto"><table class="vtable"><thead><tr>' +
+        '<th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">P. unit.</th>' +
+        '<th style="text-align:right">Subtotal</th><th>Lote</th><th>Vence</th><th>Stock</th><th>Costo (con IGV)</th></tr></thead><tbody>' +
+      c.items.map(function(it) {
+        return '<tr><td style="font-weight:600">' + esc(it.descripcion) + '</td>' +
+          '<td style="text-align:right">' + parseFloat(it.cantidad).toFixed(2) + ' ' + esc(it.unidad || '') + '</td>' +
+          '<td style="text-align:right">' + s2(it.precio_unitario) + '</td>' +
+          '<td style="text-align:right;font-weight:700">' + s2(it.subtotal) + '</td>' +
+          '<td style="font-family:monospace;font-size:.76rem">' + esc(it.lote || '—') + '</td>' +
+          '<td>' + (it.fecha_vencimiento ? esc(fYmd(it.fecha_vencimiento)) : '—') + '</td>' +
+          '<td style="font-size:.75rem;white-space:nowrap">' + parseFloat(it.stock_anterior).toFixed(2) + ' → ' +
+            (parseFloat(it.stock_anterior) + parseFloat(it.cantidad)).toFixed(2) + '</td>' +
+          '<td style="font-size:.75rem;white-space:nowrap">' + s2(it.costo_anterior) + ' → <b>' + s2(it.costo_promedio) + '</b></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:.8rem;font-size:.84rem">' +
+        '<div style="min-width:220px"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><b>' + s2(c.subtotal) + '</b></div>' +
+        '<div style="display:flex;justify-content:space-between"><span>IGV</span><b>' + s2(c.igv) + '</b></div>' +
+        '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:.3rem;padding-top:.3rem">' +
+          '<span style="font-weight:700">Total</span><b style="color:var(--green-700)">' + s2(c.total) + '</b></div></div></div>';
+  } catch { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error de conexión.</p>'; }
 }
 </script>
 </body>

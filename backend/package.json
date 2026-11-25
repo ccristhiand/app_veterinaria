@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "migrar": "node scripts/migrar-clinicas.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.33.0",

@@ -22,6 +22,7 @@ const mascotaFotoRoutes = require('./routes/mascotas-foto.routes');   // ← NUE
 const citaRoutes        = require('./routes/citas.routes');
 const historiaRoutes    = require('./routes/historia.routes');
 const inventarioRoutes  = require('./routes/inventario.routes');
+const comprasRoutes     = require('./routes/compras.routes');
 const notifRoutes       = require('./routes/notificaciones.routes');
 const usuarioRoutes     = require('./routes/usuarios.routes');
 const vacunaRoutes      = require('./routes/vacunas.routes');
@@ -186,6 +187,7 @@ app.use(`${API}/mascotas`,         mascotaRoutes);
 app.use(`${API}/mascotas`,         mascotaFotoRoutes);        // ← NUEVO: /mascotas/:id/foto
 app.use(`${API}/citas`,            citaRoutes);
 app.use(`${API}/historia`,         historiaRoutes);
+app.use(`${API}/inventario/compras`, comprasRoutes);         // ← antes de /inventario (choca con /:id)
 app.use(`${API}/inventario`,       inventarioRoutes);
 app.use(`${API}/notificaciones`,   notifRoutes);
 app.use(`${API}/usuarios`,         usuarioRoutes);
