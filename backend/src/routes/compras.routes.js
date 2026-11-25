@@ -53,7 +53,12 @@ router.get('/', async (req, res, next) => {
       params.push(like, like, like);
     }
 
-    const [{ total }] = await req.db.query(`SELECT COUNT(*) AS total FROM compras c ${where}`, params);
+    // Totales del período filtrado (para el resumen de la ventana)
+    const [res_] = await req.db.query(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(c.total), 0) AS monto, COALESCE(SUM(c.igv), 0) AS igv,
+              COUNT(DISTINCT COALESCE(c.proveedor_ruc, c.proveedor_nombre)) AS proveedores
+       FROM compras c ${where}`, params);
+    const total = Number(res_.total) || 0;
     const rows = await req.db.query(
       `SELECT c.*, DATE_FORMAT(c.fecha_emision, '%Y-%m-%d') AS fecha_emision,
               s.nombre AS sede_nombre, u.nombre AS registrado_por,
@@ -66,7 +71,12 @@ router.get('/', async (req, res, next) => {
        LIMIT ${limitN} OFFSET ${offsetN}`,
       params
     );
-    return res.json({ success: true, data: rows, meta: { total, page: parseInt(page) || 1, limit: limitN } });
+    return res.json({
+      success: true, data: rows,
+      meta: { total, page: parseInt(page) || 1, limit: limitN, pages: Math.max(1, Math.ceil(total / limitN)) },
+      resumen: { compras: total, monto: Number(res_.monto) || 0, igv: Number(res_.igv) || 0,
+                 proveedores: Number(res_.proveedores) || 0 },
+    });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') return sinMigracion(res);
     next(err);

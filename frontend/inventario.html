@@ -478,15 +478,95 @@
   border-radius:.8rem;box-shadow:0 12px 32px rgba(15,40,30,.16);max-height:280px;overflow-y:auto;padding:.3rem"></div>
 
 <!-- ══ Modal Historial de Compras ════════════════════════════════ -->
+<style>
+  /* ── Historial de compras ── */
+  .hc-filtros { display:flex; flex-wrap:wrap; gap:.6rem; align-items:flex-end; margin-bottom:1rem; }
+  .hc-filtros .vinput { padding:.5rem .7rem; font-size:.82rem; }
+  .hc-chips { display:flex; gap:.35rem; flex-wrap:wrap; }
+  .hc-chip { border:1px solid var(--line); background:#fff; color:var(--ink-soft); border-radius:999px;
+             padding:.4rem .8rem; font:inherit; font-size:.75rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .hc-chip:hover { border-color:var(--green-200); color:var(--green-700); }
+  .hc-chip.on { background:var(--green-50); border-color:var(--green-200); color:var(--green-700); }
+  .hc-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; margin-bottom:1rem; }
+  @media (max-width:700px) { .hc-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .hc-kpi { border:1px solid var(--line); border-radius:.9rem; padding:.75rem .9rem; background:#fff; }
+  .hc-kpi p:first-child { font-size:.62rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .hc-kpi p:last-child { font-size:1.15rem; font-weight:800; margin-top:.15rem; white-space:nowrap; }
+  .hc-tabla-wrap { border:1px solid var(--line); border-radius:.9rem; overflow-x:auto; }
+  .hc-tabla { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .hc-tabla th { background:#f6f8f6; text-align:left; font-size:.6rem; font-weight:700; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--ink-faint); padding:.65rem .8rem; white-space:nowrap; }
+  .hc-tabla td { padding:.7rem .8rem; border-top:1px solid var(--line); vertical-align:middle; }
+  .hc-tabla tbody tr.hc-click { cursor:pointer; transition:background .12s; }
+  .hc-tabla tbody tr.hc-click:hover { background:#f8fbf9; }
+  .hc-tabla .num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .hc-tipo { display:inline-flex; align-items:center; padding:.12rem .5rem; border-radius:.4rem; font-size:.62rem;
+             font-weight:800; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; border:1px solid; }
+  .hc-doc { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.78rem; font-weight:600; }
+  .hc-movil { display:none; }
+  .hc-sub { font-size:.68rem; color:var(--ink-faint); margin-top:.1rem; }
+  .hc-pag { display:flex; justify-content:space-between; align-items:center; gap:.6rem; flex-wrap:wrap;
+            margin-top:.8rem; font-size:.76rem; color:var(--ink-soft); }
+  @media (max-width:760px) { .hc-tabla .hc-opc { display:none; } }
+  @media (max-width:520px) {
+    .hc-tabla .hc-opc2 { display:none; }
+    .hc-tabla .hc-movil { display:block; }
+    .hc-tabla th, .hc-tabla td { padding:.6rem .5rem; }
+  }
+  /* Detalle */
+  .hc-cab { display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; border:1px solid var(--line);
+            border-radius:1rem; padding:1rem 1.1rem; margin-bottom:1rem;
+            background:linear-gradient(135deg,#f8fbf9,#fff); }
+  @media (max-width:700px) { .hc-cab { grid-template-columns:1fr; } }
+  .hc-dato p:first-child { font-size:.6rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                           color:var(--ink-faint); margin-bottom:.15rem; }
+  .hc-dato p:nth-child(2) { font-size:.85rem; font-weight:600; }
+  .hc-datos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem 1rem; }
+  .hc-totales { margin-left:auto; min-width:260px; border:1px solid var(--line); border-radius:.9rem;
+                padding:.75rem 1rem; font-size:.84rem; background:#fff; }
+  .hc-totales div { display:flex; justify-content:space-between; gap:1rem; padding:.15rem 0; }
+</style>
 <div id="modal-historial-compras" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:920px">
+  <div class="vmodal" style="max-width:1100px">
     <div class="vmodal-head">
-      <h3 id="hc-titulo">📚 Compras registradas</h3>
+      <div>
+        <h3 id="hc-titulo">📚 Compras registradas</h3>
+        <p id="hc-subtitulo" style="font-size:.74rem;color:var(--ink-faint);margin-top:.15rem">
+          Comprobantes de proveedores ingresados al inventario
+        </p>
+      </div>
       <button onclick="closeModal('modal-historial-compras')" class="vmodal-close">✕</button>
     </div>
-    <div class="vmodal-body" id="hc-body"></div>
+    <div class="vmodal-body">
+      <!-- Vista lista -->
+      <div id="hc-lista">
+        <div class="hc-filtros">
+          <div class="hc-chips">
+            <button type="button" class="hc-chip" data-rango="mes">Este mes</button>
+            <button type="button" class="hc-chip" data-rango="anterior">Mes pasado</button>
+            <button type="button" class="hc-chip" data-rango="90">Últimos 90 días</button>
+            <button type="button" class="hc-chip" data-rango="todo">Todo</button>
+          </div>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input id="hc-desde" type="date" class="vinput" style="width:auto" title="Desde"/>
+            <span style="color:var(--ink-faint);font-size:.75rem">a</span>
+            <input id="hc-hasta" type="date" class="vinput" style="width:auto" title="Hasta"/>
+          </div>
+          <div class="search-wrap" style="flex:1;min-width:220px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input id="hc-buscar" type="text" class="vinput" placeholder="Proveedor, RUC o N° de comprobante…"/>
+          </div>
+        </div>
+        <div class="hc-kpis" id="hc-kpis"></div>
+        <div id="hc-tabla"></div>
+      </div>
+      <!-- Vista detalle -->
+      <div id="hc-detalle" style="display:none"></div>
+    </div>
     <div class="vmodal-foot">
-      <button id="hc-volver" onclick="abrirHistorialCompras()" class="vbtn vbtn-ghost" style="display:none">← Volver</button>
+      <button id="hc-volver" onclick="volverListaCompras()" class="vbtn vbtn-ghost" style="display:none;margin-right:auto">← Volver al listado</button>
       <button onclick="closeModal('modal-historial-compras')" class="vbtn vbtn-ghost">Cerrar</button>
     </div>
   </div>
@@ -1449,78 +1529,232 @@ async function guardarCompra() {
 
 // ── Historial de compras ──────────────────────────────────────────
 var TIPO_COMP = { factura: 'Factura', boleta: 'Boleta', nota_venta: 'Nota de venta', guia: 'Guía', otro: 'Otro' };
-var MODO_IGV  = { sin_igv: 'Precios sin IGV', con_igv: 'Precios con IGV', no_afecto: 'No afecto a IGV' };
+var TIPO_COLOR = {
+  factura   : ['#1d4ed8', '#eff6ff', '#bfdbfe'],
+  boleta    : ['#0f766e', '#f0fdfa', '#99f6e4'],
+  nota_venta: ['#b45309', '#fffbeb', '#fde68a'],
+  guia      : ['#475569', '#f8fafc', '#cbd5e1'],
+  otro      : ['#64748b', '#f8fafc', '#e2e8f0'],
+};
+var MODO_IGV = { sin_igv: 'Precios sin IGV', con_igv: 'Precios con IGV incluido', no_afecto: 'No afecto a IGV' };
 
-async function abrirHistorialCompras() {
-  var body = document.getElementById('hc-body');
-  document.getElementById('hc-titulo').textContent = '📚 Compras registradas';
-  document.getElementById('hc-volver').style.display = 'none';
-  body.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
-  openModal('modal-historial-compras');
-  try {
-    var r = await api('/inventario/compras?limit=100');
-    var d = r ? await r.json() : null;
-    if (!r || !r.ok) { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">' + esc((d && d.message) || 'Error al cargar.') + '</p>'; return; }
-    var rows = d.data || [];
-    if (!rows.length) { body.innerHTML = '<div class="vempty"><span class="icon">🧾</span><p>Aún no hay compras registradas.</p></div>'; return; }
-    body.innerHTML =
-      '<div style="overflow-x:auto"><table class="vtable"><thead><tr>' +
-        '<th>Fecha</th><th>Comprobante</th><th>Proveedor</th><th style="text-align:right">Ítems</th>' +
-        '<th style="text-align:right">Total</th><th>Registró</th><th></th></tr></thead><tbody>' +
-      rows.map(function(c) {
-        return '<tr><td style="white-space:nowrap">' + esc(fYmd(c.fecha_emision)) + '</td>' +
-          '<td style="white-space:nowrap">' + esc(TIPO_COMP[c.tipo_comprobante] || c.tipo_comprobante) + ' ' +
-            '<span style="font-family:monospace">' + esc((c.serie ? c.serie + '-' : '') + c.numero) + '</span></td>' +
-          '<td><p style="font-weight:600">' + esc(c.proveedor_nombre) + '</p>' +
-            (c.proveedor_ruc ? '<p style="font-size:.68rem;color:var(--ink-faint)">RUC ' + esc(c.proveedor_ruc) + '</p>' : '') + '</td>' +
-          '<td style="text-align:right">' + c.total_items + '</td>' +
-          '<td style="text-align:right;font-weight:700;white-space:nowrap">' + s2(c.total) + '</td>' +
-          '<td style="font-size:.76rem;color:var(--ink-soft)">' + esc(c.registrado_por || '—') + '</td>' +
-          '<td><button class="vlink" style="font-size:.76rem;color:var(--sky)" onclick="verCompra(' + c.id + ')">Ver</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
-  } catch { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error de conexión.</p>'; }
+var _hc = { pagina: 1, rango: 'todo', timer: null, iniciado: false };
+
+function badgeTipo(t) {
+  var c = TIPO_COLOR[t] || TIPO_COLOR.otro;
+  return '<span class="hc-tipo" style="color:' + c[0] + ';background:' + c[1] + ';border-color:' + c[2] + '">' +
+         esc(TIPO_COMP[t] || t) + '</span>';
+}
+function numDoc(c) { return (c.serie ? c.serie + '-' : '') + c.numero; }
+// Montos con separador de miles: S/ 1,234.50
+function sm(n) { return 'S/ ' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// ── Rango de fechas rápido ────────────────────────────────────────
+function aplicarRango(rango) {
+  _hc.rango = rango;
+  var hoy = new Date(), y = hoy.getFullYear(), m = hoy.getMonth();
+  var iso = function(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  var desde = '', hasta = '';
+  if (rango === 'mes')      { desde = iso(new Date(y, m, 1));     hasta = iso(new Date(y, m + 1, 0)); }
+  if (rango === 'anterior') { desde = iso(new Date(y, m - 1, 1)); hasta = iso(new Date(y, m, 0)); }
+  if (rango === '90')       { desde = iso(new Date(y, m, hoy.getDate() - 89)); hasta = iso(hoy); }
+  document.getElementById('hc-desde').value = desde;
+  document.getElementById('hc-hasta').value = hasta;
+  marcarChip();
+}
+function marcarChip() {
+  document.querySelectorAll('.hc-chip').forEach(function(b) { b.classList.toggle('on', b.dataset.rango === _hc.rango); });
 }
 
+function iniciarFiltrosCompras() {
+  if (_hc.iniciado) return;
+  _hc.iniciado = true;
+  document.querySelectorAll('.hc-chip').forEach(function(b) {
+    b.onclick = function() { aplicarRango(b.dataset.rango); _hc.pagina = 1; cargarListaCompras(); };
+  });
+  ['hc-desde', 'hc-hasta'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function() {
+      _hc.rango = ''; marcarChip(); _hc.pagina = 1; cargarListaCompras();
+    });
+  });
+  document.getElementById('hc-buscar').addEventListener('input', function() {
+    clearTimeout(_hc.timer);
+    _hc.timer = setTimeout(function() { _hc.pagina = 1; cargarListaCompras(); }, 350);
+  });
+}
+
+async function abrirHistorialCompras() {
+  iniciarFiltrosCompras();
+  aplicarRango('todo');
+  document.getElementById('hc-buscar').value = '';
+  _hc.pagina = 1;
+  volverListaCompras();
+  openModal('modal-historial-compras');
+  cargarListaCompras();
+}
+
+function volverListaCompras() {
+  document.getElementById('hc-titulo').textContent    = '📚 Compras registradas';
+  document.getElementById('hc-subtitulo').textContent = 'Comprobantes de proveedores ingresados al inventario';
+  document.getElementById('hc-lista').style.display   = '';
+  document.getElementById('hc-detalle').style.display = 'none';
+  document.getElementById('hc-volver').style.display  = 'none';
+}
+
+async function cargarListaCompras() {
+  var cont = document.getElementById('hc-tabla');
+  cont.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  var qs = new URLSearchParams({ page: _hc.pagina, limit: 15 });
+  var desde = document.getElementById('hc-desde').value, hasta = document.getElementById('hc-hasta').value;
+  var buscar = document.getElementById('hc-buscar').value.trim();
+  if (desde)  qs.set('desde', desde);
+  if (hasta)  qs.set('hasta', hasta);
+  if (buscar) qs.set('search', buscar);
+
+  try {
+    var r = await api('/inventario/compras?' + qs.toString());
+    var d = r ? await r.json() : null;
+    if (!r || !r.ok) {
+      document.getElementById('hc-kpis').innerHTML = '';
+      cont.innerHTML = '<div class="vempty"><span class="icon">⚠️</span><p>' + esc((d && d.message) || 'Error al cargar.') + '</p></div>';
+      return;
+    }
+    pintarResumenCompras(d.resumen || {});
+    pintarTablaCompras(d.data || [], d.meta || {});
+  } catch {
+    cont.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error de conexión.</p></div>';
+  }
+}
+
+function pintarResumenCompras(res) {
+  var kpi = function(lbl, val, color) {
+    return '<div class="hc-kpi"><p>' + lbl + '</p><p style="color:' + (color || 'inherit') + '">' + val + '</p></div>';
+  };
+  document.getElementById('hc-kpis').innerHTML =
+    kpi('Compras', (res.compras || 0).toLocaleString('en-US')) +
+    kpi('Total comprado', sm(res.monto), 'var(--green-700)') +
+    kpi('IGV de compras', sm(res.igv), '#1d4ed8') +
+    kpi('Proveedores', (res.proveedores || 0).toLocaleString('en-US'));
+}
+
+function pintarTablaCompras(rows, meta) {
+  var cont = document.getElementById('hc-tabla');
+  if (!rows.length) {
+    var hayFiltro = document.getElementById('hc-buscar').value.trim() || _hc.rango !== 'todo';
+    cont.innerHTML =
+      '<div class="vempty" style="border:1px dashed var(--line);border-radius:.9rem;padding:2rem 1rem">' +
+        '<span class="icon">🧾</span>' +
+        '<p>' + (hayFiltro ? 'No hay compras con estos filtros.' : 'Aún no hay compras registradas.') + '</p>' +
+        (hayFiltro ? '' : '<button class="vbtn vbtn-primary" style="margin-top:.8rem" ' +
+          'onclick="closeModal(\'modal-historial-compras\');abrirCompra()">🧾 Registrar la primera compra</button>') +
+      '</div>';
+    return;
+  }
+
+  var variasSedes = getSedesUsuario().length > 1;
+  cont.innerHTML =
+    '<div class="hc-tabla-wrap"><table class="hc-tabla"><thead><tr>' +
+      '<th class="hc-opc2">Fecha</th><th>Comprobante</th><th>Proveedor</th><th class="num hc-opc2">Ítems</th>' +
+      '<th class="num hc-opc">Subtotal</th><th class="num hc-opc">IGV</th><th class="num">Total</th>' +
+      '<th class="hc-opc">Registrado por</th><th class="hc-opc2" style="width:28px"></th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(c) {
+      return '<tr class="hc-click" data-id="' + c.id + '" title="Ver detalle">' +
+        '<td class="hc-opc2" style="white-space:nowrap;font-weight:600">' + esc(fYmd(c.fecha_emision)) + '</td>' +
+        '<td>' + badgeTipo(c.tipo_comprobante) + '<div class="hc-doc" style="margin-top:.25rem">' + esc(numDoc(c)) + '</div>' +
+          '<div class="hc-sub hc-movil">' + esc(fYmd(c.fecha_emision)) + '</div></td>' +
+        '<td><div style="font-weight:600">' + esc(c.proveedor_nombre) + '</div>' +
+          (c.proveedor_ruc ? '<div class="hc-sub">RUC ' + esc(c.proveedor_ruc) + '</div>' : '') + '</td>' +
+        '<td class="num hc-opc2">' + c.total_items + '</td>' +
+        '<td class="num hc-opc" style="color:var(--ink-soft)">' + sm(c.subtotal) + '</td>' +
+        '<td class="num hc-opc" style="color:var(--ink-soft)">' + sm(c.igv) + '</td>' +
+        '<td class="num" style="font-weight:800">' + sm(c.total) + '</td>' +
+        '<td class="hc-opc"><div style="font-size:.76rem">' + esc(c.registrado_por || '—') + '</div>' +
+          (variasSedes && c.sede_nombre ? '<div class="hc-sub">🏥 ' + esc(c.sede_nombre) + '</div>' : '') + '</td>' +
+        '<td class="hc-opc2" style="color:var(--ink-faint);font-size:1rem;text-align:center">›</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>' +
+    (meta.pages > 1
+      ? '<div class="hc-pag"><span>Página ' + meta.page + ' de ' + meta.pages + ' · ' + meta.total + ' compras</span>' +
+          '<div style="display:flex;gap:.4rem">' +
+            '<button class="vbtn vbtn-ghost" style="padding:.35rem .8rem;font-size:.76rem" ' + (meta.page <= 1 ? 'disabled' : '') +
+              ' onclick="_hc.pagina--;cargarListaCompras()">← Anterior</button>' +
+            '<button class="vbtn vbtn-ghost" style="padding:.35rem .8rem;font-size:.76rem" ' + (meta.page >= meta.pages ? 'disabled' : '') +
+              ' onclick="_hc.pagina++;cargarListaCompras()">Siguiente →</button>' +
+          '</div></div>'
+      : '');
+
+  cont.querySelectorAll('tr.hc-click').forEach(function(tr) {
+    tr.onclick = function() { verCompra(parseInt(tr.dataset.id, 10)); };
+  });
+}
+
+// ── Detalle de una compra ─────────────────────────────────────────
 async function verCompra(id) {
-  var body = document.getElementById('hc-body');
-  body.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
+  var det = document.getElementById('hc-detalle');
+  document.getElementById('hc-lista').style.display  = 'none';
   document.getElementById('hc-volver').style.display = '';
+  det.style.display = '';
+  det.innerHTML = '<div class="vempty"><div class="vspinner"></div></div>';
   try {
     var r = await api('/inventario/compras/' + id);
-    if (!r || !r.ok) { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error al cargar.</p>'; return; }
+    if (!r || !r.ok) { det.innerHTML = '<div class="vempty"><span class="icon">⚠️</span><p>Error al cargar la compra.</p></div>'; return; }
     var c = (await r.json()).data;
-    document.getElementById('hc-titulo').textContent = '🧾 ' + (TIPO_COMP[c.tipo_comprobante] || '') + ' ' + (c.serie ? c.serie + '-' : '') + c.numero;
-    body.innerHTML =
-      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3" style="margin-bottom:1rem;font-size:.8rem">' +
-        '<div><p class="vlabel">Proveedor</p><p style="font-weight:600">' + esc(c.proveedor_nombre) + '</p>' +
-          (c.proveedor_ruc ? '<p style="font-size:.7rem;color:var(--ink-faint)">RUC ' + esc(c.proveedor_ruc) + '</p>' : '') + '</div>' +
-        '<div><p class="vlabel">Fecha emisión</p><p style="font-weight:600">' + esc(fYmd(c.fecha_emision)) + '</p></div>' +
-        '<div><p class="vlabel">Registrado por</p><p style="font-weight:600">' + esc(c.registrado_por || '—') + '</p>' +
-          '<p style="font-size:.7rem;color:var(--ink-faint)">' + esc(fDateTime(c.created_at)) + '</p></div>' +
-        '<div><p class="vlabel">Precios</p><p style="font-weight:600">' + esc(MODO_IGV[c.modo_igv] || c.modo_igv) + '</p>' +
-          (c.sede_nombre ? '<p style="font-size:.7rem;color:var(--ink-faint)">🏥 ' + esc(c.sede_nombre) + '</p>' : '') + '</div>' +
+    document.getElementById('hc-titulo').textContent    = '🧾 ' + (TIPO_COMP[c.tipo_comprobante] || 'Comprobante') + ' ' + numDoc(c);
+    document.getElementById('hc-subtitulo').textContent = c.proveedor_nombre + ' · ' + fYmd(c.fecha_emision);
+
+    var dato = function(lbl, val, sub) {
+      return '<div class="hc-dato"><p>' + lbl + '</p><p>' + val + '</p>' + (sub ? '<p class="hc-sub">' + sub + '</p>' : '') + '</div>';
+    };
+    var items = c.items || [];
+    det.innerHTML =
+      '<div class="hc-cab">' +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">' + badgeTipo(c.tipo_comprobante) +
+            '<span class="hc-doc" style="font-size:1.05rem">' + esc(numDoc(c)) + '</span></div>' +
+          '<p style="font-size:1rem;font-weight:800;margin-top:.55rem">' + esc(c.proveedor_nombre) + '</p>' +
+          (c.proveedor_ruc ? '<p class="hc-sub" style="font-size:.76rem">RUC ' + esc(c.proveedor_ruc) + '</p>' : '') +
+          (c.observaciones ? '<p style="font-size:.78rem;color:var(--ink-soft);margin-top:.6rem">📝 ' + esc(c.observaciones) + '</p>' : '') +
+        '</div>' +
+        '<div class="hc-datos">' +
+          dato('Fecha de emisión', esc(fYmd(c.fecha_emision))) +
+          dato('Precios', esc(MODO_IGV[c.modo_igv] || c.modo_igv), c.modo_igv !== 'no_afecto' ? 'IGV ' + parseFloat(c.igv_porcentaje) + '%' : '') +
+          dato('Registrado por', esc(c.registrado_por || '—'), esc(fDateTime(c.created_at))) +
+          dato('Sede', esc(c.sede_nombre || '—')) +
+        '</div>' +
       '</div>' +
-      (c.observaciones ? '<p style="font-size:.78rem;color:var(--ink-soft);margin-bottom:.8rem">📝 ' + esc(c.observaciones) + '</p>' : '') +
-      '<div style="overflow-x:auto"><table class="vtable"><thead><tr>' +
-        '<th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">P. unit.</th>' +
-        '<th style="text-align:right">Subtotal</th><th>Lote</th><th>Vence</th><th>Stock</th><th>Costo (con IGV)</th></tr></thead><tbody>' +
-      c.items.map(function(it) {
-        return '<tr><td style="font-weight:600">' + esc(it.descripcion) + '</td>' +
-          '<td style="text-align:right">' + parseFloat(it.cantidad).toFixed(2) + ' ' + esc(it.unidad || '') + '</td>' +
-          '<td style="text-align:right">' + s2(it.precio_unitario) + '</td>' +
-          '<td style="text-align:right;font-weight:700">' + s2(it.subtotal) + '</td>' +
-          '<td style="font-family:monospace;font-size:.76rem">' + esc(it.lote || '—') + '</td>' +
-          '<td>' + (it.fecha_vencimiento ? esc(fYmd(it.fecha_vencimiento)) : '—') + '</td>' +
-          '<td style="font-size:.75rem;white-space:nowrap">' + parseFloat(it.stock_anterior).toFixed(2) + ' → ' +
-            (parseFloat(it.stock_anterior) + parseFloat(it.cantidad)).toFixed(2) + '</td>' +
-          '<td style="font-size:.75rem;white-space:nowrap">' + s2(it.costo_anterior) + ' → <b>' + s2(it.costo_promedio) + '</b></td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      '<div style="display:flex;justify-content:flex-end;margin-top:.8rem;font-size:.84rem">' +
-        '<div style="min-width:220px"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><b>' + s2(c.subtotal) + '</b></div>' +
-        '<div style="display:flex;justify-content:space-between"><span>IGV</span><b>' + s2(c.igv) + '</b></div>' +
-        '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:.3rem;padding-top:.3rem">' +
-          '<span style="font-weight:700">Total</span><b style="color:var(--green-700)">' + s2(c.total) + '</b></div></div></div>';
-  } catch { body.innerHTML = '<p style="color:#e11d48;font-size:.85rem">Error de conexión.</p>'; }
+
+      '<div class="hc-tabla-wrap"><table class="hc-tabla"><thead><tr>' +
+        '<th>Producto</th><th class="hc-opc2">Lote / Vence</th><th class="num">Cantidad</th><th class="num hc-opc2">P. unitario</th>' +
+        '<th class="num">Subtotal</th><th class="num hc-opc">Stock</th><th class="num hc-opc">Costo (con IGV)</th>' +
+      '</tr></thead><tbody>' +
+      items.map(function(it) {
+        var stockAnt = parseFloat(it.stock_anterior) || 0, cant = parseFloat(it.cantidad) || 0;
+        var costoAnt = parseFloat(it.costo_anterior) || 0, costoNue = parseFloat(it.costo_promedio) || 0;
+        var flecha = costoNue > costoAnt ? '<span style="color:#be123c">▲</span>' : costoNue < costoAnt ? '<span style="color:#15803d">▼</span>' : '';
+        return '<tr>' +
+          '<td style="font-weight:600">' + esc(it.descripcion) + '</td>' +
+          '<td class="hc-opc2">' + (it.lote ? '<span class="hc-doc" style="font-size:.74rem">' + esc(it.lote) + '</span>' : '<span style="color:var(--ink-faint)">—</span>') +
+            (it.fecha_vencimiento ? '<div class="hc-sub">Vence ' + esc(fYmd(it.fecha_vencimiento)) + '</div>' : '') + '</td>' +
+          '<td class="num">' + cant.toFixed(2) + ' <span class="hc-sub">' + esc(it.unidad || '') + '</span></td>' +
+          '<td class="num hc-opc2">' + sm(it.precio_unitario) + '</td>' +
+          '<td class="num" style="font-weight:700">' + sm(it.subtotal) + '</td>' +
+          '<td class="num hc-opc" style="font-size:.76rem;color:var(--ink-soft)">' + stockAnt.toFixed(2) + ' → <b style="color:var(--ink)">' + (stockAnt + cant).toFixed(2) + '</b></td>' +
+          '<td class="num hc-opc" style="font-size:.76rem;color:var(--ink-soft)">' + sm(costoAnt) + ' → <b style="color:var(--green-700)">' + sm(costoNue) + '</b> ' + flecha + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+
+      '<div style="display:flex;margin-top:1rem">' +
+        '<div class="hc-totales">' +
+          '<div><span>Subtotal (sin IGV)</span><b>' + sm(c.subtotal) + '</b></div>' +
+          '<div><span>IGV</span><b>' + sm(c.igv) + '</b></div>' +
+          '<div style="border-top:1px solid var(--line);margin-top:.35rem;padding-top:.5rem;font-size:1rem">' +
+            '<span style="font-weight:800">Total</span><b style="color:var(--green-700)">' + sm(c.total) + '</b></div>' +
+        '</div>' +
+      '</div>';
+  } catch { det.innerHTML = '<div class="vempty"><span class="icon">😿</span><p>Error de conexión.</p></div>'; }
 }
 </script>
 </body>
