@@ -20,6 +20,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { auditMiddleware } = require('../middlewares/audit.middleware');
 const { emitirSala } = require('../sockets/emitir');
 const { filtroSede, exigirAcceso } = require('../services/sede.service');
+const { rucValido } = require('../utils/ruc');
 
 const router = Router();
 router.use(authenticate);
@@ -120,6 +121,7 @@ router.post('/', authorize('admin', 'veterinario', 'recepcionista'),
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return error('Ingresa la fecha de emisión.');
     if (!provNombre)                        return error('Ingresa el nombre del proveedor.');
     if (provRuc && !/^\d{11}$/.test(provRuc)) return error('El RUC del proveedor debe tener 11 dígitos.');
+    if (provRuc && !rucValido(provRuc))     return error(`El RUC ${provRuc} no es válido (revisa los dígitos).`);
     if (tipo === 'factura' && !provRuc)     return error('Para una factura ingresa el RUC del proveedor.');
     if (!itemsIn.length)                    return error('Agrega al menos un producto.');
     if (itemsIn.length > 200)               return error('Máximo 200 ítems por compra.');

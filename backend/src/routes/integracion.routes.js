@@ -13,6 +13,7 @@
 const { Router } = require('express');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { masterQuery } = require('../config/masterDB');
+const { rucValido } = require('../utils/ruc');
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 const router = Router();
@@ -167,6 +168,10 @@ router.get('/ruc/:ruc', async (req, res, next) => {
     if (!/^\d{11}$/.test(ruc)) {
       return res.status(422).json({ success: false, message: 'El RUC debe tener 11 dígitos.' });
     }
+    if (!rucValido(ruc)) {
+      return res.status(422).json({ success: false, code: 'RUC_INVALIDO',
+        message: `El RUC ${ruc} no es válido (revisa los dígitos).` });
+    }
 
     // Verificar integración SUNAT activa
     const [cfg] = await masterQuery(
@@ -190,8 +195,13 @@ router.get('/ruc/:ruc', async (req, res, next) => {
     if (apiRes.status === 404) {
       return res.status(404).json({ success: false, message: 'RUC no encontrado en SUNAT.' });
     }
+    if (apiRes.status === 400 || apiRes.status === 422) {
+      return res.status(422).json({ success: false, message: `SUNAT no reconoce el RUC ${ruc}.` });
+    }
     if (!apiRes.ok) {
-      return res.status(apiRes.status).json({ success: false, message: 'Error consultando SUNAT.' });
+      console.error(`[integracion] SUNAT respondió ${apiRes.status} para el RUC ${ruc}`);
+      return res.status(502).json({ success: false,
+        message: `Error consultando SUNAT (código ${apiRes.status}). Intenta de nuevo en unos minutos.` });
     }
 
     const data = await apiRes.json();

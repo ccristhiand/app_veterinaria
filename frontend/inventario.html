@@ -316,8 +316,57 @@
 </div>
 
 <!-- ══ Modal Registrar Compra ════════════════════════════════════ -->
+<style>
+  /* Etiquetas de la tabla de inventario: que no se partan en dos líneas */
+  .inv-badge { display:inline-flex; align-items:center; gap:.25rem; white-space:nowrap; }
+
+  /* ── Ítems de la compra: filas en grilla que se adaptan al ancho del modal (sin scroll) ── */
+  .c-lista { container-type:inline-size; }
+  .c-fila {
+    display:grid; gap:.55rem; align-items:start;
+    grid-template-columns: minmax(0,1fr) 88px 112px 120px 148px 92px 34px;
+    grid-template-areas: "prod cant pu lote venc sub del";
+  }
+  .c-cab { padding:0 .85rem .35rem; font-size:.62rem; font-weight:700; letter-spacing:.08em;
+           text-transform:uppercase; color:var(--ink-faint); }
+  .c-cab > div { white-space:nowrap; }
+  .c-item { padding:.7rem .85rem; border:1px solid var(--line); border-radius:.9rem; background:#fff;
+            transition:border-color .15s, background .15s; }
+  .c-item + .c-item { margin-top:.5rem; }
+  .c-item.c-ok { background:#fbfdfb; }
+  .c-item:focus-within { border-color:var(--green-200); box-shadow:0 0 0 3px rgba(16,185,129,.08); }
+  .c-item .vinput { width:100%; min-width:0; }
+  .f-prod { grid-area:prod; min-width:0; } .f-cant { grid-area:cant; } .f-pu { grid-area:pu; }
+  .f-lote { grid-area:lote; } .f-venc { grid-area:venc; } .f-sub { grid-area:sub; } .f-del { grid-area:del; }
+  .f-sub { text-align:right; font-weight:800; white-space:nowrap; padding-top:.7rem; }
+  .f-del { padding-top:.35rem; text-align:center; }
+  .c-lbl { display:none; font-size:.62rem; font-weight:700; color:var(--ink-faint); text-transform:uppercase;
+           letter-spacing:.06em; margin-bottom:.2rem; }
+  .c-info { font-size:.7rem; color:var(--ink-faint); margin-top:.3rem; line-height:1.35; }
+  .c-info b { color:var(--green-700); }
+  .c-quitar { width:30px; height:30px; border-radius:.55rem; border:none; background:none; color:#94a3b8;
+              cursor:pointer; font-size:.85rem; }
+  .c-quitar:hover { background:#fff1f2; color:#e11d48; }
+
+  /* Ancho medio: producto en una línea, el resto debajo (con etiqueta en cada campo) */
+  @container (max-width: 860px) {
+    .c-cab { display:none; }
+    .c-lbl { display:block; }
+    .c-fila { grid-template-columns: repeat(4, minmax(0,1fr)) 92px;
+              grid-template-areas: "prod prod prod prod del" "cant pu lote venc sub"; }
+    .f-del { text-align:right; }
+    .f-sub { padding-top:1.55rem; }
+  }
+  /* Celular */
+  @container (max-width: 520px) {
+    .c-fila { grid-template-columns: repeat(2, minmax(0,1fr));
+              grid-template-areas: "prod prod" "cant pu" "lote venc" "sub del"; }
+    .f-sub { padding-top:.3rem; text-align:left; }
+    .f-del { padding-top:0; }
+  }
+</style>
 <div id="modal-compra" class="hidden vmodal-backdrop">
-  <div class="vmodal" style="max-width:980px">
+  <div class="vmodal" style="max-width:1180px">
     <div class="vmodal-head">
       <h3>🧾 Registrar compra</h3>
       <button onclick="closeModal('modal-compra')" class="vmodal-close">✕</button>
@@ -391,26 +440,18 @@
             ＋ Agregar producto
           </button>
         </div>
-        <div style="overflow-x:auto;border:1px solid var(--line);border-radius:.9rem">
-          <table class="vtable" style="min-width:920px">
-            <thead>
-              <tr>
-                <th style="width:28%">Producto (del inventario)</th>
-                <th style="width:9%">Cantidad</th>
-                <th style="width:11%">P. unitario</th>
-                <th style="width:11%">Lote</th>
-                <th style="width:13%">Vencimiento</th>
-                <th style="width:10%;text-align:right">Subtotal</th>
-                <th style="width:15%">Costo → promedio</th>
-                <th style="width:3%"></th>
-              </tr>
-            </thead>
-            <tbody id="c-items"></tbody>
-          </table>
+        <div class="c-lista">
+          <div class="c-fila c-cab">
+            <div>Producto (del inventario)</div><div>Cantidad</div><div>P. unitario</div>
+            <div>Lote</div><div>Vencimiento</div><div style="text-align:right">Subtotal</div><div></div>
+          </div>
+          <div id="c-items"></div>
         </div>
-        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.45rem">
-          Solo se pueden elegir productos ya registrados. Si falta alguno, créalo con “＋ Nuevo Ítem” y vuelve aquí.
-          El costo del producto se recalcula con promedio ponderado y se guarda <b>con IGV</b>.
+        <p style="font-size:.7rem;color:var(--ink-faint);margin-top:.55rem;line-height:1.5">
+          ⌨️ <b>Enter</b> pasa al siguiente campo y, al terminar una fila, abre la siguiente.
+          Con el precio vacío, <b>Enter</b> usa el último costo del producto.
+          Solo se eligen productos ya registrados (si falta uno, créalo con “＋ Nuevo Ítem”).
+          El costo se recalcula con promedio ponderado y se guarda <b>con IGV</b>.
         </p>
       </div>
 
@@ -620,10 +661,8 @@ function renderTabla(items) {
         ${i.lote ? `<p style="font-size:.68rem;color:var(--ink-faint)">Lote: ${esc(i.lote)}</p>` : ''}
       </td>
       <td>
-        <span style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;
-          background:${cc.bg};color:${cc.color};border:1px solid ${cc.border}">
-          ${cc.icon} ${esc(i.categoria)}
-        </span>
+        <span class="inv-badge" style="font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:999px;
+          background:${cc.bg};color:${cc.color};border:1px solid ${cc.border}">${cc.icon} ${esc(i.categoria)}</span>
       </td>
       <td>
         <p style="font-weight:800;font-size:1rem;color:${esBajo?'#e11d48':'inherit'}">
@@ -634,8 +673,8 @@ function renderTabla(items) {
         </div>
       </td>
       <td style="color:var(--ink-soft);font-size:.85rem">${minimo.toFixed(2)} ${esc(i.unidad||'')}</td>
-      <td style="font-size:.85rem">${i.precio_compra > 0 ? `S/. ${parseFloat(i.precio_compra).toFixed(2)}` : '—'}</td>
-      <td style="font-size:.85rem">${i.precio_unitario ? `S/. ${parseFloat(i.precio_unitario).toFixed(2)}` : '—'}</td>
+      <td style="font-size:.85rem;white-space:nowrap">${i.precio_compra > 0 ? `S/. ${parseFloat(i.precio_compra).toFixed(2)}` : '—'}</td>
+      <td style="font-size:.85rem;white-space:nowrap">${i.precio_unitario ? `S/. ${parseFloat(i.precio_unitario).toFixed(2)}` : '—'}</td>
       <td style="font-size:.82rem">${
         i.margen_pct !== null && i.margen_pct !== undefined
           ? `<span style="font-weight:700;color:${parseFloat(i.margen_pct)>=50?'#15803d':parseFloat(i.margen_pct)>=20?'#b45309':'#be123c'}">
@@ -650,14 +689,13 @@ function renderTabla(items) {
       <td class="hidden lg:table-cell" style="font-size:.74rem;color:var(--ink-soft)">${i.sede_nombre ? '🏥 '+esc(i.sede_nombre) : '—'}</td>
       <td>
         ${esBajo
-          ? '<span style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">⚠️ Bajo stock</span>'
-          : '<span style="background:var(--green-50);color:var(--green-700);font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid var(--green-200)">✅ OK</span>'}
+          ? '<span class="inv-badge" style="background:#fff1f2;color:#be123c;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid #fecdd3">⚠️ Bajo stock</span>'
+          : '<span class="inv-badge" style="background:var(--green-50);color:var(--green-700);font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:999px;border:1px solid var(--green-200)">✅ OK</span>'}
       </td>
       <td>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;white-space:nowrap">
           <button class="vlink" onclick="abrirEditar(${i.id})"
             style="font-size:.74rem;color:var(--sky)">✏️ Editar</button>
-          <span style="color:var(--line)">·</span>
           <button class="vlink" onclick="abrirStock(${i.id},'${esc(i.nombre)}',${cant},${minimo},'${esc(i.unidad||'')}')"
             style="font-size:.74rem;color:var(--green-600)">🔄 Stock</button>
         </div>
@@ -1064,6 +1102,16 @@ var _sunatActiva = null;
 var _sugTimer    = null;
 var _sugInput    = null;
 
+/** RUC peruano válido: 11 dígitos, prefijo 10/15/16/17/20 y dígito verificador (módulo 11).
+ *  Va aquí y no en shared.js: shared.js se carga sin versión y el navegador puede tenerlo en caché. */
+function esRucValido(ruc) {
+  ruc = String(ruc || '');
+  if (!/^(10|15|16|17|20)\d{9}$/.test(ruc)) return false;
+  var pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2], suma = 0;
+  for (var i = 0; i < 10; i++) suma += pesos[i] * Number(ruc[i]);
+  return (11 - (suma % 11)) % 10 === Number(ruc[10]);
+}
+
 var s2 = function(n) { return 'S/ ' + (Number(n) || 0).toFixed(2); };
 // 'YYYY-MM-DD' → 'DD/MM/YYYY' sin pasar por Date (evita el corrimiento de un día por zona horaria)
 var fYmd = function(s) { return s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; };
@@ -1105,6 +1153,7 @@ async function consultarRucProveedor(manual) {
   var ruc = document.getElementById('c-ruc').value.trim();
   if (!_sunatActiva) return;
   if (ruc.length !== 11) { if (manual) toast('El RUC debe tener 11 dígitos.', 'warning'); return; }
+  if (!esRucValido(ruc)) { toast('El RUC ' + ruc + ' no es válido. Revisa los dígitos.', 'warning'); return; }
   var prov = document.getElementById('c-proveedor');
   if (!manual && prov.value.trim()) return;   // al salir del campo no pisa lo ya escrito
   try {
@@ -1120,45 +1169,82 @@ async function consultarRucProveedor(manual) {
   } catch { if (manual) toast('Error consultando SUNAT.', 'danger'); }
 }
 
+/**
+ * Agrega una fila de producto. Navegación rápida con Enter:
+ * producto → cantidad → precio (vacío = último costo) → lote → vencimiento → siguiente fila.
+ * Al elegir el producto de la última fila se abre otra vacía automáticamente.
+ */
 function agregarFilaCompra(sinFoco) {
   var uid = 'cf' + (++_compraSeq);
-  var tr  = document.createElement('tr');
-  tr.dataset.uid = uid;
-  tr.innerHTML =
-    '<td style="position:relative">' +
-      '<input type="text" class="vinput c-prod" placeholder="Busca por nombre o código…" autocomplete="off"/>' +
-      '<p class="c-prod-info" style="font-size:.68rem;color:var(--ink-faint);margin-top:.2rem"></p>' +
-    '</td>' +
-    '<td><input type="number" class="vinput c-cant" min="0" step="0.01" placeholder="0"/></td>' +
-    '<td><input type="number" class="vinput c-pu" min="0" step="0.0001" placeholder="0.00"/></td>' +
-    '<td><input type="text" class="vinput c-lote" maxlength="50" placeholder="Lote" style="min-width:96px"/></td>' +
-    '<td><input type="date" class="vinput c-venc"/></td>' +
-    '<td class="c-sub" style="text-align:right;font-weight:700;white-space:nowrap">S/ 0.00</td>' +
-    '<td class="c-costo" style="font-size:.74rem;white-space:nowrap;color:var(--ink-soft)">—</td>' +
-    '<td><button type="button" class="vlink c-quitar" title="Quitar" style="color:#e11d48;font-size:.9rem">✕</button></td>';
+  var row = document.createElement('div');
+  row.className = 'c-item c-fila';
+  row.dataset.uid = uid;
+  var lbl = function(t) { return '<span class="c-lbl">' + t + '</span>'; };
+  row.innerHTML =
+    '<div class="f-prod">' + lbl('Producto') +
+      '<input type="text" class="vinput c-prod" placeholder="🔎 Escribe para buscar el producto…" autocomplete="off"/>' +
+      '<div class="c-info"><span class="c-prod-info"></span><span class="c-costo"></span></div>' +
+    '</div>' +
+    '<div class="f-cant">' + lbl('Cantidad') +
+      '<input type="number" class="vinput c-cant" min="0" step="0.01" inputmode="decimal" placeholder="0"/></div>' +
+    '<div class="f-pu">' + lbl('P. unitario') +
+      '<input type="number" class="vinput c-pu" min="0" step="0.0001" inputmode="decimal" placeholder="0.00"/></div>' +
+    '<div class="f-lote">' + lbl('Lote') +
+      '<input type="text" class="vinput c-lote" maxlength="50" placeholder="Opcional"/></div>' +
+    '<div class="f-venc">' + lbl('Vencimiento') +
+      '<input type="date" class="vinput c-venc"/></div>' +
+    '<div class="f-sub">' + lbl('Subtotal') + '<span class="c-sub">S/ 0.00</span></div>' +
+    '<div class="f-del"><button type="button" class="c-quitar" title="Quitar fila" tabindex="-1">✕</button></div>';
 
-  var inp = tr.querySelector('.c-prod');
+  var q = function(c) { return row.querySelector(c); };
+  var inp = q('.c-prod');
   inp.addEventListener('input', function() {
     delete _compraProds[uid];               // al escribir se pierde la selección anterior
-    pintarInfoProducto(tr);
+    pintarInfoProducto(row);
     recalcularCompra();
     clearTimeout(_sugTimer);
     _sugTimer = setTimeout(function() { buscarProductosCompra(inp, uid); }, 250);
   });
   inp.addEventListener('focus', function() { if (!_compraProds[uid]) buscarProductosCompra(inp, uid); });
-  inp.addEventListener('keydown', navegarSugerencias);
-  tr.querySelector('.c-cant').addEventListener('input', recalcularCompra);
-  tr.querySelector('.c-pu').addEventListener('input', recalcularCompra);
-  tr.querySelector('.c-quitar').onclick = function() {
+  inp.addEventListener('keydown', function(e) {
+    navegarSugerencias(e);
+    if (e.key === 'Enter' && !e.defaultPrevented && _compraProds[uid]) { e.preventDefault(); q('.c-cant').focus(); }
+  });
+
+  // Enter = siguiente campo (sin enviar nada)
+  var alEnter = function(el, fn) {
+    el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); fn(); } });
+  };
+  alEnter(q('.c-cant'), function() { q('.c-pu').focus(); });
+  alEnter(q('.c-pu'), function() {
+    var pu = q('.c-pu');
+    if (pu.value === '' && pu.dataset.sugerido) { pu.value = pu.dataset.sugerido; recalcularCompra(); }
+    q('.c-lote').focus();
+  });
+  alEnter(q('.c-lote'), function() { q('.c-venc').focus(); });
+  alEnter(q('.c-venc'), function() { irASiguienteFila(row); });
+
+  ['.c-cant', '.c-pu'].forEach(function(c) {
+    q(c).addEventListener('input', recalcularCompra);
+    q(c).addEventListener('wheel', function() { this.blur(); }, { passive: true });  // la rueda no cambia el número
+  });
+  q('.c-quitar').onclick = function() {
     delete _compraProds[uid];
-    tr.remove();
-    if (!document.querySelector('#c-items tr')) agregarFilaCompra(true);
+    row.remove();
+    if (!document.querySelector('#c-items .c-item')) agregarFilaCompra(true);
     recalcularCompra();
   };
 
-  document.getElementById('c-items').appendChild(tr);
+  document.getElementById('c-items').appendChild(row);
   recalcularCompra();
   if (!sinFoco) setTimeout(function() { inp.focus(); }, 30);
+  return row;
+}
+
+function irASiguienteFila(row) {
+  var sig = row.nextElementSibling;
+  if (!sig) sig = agregarFilaCompra(true);
+  sig.querySelector('.c-prod').focus();
 }
 
 async function buscarProductosCompra(inp, uid) {
@@ -1224,17 +1310,20 @@ function elegirProducto(inp, uid, p) {
   _compraProds[uid] = p;
   inp.value = p.nombre;
   document.getElementById('c-sugerencias').style.display = 'none';
-  var tr = inp.closest('tr');
-  pintarInfoProducto(tr);
+  var row = inp.closest('.c-item');
+  pintarInfoProducto(row);
+  // Siempre queda una fila vacía al final, lista para el siguiente producto
+  if (!row.nextElementSibling) agregarFilaCompra(true);
   recalcularCompra();
-  tr.querySelector('.c-cant').focus();
+  row.querySelector('.c-cant').focus();
 }
 
-function pintarInfoProducto(tr) {
-  var p = _compraProds[tr.dataset.uid];
-  tr.querySelector('.c-prod-info').textContent = p
-    ? 'Stock actual: ' + parseFloat(p.cantidad || 0).toFixed(2) + ' ' + (p.unidad || '') + ' · Costo actual: ' + s2(p.precio_compra) +
-      (p.lote ? ' · Lote actual: ' + p.lote : '')
+function pintarInfoProducto(row) {
+  var p = _compraProds[row.dataset.uid];
+  row.classList.toggle('c-ok', !!p);
+  row.querySelector('.c-prod-info').textContent = p
+    ? 'Stock ' + parseFloat(p.cantidad || 0).toFixed(2) + ' ' + (p.unidad || '') +
+      (p.lote ? ' · Lote ' + p.lote : '')
     : '';
 }
 
@@ -1254,26 +1343,41 @@ document.addEventListener('scroll', function(e) {
 function recalcularCompra() {
   var modo   = document.getElementById('c-modo-igv').value;
   var factor = 1 + (_igvPct == null ? 18 : _igvPct) / 100;
-  var filas  = document.querySelectorAll('#c-items tr');
-  var bruto  = 0;
+  var filas  = document.querySelectorAll('#c-items .c-item');
+  var bruto  = 0, conProducto = 0;
   var acumulado = {};   // mismo producto en varias filas: el promedio se encadena
 
-  filas.forEach(function(tr) {
-    var cant = parseFloat(tr.querySelector('.c-cant').value) || 0;
-    var pu   = parseFloat(tr.querySelector('.c-pu').value)   || 0;
+  filas.forEach(function(row) {
+    var cant = parseFloat(row.querySelector('.c-cant').value) || 0;
+    var puEl = row.querySelector('.c-pu');
+    var pu   = parseFloat(puEl.value) || 0;
     var sub  = cant * pu;
     bruto += sub;
-    tr.querySelector('.c-sub').textContent = s2(sub);
+    row.querySelector('.c-sub').textContent = s2(sub);
 
-    var p = _compraProds[tr.dataset.uid];
-    var celda = tr.querySelector('.c-costo');
-    if (!p || cant <= 0) { celda.textContent = '—'; return; }
-    var prev  = acumulado[p.id] || { stock: parseFloat(p.cantidad) || 0, costo: parseFloat(p.precio_compra) || 0 };
+    var p = _compraProds[row.dataset.uid];
+    var celda = row.querySelector('.c-costo');
+    if (!p) { celda.textContent = ''; puEl.placeholder = '0.00'; delete puEl.dataset.sugerido; return; }
+    conProducto++;
+
+    // Último costo del producto (se guarda con IGV) expresado como lo pide el comprobante
+    var costoAct = parseFloat(p.precio_compra) || 0;
+    if (costoAct > 0) {
+      var sug = (modo === 'sin_igv' ? costoAct / factor : costoAct).toFixed(2);
+      puEl.dataset.sugerido = sug;
+      puEl.placeholder = 'Últ. ' + sug;
+    } else { delete puEl.dataset.sugerido; puEl.placeholder = '0.00'; }
+
+    var prev = acumulado[p.id] || { stock: parseFloat(p.cantidad) || 0, costo: costoAct };
+    if (cant <= 0 || puEl.value === '') {
+      celda.innerHTML = ' · Costo ' + s2(prev.costo);
+      return;
+    }
     var costoU = modo === 'sin_igv' ? pu * factor : pu;
     var base  = Math.max(prev.stock, 0);
     var prom  = (base > 0 && prev.costo > 0) ? (base * prev.costo + cant * costoU) / (base + cant) : costoU;
     acumulado[p.id] = { stock: prev.stock + cant, costo: Math.round(prom * 100) / 100 };
-    celda.innerHTML = s2(prev.costo) + ' → <b style="color:var(--green-700)">' + s2(prom) + '</b>';
+    celda.innerHTML = ' · Costo ' + s2(prev.costo) + ' → <b>' + s2(prom) + '</b>';
   });
 
   var subtotal, igv, total;
@@ -1285,7 +1389,7 @@ function recalcularCompra() {
   document.getElementById('c-igv').textContent      = s2(igv);
   document.getElementById('c-total').textContent    = s2(total);
   document.getElementById('c-igv-lbl').textContent  = modo === 'no_afecto' ? 'IGV (no afecto)' : 'IGV (' + (_igvPct == null ? 18 : _igvPct) + '%)';
-  document.getElementById('c-contador').textContent = filas.length ? '(' + filas.length + ')' : '';
+  document.getElementById('c-contador').textContent = conProducto ? '(' + conProducto + ')' : '';
 }
 
 async function guardarCompra() {
@@ -1307,8 +1411,11 @@ async function guardarCompra() {
   if (body.tipo_comprobante === 'factura' && !/^\d{11}$/.test(body.proveedor_ruc || '')) {
     toast('Para una factura ingresa el RUC del proveedor (11 dígitos).', 'warning'); return;
   }
+  if (body.proveedor_ruc && !esRucValido(body.proveedor_ruc)) {
+    toast('El RUC ' + body.proveedor_ruc + ' no es válido. Revisa los dígitos.', 'warning'); return;
+  }
 
-  var filas = document.querySelectorAll('#c-items tr');
+  var filas = document.querySelectorAll('#c-items .c-item');
   for (var i = 0; i < filas.length; i++) {
     var tr   = filas[i];
     var p    = _compraProds[tr.dataset.uid];
